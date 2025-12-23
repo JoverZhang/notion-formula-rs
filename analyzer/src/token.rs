@@ -1,4 +1,5 @@
 pub type NodeId = u32;
+pub type TokenIdx = u32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
@@ -9,6 +10,18 @@ pub struct Symbol {
 pub struct Span {
     pub start: u32,
     pub end: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TokenRange {
+    pub lo: TokenIdx, // inclusive
+    pub hi: TokenIdx, // exclusive
+}
+
+impl TokenRange {
+    pub fn new(lo: TokenIdx, hi: TokenIdx) -> Self {
+        Self { lo, hi }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,17 +70,17 @@ pub enum TokenKind {
     OrOr,
     /// `!`
     Bang,
-    // `+`
+    /// `+`
     Plus,
-    // `-`
+    /// `-`
     Minus,
-    // `*`
+    /// `*`
     Star,
-    // `/`
+    /// `/`
     Slash,
-    // `%`
+    /// `%`
     Percent,
-    // `^`
+    /// `^`
     Caret,
 
     /* Structural symbols */
@@ -108,16 +121,14 @@ pub struct Token {
 }
 
 impl Token {
-    /// Returns `true` if the token can appear at the start of an expression.
     #[allow(unused)]
     pub fn can_begin_expr(&self) -> bool {
         match self.kind {
-            TokenKind::Ident(..)    => true, // TODO: check if the identifier is a valid start of an expression
-            TokenKind::OpenParen   | // parenthesized expression
-            TokenKind::Literal(..) | // literal
-            TokenKind::Bang        | // operator not
-            TokenKind::Minus       | // unary minus
-            TokenKind::Pound        => true, // doc comment
+            TokenKind::Ident(..)
+            | TokenKind::OpenParen
+            | TokenKind::Literal(..)
+            | TokenKind::Bang
+            | TokenKind::Minus => true,
             _ => false,
         }
     }

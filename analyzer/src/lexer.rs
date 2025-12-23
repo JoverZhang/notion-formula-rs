@@ -10,16 +10,66 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
+        // Two-char operators first
         let kind = match ch {
-            '<' => TokenKind::Lt,
-            '>' => TokenKind::Gt,
-            '!' => TokenKind::Bang,
+            '<' => {
+                if matches!(iter.peek(), Some((_, '='))) {
+                    let (_, _) = iter.next().unwrap();
+                    TokenKind::Le
+                } else {
+                    TokenKind::Lt
+                }
+            }
+            '>' => {
+                if matches!(iter.peek(), Some((_, '='))) {
+                    let (_, _) = iter.next().unwrap();
+                    TokenKind::Ge
+                } else {
+                    TokenKind::Gt
+                }
+            }
+            '=' => {
+                if matches!(iter.peek(), Some((_, '='))) {
+                    let (_, _) = iter.next().unwrap();
+                    TokenKind::EqEq
+                } else {
+                    return Err(format!("unexpected char '=' at {} (did you mean '==')", start));
+                }
+            }
+            '!' => {
+                if matches!(iter.peek(), Some((_, '='))) {
+                    let (_, _) = iter.next().unwrap();
+                    TokenKind::Ne
+                } else {
+                    TokenKind::Bang
+                }
+            }
+            '&' => {
+                if matches!(iter.peek(), Some((_, '&'))) {
+                    let (_, _) = iter.next().unwrap();
+                    TokenKind::AndAnd
+                } else {
+                    return Err(format!("unexpected char '&' at {} (did you mean '&&')", start));
+                }
+            }
+            '|' => {
+                if matches!(iter.peek(), Some((_, '|'))) {
+                    let (_, _) = iter.next().unwrap();
+                    TokenKind::OrOr
+                } else {
+                    return Err(format!("unexpected char '|' at {} (did you mean '||')", start));
+                }
+            }
+
+            // one-char
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
             '*' => TokenKind::Star,
             '/' => TokenKind::Slash,
             '%' => TokenKind::Percent,
             '^' => TokenKind::Caret,
+
+            '.' => TokenKind::Dot,
             ',' => TokenKind::Comma,
             ':' => TokenKind::Colon,
             '#' => TokenKind::Pound,
@@ -28,7 +78,7 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
             ')' => TokenKind::CloseParen,
 
             '"' => {
-                // Read string until the next ".
+                // Read string until next quote (no escapes in v1).
                 let mut end = start + ch.len_utf8();
                 while let Some((i, c)) = iter.next() {
                     if c == '"' {
@@ -53,12 +103,12 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
             }
 
             c if c.is_ascii_digit() => {
-                // Simple number literal (only supports integers).
-                let mut end = start + 1;
-                while let Some((&(i, c), _)) = iter.peek().map(|x| (x, ())) {
-                    if c.is_ascii_digit() {
+                // integer number literal (v1)
+                let mut end = start + c.len_utf8();
+                while let Some(&(i, c2)) = iter.peek().map(|x| x) {
+                    if c2.is_ascii_digit() {
                         iter.next();
-                        end = i + 1;
+                        end = i + c2.len_utf8();
                     } else {
                         break;
                     }
@@ -84,20 +134,18 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                 let mut ident = String::new();
                 ident.push(c);
 
-                while let Some((&(i, ch), _)) = iter.peek().map(|x| (x, ())) {
-                    if is_ident_continue(ch) {
-                        ident.push(ch);
+                while let Some(&(i, ch2)) = iter.peek().map(|x| x) {
+                    if is_ident_continue(ch2) {
+                        ident.push(ch2);
                         iter.next();
-                        end = i + ch.len_utf8();
+                        end = i + ch2.len_utf8();
                     } else {
                         break;
                     }
                 }
 
                 tokens.push(Token {
-                    kind: TokenKind::Ident(Symbol {
-                        text: ident,
-                    }),
+                    kind: TokenKind::Ident(Symbol { text: ident }),
                     span: Span {
                         start: start as u32,
                         end: end as u32,
@@ -111,11 +159,22 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
             }
         };
 
+        // span end: if you consume a double-character operator, you need to extend the end
+        let end = match kind {
+            TokenKind::Le
+            | TokenKind::Ge
+            | TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::AndAnd
+            | TokenKind::OrOr => (start + 2) as u32,
+            _ => (start + ch.len_utf8()) as u32,
+        };
+
         tokens.push(Token {
             kind,
             span: Span {
                 start: start as u32,
-                end: (start + ch.len_utf8()) as u32,
+                end,
             },
         });
     }

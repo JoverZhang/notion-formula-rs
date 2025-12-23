@@ -1,7 +1,5 @@
-use std::mem::discriminant;
-
-use crate::ast::{BinOp, BinOpKind, Expr, ExprKind};
-use crate::token::{Lit, LitKind, NodeId, Span, Symbol, Token, TokenKind};
+use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
+use crate::token::{Lit, LitKind, NodeId, Span, Symbol, Token, TokenKind, TokenRange};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -36,114 +34,54 @@ impl<'a> Parser<'a> {
         id
     }
 
-    fn current(&self) -> &Token {
+    fn cur(&self) -> &Token {
         &self.tokens[self.pos]
     }
 
-    fn bump(&mut self) -> &Token {
-        let tok = &self.tokens[self.pos];
+    fn cur_kind(&self) -> &TokenKind {
+        &self.tokens[self.pos].kind
+    }
+
+    fn cur_idx(&self) -> u32 {
+        self.pos as u32
+    }
+
+    fn bump(&mut self) -> Token {
+        let tok = self.tokens[self.pos].clone();
         self.pos += 1;
         tok
     }
 
-    fn expect(&mut self, kind: TokenKind) -> Result<Token, ParseError> {
-        let tok = self.current().clone();
-        if discriminant(&tok.kind) == discriminant(&kind) {
+    #[allow(unused)]
+    fn eat(&mut self, kind: TokenKind) -> bool {
+        if self.same_kind(self.cur_kind(), &kind) {
             self.pos += 1;
-            Ok(tok)
+            true
         } else {
+            false
+        }
+    }
+
+    fn expect_punct(&mut self, kind: TokenKind, expected: &'static str) -> Result<Token, ParseError> {
+        if self.same_kind(self.cur_kind(), &kind) {
+            Ok(self.bump())
+        } else {
+            let tok = self.cur().clone();
             Err(ParseError::UnexpectedToken {
-                expected: match kind {
-                    TokenKind::Ident(symbol) => symbol.text,
-                    TokenKind::Literal(lit) => lit.symbol.text,
-                    TokenKind::Lt => "<".to_string(),
-                    TokenKind::Le => "<=".to_string(),
-                    TokenKind::EqEq => "==".to_string(),
-                    TokenKind::Ne => "!=".to_string(),
-                    TokenKind::Ge => ">=".to_string(),
-                    TokenKind::Gt => ">".to_string(),
-                    TokenKind::AndAnd => "&&".to_string(),
-                    TokenKind::OrOr => "||".to_string(),
-                    TokenKind::Bang => "!".to_string(),
-                    TokenKind::Plus => "+".to_string(),
-                    TokenKind::Minus => "-".to_string(),
-                    TokenKind::Star => "*".to_string(),
-                    TokenKind::Slash => "/".to_string(),
-                    TokenKind::Percent => "%".to_string(),
-                    TokenKind::Caret => "^".to_string(),
-                    TokenKind::Dot => ".".to_string(),
-                    TokenKind::Comma => ",".to_string(),
-                    TokenKind::Colon => ":".to_string(),
-                    TokenKind::Pound => "#".to_string(),
-                    TokenKind::Question => "?".to_string(),
-                    TokenKind::OpenParen => "(".to_string(),
-                    TokenKind::CloseParen => ")".to_string(),
-                    TokenKind::DocComment(..) => "# or /*".to_string(),
-                    TokenKind::Eof => "EOF".to_string(),
-                },
+                expected: expected.to_string(),
                 found: tok.kind,
                 span: tok.span,
             })
         }
     }
-}
 
-impl<'a> Parser<'a> {
-    pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
-        self.parse_binary_expr()
-    }
-
-    /// Only supports expressions like `primary` or `primary > primary`.
-    fn parse_binary_expr(&mut self) -> Result<Expr, ParseError> {
-        let mut left = self.parse_primary()?;
-
-        if self.current().kind == TokenKind::Gt {
-            let op_tok = self.bump().clone();
-            let right = self.parse_primary()?;
-
-            let span = Span {
-                start: left.span.start,
-                end: right.span.end,
-            };
-
-            left = Expr {
-                id: self.alloc_id(),
-                span,
-                kind: ExprKind::Binary {
-                    op: BinOp {
-                        node: BinOpKind::Gt,
-                        span: op_tok.span,
-                    },
-                    left: Box::new(left),
-                    right: Box::new(right),
-                },
-            };
-        }
-
-        Ok(left)
-    }
-
-    fn parse_primary(&mut self) -> Result<Expr, ParseError> {
-        match &self.current().kind {
-            TokenKind::Ident(..) => self.parse_ident_or_call(),
-            TokenKind::Literal(lit) => {
-                match lit.kind {
-                    LitKind::Number => self.parse_number_literal(),
-                    LitKind::String => self.parse_string_literal(),
-                    _ => {
-                        let tok = self.current().clone();
-                        Err(ParseError::UnexpectedToken {
-                            expected: "number or string literal".to_string(),
-                            found: tok.kind,
-                            span: tok.span,
-                        })
-                    }
-                }
-            }
+    fn expect_ident(&mut self) -> Result<Token, ParseError> {
+        match self.cur_kind() {
+            TokenKind::Ident(..) => Ok(self.bump()),
             _ => {
-                let tok = self.current().clone();
+                let tok = self.cur().clone();
                 Err(ParseError::UnexpectedToken {
-                    expected: "identifier or function call".to_string(),
+                    expected: "identifier".to_string(),
                     found: tok.kind,
                     span: tok.span,
                 })
@@ -151,77 +89,423 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_ident_or_call(&mut self) -> Result<Expr, ParseError> {
-        let ident_tok = self.expect(TokenKind::Ident(Symbol { text: String::new() }))?;
-        let ident_text = &self.source[ident_tok.span.start as usize..ident_tok.span.end as usize];
-
-        // Here we simply handle: If the IDENT is followed by "(", it is treated as a function call.
-        if self.current().kind == TokenKind::OpenParen {
-            self.bump(); // consume "("
-
-            // Currently only to support prop("Title") and subsequent possible multi-parameter calls.
-            let mut args = Vec::new();
-            // Simply: at least one parameter.
-            args.push(self.parse_expr()?);
-
-            while self.current().kind == TokenKind::Comma {
-                self.bump(); // consume ","
-                args.push(self.parse_expr()?);
+    fn expect_literal_kind(&mut self, k: LitKind) -> Result<Token, ParseError> {
+        match self.cur_kind() {
+            TokenKind::Literal(lit) if lit.kind == k => Ok(self.bump()),
+            _ => {
+                let tok = self.cur().clone();
+                Err(ParseError::UnexpectedToken {
+                    expected: format!("{:?} literal", k),
+                    found: tok.kind,
+                    span: tok.span,
+                })
             }
+        }
+    }
 
-            let rparen = self.expect(TokenKind::CloseParen)?;
+    fn same_kind(&self, a: &TokenKind, b: &TokenKind) -> bool {
+        use TokenKind::*;
+        match (a, b) {
+            (Ident(_), Ident(_)) => true,
+            (Literal(_), Literal(_)) => true,
+            (DocComment(..), DocComment(..)) => true,
 
-            let span = Span {
-                start: ident_tok.span.start,
-                end: rparen.span.end,
+            (Lt, Lt) | (Le, Le) | (EqEq, EqEq) | (Ne, Ne) | (Ge, Ge) | (Gt, Gt) => true,
+            (AndAnd, AndAnd) | (OrOr, OrOr) | (Bang, Bang) => true,
+            (Plus, Plus) | (Minus, Minus) | (Star, Star) | (Slash, Slash) | (Percent, Percent) | (Caret, Caret) => true,
+            (Dot, Dot) | (Comma, Comma) | (Colon, Colon) | (Pound, Pound) | (Question, Question) => true,
+            (OpenParen, OpenParen) | (CloseParen, CloseParen) | (Eof, Eof) => true,
+            _ => false,
+        }
+    }
+
+    fn span_from_tokens(&self, range: TokenRange) -> Span {
+        let lo = range.lo as usize;
+        let hi = range.hi as usize;
+        if lo >= self.tokens.len() || hi == 0 || hi > self.tokens.len() || lo >= hi {
+            // fallback: empty span
+            return Span { start: 0, end: 0 };
+        }
+        let start = self.tokens[lo].span.start;
+        let end = self.tokens[hi - 1].span.end;
+        Span { start, end }
+    }
+}
+
+// ---------- Pratt parser ----------
+impl<'a> Parser<'a> {
+    pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.parse_expr_bp(0)?;
+        // Optionally, you can check if we're at EOF and report trailing tokens if not
+        Ok(expr)
+    }
+
+    fn parse_expr_bp(&mut self, min_bp: u8) -> Result<Expr, ParseError> {
+        let mut lhs = self.parse_prefix()?;
+
+        loop {
+            let op = match self.cur_kind() {
+                TokenKind::Lt => BinOpKind::Lt,
+                TokenKind::Le => BinOpKind::Le,
+                TokenKind::EqEq => BinOpKind::EqEq,
+                TokenKind::Ne => BinOpKind::Ne,
+                TokenKind::Ge => BinOpKind::Ge,
+                TokenKind::Gt => BinOpKind::Gt,
+                TokenKind::AndAnd => BinOpKind::AndAnd,
+                TokenKind::OrOr => BinOpKind::OrOr,
+                TokenKind::Plus => BinOpKind::Plus,
+                TokenKind::Minus => BinOpKind::Minus,
+                TokenKind::Star => BinOpKind::Star,
+                TokenKind::Slash => BinOpKind::Slash,
+                TokenKind::Percent => BinOpKind::Percent,
+                TokenKind::Caret => BinOpKind::Caret,
+                _ => break,
             };
 
-            Ok(Expr {
+            let (l_bp, r_bp) = infix_binding_power(op);
+            if l_bp < min_bp {
+                break;
+            }
+
+            // consume op
+            let op_tok_idx = self.cur_idx();
+            let op_tok = self.bump();
+
+            let rhs = self.parse_expr_bp(r_bp)?;
+
+            let tokens = TokenRange::new(lhs.tokens.lo, rhs.tokens.hi);
+            let span = self.span_from_tokens(tokens);
+
+            lhs = Expr {
                 id: self.alloc_id(),
                 span,
-                kind: ExprKind::Call {
-                    callee: ident_text.to_string(),
-                    args,
+                tokens,
+                kind: ExprKind::Binary {
+                    op: BinOp {
+                        node: op,
+                        span: op_tok.span,
+                    },
+                    left: Box::new(lhs),
+                    right: Box::new(rhs),
                 },
-            })
-        } else {
-            Err(ParseError::UnexpectedToken {
-                expected: "identifier or function call".to_string(),
-                found: self.current().kind.clone(),
-                span: self.current().span,
-            })
+            };
+
+            // You might want to use op_tok_idx in the future for fixing the operator token location
+            let _ = op_tok_idx;
+        }
+
+        Ok(lhs)
+    }
+
+    fn parse_prefix(&mut self) -> Result<Expr, ParseError> {
+        match self.cur_kind() {
+            TokenKind::Bang => {
+                let start = self.cur_idx();
+                let tok = self.bump();
+                let expr = self.parse_expr_bp(prefix_binding_power(UnOpKind::Not))?;
+                let tokens = TokenRange::new(start, expr.tokens.hi);
+                let span = self.span_from_tokens(tokens);
+
+                Ok(Expr {
+                    id: self.alloc_id(),
+                    span,
+                    tokens,
+                    kind: ExprKind::Unary {
+                        op: UnOp {
+                            node: UnOpKind::Not,
+                            span: tok.span,
+                        },
+                        expr: Box::new(expr),
+                    },
+                })
+            }
+            TokenKind::Minus => {
+                let start = self.cur_idx();
+                let tok = self.bump();
+                let expr = self.parse_expr_bp(prefix_binding_power(UnOpKind::Neg))?;
+                let tokens = TokenRange::new(start, expr.tokens.hi);
+                let span = self.span_from_tokens(tokens);
+
+                Ok(Expr {
+                    id: self.alloc_id(),
+                    span,
+                    tokens,
+                    kind: ExprKind::Unary {
+                        op: UnOp {
+                            node: UnOpKind::Neg,
+                            span: tok.span,
+                        },
+                        expr: Box::new(expr),
+                    },
+                })
+            }
+            _ => self.parse_postfix_primary(),
+        }
+    }
+
+    fn parse_postfix_primary(&mut self) -> Result<Expr, ParseError> {
+        // primary: literal / ident / (expr)
+        let mut expr = self.parse_primary()?;
+
+        // postfix: call
+        loop {
+            if matches!(self.cur_kind(), TokenKind::OpenParen) {
+                let lparen_idx = self.cur_idx();
+                self.bump(); // consume '('
+
+                let mut args = Vec::new();
+
+                if !matches!(self.cur_kind(), TokenKind::CloseParen) {
+                    args.push(self.parse_expr_bp(0)?);
+                    while matches!(self.cur_kind(), TokenKind::Comma) {
+                        self.bump(); // ','
+                        args.push(self.parse_expr_bp(0)?);
+                    }
+                }
+
+                self.expect_punct(TokenKind::CloseParen, "')'")?;
+
+                let tokens = TokenRange::new(expr.tokens.lo, self.cur_idx()); // hi points after ')'
+                let span = self.span_from_tokens(tokens);
+
+                // Only Ident can call
+                let callee = match expr.kind {
+                    ExprKind::Ident(sym) => sym,
+                    _ => {
+                        return Err(ParseError::UnexpectedToken {
+                            expected: "call callee (identifier)".to_string(),
+                            found: self.cur().kind.clone(),
+                            span: span,
+                        });
+                    }
+                };
+
+                expr = Expr {
+                    id: self.alloc_id(),
+                    span,
+                    tokens,
+                    kind: ExprKind::Call { callee, args },
+                };
+
+                let _ = lparen_idx;
+                continue;
+            }
+
+            break;
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+        match self.cur_kind() {
+            TokenKind::Ident(_) => {
+                let start = self.cur_idx();
+                let tok = self.expect_ident()?;
+                let tokens = TokenRange::new(start, start + 1);
+                let span = tok.span;
+
+                // The ident text can be directly used from the Symbol in tok.kind
+                let sym = match tok.kind {
+                    TokenKind::Ident(sym) => sym,
+                    _ => unreachable!(),
+                };
+
+                Ok(Expr {
+                    id: self.alloc_id(),
+                    span,
+                    tokens,
+                    kind: ExprKind::Ident(sym),
+                })
+            }
+
+            TokenKind::Literal(lit) => match lit.kind {
+                LitKind::Number => self.parse_number_literal(),
+                LitKind::String => self.parse_string_literal(),
+                LitKind::Bool => {
+                    // You lexer currently doesn't produce bool tokens (if you add true/false keywords in the future, go here)
+                    let tok = self.bump();
+                    let idx = (self.pos - 1) as u32;
+                    Ok(Expr {
+                        id: self.alloc_id(),
+                        span: tok.span,
+                        tokens: TokenRange::new(idx, idx + 1),
+                        kind: ExprKind::Lit(Lit {
+                            kind: LitKind::Bool,
+                            symbol: Symbol { text: self.source[tok.span.start as usize..tok.span.end as usize].to_string() },
+                        }),
+                    })
+                }
+            },
+
+            TokenKind::OpenParen => {
+                let start = self.cur_idx();
+                self.bump(); // '('
+                let mut inner = self.parse_expr_bp(0)?;
+                self.expect_punct(TokenKind::CloseParen, "')'")?;
+
+                // Wrap the parentheses token range around inner (without keeping the Group node)
+                let tokens = TokenRange::new(start, self.cur_idx()); // hi points after ')'
+                let span = self.span_from_tokens(tokens);
+                inner.tokens = tokens;
+                inner.span = span;
+                Ok(inner)
+            }
+
+            _ => {
+                let tok = self.cur().clone();
+                Err(ParseError::UnexpectedToken {
+                    expected: "primary expression".to_string(),
+                    found: tok.kind,
+                    span: tok.span,
+                })
+            }
         }
     }
 
     fn parse_number_literal(&mut self) -> Result<Expr, ParseError> {
-        let tok = self.expect(TokenKind::Literal(Lit { kind: LitKind::Number, symbol: Symbol { text: String::new() } }))?;
+        let start = self.cur_idx();
+        let tok = self.expect_literal_kind(LitKind::Number)?;
+        let tokens = TokenRange::new(start, start + 1);
+
         let text = &self.source[tok.span.start as usize..tok.span.end as usize];
-        let _value: f64 = text.parse().unwrap_or(0.0);
 
         Ok(Expr {
             id: self.alloc_id(),
             span: tok.span,
+            tokens,
             kind: ExprKind::Lit(Lit {
                 kind: LitKind::Number,
-                symbol: Symbol { text: String::new() },
+                symbol: Symbol {
+                    text: text.to_string(),
+                },
             }),
         })
     }
 
     fn parse_string_literal(&mut self) -> Result<Expr, ParseError> {
-        let tok = self.expect(TokenKind::Literal(Lit { kind: LitKind::String, symbol: Symbol { text: String::new() } }))?;
-        let text = &self.source[tok.span.start as usize..tok.span.end as usize];
+        let start = self.cur_idx();
+        let tok = self.expect_literal_kind(LitKind::String)?;
+        let tokens = TokenRange::new(start, start + 1);
 
-        // Remove the leading and trailing quotes (without handling escapes).
-        let inner = &text[1..text.len() - 1];
+        let text = &self.source[tok.span.start as usize..tok.span.end as usize];
+        let inner = if text.len() >= 2 { &text[1..text.len() - 1] } else { "" };
 
         Ok(Expr {
             id: self.alloc_id(),
             span: tok.span,
+            tokens,
             kind: ExprKind::Lit(Lit {
                 kind: LitKind::String,
-                symbol: Symbol { text: inner.to_string() },
+                symbol: Symbol {
+                    text: inner.to_string(),
+                },
             }),
         })
+    }
+}
+
+// precedence: bigger = tighter binding
+fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
+    use BinOpKind::*;
+
+    // Return (left_bp, right_bp)
+    // Right-associative: (p, p) or (p, p-1)
+    // Left-associative: (p, p+1)
+    // Here we use the classic Pratt parser:
+    match op {
+        OrOr => (1, 2),
+        AndAnd => (3, 4),
+
+        EqEq | Ne => (5, 6),
+        Lt | Le | Ge | Gt => (7, 8),
+
+        Plus | Minus => (9, 10),
+        Star | Slash | Percent => (11, 12),
+
+        Caret => (13, 13), // ^ right-associative
+    }
+}
+
+fn prefix_binding_power(op: UnOpKind) -> u8 {
+    match op {
+        UnOpKind::Not => 14,
+        UnOpKind::Neg => 14,
+    }
+}
+
+// ---------- pretty print (single-line) ----------
+impl Expr {
+    pub fn pretty(&self) -> String {
+        self.pretty_with_prec(0)
+    }
+
+    fn pretty_with_prec(&self, parent_prec: u8) -> String {
+        match &self.kind {
+            ExprKind::Ident(sym) => sym.text.clone(),
+            ExprKind::Lit(lit) => match lit.kind {
+                LitKind::Number => lit.symbol.text.clone(),
+                LitKind::String => format!("{:?}", lit.symbol.text),
+                LitKind::Bool => lit.symbol.text.clone(),
+            },
+            ExprKind::Call { callee, args } => {
+                let mut s = String::new();
+                s.push_str(&callee.text);
+                s.push('(');
+                for (i, a) in args.iter().enumerate() {
+                    if i > 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&a.pretty_with_prec(0));
+                }
+                s.push(')');
+                s
+            }
+            ExprKind::Unary { op, expr } => {
+                let op_str = match op.node {
+                    UnOpKind::Not => "!",
+                    UnOpKind::Neg => "-",
+                };
+                let inner = expr.pretty_with_prec(prefix_binding_power(op.node));
+                format!("{}{}", op_str, inner)
+            }
+            ExprKind::Binary { op, left, right } => {
+                let (l_bp, r_bp) = infix_binding_power(op.node);
+                let this_prec = l_bp;
+
+                let l = left.pretty_with_prec(l_bp);
+                let r = right.pretty_with_prec(r_bp);
+
+                let op_str = binop_str(op.node);
+                let combined = format!("{} {} {}", l, op_str, r);
+
+                if this_prec < parent_prec {
+                    format!("({})", combined)
+                } else {
+                    combined
+                }
+            }
+            ExprKind::Error => "<error>".to_string(),
+        }
+    }
+}
+
+fn binop_str(op: BinOpKind) -> &'static str {
+    use BinOpKind::*;
+    match op {
+        Lt => "<",
+        Le => "<=",
+        EqEq => "==",
+        Ne => "!=",
+        Ge => ">=",
+        Gt => ">",
+        AndAnd => "&&",
+        OrOr => "||",
+        Plus => "+",
+        Minus => "-",
+        Star => "*",
+        Slash => "/",
+        Percent => "%",
+        Caret => "^",
     }
 }

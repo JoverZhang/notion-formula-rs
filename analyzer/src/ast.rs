@@ -1,30 +1,47 @@
-use crate::token::{Lit, NodeId, Span, Spanned};
+use crate::token::{Lit, NodeId, Span, Spanned, Symbol, TokenRange};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOpKind {
-    /// The `>` operator (greater than)
+    Lt,
+    Le,
+    EqEq,
+    Ne,
+    Ge,
     Gt,
+    AndAnd,
+    OrOr,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Caret,
 }
 
 pub type BinOp = Spanned<BinOpKind>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnOpKind {
+    Not,
+    Neg,
+}
+
+pub type UnOp = Spanned<UnOpKind>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expr {
     pub id: NodeId,
     pub span: Span,
+    pub tokens: TokenRange,
     pub kind: ExprKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind {
-    /// A function call.
-    Call { callee: String, args: Vec<Expr> },
-    /// A literal (e.g., `1`, `"foo"`).
+    Ident(Symbol),
+    Call { callee: Symbol, args: Vec<Expr> },
     Lit(Lit),
-    /// A binary operation (e.g., `a + b`, `a * b`).
-    Binary {
-        op: BinOp,
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
+    Unary { op: UnOp, expr: Box<Expr> },
+    Binary { op: BinOp, left: Box<Expr>, right: Box<Expr> },
+    Error,
 }
