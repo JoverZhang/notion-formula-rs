@@ -136,7 +136,14 @@ impl<'a> Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         let expr = self.parse_expr_bp(0)?;
-        // Optionally, you can check if we're at EOF and report trailing tokens if not
+        if !self.same_kind(self.cur_kind(), &TokenKind::Eof) {
+            let tok = self.cur().clone();
+            return Err(ParseError::UnexpectedToken {
+                expected: "EOF".to_string(),
+                found: tok.kind,
+                span: tok.span,
+            });
+        }
         Ok(expr)
     }
 
@@ -445,7 +452,7 @@ impl Expr {
             ExprKind::Ident(sym) => sym.text.clone(),
             ExprKind::Lit(lit) => match lit.kind {
                 LitKind::Number => lit.symbol.text.clone(),
-                LitKind::String => format!("{:?}", lit.symbol.text),
+                LitKind::String => escape_string_for_pretty(&lit.symbol.text),
                 LitKind::Bool => lit.symbol.text.clone(),
             },
             ExprKind::Call { callee, args } => {
@@ -508,4 +515,18 @@ fn binop_str(op: BinOpKind) -> &'static str {
         Percent => "%",
         Caret => "^",
     }
+}
+
+fn escape_string_for_pretty(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for ch in text.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(ch),
+        }
+    }
+    out.push('"');
+    out
 }

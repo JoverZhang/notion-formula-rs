@@ -79,13 +79,20 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
 
             '"' => {
                 // Read string until next quote (no escapes in v1).
-                let mut end = start + ch.len_utf8();
+                let mut end: Option<usize> = None;
                 while let Some((i, c)) = iter.next() {
                     if c == '"' {
-                        end = i + 1;
+                        end = Some(i + 1);
                         break;
                     }
                 }
+
+                let end = match end {
+                    Some(end) => end,
+                    None => {
+                        return Err(format!("unterminated string literal at {}", start));
+                    }
+                };
 
                 tokens.push(Token {
                     kind: TokenKind::Literal(Lit {
