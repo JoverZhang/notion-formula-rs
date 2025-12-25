@@ -2,6 +2,7 @@ use crate::ast::{Expr, ExprKind};
 use crate::lexer::lex;
 use crate::parser::Parser;
 use crate::token::{Span, Token, TokenRange};
+use crate::tokenstream::TokenCursor;
 
 fn span_from_tokens(tokens: &[Token], range: TokenRange) -> Span {
     let lo = range.lo as usize;
@@ -70,7 +71,8 @@ fn test_span_and_tokenrange_invariants() {
 
     for input in cases {
         let tokens = lex(input).unwrap();
-        let mut parser = Parser::new(input, tokens.clone());
+        let token_cursor = TokenCursor::new(input, tokens.clone());
+        let mut parser = Parser::new(token_cursor);
         let expr = parser.parse_expr().unwrap();
         check_invariants(&expr, &tokens);
     }

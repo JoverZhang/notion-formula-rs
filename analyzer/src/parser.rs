@@ -1,5 +1,6 @@
 use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
 use crate::token::{Lit, LitKind, NodeId, Span, Symbol, Token, TokenKind, TokenRange};
+use crate::tokenstream::TokenCursor;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -12,18 +13,14 @@ pub enum ParseError {
 }
 
 pub struct Parser<'a> {
-    source: &'a str,
-    tokens: Vec<Token>,
-    pos: usize,
+    token_cursor: TokenCursor<'a>,
     next_id: NodeId,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str, tokens: Vec<Token>) -> Self {
+    pub fn new(token_cursor: TokenCursor<'a>) -> Self {
         Parser {
-            source,
-            tokens,
-            pos: 0,
+            token_cursor,
             next_id: 0,
         }
     }
@@ -35,33 +32,38 @@ impl<'a> Parser<'a> {
     }
 
     fn cur(&self) -> &Token {
-        &self.tokens[self.pos]
+        &self.token_cursor.tokens[self.token_cursor.pos]
     }
 
     fn cur_kind(&self) -> &TokenKind {
-        &self.tokens[self.pos].kind
+        &self.token_cursor.tokens[self.token_cursor.pos].kind
     }
 
     fn cur_idx(&self) -> u32 {
-        self.pos as u32
+        self.token_cursor.pos as u32
     }
 
     fn bump(&mut self) -> Token {
-        let tok = self.tokens[self.pos].clone();
-        self.pos += 1;
+        let tok = self.token_cursor.tokens[self.token_cursor.pos].clone();
+        self.token_cursor.pos += 1;
         tok
+    }
+
+    fn lit_text(&self, span: Span) -> &'a str {
+        &self.token_cursor.source[span.start as usize..span.end as usize]
     }
 
     #[allow(unused)]
     fn eat(&mut self, kind: TokenKind) -> bool {
         if self.same_kind(self.cur_kind(), &kind) {
-            self.pos += 1;
+            self.token_cursor.pos += 1;
             true
         } else {
             false
         }
     }
 
+    /// punctuation
     fn expect_punct(
         &mut self,
         kind: TokenKind,
@@ -135,13 +137,30 @@ impl<'a> Parser<'a> {
     fn span_from_tokens(&self, range: TokenRange) -> Span {
         let lo = range.lo as usize;
         let hi = range.hi as usize;
-        if lo >= self.tokens.len() || hi == 0 || hi > self.tokens.len() || lo >= hi {
+        if lo >= self.token_cursor.tokens.len()
+            || hi == 0
+            || hi > self.token_cursor.tokens.len()
+            || lo >= hi
+        {
             // fallback: empty span
-            return Span { start: 0, end: 0 };
+            return self.cur().span;
         }
-        let start = self.tokens[lo].span.start;
-        let end = self.tokens[hi - 1].span.end;
+        let start = self.token_cursor.tokens[lo].span.start;
+        let end = self.token_cursor.tokens[hi - 1].span.end;
         Span { start, end }
+    }
+
+    fn mk_token_range(&self, start: u32, end: u32) -> TokenRange {
+        TokenRange::new(start as u32, end as u32)
+    }
+
+    fn mk_expr(&mut self, span: Span, token_range: TokenRange, kind: ExprKind) -> Expr {
+        Expr {
+            id: self.alloc_id(),
+            span: span,
+            tokens: token_range,
+            kind,
+        }
     }
 }
 
@@ -149,6 +168,7 @@ impl<'a> Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         let expr = self.parse_expr_bp(0)?;
+
         if !self.same_kind(self.cur_kind(), &TokenKind::Eof) {
             let tok = self.cur().clone();
             return Err(ParseError::UnexpectedToken {
@@ -196,11 +216,10 @@ impl<'a> Parser<'a> {
             let tokens = TokenRange::new(lhs.tokens.lo, rhs.tokens.hi);
             let span = self.span_from_tokens(tokens);
 
-            lhs = Expr {
-                id: self.alloc_id(),
+            lhs = self.mk_expr(
                 span,
                 tokens,
-                kind: ExprKind::Binary {
+                ExprKind::Binary {
                     op: BinOp {
                         node: op,
                         span: op_tok.span,
@@ -208,8 +227,7 @@ impl<'a> Parser<'a> {
                     left: Box::new(lhs),
                     right: Box::new(rhs),
                 },
-            };
-
+            );
             // You might want to use op_tok_idx in the future for fixing the operator token location
             let _ = op_tok_idx;
         }
@@ -226,18 +244,17 @@ impl<'a> Parser<'a> {
                 let tokens = TokenRange::new(start, expr.tokens.hi);
                 let span = self.span_from_tokens(tokens);
 
-                Ok(Expr {
-                    id: self.alloc_id(),
+                Ok(self.mk_expr(
                     span,
                     tokens,
-                    kind: ExprKind::Unary {
+                    ExprKind::Unary {
                         op: UnOp {
                             node: UnOpKind::Not,
                             span: tok.span,
                         },
                         expr: Box::new(expr),
                     },
-                })
+                ))
             }
             TokenKind::Minus => {
                 let start = self.cur_idx();
@@ -246,18 +263,17 @@ impl<'a> Parser<'a> {
                 let tokens = TokenRange::new(start, expr.tokens.hi);
                 let span = self.span_from_tokens(tokens);
 
-                Ok(Expr {
-                    id: self.alloc_id(),
+                Ok(self.mk_expr(
                     span,
                     tokens,
-                    kind: ExprKind::Unary {
+                    ExprKind::Unary {
                         op: UnOp {
                             node: UnOpKind::Neg,
                             span: tok.span,
                         },
                         expr: Box::new(expr),
                     },
-                })
+                ))
             }
             _ => self.parse_postfix_primary(),
         }
@@ -285,9 +301,6 @@ impl<'a> Parser<'a> {
 
                 self.expect_punct(TokenKind::CloseParen, "')'")?;
 
-                let tokens = TokenRange::new(expr.tokens.lo, self.cur_idx()); // hi points after ')'
-                let span = self.span_from_tokens(tokens);
-
                 // Only Ident can call
                 let callee = match expr.kind {
                     ExprKind::Ident(sym) => sym,
@@ -295,17 +308,14 @@ impl<'a> Parser<'a> {
                         return Err(ParseError::UnexpectedToken {
                             expected: "call callee (identifier)".to_string(),
                             found: self.cur().kind.clone(),
-                            span: span,
+                            span: self.cur().span,
                         });
                     }
                 };
 
-                expr = Expr {
-                    id: self.alloc_id(),
-                    span,
-                    tokens,
-                    kind: ExprKind::Call { callee, args },
-                };
+                let tokens = self.mk_token_range(expr.tokens.lo, self.cur_idx());
+                let span = self.span_from_tokens(tokens);
+                expr = self.mk_expr(span, tokens, ExprKind::Call { callee, args });
 
                 let _ = lparen_idx;
                 continue;
@@ -331,12 +341,7 @@ impl<'a> Parser<'a> {
                     _ => unreachable!(),
                 };
 
-                Ok(Expr {
-                    id: self.alloc_id(),
-                    span,
-                    tokens,
-                    kind: ExprKind::Ident(sym),
-                })
+                Ok(self.mk_expr(span, tokens, ExprKind::Ident(sym)))
             }
 
             TokenKind::Literal(lit) => match lit.kind {
@@ -345,19 +350,17 @@ impl<'a> Parser<'a> {
                 LitKind::Bool => {
                     // You lexer currently doesn't produce bool tokens (if you add true/false keywords in the future, go here)
                     let tok = self.bump();
-                    let idx = (self.pos - 1) as u32;
-                    Ok(Expr {
-                        id: self.alloc_id(),
-                        span: tok.span,
-                        tokens: TokenRange::new(idx, idx + 1),
-                        kind: ExprKind::Lit(Lit {
+                    let idx = (self.token_cursor.pos - 1) as u32;
+                    Ok(self.mk_expr(
+                        tok.span,
+                        TokenRange::new(idx, idx + 1),
+                        ExprKind::Lit(Lit {
                             kind: LitKind::Bool,
                             symbol: Symbol {
-                                text: self.source[tok.span.start as usize..tok.span.end as usize]
-                                    .to_string(),
+                                text: self.lit_text(tok.span).into(),
                             },
                         }),
-                    })
+                    ))
                 }
             },
 
@@ -378,7 +381,7 @@ impl<'a> Parser<'a> {
             _ => {
                 let tok = self.cur().clone();
                 Err(ParseError::UnexpectedToken {
-                    expected: "primary expression".to_string(),
+                    expected: "primary expression".into(),
                     found: tok.kind,
                     span: tok.span,
                 })
@@ -391,19 +394,16 @@ impl<'a> Parser<'a> {
         let tok = self.expect_literal_kind(LitKind::Number)?;
         let tokens = TokenRange::new(start, start + 1);
 
-        let text = &self.source[tok.span.start as usize..tok.span.end as usize];
-
-        Ok(Expr {
-            id: self.alloc_id(),
-            span: tok.span,
+        Ok(self.mk_expr(
+            tok.span,
             tokens,
-            kind: ExprKind::Lit(Lit {
+            ExprKind::Lit(Lit {
                 kind: LitKind::Number,
                 symbol: Symbol {
-                    text: text.to_string(),
+                    text: self.lit_text(tok.span).into(),
                 },
             }),
-        })
+        ))
     }
 
     fn parse_string_literal(&mut self) -> Result<Expr, ParseError> {
@@ -411,24 +411,21 @@ impl<'a> Parser<'a> {
         let tok = self.expect_literal_kind(LitKind::String)?;
         let tokens = TokenRange::new(start, start + 1);
 
-        let text = &self.source[tok.span.start as usize..tok.span.end as usize];
+        let text = self.lit_text(tok.span);
         let inner = if text.len() >= 2 {
             &text[1..text.len() - 1]
         } else {
             ""
         };
 
-        Ok(Expr {
-            id: self.alloc_id(),
-            span: tok.span,
+        Ok(self.mk_expr(
+            tok.span,
             tokens,
-            kind: ExprKind::Lit(Lit {
+            ExprKind::Lit(Lit {
                 kind: LitKind::String,
-                symbol: Symbol {
-                    text: inner.to_string(),
-                },
+                symbol: Symbol { text: inner.into() },
             }),
-        })
+        ))
     }
 }
 
@@ -511,7 +508,11 @@ impl Expr {
                 }
             }
             ExprKind::Error => "<error>".to_string(),
-            ExprKind::Ternary { cond, then, otherwise } => {
+            ExprKind::Ternary {
+                cond,
+                then,
+                otherwise,
+            } => {
                 let cond = cond.pretty_with_prec(0);
                 let then = then.pretty_with_prec(0);
                 let otherwise = otherwise.pretty_with_prec(0);
