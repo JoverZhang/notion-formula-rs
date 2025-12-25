@@ -46,6 +46,14 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
             check_invariants(right, tokens);
         }
         ExprKind::Ident(_) | ExprKind::Lit(_) | ExprKind::Error => {}
+        ExprKind::Ternary { cond, then, otherwise } => {
+            assert_child_range(cond, expr);
+            assert_child_range(then, expr);
+            assert_child_range(otherwise, expr);
+            check_invariants(cond, tokens);
+            check_invariants(then, tokens);
+            check_invariants(otherwise, tokens);
+        }
     }
 }
 

@@ -62,7 +62,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expect_punct(&mut self, kind: TokenKind, expected: &'static str) -> Result<Token, ParseError> {
+    fn expect_punct(
+        &mut self,
+        kind: TokenKind,
+        expected: &'static str,
+    ) -> Result<Token, ParseError> {
         if self.same_kind(self.cur_kind(), &kind) {
             Ok(self.bump())
         } else {
@@ -112,8 +116,17 @@ impl<'a> Parser<'a> {
 
             (Lt, Lt) | (Le, Le) | (EqEq, EqEq) | (Ne, Ne) | (Ge, Ge) | (Gt, Gt) => true,
             (AndAnd, AndAnd) | (OrOr, OrOr) | (Bang, Bang) => true,
-            (Plus, Plus) | (Minus, Minus) | (Star, Star) | (Slash, Slash) | (Percent, Percent) | (Caret, Caret) => true,
-            (Dot, Dot) | (Comma, Comma) | (Colon, Colon) | (Pound, Pound) | (Question, Question) => true,
+            (Plus, Plus)
+            | (Minus, Minus)
+            | (Star, Star)
+            | (Slash, Slash)
+            | (Percent, Percent)
+            | (Caret, Caret) => true,
+            (Dot, Dot)
+            | (Comma, Comma)
+            | (Colon, Colon)
+            | (Pound, Pound)
+            | (Question, Question) => true,
             (OpenParen, OpenParen) | (CloseParen, CloseParen) | (Eof, Eof) => true,
             _ => false,
         }
@@ -339,7 +352,10 @@ impl<'a> Parser<'a> {
                         tokens: TokenRange::new(idx, idx + 1),
                         kind: ExprKind::Lit(Lit {
                             kind: LitKind::Bool,
-                            symbol: Symbol { text: self.source[tok.span.start as usize..tok.span.end as usize].to_string() },
+                            symbol: Symbol {
+                                text: self.source[tok.span.start as usize..tok.span.end as usize]
+                                    .to_string(),
+                            },
                         }),
                     })
                 }
@@ -396,7 +412,11 @@ impl<'a> Parser<'a> {
         let tokens = TokenRange::new(start, start + 1);
 
         let text = &self.source[tok.span.start as usize..tok.span.end as usize];
-        let inner = if text.len() >= 2 { &text[1..text.len() - 1] } else { "" };
+        let inner = if text.len() >= 2 {
+            &text[1..text.len() - 1]
+        } else {
+            ""
+        };
 
         Ok(Expr {
             id: self.alloc_id(),
@@ -423,14 +443,12 @@ fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
     match op {
         OrOr => (1, 2),
         AndAnd => (3, 4),
-
         EqEq | Ne => (5, 6),
         Lt | Le | Ge | Gt => (7, 8),
-
         Plus | Minus => (9, 10),
         Star | Slash | Percent => (11, 12),
-
-        Caret => (13, 13), // ^ right-associative
+        Caret => (13, 13),
+        Dot => todo!(),
     }
 }
 
@@ -493,6 +511,12 @@ impl Expr {
                 }
             }
             ExprKind::Error => "<error>".to_string(),
+            ExprKind::Ternary { cond, then, otherwise } => {
+                let cond = cond.pretty_with_prec(0);
+                let then = then.pretty_with_prec(0);
+                let otherwise = otherwise.pretty_with_prec(0);
+                format!("{} ? {} : {}", cond, then, otherwise)
+            }
         }
     }
 }
@@ -506,6 +530,7 @@ fn binop_str(op: BinOpKind) -> &'static str {
         Ne => "!=",
         Ge => ">=",
         Gt => ">",
+        Dot => ".",
         AndAnd => "&&",
         OrOr => "||",
         Plus => "+",

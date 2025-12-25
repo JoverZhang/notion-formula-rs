@@ -8,6 +8,7 @@ pub enum BinOpKind {
     Ne,
     Ge,
     Gt,
+    Dot,
     AndAnd,
     OrOr,
     Plus,
@@ -43,5 +44,6 @@ pub enum ExprKind {
     Lit(Lit),
     Unary { op: UnOp, expr: Box<Expr> },
     Binary { op: BinOp, left: Box<Expr>, right: Box<Expr> },
+    Ternary { cond: Box<Expr>, then: Box<Expr>, otherwise: Box<Expr> },
     Error,
 }
