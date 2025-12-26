@@ -1,0 +1,8 @@
+---
+source: analyzer/tests/diagnostics_snapshots.rs
+assertion_line: 17
+expression: rendered
+input_file: analyzer/tests/diagnostics/missing_binary_rhs.formula
+---
+error: expected expression after 'Plus'
+  --> <input>:1:3 [2..3]

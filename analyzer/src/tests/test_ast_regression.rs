@@ -10,7 +10,7 @@ use crate::{
 #[test]
 fn test_analyze_single_line() {
     let parsed = analyze(r#"if(prop("Title"), 1, 0)"#).unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
     assert_eq!(
@@ -84,7 +84,7 @@ fn test_analyze_multiple_lines() {
             )"#,
     ))
     .unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
     assert_eq!(
@@ -150,7 +150,7 @@ fn test_analyze_multiple_lines() {
 #[test]
 fn test_precedence() {
     let parsed = analyze(r#"1 + 2 * 3"#).unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
     assert_eq!(
         Expr {

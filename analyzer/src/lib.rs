@@ -1,19 +1,25 @@
-use crate::{
-    lexer::lex,
-    parser::{ParseError, ParseOutput, Parser},
-    tokenstream::TokenCursor,
-};
+use crate::{lexer::lex, parser::{ParseOutput, Parser}, tokenstream::TokenCursor};
 
 mod ast;
+mod diagnostics;
 mod lexer;
 mod parser;
+mod source_map;
 mod tests;
 mod token;
 mod tokenstream;
 
-pub fn analyze(text: &str) -> Result<ParseOutput, ParseError> {
-    let tokens = lex(&text).map_err(ParseError::LexError)?;
+pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
+    let tokens = lex(&text).map_err(|msg| diagnostics::Diagnostic {
+        kind: diagnostics::DiagnosticKind::Error,
+        message: msg,
+        span: crate::token::Span { start: 0, end: 0 },
+        notes: vec![],
+    })?;
     let token_cursor = TokenCursor::new(&text, tokens);
     let mut parser = Parser::new(token_cursor);
     Ok(parser.parse_expr())
 }
+
+pub use diagnostics::format_diagnostics;
+pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};

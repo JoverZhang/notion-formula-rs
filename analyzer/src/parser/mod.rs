@@ -1,11 +1,13 @@
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
+use crate::diagnostics::{Diagnostic, Diagnostics};
 use crate::token::{LitKind, NodeId, Span, Token, TokenKind, TokenRange};
 use crate::tokenstream::TokenCursor;
 
 mod expr;
 mod pretty;
 
-#[derive(Debug)]
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum ParseError {
     UnexpectedToken {
         expected: String,
@@ -14,17 +16,16 @@ pub enum ParseError {
     },
     LexError(String),
 }
-
 pub struct Parser<'a> {
     token_cursor: TokenCursor<'a>,
     next_id: NodeId,
-    errors: Vec<ParseError>,
+    diagnostics: Diagnostics,
 }
 
 #[derive(Debug)]
 pub struct ParseOutput {
     pub expr: Expr,
-    pub errors: Vec<ParseError>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a> Parser<'a> {
@@ -32,7 +33,7 @@ impl<'a> Parser<'a> {
         Parser {
             token_cursor,
             next_id: 0,
-            errors: Vec::new(),
+            diagnostics: Diagnostics::default(),
         }
     }
 
@@ -75,47 +76,34 @@ impl<'a> Parser<'a> {
     }
 
     /// punctuation
-    fn expect_punct(
-        &mut self,
-        kind: TokenKind,
-        expected: &'static str,
-    ) -> Result<Token, ParseError> {
+    fn expect_punct(&mut self, kind: TokenKind, expected: &'static str) -> Result<Token, ()> {
         if self.same_kind(self.cur_kind(), &kind) {
             Ok(self.bump())
         } else {
             let tok = self.cur().clone();
-            Err(ParseError::UnexpectedToken {
-                expected: expected.to_string(),
-                found: tok.kind,
-                span: tok.span,
-            })
+            self.emit_unexpected(expected, tok.kind.clone(), tok.span);
+            Err(())
         }
     }
 
-    fn expect_ident(&mut self) -> Result<Token, ParseError> {
+    fn expect_ident(&mut self) -> Result<Token, ()> {
         match self.cur_kind() {
             TokenKind::Ident(..) => Ok(self.bump()),
             _ => {
                 let tok = self.cur().clone();
-                Err(ParseError::UnexpectedToken {
-                    expected: "identifier".to_string(),
-                    found: tok.kind,
-                    span: tok.span,
-                })
+                self.emit_unexpected("identifier", tok.kind.clone(), tok.span);
+                Err(())
             }
         }
     }
 
-    fn expect_literal_kind(&mut self, k: LitKind) -> Result<Token, ParseError> {
+    fn expect_literal_kind(&mut self, k: LitKind) -> Result<Token, ()> {
         match self.cur_kind() {
             TokenKind::Literal(lit) if lit.kind == k => Ok(self.bump()),
             _ => {
                 let tok = self.cur().clone();
-                Err(ParseError::UnexpectedToken {
-                    expected: format!("{:?} literal", k),
-                    found: tok.kind,
-                    span: tok.span,
-                })
+                self.emit_unexpected(&format!("{:?} literal", k), tok.kind.clone(), tok.span);
+                Err(())
             }
         }
     }
@@ -174,15 +162,18 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn record_error(&mut self, err: ParseError) {
-        self.errors.push(err);
-    }
-
     fn finish(&mut self, expr: Expr) -> ParseOutput {
         ParseOutput {
             expr,
-            errors: std::mem::take(&mut self.errors),
+            diagnostics: std::mem::take(&mut self.diagnostics.diags),
         }
+    }
+
+    fn emit_unexpected(&mut self, expected: &str, found: TokenKind, span: Span) {
+        self.diagnostics.emit_error(
+            span,
+            format!("expected {}, found {:?}", expected, found),
+        );
     }
 }
 

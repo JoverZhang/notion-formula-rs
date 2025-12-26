@@ -1,27 +1,25 @@
-use crate::parser::ParseError;
 use crate::analyze;
+use crate::diagnostics::DiagnosticKind;
 
 #[test]
 fn test_trailing_tokens_error() {
     let result = analyze("1 2").unwrap();
-    assert_eq!(result.errors.len(), 1);
-    match &result.errors[0] {
-        ParseError::UnexpectedToken { expected, .. } => assert_eq!(expected, "EOF"),
-        other => panic!("unexpected error: {:?}", other),
-    };
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].kind, DiagnosticKind::Error);
+    assert!(
+        result.diagnostics[0].message.contains("expected EOF"),
+        "unexpected message: {}",
+        result.diagnostics[0].message
+    );
 }
 
 #[test]
 fn test_multiple_errors_collected() {
     // Missing operand before ')' and an unmatched ')'
     let result = analyze("(1 + ) 3").unwrap();
-    assert!(result.errors.len() >= 2);
-    assert!(matches!(
-        result.errors[0],
-        ParseError::UnexpectedToken { .. }
-    ));
-    assert!(matches!(
-        result.errors[1],
-        ParseError::UnexpectedToken { .. }
-    ));
+    assert!(
+        result.diagnostics.len() >= 2,
+        "expected at least two diagnostics, got {:?}",
+        result.diagnostics
+    );
 }

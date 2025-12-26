@@ -1,0 +1,12 @@
+---
+source: analyzer/tests/diagnostics_snapshots.rs
+assertion_line: 17
+expression: rendered
+input_file: analyzer/tests/diagnostics/multi_errors.formula
+---
+error: expected expression after 'Plus'
+  --> <input>:1:4 [3..4]
+error: expected expression after 'Star'
+  --> <input>:1:8 [7..8]
+error: expected ')', found Eof
+  --> <input>:2:1 [9..9]

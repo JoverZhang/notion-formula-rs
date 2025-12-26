@@ -13,7 +13,7 @@ fn test_pretty() {
             )"#,
     ))
     .unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
     let (_callee, args) = assert_call!(ast, "if", 3);
@@ -24,7 +24,7 @@ fn test_pretty() {
 #[test]
 fn test_precedence() {
     let parsed = analyze("1 + 2 * 3").unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
     let (left, right) = assert_bin!(ast, BinOpKind::Plus);
@@ -38,7 +38,7 @@ fn test_precedence() {
 #[test]
 fn test_ternary_parse_shape() {
     let parsed = analyze("1 ? 2 : 3").unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
     assert_lit_num!(cond, 1);
@@ -46,7 +46,7 @@ fn test_ternary_parse_shape() {
     assert_lit_num!(otherwise, 3);
 
     let parsed = analyze("1 ? 2 : 3 ? 4 : 5").unwrap();
-    assert!(parsed.errors.is_empty());
+    assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
     assert_lit_num!(cond, 1);

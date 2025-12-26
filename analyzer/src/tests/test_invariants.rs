@@ -77,9 +77,9 @@ fn test_span_and_tokenrange_invariants() {
         let mut parser = Parser::new(token_cursor);
         let output = parser.parse_expr();
         assert!(
-            output.errors.is_empty(),
+            output.diagnostics.is_empty(),
             "expected no parse errors for {input:?}, got {:?}",
-            output.errors
+            output.diagnostics
         );
         check_invariants(&output.expr, &tokens);
     }
