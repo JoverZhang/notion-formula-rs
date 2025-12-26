@@ -1,6 +1,6 @@
 use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
-use crate::parser::{infix_binding_power, ParseOutput};
-use crate::parser::{prefix_binding_power, Parser};
+use crate::parser::{ParseOutput, infix_binding_power};
+use crate::parser::{Parser, prefix_binding_power};
 use crate::token::{Lit, LitKind, Symbol, TokenKind, TokenRange};
 
 impl<'a> Parser<'a> {
@@ -73,10 +73,8 @@ impl<'a> Parser<'a> {
             let rhs = if self.cur().can_begin_expr() {
                 self.parse_expr_bp(r_bp)
             } else {
-                self.diagnostics.emit_error(
-                    op_tok.span,
-                    format!("expected expression after '{:?}'", op),
-                );
+                self.diagnostics
+                    .emit_error(op_tok.span, format!("expected expression after '{:?}'", op));
                 self.error_expr_bump()
             };
 
@@ -177,10 +175,8 @@ impl<'a> Parser<'a> {
                 let callee = match expr.kind {
                     ExprKind::Ident(sym) => sym,
                     _ => {
-                        self.diagnostics.emit_error(
-                            self.cur().span,
-                            "expected call callee (identifier)",
-                        );
+                        self.diagnostics
+                            .emit_error(self.cur().span, "expected call callee (identifier)");
                         let tokens = self.mk_token_range(expr.tokens.lo, self.cur_idx());
                         let span = self.span_from_tokens(tokens);
                         expr = self.mk_expr(span, tokens, ExprKind::Error);

@@ -11,7 +11,10 @@ impl<'a> SourceMap<'a> {
                 line_starts.push(i + 1);
             }
         }
-        Self { _src: src, line_starts }
+        Self {
+            _src: src,
+            line_starts,
+        }
     }
 
     /// Returns (line, col), both 1-based.

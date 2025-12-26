@@ -170,10 +170,8 @@ impl<'a> Parser<'a> {
     }
 
     fn emit_unexpected(&mut self, expected: &str, found: TokenKind, span: Span) {
-        self.diagnostics.emit_error(
-            span,
-            format!("expected {}, found {:?}", expected, found),
-        );
+        self.diagnostics
+            .emit_error(span, format!("expected {}, found {:?}", expected, found));
     }
 }
 

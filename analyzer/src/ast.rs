@@ -40,10 +40,24 @@ pub struct Expr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind {
     Ident(Symbol),
-    Call { callee: Symbol, args: Vec<Expr> },
+    Call {
+        callee: Symbol,
+        args: Vec<Expr>,
+    },
     Lit(Lit),
-    Unary { op: UnOp, expr: Box<Expr> },
-    Binary { op: BinOp, left: Box<Expr>, right: Box<Expr> },
-    Ternary { cond: Box<Expr>, then: Box<Expr>, otherwise: Box<Expr> },
+    Unary {
+        op: UnOp,
+        expr: Box<Expr>,
+    },
+    Binary {
+        op: BinOp,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    Ternary {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        otherwise: Box<Expr>,
+    },
     Error,
 }

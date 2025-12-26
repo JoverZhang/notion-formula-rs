@@ -33,7 +33,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     let (_, _) = iter.next().unwrap();
                     TokenKind::EqEq
                 } else {
-                    return Err(format!("unexpected char '=' at {} (did you mean '==')", start));
+                    return Err(format!(
+                        "unexpected char '=' at {} (did you mean '==')",
+                        start
+                    ));
                 }
             }
             '!' => {
@@ -49,7 +52,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     let (_, _) = iter.next().unwrap();
                     TokenKind::AndAnd
                 } else {
-                    return Err(format!("unexpected char '&' at {} (did you mean '&&')", start));
+                    return Err(format!(
+                        "unexpected char '&' at {} (did you mean '&&')",
+                        start
+                    ));
                 }
             }
             '|' => {
@@ -57,7 +63,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     let (_, _) = iter.next().unwrap();
                     TokenKind::OrOr
                 } else {
-                    return Err(format!("unexpected char '|' at {} (did you mean '||')", start));
+                    return Err(format!(
+                        "unexpected char '|' at {} (did you mean '||')",
+                        start
+                    ));
                 }
             }
 
