@@ -1,7 +1,6 @@
 use crate::{
-    ast::Expr,
     lexer::lex,
-    parser::{ParseError, Parser},
+    parser::{ParseError, ParseOutput, Parser},
     tokenstream::TokenCursor,
 };
 
@@ -12,9 +11,9 @@ mod tests;
 mod token;
 mod tokenstream;
 
-pub fn analyze(text: &str) -> Result<Expr, ParseError> {
-    let tokens = lex(&text).unwrap();
+pub fn analyze(text: &str) -> Result<ParseOutput, ParseError> {
+    let tokens = lex(&text).map_err(ParseError::LexError)?;
     let token_cursor = TokenCursor::new(&text, tokens);
     let mut parser = Parser::new(token_cursor);
-    parser.parse_expr()
+    Ok(parser.parse_expr())
 }

@@ -9,7 +9,9 @@ use crate::{
 
 #[test]
 fn test_analyze_single_line() {
-    let ast = analyze(r#"if(prop("Title"), 1, 0)"#).unwrap();
+    let parsed = analyze(r#"if(prop("Title"), 1, 0)"#).unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
 
     assert_eq!(
         Expr {
@@ -73,7 +75,7 @@ fn test_analyze_single_line() {
 
 #[test]
 fn test_analyze_multiple_lines() {
-    let ast = analyze(&trim_indent(
+    let parsed = analyze(&trim_indent(
         r#"
             if(
                 prop("Title"),
@@ -82,6 +84,8 @@ fn test_analyze_multiple_lines() {
             )"#,
     ))
     .unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
 
     assert_eq!(
         Expr {
@@ -145,7 +149,9 @@ fn test_analyze_multiple_lines() {
 
 #[test]
 fn test_precedence() {
-    let ast = analyze(r#"1 + 2 * 3"#).unwrap();
+    let parsed = analyze(r#"1 + 2 * 3"#).unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
     assert_eq!(
         Expr {
             id: 4,

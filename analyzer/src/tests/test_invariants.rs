@@ -75,7 +75,12 @@ fn test_span_and_tokenrange_invariants() {
         let tokens = lex(input).unwrap();
         let token_cursor = TokenCursor::new(input, tokens.clone());
         let mut parser = Parser::new(token_cursor);
-        let expr = parser.parse_expr().unwrap();
-        check_invariants(&expr, &tokens);
+        let output = parser.parse_expr();
+        assert!(
+            output.errors.is_empty(),
+            "expected no parse errors for {input:?}, got {:?}",
+            output.errors
+        );
+        check_invariants(&output.expr, &tokens);
     }
 }

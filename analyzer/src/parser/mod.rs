@@ -18,6 +18,13 @@ pub enum ParseError {
 pub struct Parser<'a> {
     token_cursor: TokenCursor<'a>,
     next_id: NodeId,
+    errors: Vec<ParseError>,
+}
+
+#[derive(Debug)]
+pub struct ParseOutput {
+    pub expr: Expr,
+    pub errors: Vec<ParseError>,
 }
 
 impl<'a> Parser<'a> {
@@ -25,6 +32,7 @@ impl<'a> Parser<'a> {
         Parser {
             token_cursor,
             next_id: 0,
+            errors: Vec::new(),
         }
     }
 
@@ -163,6 +171,17 @@ impl<'a> Parser<'a> {
             span: span,
             tokens: token_range,
             kind,
+        }
+    }
+
+    fn record_error(&mut self, err: ParseError) {
+        self.errors.push(err);
+    }
+
+    fn finish(&mut self, expr: Expr) -> ParseOutput {
+        ParseOutput {
+            expr,
+            errors: std::mem::take(&mut self.errors),
         }
     }
 }

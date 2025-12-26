@@ -4,7 +4,7 @@ use crate::{analyze, tests::common::trim_indent};
 
 #[test]
 fn test_pretty() {
-    let ast = analyze(&trim_indent(
+    let parsed = analyze(&trim_indent(
         r#"
             if(
                 prop("Title"),
@@ -13,6 +13,8 @@ fn test_pretty() {
             )"#,
     ))
     .unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
 
     let (_callee, args) = assert_call!(ast, "if", 3);
     let (_callee, args) = assert_call!(args[0], "prop", 1);
@@ -21,7 +23,9 @@ fn test_pretty() {
 
 #[test]
 fn test_precedence() {
-    let ast = analyze("1 + 2 * 3").unwrap();
+    let parsed = analyze("1 + 2 * 3").unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
 
     let (left, right) = assert_bin!(ast, BinOpKind::Plus);
     assert_lit_num!(left, 1);
@@ -33,13 +37,17 @@ fn test_precedence() {
 
 #[test]
 fn test_ternary_parse_shape() {
-    let ast = analyze("1 ? 2 : 3").unwrap();
+    let parsed = analyze("1 ? 2 : 3").unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
     assert_lit_num!(cond, 1);
     assert_lit_num!(then, 2);
     assert_lit_num!(otherwise, 3);
 
-    let ast = analyze("1 ? 2 : 3 ? 4 : 5").unwrap();
+    let parsed = analyze("1 ? 2 : 3 ? 4 : 5").unwrap();
+    assert!(parsed.errors.is_empty());
+    let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
     assert_lit_num!(cond, 1);
     assert_lit_num!(then, 2);

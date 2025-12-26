@@ -1,33 +1,38 @@
 use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
-use crate::parser::{ParseError, infix_binding_power};
-use crate::parser::{Parser, prefix_binding_power};
+use crate::parser::{infix_binding_power, ParseError, ParseOutput};
+use crate::parser::{prefix_binding_power, Parser};
 use crate::token::{Lit, LitKind, Symbol, TokenKind, TokenRange};
 
 impl<'a> Parser<'a> {
-    pub fn parse_expr(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.parse_expr_bp(0)?;
+    pub fn parse_expr(&mut self) -> ParseOutput {
+        let expr = self.parse_expr_bp(0);
 
         if !self.same_kind(self.cur_kind(), &TokenKind::Eof) {
             let tok = self.cur().clone();
-            return Err(ParseError::UnexpectedToken {
+            self.record_error(ParseError::UnexpectedToken {
                 expected: "EOF".to_string(),
                 found: tok.kind,
                 span: tok.span,
             });
         }
-        Ok(expr)
+        self.finish(expr)
     }
 
-    fn parse_expr_bp(&mut self, min_bp: u8) -> Result<Expr, ParseError> {
-        let mut lhs = self.parse_prefix()?;
+    fn parse_expr_bp(&mut self, min_bp: u8) -> Expr {
+        let mut lhs = self.parse_prefix();
 
         loop {
             if matches!(self.cur_kind(), TokenKind::Question) {
                 let q_tok_idx = self.cur_idx();
                 let _q_tok = self.bump(); // '?'
-                let then_expr = self.parse_expr_bp(0)?;
-                self.expect_punct(TokenKind::Colon, "':'")?;
-                let else_expr = self.parse_expr_bp(0)?;
+                let then_expr = self.parse_expr_bp(0);
+                let else_expr = match self.expect_punct(TokenKind::Colon, "':'") {
+                    Ok(_) => self.parse_expr_bp(0),
+                    Err(err) => {
+                        self.record_error(err);
+                        self.parse_expr_bp(0)
+                    }
+                };
 
                 let tokens = TokenRange::new(lhs.tokens.lo, else_expr.tokens.hi);
                 let span = self.span_from_tokens(tokens);
@@ -72,7 +77,7 @@ impl<'a> Parser<'a> {
             let op_tok_idx = self.cur_idx();
             let op_tok = self.bump();
 
-            let rhs = self.parse_expr_bp(r_bp)?;
+            let rhs = self.parse_expr_bp(r_bp);
 
             let tokens = TokenRange::new(lhs.tokens.lo, rhs.tokens.hi);
             let span = self.span_from_tokens(tokens);
@@ -93,19 +98,19 @@ impl<'a> Parser<'a> {
             let _ = op_tok_idx;
         }
 
-        Ok(lhs)
+        lhs
     }
 
-    fn parse_prefix(&mut self) -> Result<Expr, ParseError> {
+    fn parse_prefix(&mut self) -> Expr {
         match self.cur_kind() {
             TokenKind::Bang => {
                 let start = self.cur_idx();
                 let tok = self.bump();
-                let expr = self.parse_expr_bp(prefix_binding_power(UnOpKind::Not))?;
+                let expr = self.parse_expr_bp(prefix_binding_power(UnOpKind::Not));
                 let tokens = TokenRange::new(start, expr.tokens.hi);
                 let span = self.span_from_tokens(tokens);
 
-                Ok(self.mk_expr(
+                self.mk_expr(
                     span,
                     tokens,
                     ExprKind::Unary {
@@ -115,16 +120,16 @@ impl<'a> Parser<'a> {
                         },
                         expr: Box::new(expr),
                     },
-                ))
+                )
             }
             TokenKind::Minus => {
                 let start = self.cur_idx();
                 let tok = self.bump();
-                let expr = self.parse_expr_bp(prefix_binding_power(UnOpKind::Neg))?;
+                let expr = self.parse_expr_bp(prefix_binding_power(UnOpKind::Neg));
                 let tokens = TokenRange::new(start, expr.tokens.hi);
                 let span = self.span_from_tokens(tokens);
 
-                Ok(self.mk_expr(
+                self.mk_expr(
                     span,
                     tokens,
                     ExprKind::Unary {
@@ -134,15 +139,15 @@ impl<'a> Parser<'a> {
                         },
                         expr: Box::new(expr),
                     },
-                ))
+                )
             }
             _ => self.parse_postfix_primary(),
         }
     }
 
-    fn parse_postfix_primary(&mut self) -> Result<Expr, ParseError> {
+    fn parse_postfix_primary(&mut self) -> Expr {
         // primary: literal / ident / (expr)
-        let mut expr = self.parse_primary()?;
+        let mut expr = self.parse_primary();
 
         // postfix: call
         loop {
@@ -153,24 +158,30 @@ impl<'a> Parser<'a> {
                 let mut args = Vec::new();
 
                 if !matches!(self.cur_kind(), TokenKind::CloseParen) {
-                    args.push(self.parse_expr_bp(0)?);
+                    args.push(self.parse_expr_bp(0));
                     while matches!(self.cur_kind(), TokenKind::Comma) {
                         self.bump(); // ','
-                        args.push(self.parse_expr_bp(0)?);
+                        args.push(self.parse_expr_bp(0));
                     }
                 }
 
-                self.expect_punct(TokenKind::CloseParen, "')'")?;
+                if let Err(err) = self.expect_punct(TokenKind::CloseParen, "')'") {
+                    self.record_error(err);
+                }
 
                 // Only Ident can call
                 let callee = match expr.kind {
                     ExprKind::Ident(sym) => sym,
                     _ => {
-                        return Err(ParseError::UnexpectedToken {
+                        self.record_error(ParseError::UnexpectedToken {
                             expected: "call callee (identifier)".to_string(),
                             found: self.cur().kind.clone(),
                             span: self.cur().span,
                         });
+                        let tokens = self.mk_token_range(expr.tokens.lo, self.cur_idx());
+                        let span = self.span_from_tokens(tokens);
+                        expr = self.mk_expr(span, tokens, ExprKind::Error);
+                        break;
                     }
                 };
 
@@ -185,14 +196,20 @@ impl<'a> Parser<'a> {
             break;
         }
 
-        Ok(expr)
+        expr
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+    fn parse_primary(&mut self) -> Expr {
         match self.cur_kind() {
             TokenKind::Ident(_) => {
                 let start = self.cur_idx();
-                let tok = self.expect_ident()?;
+                let tok = match self.expect_ident() {
+                    Ok(tok) => tok,
+                    Err(err) => {
+                        self.record_error(err);
+                        return self.error_expr_bump();
+                    }
+                };
                 let tokens = TokenRange::new(start, start + 1);
                 let span = tok.span;
 
@@ -202,7 +219,7 @@ impl<'a> Parser<'a> {
                     _ => unreachable!(),
                 };
 
-                Ok(self.mk_expr(span, tokens, ExprKind::Ident(sym)))
+                self.mk_expr(span, tokens, ExprKind::Ident(sym))
             }
 
             TokenKind::Literal(lit) => match lit.kind {
@@ -212,7 +229,7 @@ impl<'a> Parser<'a> {
                     // You lexer currently doesn't produce bool tokens (if you add true/false keywords in the future, go here)
                     let tok = self.bump();
                     let idx = (self.token_cursor.pos - 1) as u32;
-                    Ok(self.mk_expr(
+                    self.mk_expr(
                         tok.span,
                         TokenRange::new(idx, idx + 1),
                         ExprKind::Lit(Lit {
@@ -221,41 +238,50 @@ impl<'a> Parser<'a> {
                                 text: self.lit_text(tok.span).into(),
                             },
                         }),
-                    ))
+                    )
                 }
             },
 
             TokenKind::OpenParen => {
                 let start = self.cur_idx();
                 self.bump(); // '('
-                let mut inner = self.parse_expr_bp(0)?;
-                self.expect_punct(TokenKind::CloseParen, "')'")?;
+                let mut inner = self.parse_expr_bp(0);
+                if let Err(err) = self.expect_punct(TokenKind::CloseParen, "')'") {
+                    self.record_error(err);
+                }
 
                 // Wrap the parentheses token range around inner (without keeping the Group node)
                 let tokens = TokenRange::new(start, self.cur_idx()); // hi points after ')'
                 let span = self.span_from_tokens(tokens);
                 inner.tokens = tokens;
                 inner.span = span;
-                Ok(inner)
+                inner
             }
 
             _ => {
                 let tok = self.cur().clone();
-                Err(ParseError::UnexpectedToken {
+                self.record_error(ParseError::UnexpectedToken {
                     expected: "primary expression".into(),
                     found: tok.kind,
                     span: tok.span,
-                })
+                });
+                self.error_expr_bump()
             }
         }
     }
 
-    fn parse_number_literal(&mut self) -> Result<Expr, ParseError> {
+    fn parse_number_literal(&mut self) -> Expr {
         let start = self.cur_idx();
-        let tok = self.expect_literal_kind(LitKind::Number)?;
+        let tok = match self.expect_literal_kind(LitKind::Number) {
+            Ok(tok) => tok,
+            Err(err) => {
+                self.record_error(err);
+                return self.error_expr_bump();
+            }
+        };
         let tokens = TokenRange::new(start, start + 1);
 
-        Ok(self.mk_expr(
+        self.mk_expr(
             tok.span,
             tokens,
             ExprKind::Lit(Lit {
@@ -264,12 +290,18 @@ impl<'a> Parser<'a> {
                     text: self.lit_text(tok.span).into(),
                 },
             }),
-        ))
+        )
     }
 
-    fn parse_string_literal(&mut self) -> Result<Expr, ParseError> {
+    fn parse_string_literal(&mut self) -> Expr {
         let start = self.cur_idx();
-        let tok = self.expect_literal_kind(LitKind::String)?;
+        let tok = match self.expect_literal_kind(LitKind::String) {
+            Ok(tok) => tok,
+            Err(err) => {
+                self.record_error(err);
+                return self.error_expr_bump();
+            }
+        };
         let tokens = TokenRange::new(start, start + 1);
 
         let text = self.lit_text(tok.span);
@@ -279,13 +311,23 @@ impl<'a> Parser<'a> {
             ""
         };
 
-        Ok(self.mk_expr(
+        self.mk_expr(
             tok.span,
             tokens,
             ExprKind::Lit(Lit {
                 kind: LitKind::String,
                 symbol: Symbol { text: inner.into() },
             }),
-        ))
+        )
+    }
+
+    fn error_expr_bump(&mut self) -> Expr {
+        let idx = self.cur_idx();
+        let tok = self.cur().clone();
+        if !matches!(tok.kind, TokenKind::Eof) {
+            self.bump();
+        }
+        let hi = (idx + 1).min(self.token_cursor.tokens.len() as u32);
+        self.mk_expr(tok.span, TokenRange::new(idx, hi), ExprKind::Error)
     }
 }
