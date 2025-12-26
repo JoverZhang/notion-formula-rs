@@ -1,6 +1,7 @@
 use crate::{
     lexer::lex,
     parser::{ParseOutput, Parser},
+    token::Span,
     tokenstream::TokenCursor,
 };
 
@@ -17,7 +18,7 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
     let tokens = lex(&text).map_err(|msg| diagnostics::Diagnostic {
         kind: diagnostics::DiagnosticKind::Error,
         message: msg,
-        span: crate::token::Span { start: 0, end: 0 },
+        span: Span { start: 0, end: 0 },
         labels: vec![],
         notes: vec![],
     })?;

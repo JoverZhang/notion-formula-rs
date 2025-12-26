@@ -56,6 +56,10 @@ pub fn format_diagnostics(source: &str, mut diags: Vec<Diagnostic>) -> String {
     let sm = SourceMap::new(source);
 
     let mut out = String::new();
+
+    let _ = write!(&mut out, "{source}");
+    let _ = writeln!(&mut out, "{:-<100}", "");
+
     for d in diags {
         let mut labels = d.labels;
         labels.sort_by(|a, b| {
