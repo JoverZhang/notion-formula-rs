@@ -2,11 +2,3 @@
 name = "analyzer"
 version = "0.1.0"
 edition = "2024"
-
-[dependencies]
-tracing = "0.1.44"
-
-[dev-dependencies]
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-insta = { version = "1", features = ["glob"] }
