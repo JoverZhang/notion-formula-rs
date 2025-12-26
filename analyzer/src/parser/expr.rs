@@ -1,6 +1,6 @@
 use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
-use crate::parser::{Parser, prefix_binding_power};
 use crate::parser::{ParseError, infix_binding_power};
+use crate::parser::{Parser, prefix_binding_power};
 use crate::token::{Lit, LitKind, Symbol, TokenKind, TokenRange};
 
 impl<'a> Parser<'a> {
@@ -22,6 +22,29 @@ impl<'a> Parser<'a> {
         let mut lhs = self.parse_prefix()?;
 
         loop {
+            if matches!(self.cur_kind(), TokenKind::Question) {
+                let q_tok_idx = self.cur_idx();
+                let _q_tok = self.bump(); // '?'
+                let then_expr = self.parse_expr_bp(0)?;
+                self.expect_punct(TokenKind::Colon, "':'")?;
+                let else_expr = self.parse_expr_bp(0)?;
+
+                let tokens = TokenRange::new(lhs.tokens.lo, else_expr.tokens.hi);
+                let span = self.span_from_tokens(tokens);
+                lhs = self.mk_expr(
+                    span,
+                    tokens,
+                    ExprKind::Ternary {
+                        cond: Box::new(lhs),
+                        then: Box::new(then_expr),
+                        otherwise: Box::new(else_expr),
+                    },
+                );
+
+                let _ = q_tok_idx;
+                continue;
+            }
+
             let op = match self.cur_kind() {
                 TokenKind::Lt => BinOpKind::Lt,
                 TokenKind::Le => BinOpKind::Le,

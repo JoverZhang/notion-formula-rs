@@ -65,6 +65,8 @@ fn test_span_and_tokenrange_invariants() {
         "(1+2)*3",
         "a&&b||c",
         "!a&&-b",
+        "1 ? 2 : 3",
+        "1 ? 2 : 3 ? 4 : 5",
         r#"prop("Title",1+2*3)"#,
         "f(1,2,3)",
     ];

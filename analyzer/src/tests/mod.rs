@@ -1,3 +1,4 @@
+#[macro_use]
 #[cfg(test)]
 mod common;
 #[cfg(test)]

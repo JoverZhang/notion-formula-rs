@@ -8,6 +8,7 @@
         "peekable",
         "prec",
         "punct",
+        "toks",
         "tokenstream",
         "tokenrange",
     ]

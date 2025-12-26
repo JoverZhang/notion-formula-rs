@@ -18,6 +18,8 @@ fn test_pretty_idempotence_cases() {
         "a&&b||c",
         "a==b||c==d",
         "!a&&-b",
+        "1 ? 2 : 3",
+        "1 ? 2 : 3 ? 4 : 5",
         r#"prop("Title",1+2*3)"#,
         "f()",
         "f(1,2,3)",
