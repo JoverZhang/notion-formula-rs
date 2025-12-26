@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod common;
 #[cfg(test)]
-mod test_ast;
+mod test_ast_regression;
 #[cfg(test)]
 mod test_errors;
 #[cfg(test)]

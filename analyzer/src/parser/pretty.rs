@@ -1,6 +1,6 @@
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::parser::{infix_binding_power, prefix_binding_power};
-use crate::token::{LitKind};
+use crate::token::LitKind;
 
 impl Expr {
     pub fn pretty(&self) -> String {
@@ -15,6 +15,7 @@ impl Expr {
                 LitKind::String => escape_string_for_pretty(&lit.symbol.text),
                 LitKind::Bool => lit.symbol.text.clone(),
             },
+
             ExprKind::Call { callee, args } => {
                 let mut s = String::new();
                 s.push_str(&callee.text);
@@ -28,6 +29,7 @@ impl Expr {
                 s.push(')');
                 s
             }
+
             ExprKind::Unary { op, expr } => {
                 let op_str = match op.node {
                     UnOpKind::Not => "!",
@@ -36,6 +38,7 @@ impl Expr {
                 let inner = expr.pretty_with_prec(prefix_binding_power(op.node));
                 format!("{}{}", op_str, inner)
             }
+
             ExprKind::Binary { op, left, right } => {
                 let (l_bp, r_bp) = infix_binding_power(op.node);
                 let this_prec = l_bp;
@@ -52,7 +55,7 @@ impl Expr {
                     combined
                 }
             }
-            ExprKind::Error => "<error>".to_string(),
+
             ExprKind::Ternary {
                 cond,
                 then,
@@ -63,6 +66,8 @@ impl Expr {
                 let otherwise = otherwise.pretty_with_prec(0);
                 format!("{} ? {} : {}", cond, then, otherwise)
             }
+
+            ExprKind::Error => "<error>".into(),
         }
     }
 }
