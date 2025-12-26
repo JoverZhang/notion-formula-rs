@@ -1,0 +1,8 @@
+---
+source: analyzer/tests/format_snapshots.rs
+expression: formatted
+input_file: analyzer/tests/format/block_comment.formula
+---
+1 /*mid*/
+  + /*mid2*/
+  2

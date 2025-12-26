@@ -1,0 +1,8 @@
+---
+source: analyzer/tests/format_snapshots.rs
+expression: formatted
+input_file: analyzer/tests/format/ternary_comment.formula
+---
+a
+  ? b // then
+  : c // else

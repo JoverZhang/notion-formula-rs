@@ -1,0 +1,8 @@
+---
+source: analyzer/tests/format_snapshots.rs
+expression: formatted
+input_file: analyzer/tests/format/trailing_comment.formula
+---
+1
+  + 2 // sum
+    * 3

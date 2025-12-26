@@ -1,0 +1,7 @@
+---
+source: analyzer/tests/format_snapshots.rs
+expression: formatted
+input_file: analyzer/tests/format/doc_comment.formula
+---
+## about value
+value + 1

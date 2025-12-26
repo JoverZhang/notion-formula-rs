@@ -1,5 +1,5 @@
 use crate::lexer::lex;
-use crate::token::{Lit, LitKind, Span, Symbol, Token, TokenKind};
+use crate::token::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
 
 fn tokens(input: &str) -> Vec<Token> {
     lex(input).unwrap()
@@ -38,6 +38,27 @@ fn string_lit(text: &str) -> TokenKind {
             text: text.to_string(),
         },
     })
+}
+
+fn line_comment(text: &str) -> TokenKind {
+    TokenKind::LineComment(Symbol {
+        text: text.to_string(),
+    })
+}
+
+fn block_comment(text: &str) -> TokenKind {
+    TokenKind::BlockComment(Symbol {
+        text: text.to_string(),
+    })
+}
+
+fn doc_comment(text: &str) -> TokenKind {
+    TokenKind::DocComment(
+        CommentKind::Line,
+        Symbol {
+            text: text.to_string(),
+        },
+    )
 }
 
 #[test]
@@ -130,14 +151,23 @@ fn test_whitespace_skipping_spans() {
     let ks = kinds(input);
     assert_eq!(
         ks,
-        vec![number("1"), TokenKind::Plus, number("2"), TokenKind::Eof]
+        vec![
+            TokenKind::Newline,
+            number("1"),
+            TokenKind::Plus,
+            TokenKind::Newline,
+            number("2"),
+            TokenKind::Eof
+        ]
     );
 
     let sp = spans(input);
-    assert_eq!(sp[0], (4, 5));
-    assert_eq!(sp[1], (8, 9));
-    assert_eq!(sp[2], (10, 11));
-    assert_eq!(sp[3], (12, 12));
+    assert_eq!(sp[0], (2, 3)); // newline
+    assert_eq!(sp[1], (4, 5));
+    assert_eq!(sp[2], (8, 9));
+    assert_eq!(sp[3], (9, 10)); // newline
+    assert_eq!(sp[4], (10, 11));
+    assert_eq!(sp[5], (12, 12));
 }
 
 #[test]
@@ -178,4 +208,27 @@ fn test_empty_input_eof_span() {
 fn test_unterminated_string_error() {
     let err = lex("\"abc").unwrap_err();
     assert!(err.contains("unterminated string"));
+}
+
+#[test]
+fn test_comment_tokens() {
+    let input = "// guard\n1 /*mid*/ + /*mid2*/ 2\n## docs\n3";
+    let ks = kinds(input);
+    assert_eq!(
+        ks,
+        vec![
+            line_comment(" guard"),
+            TokenKind::Newline,
+            number("1"),
+            block_comment("mid"),
+            TokenKind::Plus,
+            block_comment("mid2"),
+            number("2"),
+            TokenKind::Newline,
+            doc_comment(" docs"),
+            TokenKind::Newline,
+            number("3"),
+            TokenKind::Eof
+        ]
+    );
 }

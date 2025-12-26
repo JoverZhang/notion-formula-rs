@@ -1,17 +1,58 @@
-use crate::token::{Lit, LitKind, Span, Symbol, Token, TokenKind};
+use crate::token::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
 
 pub fn lex(input: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut iter = input.char_indices().peekable();
 
     while let Some((start, ch)) = iter.next() {
-        // Skip whitespace.
-        if ch.is_whitespace() {
+        // Skip spaces/tabs but keep newlines as trivia tokens.
+        if matches!(ch, ' ' | '\t' | '\r') {
+            continue;
+        }
+
+        if ch == '\n' {
+            tokens.push(Token {
+                kind: TokenKind::Newline,
+                span: Span {
+                    start: start as u32,
+                    end: (start + 1) as u32,
+                },
+            });
             continue;
         }
 
         // Two-char operators first
         let kind = match ch {
+            '#' => {
+                if matches!(iter.peek(), Some((_, '#'))) {
+                    let (_, _) = iter.next().unwrap();
+
+                    let mut end = start + 2;
+                    while let Some(&(i, c2)) = iter.peek() {
+                        if c2 == '\n' {
+                            break;
+                        }
+                        iter.next();
+                        end = i + c2.len_utf8();
+                    }
+
+                    tokens.push(Token {
+                        kind: TokenKind::DocComment(
+                            CommentKind::Line,
+                            Symbol {
+                                text: String::from(&input[start + 2..end]),
+                            },
+                        ),
+                        span: Span {
+                            start: start as u32,
+                            end: end as u32,
+                        },
+                    });
+                    continue;
+                } else {
+                    TokenKind::Pound
+                }
+            }
             '<' => {
                 if matches!(iter.peek(), Some((_, '='))) {
                     let (_, _) = iter.next().unwrap();
@@ -74,14 +115,70 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
             '*' => TokenKind::Star,
-            '/' => TokenKind::Slash,
+            '/' => {
+                if matches!(iter.peek(), Some((_, '/'))) {
+                    let (_, _) = iter.next().unwrap();
+                    let mut end = start + 2;
+                    while let Some(&(i, c2)) = iter.peek() {
+                        if c2 == '\n' {
+                            break;
+                        }
+                        iter.next();
+                        end = i + c2.len_utf8();
+                    }
+
+                    tokens.push(Token {
+                        kind: TokenKind::LineComment(Symbol {
+                            text: String::from(&input[start + 2..end]),
+                        }),
+                        span: Span {
+                            start: start as u32,
+                            end: end as u32,
+                        },
+                    });
+                    continue;
+                } else if matches!(iter.peek(), Some((_, '*'))) {
+                    let (_, _) = iter.next().unwrap();
+
+                    let mut end = start + 2;
+                    let mut terminated = false;
+                    while let Some((i, c2)) = iter.next() {
+                        if c2 == '*' {
+                            if matches!(iter.peek(), Some((_, '/'))) {
+                                let (j, slash) = iter.next().unwrap();
+                                debug_assert_eq!(slash, '/');
+                                end = j + slash.len_utf8();
+                                terminated = true;
+                                break;
+                            }
+                        }
+                        end = i + c2.len_utf8();
+                    }
+
+                    if !terminated {
+                        return Err(format!("unterminated block comment starting at {}", start));
+                    }
+
+                    tokens.push(Token {
+                        kind: TokenKind::BlockComment(Symbol {
+                            text: String::from(&input[start + 2..end - 2]),
+                        }),
+                        span: Span {
+                            start: start as u32,
+                            end: end as u32,
+                        },
+                    });
+                    continue;
+                } else {
+                    TokenKind::Slash
+                }
+            }
             '%' => TokenKind::Percent,
             '^' => TokenKind::Caret,
 
             '.' => TokenKind::Dot,
             ',' => TokenKind::Comma,
             ':' => TokenKind::Colon,
-            '#' => TokenKind::Pound,
             '?' => TokenKind::Question,
             '(' => TokenKind::OpenParen,
             ')' => TokenKind::CloseParen,

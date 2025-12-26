@@ -1,0 +1,10 @@
+---
+source: analyzer/tests/format_snapshots.rs
+expression: formatted
+input_file: analyzer/tests/format/call_multiline.formula
+---
+if(
+  prop("Title"),
+  1 + 2,
+  3 - 4,
+)

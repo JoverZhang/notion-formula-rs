@@ -1,18 +1,21 @@
 use crate::{
     lexer::lex,
-    parser::{ParseOutput, Parser},
+    parser::Parser,
     token::Span,
     tokenstream::TokenCursor,
 };
 
 mod ast;
 mod diagnostics;
+mod format;
 mod lexer;
 mod parser;
 mod source_map;
 mod tests;
 mod token;
 mod tokenstream;
+
+pub use parser::ParseOutput;
 
 pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
     let tokens = lex(&text).map_err(|msg| diagnostics::Diagnostic {
@@ -29,3 +32,4 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
 
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
+pub use format::format_expr;

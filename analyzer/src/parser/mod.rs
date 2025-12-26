@@ -26,6 +26,7 @@ pub struct Parser<'a> {
 pub struct ParseOutput {
     pub expr: Expr,
     pub diagnostics: Vec<Diagnostic>,
+    pub tokens: Vec<Token>,
 }
 
 impl<'a> Parser<'a> {
@@ -44,18 +45,21 @@ impl<'a> Parser<'a> {
     }
 
     fn cur(&self) -> &Token {
-        &self.token_cursor.tokens[self.token_cursor.pos]
+        let idx = self.next_nontrivia_idx(self.token_cursor.pos);
+        &self.token_cursor.tokens[idx]
     }
 
     fn cur_kind(&self) -> &TokenKind {
-        &self.token_cursor.tokens[self.token_cursor.pos].kind
+        &self.cur().kind
     }
 
     fn cur_idx(&self) -> u32 {
-        self.token_cursor.pos as u32
+        self.next_nontrivia_idx(self.token_cursor.pos) as u32
     }
 
     fn bump(&mut self) -> Token {
+        let idx = self.next_nontrivia_idx(self.token_cursor.pos);
+        self.token_cursor.pos = idx;
         let tok = self.token_cursor.tokens[self.token_cursor.pos].clone();
         self.token_cursor.pos += 1;
         tok
@@ -68,7 +72,7 @@ impl<'a> Parser<'a> {
     #[allow(unused)]
     fn eat(&mut self, kind: TokenKind) -> bool {
         if self.same_kind(self.cur_kind(), &kind) {
-            self.token_cursor.pos += 1;
+            self.bump();
             true
         } else {
             false
@@ -114,6 +118,9 @@ impl<'a> Parser<'a> {
             (Ident(_), Ident(_)) => true,
             (Literal(_), Literal(_)) => true,
             (DocComment(..), DocComment(..)) => true,
+            (LineComment(_), LineComment(_)) => true,
+            (BlockComment(_), BlockComment(_)) => true,
+            (Newline, Newline) => true,
 
             (Lt, Lt) | (Le, Le) | (EqEq, EqEq) | (Ne, Ne) | (Ge, Ge) | (Gt, Gt) => true,
             (AndAnd, AndAnd) | (OrOr, OrOr) | (Bang, Bang) => true,
@@ -131,6 +138,21 @@ impl<'a> Parser<'a> {
             (OpenParen, OpenParen) | (CloseParen, CloseParen) | (Eof, Eof) => true,
             _ => false,
         }
+    }
+
+    fn is_trivia(kind: &TokenKind) -> bool {
+        kind.is_trivia()
+    }
+
+    fn next_nontrivia_idx(&self, mut idx: usize) -> usize {
+        while idx < self.token_cursor.tokens.len() {
+            if Self::is_trivia(&self.token_cursor.tokens[idx].kind) {
+                idx += 1;
+                continue;
+            }
+            break;
+        }
+        idx.min(self.token_cursor.tokens.len().saturating_sub(1))
     }
 
     fn span_from_tokens(&self, range: TokenRange) -> Span {
@@ -166,6 +188,7 @@ impl<'a> Parser<'a> {
         ParseOutput {
             expr,
             diagnostics: std::mem::take(&mut self.diagnostics.diags),
+            tokens: self.token_cursor.tokens.clone(),
         }
     }
 
