@@ -1,7 +1,7 @@
 use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
 use crate::diagnostics::Label;
-use crate::parser::{infix_binding_power, ParseOutput};
-use crate::parser::{prefix_binding_power, Parser};
+use crate::parser::{ParseOutput, infix_binding_power};
+use crate::parser::{Parser, prefix_binding_power};
 use crate::token::{Lit, LitKind, Span, Symbol, TokenKind, TokenRange};
 
 impl<'a> Parser<'a> {

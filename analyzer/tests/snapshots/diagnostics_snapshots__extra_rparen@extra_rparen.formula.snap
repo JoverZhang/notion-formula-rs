@@ -1,8 +1,0 @@
----
-source: analyzer/tests/diagnostics_snapshots.rs
-assertion_line: 13
-expression: rendered
-input_file: analyzer/tests/diagnostics/extra_rparen.formula
----
-error: expected primary expression, found CloseParen
-  --> <input>:1:1 [0..1]

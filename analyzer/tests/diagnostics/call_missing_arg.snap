@@ -1,9 +1,3 @@
----
-source: analyzer/tests/diagnostics_snapshots.rs
-assertion_line: 13
-expression: rendered
-input_file: analyzer/tests/diagnostics/call_missing_arg.formula
----
 error: expected primary expression, found Comma
   --> <input>:1:6 [5..6]
 error: expected ')', found Literal(Lit { kind: Number, symbol: Symbol { text: "2" } })
