@@ -1,0 +1,10 @@
+---
+source: analyzer/tests/diagnostics_snapshots.rs
+assertion_line: 13
+expression: rendered
+input_file: analyzer/tests/diagnostics/ternary_missing_colon.formula
+---
+error: expected ':', found Eof
+  --> <input>:2:1 [6..6]
+error: expected primary expression, found Eof
+  --> <input>:2:1 [6..6]

@@ -2,8 +2,8 @@
 source: analyzer/tests/diagnostics_snapshots.rs
 assertion_line: 13
 expression: rendered
-input_file: analyzer/tests/diagnostics/missing_rparen.formula
+input_file: analyzer/tests/diagnostics/nested_missing_rparen.formula
 ---
 error: expected ')', found Eof
-  --> <input>:2:1 [7..7]
+  --> <input>:2:1 [9..9]
   = label: 1:1 [0..1] this '(' is not closed

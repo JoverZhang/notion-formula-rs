@@ -1,0 +1,10 @@
+---
+source: analyzer/tests/diagnostics_snapshots.rs
+assertion_line: 13
+expression: rendered
+input_file: analyzer/tests/diagnostics/rparen_in_expr.formula
+---
+error: expected expression after 'Plus'
+  --> <input>:1:3 [2..3]
+error: expected EOF
+  --> <input>:1:5 [4..5]

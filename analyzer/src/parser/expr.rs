@@ -1,7 +1,8 @@
 use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
-use crate::parser::{ParseOutput, infix_binding_power};
-use crate::parser::{Parser, prefix_binding_power};
-use crate::token::{Lit, LitKind, Symbol, TokenKind, TokenRange};
+use crate::diagnostics::Label;
+use crate::parser::{infix_binding_power, ParseOutput};
+use crate::parser::{prefix_binding_power, Parser};
+use crate::token::{Lit, LitKind, Span, Symbol, TokenKind, TokenRange};
 
 impl<'a> Parser<'a> {
     pub fn parse_expr(&mut self) -> ParseOutput {
@@ -75,7 +76,27 @@ impl<'a> Parser<'a> {
             } else {
                 self.diagnostics
                     .emit_error(op_tok.span, format!("expected expression after '{:?}'", op));
-                self.error_expr_bump()
+                let err_span = if matches!(self.cur_kind(), TokenKind::Eof) {
+                    Span {
+                        start: op_tok.span.end,
+                        end: op_tok.span.end,
+                    }
+                } else {
+                    self.cur().span
+                };
+                let sync = [
+                    TokenKind::Comma,
+                    TokenKind::CloseParen,
+                    TokenKind::Colon,
+                    TokenKind::Eof,
+                ];
+                if !sync.iter().any(|k| self.same_kind(self.cur_kind(), k))
+                    && !matches!(self.cur_kind(), TokenKind::Eof)
+                {
+                    self.bump();
+                    self.recover_to(&sync);
+                }
+                self.error_expr_at(err_span)
             };
 
             let tokens = TokenRange::new(lhs.tokens.lo, rhs.tokens.hi);
@@ -242,10 +263,35 @@ impl<'a> Parser<'a> {
 
             TokenKind::OpenParen => {
                 let start = self.cur_idx();
-                self.bump(); // '('
+                let lparen = self.bump(); // '('
                 let mut inner = self.parse_expr_bp(0);
-                if let Err(()) = self.expect_punct(TokenKind::CloseParen, "')'") {
-                    self.recover_to(&[TokenKind::CloseParen, TokenKind::Comma, TokenKind::Eof]);
+                if matches!(self.cur_kind(), TokenKind::CloseParen) {
+                    self.bump();
+                } else {
+                    let found = self.cur().clone();
+                    let labels = vec![Label {
+                        span: lparen.span,
+                        message: Some("this '(' is not closed".into()),
+                    }];
+                    let primary_span = if matches!(found.kind, TokenKind::Eof) {
+                        Span {
+                            start: found.span.start,
+                            end: found.span.start,
+                        }
+                    } else {
+                        found.span
+                    };
+                    self.diagnostics.emit_error_with_labels(
+                        primary_span,
+                        format!("expected ')', found {:?}", found.kind),
+                        labels,
+                    );
+                    self.recover_to(&[
+                        TokenKind::CloseParen,
+                        TokenKind::Comma,
+                        TokenKind::Colon,
+                        TokenKind::Eof,
+                    ]);
                     if matches!(self.cur_kind(), TokenKind::CloseParen) {
                         self.bump();
                     }
@@ -261,8 +307,10 @@ impl<'a> Parser<'a> {
 
             _ => {
                 let tok = self.cur().clone();
-                self.diagnostics
-                    .emit_error(tok.span, "expected primary expression");
+                self.diagnostics.emit_error(
+                    tok.span,
+                    format!("expected primary expression, found {:?}", tok.kind),
+                );
                 self.error_expr_bump()
             }
         }
@@ -315,6 +363,11 @@ impl<'a> Parser<'a> {
                 symbol: Symbol { text: inner.into() },
             }),
         )
+    }
+
+    fn error_expr_at(&mut self, span: Span) -> Expr {
+        let idx = self.cur_idx();
+        self.mk_expr(span, TokenRange::new(idx, idx), ExprKind::Error)
     }
 
     fn error_expr_bump(&mut self) -> Expr {

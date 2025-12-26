@@ -11,7 +11,14 @@ pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub message: String,
     pub span: Span,
+    pub labels: Vec<Label>,
     pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Label {
+    pub span: Span,
+    pub message: Option<String>,
 }
 
 #[derive(Default, Debug)]
@@ -21,10 +28,20 @@ pub struct Diagnostics {
 
 impl Diagnostics {
     pub fn emit_error(&mut self, span: Span, message: impl Into<String>) {
+        self.emit_error_with_labels(span, message, vec![]);
+    }
+
+    pub fn emit_error_with_labels(
+        &mut self,
+        span: Span,
+        message: impl Into<String>,
+        labels: Vec<Label>,
+    ) {
         self.diags.push(Diagnostic {
             kind: DiagnosticKind::Error,
             message: message.into(),
             span,
+            labels,
             notes: vec![],
         });
     }
@@ -33,11 +50,27 @@ impl Diagnostics {
 pub fn format_diagnostics(source: &str, mut diags: Vec<Diagnostic>) -> String {
     use std::fmt::Write;
 
-    diags.sort_by_key(|d| (d.span.start, d.message.clone()));
+    diags.sort_by(|a, b| {
+        (a.span.start, a.span.end, &a.message).cmp(&(b.span.start, b.span.end, &b.message))
+    });
     let sm = SourceMap::new(source);
 
     let mut out = String::new();
     for d in diags {
+        let mut labels = d.labels;
+        labels.sort_by(|a, b| {
+            (
+                a.span.start,
+                a.span.end,
+                a.message.as_ref().map(|s| s.as_str()).unwrap_or(""),
+            )
+                .cmp(&(
+                    b.span.start,
+                    b.span.end,
+                    b.message.as_ref().map(|s| s.as_str()).unwrap_or(""),
+                ))
+        });
+
         let (line, col) = sm.line_col(d.span.start);
         let _ = writeln!(&mut out, "error: {}", d.message);
         let _ = writeln!(
@@ -45,6 +78,18 @@ pub fn format_diagnostics(source: &str, mut diags: Vec<Diagnostic>) -> String {
             "  --> <input>:{}:{} [{}..{}]",
             line, col, d.span.start, d.span.end
         );
+        for label in labels {
+            let (line, col) = sm.line_col(label.span.start);
+            let _ = writeln!(
+                &mut out,
+                "  = label: {}:{} [{}..{}] {}",
+                line,
+                col,
+                label.span.start,
+                label.span.end,
+                label.message.unwrap_or_default()
+            );
+        }
         for note in d.notes {
             let _ = writeln!(&mut out, "  note: {}", note);
         }

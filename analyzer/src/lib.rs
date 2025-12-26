@@ -18,6 +18,7 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
         kind: diagnostics::DiagnosticKind::Error,
         message: msg,
         span: crate::token::Span { start: 0, end: 0 },
+        labels: vec![],
         notes: vec![],
     })?;
     let token_cursor = TokenCursor::new(&text, tokens);
