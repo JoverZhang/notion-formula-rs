@@ -1,8 +1,0 @@
----
-source: analyzer/tests/format_snapshots.rs
-expression: formatted
-input_file: analyzer/tests/format/binary_chain.formula
----
-1
-  + 2 * 3
-  + 4
