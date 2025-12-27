@@ -1,4 +1,4 @@
-use crate::{lexer::lex, parser::Parser, token::Span, tokenstream::TokenCursor};
+use crate::{lexer::lex, parser::Parser, tokenstream::TokenCursor};
 
 mod ast;
 mod diagnostics;
@@ -28,3 +28,5 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 pub use format::format_expr;
+pub use source_map::{SourceMap, byte_offset_to_utf16};
+pub use token::{LitKind, Span, Token, TokenKind};

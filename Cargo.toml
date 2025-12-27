@@ -2,6 +2,7 @@
 members = [
     "analyzer",
     "evaluator",
+    "analyzer_wasm",
 ]
 
 resolver = "2"
