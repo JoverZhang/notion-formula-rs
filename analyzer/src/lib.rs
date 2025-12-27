@@ -1,9 +1,4 @@
-use crate::{
-    lexer::lex,
-    parser::Parser,
-    token::Span,
-    tokenstream::TokenCursor,
-};
+use crate::{lexer::lex, parser::Parser, token::Span, tokenstream::TokenCursor};
 
 mod ast;
 mod diagnostics;

@@ -1,5 +1,6 @@
+=== INPUT ===
 * 3
-----------------------------------------------------------------------------------------------------
+=== OUTPUT ===
 error: expected primary expression, found Star
   --> <input>:1:1 [0..1]
 error: expected EOF

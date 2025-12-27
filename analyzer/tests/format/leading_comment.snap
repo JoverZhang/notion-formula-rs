@@ -1,0 +1,6 @@
+=== INPUT ===
+// guard
+!(a && b)
+=== OUTPUT ===
+// guard
+!(a && b)

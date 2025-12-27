@@ -1,0 +1,7 @@
+=== INPUT ===
+a ? b // then
+: c // else
+=== OUTPUT ===
+a
+  ? b // then
+  : c // else

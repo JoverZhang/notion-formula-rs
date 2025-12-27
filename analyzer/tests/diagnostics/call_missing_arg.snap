@@ -1,5 +1,6 @@
+=== INPUT ===
 f(1, , 2)
-----------------------------------------------------------------------------------------------------
+=== OUTPUT ===
 error: expected primary expression, found Comma
   --> <input>:1:6 [5..6]
 error: expected ')', found Literal(Lit { kind: Number, symbol: Symbol { text: "2" } })
