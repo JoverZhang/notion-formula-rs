@@ -9,3 +9,7 @@ test-analyzer_wasm:
 test-analyzer-bless:
   BLESS=1 cargo test -p analyzer
 
+run-example-web:
+  wasm-pack build analyzer_wasm --target web --out-dir ../examples/web/pkg
+  python3 -m http.server -d examples/web 8000
+
