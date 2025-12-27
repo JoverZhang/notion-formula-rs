@@ -1,0 +1,5 @@
+=== INPUT ===
+a + 中 + 😀 *
+=== OUTPUT ===
+error: expected expression after 'Star'
+  --> <input>:1:11 [15..16]

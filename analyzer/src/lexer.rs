@@ -304,9 +304,9 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
 }
 
 fn is_ident_start(c: char) -> bool {
-    c.is_ascii_alphabetic() || c == '_'
+    c == '_' || c.is_ascii_alphabetic() || c.len_utf8() > 1
 }
 
 fn is_ident_continue(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_'
+    c == '_' || c.is_ascii_alphanumeric() || c.len_utf8() > 1
 }

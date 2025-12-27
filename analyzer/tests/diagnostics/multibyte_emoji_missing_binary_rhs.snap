@@ -1,0 +1,5 @@
+=== INPUT ===
+😀 + 1 *
+=== OUTPUT ===
+error: expected expression after 'Star'
+  --> <input>:1:7 [9..10]

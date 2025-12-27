@@ -13,3 +13,5 @@ mod test_lexer;
 mod test_parser;
 #[cfg(test)]
 mod test_pretty_idempotence;
+#[cfg(test)]
+mod test_utf16;
