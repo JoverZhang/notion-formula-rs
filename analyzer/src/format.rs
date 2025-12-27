@@ -6,6 +6,7 @@ use crate::source_map::SourceMap;
 use crate::token::{CommentKind, Token, TokenKind};
 
 const INDENT: usize = 2;
+const MAX_WIDTH: usize = 80;
 
 pub struct Formatter<'a> {
     source: &'a str,
@@ -87,8 +88,24 @@ impl Rendered {
 
 pub fn format_expr(expr: &Expr, source: &str, tokens: &[Token]) -> String {
     let mut fmt = Formatter::new(source, tokens);
-    let rendered = fmt.format_expr_rendered(expr, 0, 0);
-    rendered.render()
+    let one_line = expr.pretty();
+    let force_multiline = fmt.forces_multiline(expr);
+
+    let out = if !force_multiline && !one_line.contains('\n') && fmt.fits_on_line(0, one_line.len()) {
+        let mut s = one_line;
+        if !s.ends_with('\n') {
+            s.push('\n');
+        }
+        s
+    } else {
+        let mut s = fmt.format_expr_rendered(expr, 0, 0).render();
+        if !s.ends_with('\n') {
+            s.push('\n');
+        }
+        s
+    };
+
+    out
 }
 
 impl<'a> Formatter<'a> {
@@ -121,6 +138,7 @@ impl<'a> Formatter<'a> {
     fn format_expr_kind(&mut self, expr: &Expr, indent: usize, parent_prec: u8) -> Rendered {
         match &expr.kind {
             ExprKind::Ident(sym) => Rendered::single(indent, sym.text.clone()),
+            ExprKind::Group { inner } => self.format_group(indent, parent_prec, inner),
             ExprKind::Lit(lit) => match lit.kind {
                 crate::token::LitKind::Number => Rendered::single(indent, lit.symbol.text.clone()),
                 crate::token::LitKind::String => {
@@ -146,6 +164,24 @@ impl<'a> Formatter<'a> {
         }
     }
 
+    fn format_group(&mut self, indent: usize, _parent_prec: u8, inner: &Expr) -> Rendered {
+        if !self.has_attached_comments(inner) {
+            if let Some(inline) = self.try_inline(inner, 0) {
+                let text = format!("({})", inline);
+                if self.fits_on_line(indent, text.len()) {
+                    return Rendered::single(indent, text);
+                }
+            }
+        }
+
+        let mut out = Rendered::default();
+        out.push_line(indent, "(");
+        let inner_rendered = self.format_expr_rendered(inner, indent + 1, 0);
+        out.append(inner_rendered);
+        out.push_line(indent, ")");
+        out
+    }
+
     fn format_unary(
         &mut self,
         indent: usize,
@@ -167,7 +203,9 @@ impl<'a> Formatter<'a> {
                 if bp < parent_prec {
                     text = format!("({})", text);
                 }
-                return Rendered::single(indent, text);
+                if self.fits_on_line(indent, text.len()) {
+                    return Rendered::single(indent, text);
+                }
             }
         }
 
@@ -194,15 +232,9 @@ impl<'a> Formatter<'a> {
         let op_str = binop_str(op);
         let need_parens = l_bp < parent_prec;
 
-        let commenty = self.has_attached_comments(left) || self.has_attached_comments(right);
-        let complex = self.is_complex_expr(left) || self.is_complex_expr(right);
-        let should_break = commenty
-            || matches!(
-                op,
-                BinOpKind::Plus | BinOpKind::Minus | BinOpKind::AndAnd | BinOpKind::OrOr
-            ) && complex;
+        let has_comments = self.has_attached_comments(left) || self.has_attached_comments(right);
 
-        if !should_break {
+        if !has_comments {
             if let (Some(lhs), Some(rhs)) =
                 (self.try_inline(left, l_bp), self.try_inline(right, r_bp))
             {
@@ -210,7 +242,9 @@ impl<'a> Formatter<'a> {
                 if need_parens {
                     text = format!("({})", text);
                 }
-                return Rendered::single(indent, text);
+                if self.fits_on_line(indent, text.len()) {
+                    return Rendered::single(indent, text);
+                }
             }
         }
 
@@ -257,7 +291,9 @@ impl<'a> Formatter<'a> {
                 if need_parens {
                     text = format!("({})", text);
                 }
-                return Rendered::single(indent, text);
+                if self.fits_on_line(indent, text.len()) {
+                    return Rendered::single(indent, text);
+                }
             }
         }
 
@@ -306,7 +342,9 @@ impl<'a> Formatter<'a> {
                 if need_parens {
                     text = format!("({})", text);
                 }
-                return Rendered::single(indent, text);
+                if self.fits_on_line(indent, text.len()) {
+                    return Rendered::single(indent, text);
+                }
             }
         }
 
@@ -353,6 +391,10 @@ impl<'a> Formatter<'a> {
     fn inline_expr(&self, expr: &Expr, parent_prec: u8) -> Option<String> {
         let text = match &expr.kind {
             ExprKind::Ident(sym) => sym.text.clone(),
+            ExprKind::Group { inner } => {
+                let inner = self.inline_expr(inner, 0)?;
+                format!("({})", inner)
+            }
             ExprKind::Lit(lit) => match lit.kind {
                 crate::token::LitKind::Number => lit.symbol.text.clone(),
                 crate::token::LitKind::String => escape_string(&lit.symbol.text),
@@ -415,8 +457,41 @@ impl<'a> Formatter<'a> {
         (match &expr.kind {
             ExprKind::Binary { .. } | ExprKind::Ternary { .. } | ExprKind::Call { .. } => true,
             ExprKind::Unary { expr, .. } => self.is_complex_expr(expr),
+            ExprKind::Group { inner } => self.is_complex_expr(inner),
             _ => false,
         }) || self.has_attached_comments(expr)
+    }
+
+    fn fits_on_line(&self, indent: usize, text_len: usize) -> bool {
+        indent * INDENT + text_len <= MAX_WIDTH
+    }
+
+    fn forces_multiline(&self, expr: &Expr) -> bool {
+        self.expr_has_comments(expr)
+    }
+
+    fn expr_has_comments(&self, expr: &Expr) -> bool {
+        if self.has_attached_comments(expr) {
+            return true;
+        }
+        match &expr.kind {
+            ExprKind::Group { inner } => self.expr_has_comments(inner),
+            ExprKind::Call { args, .. } => args.iter().any(|a| self.expr_has_comments(a)),
+            ExprKind::Unary { expr, .. } => self.expr_has_comments(expr),
+            ExprKind::Binary { left, right, .. } => {
+                self.expr_has_comments(left) || self.expr_has_comments(right)
+            }
+            ExprKind::Ternary {
+                cond,
+                then,
+                otherwise,
+            } => {
+                self.expr_has_comments(cond)
+                    || self.expr_has_comments(then)
+                    || self.expr_has_comments(otherwise)
+            }
+            _ => false,
+        }
     }
 
     fn prev_nontrivia(&self, idx: usize) -> Option<usize> {

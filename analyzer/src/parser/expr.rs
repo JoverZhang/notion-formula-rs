@@ -264,7 +264,7 @@ impl<'a> Parser<'a> {
             TokenKind::OpenParen => {
                 let start = self.cur_idx();
                 let lparen = self.bump(); // '('
-                let mut inner = self.parse_expr_bp(0);
+                let inner = self.parse_expr_bp(0);
                 if matches!(self.cur_kind(), TokenKind::CloseParen) {
                     self.bump();
                 } else {
@@ -297,12 +297,15 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                // Wrap the parentheses token range around inner (without keeping the Group node)
                 let tokens = TokenRange::new(start, self.cur_idx()); // hi points after ')'
                 let span = self.span_from_tokens(tokens);
-                inner.tokens = tokens;
-                inner.span = span;
-                inner
+                self.mk_expr(
+                    span,
+                    tokens,
+                    ExprKind::Group {
+                        inner: Box::new(inner),
+                    },
+                )
             }
 
             _ => {

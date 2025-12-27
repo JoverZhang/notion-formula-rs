@@ -40,6 +40,9 @@ pub struct Expr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind {
     Ident(Symbol),
+    Group {
+        inner: Box<Expr>,
+    },
     Call {
         callee: Symbol,
         args: Vec<Expr>,

@@ -10,6 +10,10 @@ impl Expr {
     fn pretty_with_prec(&self, parent_prec: u8) -> String {
         match &self.kind {
             ExprKind::Ident(sym) => sym.text.clone(),
+            ExprKind::Group { inner } => {
+                let inner = inner.pretty_with_prec(0);
+                format!("({})", inner)
+            }
             ExprKind::Lit(lit) => match lit.kind {
                 LitKind::Number => lit.symbol.text.clone(),
                 LitKind::String => escape_string_for_pretty(&lit.symbol.text),

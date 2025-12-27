@@ -30,6 +30,10 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
     assert_eq!(expr.span, expected_span);
 
     match &expr.kind {
+        ExprKind::Group { inner } => {
+            assert_child_range(inner, expr);
+            check_invariants(inner, tokens);
+        }
         ExprKind::Call { args, .. } => {
             for arg in args {
                 assert_child_range(arg, expr);
