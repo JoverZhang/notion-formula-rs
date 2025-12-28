@@ -1,6 +1,6 @@
 import "./style.css";
 import init, { analyze } from "./pkg/analyzer_wasm.js";
-import { RangeSetBuilder, StateEffect, StateField, EditorState } from "@codemirror/state";
+import { RangeSetBuilder, EditorState } from "@codemirror/state";
 import {
   Decoration,
   DecorationSet,
@@ -8,6 +8,17 @@ import {
   keymap,
 } from "@codemirror/view";
 import { defaultKeymap } from "@codemirror/commands";
+import {
+  computePropChips,
+  computeTokenDecorationRanges,
+  getTokenSpanIssues,
+  setTokenDecosEffect,
+  sortTokens,
+  tokenDecoStateField,
+} from "./editor_decorations";
+import type { Chip, Token } from "./editor_decorations";
+import { buildChipOffsetMap, computeChipSpans } from "./chip_spans";
+import type { ChipOffsetMap } from "./chip_spans";
 
 const DEFAULT_SOURCE = `if (
   prop( "feeling" ) == "😀",
@@ -15,25 +26,17 @@ const DEFAULT_SOURCE = `if (
       "This is fine 🔥")
 `;
 const DEBOUNCE_MS = 80;
+const ENABLE_SEMANTIC_DIAGNOSTICS = false;
 
 type Diagnostic = {
   kind?: string;
   message?: string;
-  span?: {
-    line?: number;
-    col?: number;
-  };
-};
-
-type Token = {
-  kind?: string;
   span?: {
     start?: number;
     end?: number;
     line?: number;
     col?: number;
   };
-  text?: string;
 };
 
 type AnalyzeResult = {
@@ -41,6 +44,8 @@ type AnalyzeResult = {
   formatted?: string;
   tokens?: Token[];
 };
+
+const PROPERTIES = ["Title", "feeling", "Status", "Due Date"];
 
 function expectEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
@@ -56,24 +61,6 @@ const warningEl = expectEl<HTMLElement>("#hl-warning");
 const formattedEl = expectEl<HTMLElement>("#formatted");
 const diagnosticsEl = expectEl<HTMLUListElement>("#diagnostics");
 
-const setTokenDecosEffect = StateEffect.define<DecorationSet>();
-const tokenDecosField = StateField.define<DecorationSet>({
-  create() {
-    return Decoration.none;
-  },
-  update(value, tr) {
-    for (const effect of tr.effects) {
-      if (effect.is(setTokenDecosEffect)) {
-        return effect.value;
-      }
-    }
-    if (tr.docChanged) {
-      return value.map(tr.changes);
-    }
-    return value;
-  },
-  provide: (field) => EditorView.decorations.from(field),
-});
 
 function debounce<T extends unknown[]>(fn: (...args: T) => void, delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -85,7 +72,7 @@ function debounce<T extends unknown[]>(fn: (...args: T) => void, delay: number) 
   };
 }
 
-function renderDiagnostics(diagnostics: Diagnostic[]) {
+function renderDiagnostics(diagnostics: Diagnostic[], chipMap?: ChipOffsetMap) {
   diagnosticsEl.innerHTML = "";
   if (!diagnostics || diagnostics.length === 0) {
     const li = document.createElement("li");
@@ -99,7 +86,11 @@ function renderDiagnostics(diagnostics: Diagnostic[]) {
     const kind = diag.kind || "error";
     const line = diag.span?.line ?? 0;
     const col = diag.span?.col ?? 0;
-    li.textContent = `${kind}: ${diag.message} @ ${line}:${col}`;
+    const chipPos =
+      chipMap && typeof diag.span?.start === "number"
+        ? ` (chipPos=${chipMap.toChipPos(diag.span.start)})`
+        : "";
+    li.textContent = `${kind}: ${diag.message} @ ${line}:${col}${chipPos}`;
     diagnosticsEl.appendChild(li);
   });
 }
@@ -116,17 +107,6 @@ function setWarningVisible(visible: boolean) {
   warningEl.classList.toggle("hidden", !visible);
 }
 
-function sortTokens(tokens: Token[]): Token[] {
-  return [...tokens].sort((a, b) => {
-    const aStart = a.span?.start ?? Number.MAX_SAFE_INTEGER;
-    const bStart = b.span?.start ?? Number.MAX_SAFE_INTEGER;
-    if (aStart !== bStart) return aStart - bStart;
-    const aEnd = a.span?.end ?? Number.MAX_SAFE_INTEGER;
-    const bEnd = b.span?.end ?? Number.MAX_SAFE_INTEGER;
-    return aEnd - bEnd;
-  });
-}
-
 function buildTokenDecorations(
   source: string,
   tokens: Token[],
@@ -136,36 +116,15 @@ function buildTokenDecorations(
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const sourceLength = source.length;
-  let prevEnd = 0;
-  let hasPrev = false;
-
-  for (const token of tokens) {
-    if (!token || token.kind === "Eof") {
-      continue;
-    }
-
-    const start = token.span?.start;
-    const end = token.span?.end;
-    if (typeof start !== "number" || typeof end !== "number") {
-      return { ok: false, decos: Decoration.none };
-    }
-    if (start === end || token.text === "") {
-      continue;
-    }
-    if (start < 0 || end < 0 || end < start || start > sourceLength || end > sourceLength) {
-      return { ok: false, decos: Decoration.none };
-    }
-    if (hasPrev && start < prevEnd) {
-      return { ok: false, decos: Decoration.none };
-    }
-
-    builder.add(start, end, Decoration.mark({ class: `tok tok-${token.kind}` }));
-    prevEnd = end;
-    hasPrev = true;
+  const docLen = source.length;
+  const ranges = computeTokenDecorationRanges(docLen, tokens);
+  for (const range of ranges) {
+    builder.add(range.from, range.to, Decoration.mark({ class: range.className }));
   }
 
-  return { ok: true, decos: builder.finish() };
+  const issues = getTokenSpanIssues(docLen, tokens);
+  const ok = !issues.outOfBounds && !issues.overlap;
+  return { ok, decos: builder.finish() };
 }
 
 function findTokenBefore(tokens: Token[], cursor: number): Token | null {
@@ -201,6 +160,39 @@ function findTokenAfter(tokens: Token[], cursor: number): Token | null {
     }
   }
   return null;
+}
+
+function lineColFromUtf16Offset(source: string, offset: number): { line: number; col: number } {
+  const prefix = source.slice(0, offset);
+  let line = 1;
+  for (let i = 0; i < prefix.length; i += 1) {
+    if (prefix[i] === "\n") {
+      line += 1;
+    }
+  }
+  const lastNewline = prefix.lastIndexOf("\n");
+  const col = lastNewline === -1 ? offset + 1 : offset - lastNewline;
+  return { line, col };
+}
+
+function computeSemanticDiagnostics(source: string, chips: Chip[]): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const chip of chips) {
+    if (!PROPERTIES.includes(chip.argValue)) {
+      const { line, col } = lineColFromUtf16Offset(source, chip.argContentStart);
+      diagnostics.push({
+        kind: "error",
+        message: `${chip.argValue} is not a valid property.`,
+        span: {
+          start: chip.argContentStart,
+          end: chip.argContentEnd,
+          line,
+          col,
+        },
+      });
+    }
+  }
+  return diagnostics;
 }
 
 function renderCursorInfo(cursor: number, tokens: Token[]) {
@@ -243,8 +235,24 @@ const runAnalyze = debounce((source: string) => {
     return;
   }
 
-  renderDiagnostics(result.diagnostics || []);
-  renderFormatted(result.formatted || "", result.diagnostics || []);
+  const syntaxDiagnostics = result.diagnostics || [];
+  const chipSpans = computeChipSpans(source, result.tokens || []);
+  let chipMap: ChipOffsetMap | undefined;
+  try {
+    chipMap = buildChipOffsetMap(source.length, chipSpans);
+  } catch (error) {
+    chipMap = undefined;
+    console.warn("Failed to build chip offset map:", error);
+  }
+  let combinedDiagnostics = [...syntaxDiagnostics];
+  if (ENABLE_SEMANTIC_DIAGNOSTICS) {
+    const propChips = computePropChips(source, result.tokens || []);
+    console.log("propChips", propChips);
+    const semanticDiagnostics = computeSemanticDiagnostics(source, propChips);
+    combinedDiagnostics = [...combinedDiagnostics, ...semanticDiagnostics];
+  }
+  renderDiagnostics(combinedDiagnostics, chipMap);
+  renderFormatted(result.formatted || "", syntaxDiagnostics);
   lastTokens = result.tokens || [];
   lastSortedTokens = sortTokens(lastTokens);
   const { ok, decos } = buildTokenDecorations(source, lastSortedTokens);
@@ -256,31 +264,37 @@ const runAnalyze = debounce((source: string) => {
 }, DEBOUNCE_MS);
 
 async function start() {
-  let wasmReady = false;
-  editorView = new EditorView({
-    state: EditorState.create({
-      doc: DEFAULT_SOURCE,
-      extensions: [
-        keymap.of(defaultKeymap),
-        EditorView.lineWrapping,
-        tokenDecosField,
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && wasmReady) {
-            runAnalyze(update.state.doc.toString());
-          }
-          if (update.selectionSet) {
-            renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
-          }
-        }),
-      ],
-    }),
-    parent: editorParentEl,
-  });
+  console.log("[demo] start()");
+  try {
+    let wasmReady = false;
+    editorView = new EditorView({
+      state: EditorState.create({
+        doc: DEFAULT_SOURCE,
+        extensions: [
+          keymap.of(defaultKeymap),
+          EditorView.lineWrapping,
+          tokenDecoStateField,
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged && wasmReady) {
+              runAnalyze(update.state.doc.toString());
+            }
+            if (update.selectionSet) {
+              renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
+            }
+          }),
+        ],
+      }),
+      parent: editorParentEl,
+    });
 
-  renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
-  await init();
-  wasmReady = true;
-  runAnalyze(editorView.state.doc.toString());
+    renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
+    await init();
+    wasmReady = true;
+    runAnalyze(editorView.state.doc.toString());
+    console.log("[demo] initialized" );
+  } catch (e) {
+    console.error("Failed to initialize:", e);
+  }
 }
 
 start();

@@ -189,6 +189,12 @@ label {
   font-style: italic;
 }
 
+.tok-PropCall {
+  background: rgba(181, 91, 0, 0.08);
+  border: 1px solid rgba(181, 91, 0, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
 @media (max-width: 920px) {
   main.layout {
     grid-template-columns: 1fr;
