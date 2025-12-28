@@ -13,3 +13,6 @@ run-example-web:
   wasm-pack build analyzer_wasm --target web --out-dir ../examples/web/pkg
   python3 -m http.server -d examples/web 8000
 
+run-example-vite:
+  wasm-pack build analyzer_wasm --target web --out-dir ../examples/vite/src/pkg
+  cd examples/vite && npm run dev

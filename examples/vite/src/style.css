@@ -1,0 +1,176 @@
+:root {
+  --bg: #f4f2ee;
+  --panel: #ffffff;
+  --ink: #1f1b16;
+  --muted: #6b5f52;
+  --accent: #b55b00;
+  --border: #d7cbb9;
+  --shadow: rgba(37, 24, 12, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(135deg, #efe8dc 0%, #f7f3ed 60%, #fffaf4 100%);
+}
+
+main.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
+  gap: 24px;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+.pane {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 12px 24px var(--shadow);
+}
+
+.input-pane h1 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+
+label {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 8px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fffdf9;
+  color: var(--ink);
+}
+
+.hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.output-pane {
+  display: grid;
+  gap: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.code {
+  margin: 0;
+  padding: 12px;
+  background: #fffdf9;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 96px;
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.diag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.warning {
+  background: #ffe8ce;
+  border: 1px solid #f1b97b;
+  color: #8a3b00;
+  padding: 8px 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.hidden {
+  display: none;
+}
+
+.tok {
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
+.tok-Ident {
+  background: #e7f0ff;
+  color: #1e4c8a;
+}
+
+.tok-Number {
+  background: #fff4cc;
+  color: #7a4b00;
+}
+
+.tok-String {
+  background: #ffe3ea;
+  color: #8a1b3e;
+}
+
+.tok-Plus,
+.tok-Minus,
+.tok-Star,
+.tok-Slash,
+.tok-Percent,
+.tok-Caret {
+  background: #e3f7ea;
+  color: #1c5a35;
+}
+
+.tok-Bool {
+  background: #ede8ff;
+  color: #4b2f8a;
+}
+
+.tok-OpenParen,
+.tok-CloseParen,
+.tok-Comma,
+.tok-Colon,
+.tok-Dot,
+.tok-Question {
+  background: #f4f0e8;
+  color: #6a5a46;
+}
+
+.tok-DocComment,
+.tok-LineComment,
+.tok-BlockComment {
+  background: #f0ede9;
+  color: #7a7268;
+  font-style: italic;
+}
+
+@media (max-width: 920px) {
+  main.layout {
+    grid-template-columns: 1fr;
+  }
+}
