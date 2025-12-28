@@ -8,6 +8,11 @@
     "preview": "vite preview",
     "wasm:build": "wasm-pack build ../../analyzer_wasm --target web --out-dir src/pkg"
   },
+  "dependencies": {
+    "@codemirror/commands": "^6.6.2",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.28.0"
+  },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vite": "^5.4.21"

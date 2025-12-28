@@ -1,5 +1,13 @@
 import "./style.css";
 import init, { analyze } from "./pkg/analyzer_wasm.js";
+import { RangeSetBuilder, StateEffect, StateField, EditorState } from "@codemirror/state";
+import {
+  Decoration,
+  DecorationSet,
+  EditorView,
+  keymap,
+} from "@codemirror/view";
+import { defaultKeymap } from "@codemirror/commands";
 
 const DEFAULT_SOURCE = `if (
   prop( "feeling" ) == "😀",
@@ -22,7 +30,10 @@ type Token = {
   span?: {
     start?: number;
     end?: number;
+    line?: number;
+    col?: number;
   };
+  text?: string;
 };
 
 type AnalyzeResult = {
@@ -39,15 +50,30 @@ function expectEl<T extends Element>(selector: string): T {
   return el;
 }
 
-const sourceEl = expectEl<HTMLTextAreaElement>("#source");
+const editorParentEl = expectEl<HTMLElement>("#editor");
+const cursorInfoEl = expectEl<HTMLElement>("#cursor-info");
+const warningEl = expectEl<HTMLElement>("#hl-warning");
 const formattedEl = expectEl<HTMLElement>("#formatted");
 const diagnosticsEl = expectEl<HTMLUListElement>("#diagnostics");
-const highlightEl = expectEl<HTMLElement>("#highlight");
-const tokenWarningEl = expectEl<HTMLElement>("#token-warning");
 
-function sliceUtf16(source: string, start: number, end?: number): string {
-  return source.slice(start, end);
-}
+const setTokenDecosEffect = StateEffect.define<DecorationSet>();
+const tokenDecosField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setTokenDecosEffect)) {
+        return effect.value;
+      }
+    }
+    if (tr.docChanged) {
+      return value.map(tr.changes);
+    }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
 
 function debounce<T extends unknown[]>(fn: (...args: T) => void, delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -86,62 +112,108 @@ function renderFormatted(formatted: string, diagnostics: Diagnostic[]) {
   formattedEl.textContent = formatted || "";
 }
 
-function buildHighlighted(source: string, tokens: Token[]) {
-  highlightEl.innerHTML = "";
-  tokenWarningEl.classList.add("hidden");
+function setWarningVisible(visible: boolean) {
+  warningEl.classList.toggle("hidden", !visible);
+}
 
+function sortTokens(tokens: Token[]): Token[] {
+  return [...tokens].sort((a, b) => {
+    const aStart = a.span?.start ?? Number.MAX_SAFE_INTEGER;
+    const bStart = b.span?.start ?? Number.MAX_SAFE_INTEGER;
+    if (aStart !== bStart) return aStart - bStart;
+    const aEnd = a.span?.end ?? Number.MAX_SAFE_INTEGER;
+    const bEnd = b.span?.end ?? Number.MAX_SAFE_INTEGER;
+    return aEnd - bEnd;
+  });
+}
+
+function buildTokenDecorations(
+  source: string,
+  tokens: Token[],
+): { ok: boolean; decos: DecorationSet } {
   if (!tokens || tokens.length === 0) {
-    highlightEl.textContent = source;
-    return;
+    return { ok: true, decos: Decoration.none };
   }
 
-  const sorted = [...tokens].sort((a, b) => {
-    const startDiff = (a.span?.start ?? 0) - (b.span?.start ?? 0);
-    if (startDiff !== 0) return startDiff;
-    return (a.span?.end ?? 0) - (b.span?.end ?? 0);
-  });
-
-  const fragment = document.createDocumentFragment();
-  let cursor = 0;
+  const builder = new RangeSetBuilder<Decoration>();
   const sourceLength = source.length;
+  let prevEnd = 0;
+  let hasPrev = false;
 
-  for (const token of sorted) {
+  for (const token of tokens) {
     if (!token || token.kind === "Eof") {
       continue;
     }
 
-    const start = token.span?.start ?? 0;
-    const end = token.span?.end ?? 0;
-
-    if (start < cursor || end < start || start > sourceLength || end > sourceLength) {
-      tokenWarningEl.classList.remove("hidden");
-      highlightEl.textContent = source;
-      return;
+    const start = token.span?.start;
+    const end = token.span?.end;
+    if (typeof start !== "number" || typeof end !== "number") {
+      return { ok: false, decos: Decoration.none };
+    }
+    if (start === end || token.text === "") {
+      continue;
+    }
+    if (start < 0 || end < 0 || end < start || start > sourceLength || end > sourceLength) {
+      return { ok: false, decos: Decoration.none };
+    }
+    if (hasPrev && start < prevEnd) {
+      return { ok: false, decos: Decoration.none };
     }
 
-    const gapText = sliceUtf16(source, cursor, start);
-    if (gapText) {
-      fragment.appendChild(document.createTextNode(gapText));
-    }
-
-    const tokenText = sliceUtf16(source, start, end);
-    if (tokenText) {
-      const span = document.createElement("span");
-      span.className = `tok tok-${token.kind}`;
-      span.textContent = tokenText;
-      fragment.appendChild(span);
-    }
-
-    cursor = end;
+    builder.add(start, end, Decoration.mark({ class: `tok tok-${token.kind}` }));
+    prevEnd = end;
+    hasPrev = true;
   }
 
-  const tail = sliceUtf16(source, cursor);
-  if (tail) {
-    fragment.appendChild(document.createTextNode(tail));
-  }
-
-  highlightEl.appendChild(fragment);
+  return { ok: true, decos: builder.finish() };
 }
+
+function findTokenBefore(tokens: Token[], cursor: number): Token | null {
+  let match: Token | null = null;
+  for (const token of tokens) {
+    if (!token || token.kind === "Eof") {
+      continue;
+    }
+    const start = token.span?.start;
+    const end = token.span?.end;
+    if (typeof start !== "number" || typeof end !== "number") {
+      continue;
+    }
+    if (end <= cursor || start < cursor) {
+      match = token;
+    }
+  }
+  return match;
+}
+
+function findTokenAfter(tokens: Token[], cursor: number): Token | null {
+  for (const token of tokens) {
+    if (!token || token.kind === "Eof") {
+      continue;
+    }
+    const start = token.span?.start;
+    const end = token.span?.end;
+    if (typeof start !== "number" || typeof end !== "number") {
+      continue;
+    }
+    if (start >= cursor || end > cursor) {
+      return token;
+    }
+  }
+  return null;
+}
+
+function renderCursorInfo(cursor: number, tokens: Token[]) {
+  const before = findTokenBefore(tokens, cursor);
+  const after = findTokenAfter(tokens, cursor);
+  const beforeKind = before?.kind ?? "none";
+  const afterKind = after?.kind ?? "none";
+  cursorInfoEl.textContent = `Cursor: ${cursor} | before: ${beforeKind} | after: ${afterKind}`;
+}
+
+let editorView: EditorView | null = null;
+let lastTokens: Token[] = [];
+let lastSortedTokens: Token[] = [];
 
 const runAnalyze = debounce((source: string) => {
   let result: AnalyzeResult | null = null;
@@ -153,7 +225,10 @@ const runAnalyze = debounce((source: string) => {
     const li = document.createElement("li");
     li.textContent = "error: analyze() threw; see console";
     diagnosticsEl.appendChild(li);
-    highlightEl.textContent = source;
+    setWarningVisible(false);
+    if (editorView) {
+      editorView.dispatch({ effects: setTokenDecosEffect.of(Decoration.none) });
+    }
     console.error(error);
     return;
   }
@@ -161,23 +236,51 @@ const runAnalyze = debounce((source: string) => {
   if (!result) {
     formattedEl.textContent = "(no result)";
     diagnosticsEl.innerHTML = "";
-    highlightEl.textContent = source;
+    setWarningVisible(false);
+    if (editorView) {
+      editorView.dispatch({ effects: setTokenDecosEffect.of(Decoration.none) });
+    }
     return;
   }
 
   renderDiagnostics(result.diagnostics || []);
   renderFormatted(result.formatted || "", result.diagnostics || []);
-  buildHighlighted(source, result.tokens || []);
+  lastTokens = result.tokens || [];
+  lastSortedTokens = sortTokens(lastTokens);
+  const { ok, decos } = buildTokenDecorations(source, lastSortedTokens);
+  setWarningVisible(!ok);
+  if (editorView) {
+    editorView.dispatch({ effects: setTokenDecosEffect.of(ok ? decos : Decoration.none) });
+    renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
+  }
 }, DEBOUNCE_MS);
 
 async function start() {
-  sourceEl.value = DEFAULT_SOURCE;
-  await init();
-  runAnalyze(sourceEl.value);
-
-  sourceEl.addEventListener("input", (event) => {
-    runAnalyze((event.target as HTMLTextAreaElement).value);
+  let wasmReady = false;
+  editorView = new EditorView({
+    state: EditorState.create({
+      doc: DEFAULT_SOURCE,
+      extensions: [
+        keymap.of(defaultKeymap),
+        EditorView.lineWrapping,
+        tokenDecosField,
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged && wasmReady) {
+            runAnalyze(update.state.doc.toString());
+          }
+          if (update.selectionSet) {
+            renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
+          }
+        }),
+      ],
+    }),
+    parent: editorParentEl,
   });
+
+  renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
+  await init();
+  wasmReady = true;
+  runAnalyze(editorView.state.doc.toString());
 }
 
 start();

@@ -9,8 +9,12 @@
     <main class="layout">
       <section class="pane input-pane">
         <h1>Analyzer WASM Demo</h1>
-        <label for="source">Formula</label>
-        <textarea id="source" spellcheck="false"></textarea>
+        <label for="editor">Formula</label>
+        <div id="editor" class="editor"></div>
+        <div id="cursor-info" class="cursor-info"></div>
+        <div id="hl-warning" class="warning hidden">
+          Token overlap/invalid spans detected; highlighting disabled
+        </div>
         <div class="hint">Debounced analyze on input.</div>
       </section>
       <section class="pane output-pane">
@@ -21,13 +25,6 @@
         <div class="panel">
           <h2>Diagnostics</h2>
           <ul id="diagnostics" class="diag-list"></ul>
-        </div>
-        <div class="panel">
-          <h2>Token Preview</h2>
-          <div id="token-warning" class="warning hidden">
-            Token overlap detected
-          </div>
-          <pre id="highlight" class="code"></pre>
         </div>
       </section>
     </main>

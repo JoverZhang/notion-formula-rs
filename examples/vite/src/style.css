@@ -50,17 +50,37 @@ label {
   margin-bottom: 8px;
 }
 
-textarea {
-  width: 100%;
-  min-height: 320px;
-  resize: vertical;
-  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
-  font-size: 15px;
+.editor {
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px;
   background: #fffdf9;
-  color: var(--ink);
+  min-height: 320px;
+  overflow: hidden;
+}
+
+.editor .cm-editor {
+  height: 100%;
+}
+
+.editor .cm-scroller {
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-size: 15px;
+}
+
+.editor .cm-content {
+  padding: 12px;
+}
+
+.editor .cm-gutters {
+  background: transparent;
+  border-right: none;
+}
+
+.cursor-info {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
 }
 
 .hint {
