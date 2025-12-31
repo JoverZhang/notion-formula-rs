@@ -3,5 +3,5 @@
 === OUTPUT ===
 error: expected expression after 'Plus'
   --> <input>:1:4 [3..4]
-error: Unexpected token CloseParen after expression
+error: unexpected token CloseParen after expression
   --> <input>:1:8 [7..8]

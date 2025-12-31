@@ -3,5 +3,5 @@
 === OUTPUT ===
 error: expected primary expression, found Star
   --> <input>:1:1 [0..1]
-error: Unexpected token Literal(Lit { kind: Number, symbol: Symbol { text: "3" } }) after expression
+error: unexpected token Literal(Lit { kind: Number, symbol: Symbol { text: "3" } }) after expression
   --> <input>:1:3 [2..3]
