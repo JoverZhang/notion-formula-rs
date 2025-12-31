@@ -1,6 +1,9 @@
 import "./style.css";
 import init, { analyze } from "./pkg/analyzer_wasm.js";
 import { RangeSetBuilder, EditorState } from "@codemirror/state";
+import { linter } from "@codemirror/lint";
+import { StateField, StateEffect } from "@codemirror/state";
+import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import {
   Decoration,
   DecorationSet,
@@ -60,6 +63,54 @@ const cursorInfoEl = expectEl<HTMLElement>("#cursor-info");
 const warningEl = expectEl<HTMLElement>("#hl-warning");
 const formattedEl = expectEl<HTMLElement>("#formatted");
 const diagnosticsEl = expectEl<HTMLUListElement>("#diagnostics");
+
+const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
+const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
+  create() { return []; },
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setLintDiagnosticsEffect)) return e.value;
+    }
+    return value;
+  },
+});
+
+type AnalyzerDiagnostic = Diagnostic; // 你现有的 type，建议直接改名
+
+function toCmSeverity(kind?: string): "error" | "warning" | "info" {
+  if (kind === "warning") return "warning";
+  if (kind === "info") return "info";
+  return "error";
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function analyzerToCmDiagnostics(
+  diags: AnalyzerDiagnostic[],
+  docLen: number,
+): CmDiagnostic[] {
+  const out: CmDiagnostic[] = [];
+  for (const d of diags) {
+    const start = d.span?.start;
+    const end = d.span?.end;
+    if (typeof start !== "number") continue;
+
+    const from = clamp(start, 0, docLen);
+    // when end is missing, give a minimum range to avoid 0 length causing it to be invisible
+    const toRaw = typeof end === "number" ? end : start + 1;
+    const to = clamp(Math.max(toRaw, from + 1), 0, docLen);
+
+    out.push({
+      from,
+      to,
+      severity: toCmSeverity(d.kind),
+      message: d.message || "(no message)",
+    });
+  }
+  return out;
+}
 
 
 function debounce<T extends unknown[]>(fn: (...args: T) => void, delay: number) {
@@ -253,6 +304,10 @@ const runAnalyze = debounce((source: string) => {
   }
   renderDiagnostics(combinedDiagnostics, chipMap);
   renderFormatted(result.formatted || "", syntaxDiagnostics);
+  if (editorView) {
+    const cmDiags = analyzerToCmDiagnostics(combinedDiagnostics, source.length);
+    editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
+  }
   lastTokens = result.tokens || [];
   lastSortedTokens = sortTokens(lastTokens);
   const { ok, decos } = buildTokenDecorations(source, lastSortedTokens);
@@ -272,6 +327,7 @@ async function start() {
         keymap.of(defaultKeymap),
         EditorView.lineWrapping,
         tokenDecoStateField,
+        lintDiagnosticsStateField,
         EditorView.updateListener.of((update) => {
           if (update.docChanged && wasmReady) {
             runAnalyze(update.state.doc.toString());
@@ -280,6 +336,7 @@ async function start() {
             renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
           }
         }),
+        linter((view) => view.state.field(lintDiagnosticsStateField)),
       ],
     }),
     parent: editorParentEl,

@@ -142,17 +142,14 @@ label {
 }
 
 .tok-Ident {
-  background: #e7f0ff;
   color: #1e4c8a;
 }
 
 .tok-Number {
-  background: #fff4cc;
   color: #7a4b00;
 }
 
 .tok-String {
-  background: #ffe3ea;
   color: #8a1b3e;
 }
 
@@ -162,12 +159,10 @@ label {
 .tok-Slash,
 .tok-Percent,
 .tok-Caret {
-  background: #e3f7ea;
   color: #1c5a35;
 }
 
 .tok-Bool {
-  background: #ede8ff;
   color: #4b2f8a;
 }
 
@@ -177,20 +172,17 @@ label {
 .tok-Colon,
 .tok-Dot,
 .tok-Question {
-  background: #f4f0e8;
   color: #6a5a46;
 }
 
 .tok-DocComment,
 .tok-LineComment,
 .tok-BlockComment {
-  background: #f0ede9;
   color: #7a7268;
   font-style: italic;
 }
 
 .tok-PropCall {
-  background: rgba(181, 91, 0, 0.08);
   border: 1px solid rgba(181, 91, 0, 0.28);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
