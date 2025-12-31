@@ -7,7 +7,7 @@ fn test_trailing_tokens_error() {
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(result.diagnostics[0].kind, DiagnosticKind::Error);
     assert!(
-        result.diagnostics[0].message.contains("expected EOF"),
+        result.diagnostics[0].message.contains("Unexpected token"),
         "unexpected message: {}",
         result.diagnostics[0].message
     );
