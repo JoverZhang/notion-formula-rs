@@ -264,37 +264,31 @@ const runAnalyze = debounce((source: string) => {
 }, DEBOUNCE_MS);
 
 async function start() {
-  console.log("[demo] start()");
-  try {
-    let wasmReady = false;
-    editorView = new EditorView({
-      state: EditorState.create({
-        doc: DEFAULT_SOURCE,
-        extensions: [
-          keymap.of(defaultKeymap),
-          EditorView.lineWrapping,
-          tokenDecoStateField,
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged && wasmReady) {
-              runAnalyze(update.state.doc.toString());
-            }
-            if (update.selectionSet) {
-              renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
-            }
-          }),
-        ],
-      }),
-      parent: editorParentEl,
-    });
+  let wasmReady = false;
+  editorView = new EditorView({
+    state: EditorState.create({
+      doc: DEFAULT_SOURCE,
+      extensions: [
+        keymap.of(defaultKeymap),
+        EditorView.lineWrapping,
+        tokenDecoStateField,
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged && wasmReady) {
+            runAnalyze(update.state.doc.toString());
+          }
+          if (update.selectionSet) {
+            renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
+          }
+        }),
+      ],
+    }),
+    parent: editorParentEl,
+  });
 
-    renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
-    await init();
-    wasmReady = true;
-    runAnalyze(editorView.state.doc.toString());
-    console.log("[demo] initialized" );
-  } catch (e) {
-    console.error("Failed to initialize:", e);
-  }
+  renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
+  await init();
+  wasmReady = true;
+  runAnalyze(editorView.state.doc.toString());
 }
 
 start();

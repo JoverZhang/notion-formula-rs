@@ -1,4 +1,4 @@
-import { RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
+import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 
 export type Token = {
