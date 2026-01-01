@@ -5,6 +5,7 @@ mod diagnostics;
 mod format;
 mod lexer;
 mod parser;
+pub mod semantic;
 mod source_map;
 mod tests;
 mod token;
@@ -23,6 +24,16 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
     let token_cursor = TokenCursor::new(&text, tokens);
     let mut parser = Parser::new(token_cursor);
     Ok(parser.parse_expr())
+}
+
+pub fn analyze_with_context(
+    text: &str,
+    ctx: semantic::Context,
+) -> Result<ParseOutput, diagnostics::Diagnostic> {
+    let mut output = analyze(text)?;
+    let (_, diags) = semantic::analyze_expr(&output.expr, &ctx);
+    output.diagnostics.extend(diags);
+    Ok(output)
 }
 
 pub use diagnostics::format_diagnostics;

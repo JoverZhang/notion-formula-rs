@@ -1,0 +1,9 @@
+=== INPUT ===
+prop("Missing") + if(1, 1, 2) + sum(1,"x")
+=== OUTPUT ===
+error: Unknown property: Missing
+  --> <input>:1:6 [5..14]
+error: if() condition must be boolean
+  --> <input>:1:22 [21..22]
+error: sum() expects number arguments
+  --> <input>:1:39 [38..41]

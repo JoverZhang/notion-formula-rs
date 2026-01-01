@@ -2,6 +2,7 @@ use analyzer::{
     Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind,
     byte_offset_to_utf16,
 };
+use analyzer::semantic::Context;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -48,6 +49,38 @@ pub fn analyze(source: String) -> JsValue {
     serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
 }
 
+#[wasm_bindgen(js_name = analyzeWithContext)]
+pub fn analyze_with_context(source: String, context_json: String) -> JsValue {
+    let result = match serde_json::from_str::<Context>(&context_json) {
+        Ok(ctx) => match analyzer::analyze_with_context(&source, ctx) {
+            Ok(output) => analyze_output(&source, output),
+            Err(diag) => AnalyzeResult {
+                diagnostics: vec![diag_to_view(&source, &diag)],
+                tokens: Vec::new(),
+                formatted: String::new(),
+            },
+        },
+        Err(_) => {
+            let mut result = match analyzer::analyze(&source) {
+                Ok(output) => analyze_output(&source, output),
+                Err(diag) => AnalyzeResult {
+                    diagnostics: vec![diag_to_view(&source, &diag)],
+                    tokens: Vec::new(),
+                    formatted: String::new(),
+                },
+            };
+
+            let sm = SourceMap::new(&source);
+            result
+                .diagnostics
+                .push(invalid_context_diag_view(&source, &sm));
+            result
+        }
+    };
+
+    serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
+}
+
 fn analyze_output(source: &str, output: ParseOutput) -> AnalyzeResult {
     let sm = SourceMap::new(source);
     let diagnostics = output
@@ -83,6 +116,17 @@ fn diag_to_view_with_sm(source: &str, sm: &SourceMap, diag: &Diagnostic) -> Diag
         message: diag.message.clone(),
         span: span_view(source, sm, diag.span),
     }
+}
+
+fn invalid_context_diag_view(source: &str, sm: &SourceMap) -> DiagnosticView {
+    let diag = Diagnostic {
+        kind: DiagnosticKind::Error,
+        message: "Invalid context JSON".into(),
+        span: Span { start: 0, end: 0 },
+        labels: vec![],
+        notes: vec![],
+    };
+    diag_to_view_with_sm(source, sm, &diag)
 }
 
 fn token_to_view(source: &str, sm: &SourceMap, token: &Token) -> TokenView {
