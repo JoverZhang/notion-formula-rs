@@ -1,5 +1,5 @@
 import "./style.css";
-import init, { analyze } from "./pkg/analyzer_wasm.js";
+import init, { analyzeWithContext } from "./pkg/analyzer_wasm.js";
 import { RangeSetBuilder, EditorState } from "@codemirror/state";
 import { linter } from "@codemirror/lint";
 import { StateField, StateEffect } from "@codemirror/state";
@@ -12,14 +12,13 @@ import {
 } from "@codemirror/view";
 import { defaultKeymap } from "@codemirror/commands";
 import {
-  computePropChips,
   computeTokenDecorationRanges,
   getTokenSpanIssues,
   setTokenDecosEffect,
   sortTokens,
   tokenDecoStateField,
 } from "./editor_decorations";
-import type { Chip, Token } from "./editor_decorations";
+import type { Token } from "./editor_decorations";
 import { buildChipOffsetMap, computeChipSpans } from "./chip_spans";
 import type { ChipOffsetMap } from "./chip_spans";
 
@@ -29,7 +28,6 @@ const DEFAULT_SOURCE = `if (
       "This is fine 🔥")
 `;
 const DEBOUNCE_MS = 80;
-const ENABLE_SEMANTIC_DIAGNOSTICS = false;
 
 type Diagnostic = {
   kind?: string;
@@ -48,7 +46,13 @@ type AnalyzeResult = {
   tokens?: Token[];
 };
 
-const PROPERTIES = ["Title", "feeling", "Status", "Due Date"];
+const PROPERTY_SCHEMA = [
+  { name: "Title", type: "String" },
+  { name: "feeling", type: "String" },
+  { name: "Status", type: "String" },
+  { name: "Due Date", type: "Date" },
+] as const;
+const CONTEXT_JSON = JSON.stringify({ properties: PROPERTY_SCHEMA });
 
 function expectEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
@@ -213,39 +217,6 @@ function findTokenAfter(tokens: Token[], cursor: number): Token | null {
   return null;
 }
 
-function lineColFromUtf16Offset(source: string, offset: number): { line: number; col: number } {
-  const prefix = source.slice(0, offset);
-  let line = 1;
-  for (let i = 0; i < prefix.length; i += 1) {
-    if (prefix[i] === "\n") {
-      line += 1;
-    }
-  }
-  const lastNewline = prefix.lastIndexOf("\n");
-  const col = lastNewline === -1 ? offset + 1 : offset - lastNewline;
-  return { line, col };
-}
-
-function computeSemanticDiagnostics(source: string, chips: Chip[]): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  for (const chip of chips) {
-    if (!PROPERTIES.includes(chip.argValue)) {
-      const { line, col } = lineColFromUtf16Offset(source, chip.argContentStart);
-      diagnostics.push({
-        kind: "error",
-        message: `${chip.argValue} is not a valid property.`,
-        span: {
-          start: chip.argContentStart,
-          end: chip.argContentEnd,
-          line,
-          col,
-        },
-      });
-    }
-  }
-  return diagnostics;
-}
-
 function renderCursorInfo(cursor: number, tokens: Token[]) {
   const before = findTokenBefore(tokens, cursor);
   const after = findTokenAfter(tokens, cursor);
@@ -261,7 +232,7 @@ let lastSortedTokens: Token[] = [];
 const runAnalyze = debounce((source: string) => {
   let result: AnalyzeResult | null = null;
   try {
-    result = analyze(source) as AnalyzeResult;
+    result = analyzeWithContext(source, CONTEXT_JSON) as AnalyzeResult;
   } catch (error) {
     formattedEl.textContent = "(analysis failed)";
     diagnosticsEl.innerHTML = "";
@@ -286,7 +257,7 @@ const runAnalyze = debounce((source: string) => {
     return;
   }
 
-  const syntaxDiagnostics = result.diagnostics || [];
+  const diagnostics = result.diagnostics || [];
   const chipSpans = computeChipSpans(source, result.tokens || []);
   let chipMap: ChipOffsetMap | undefined;
   try {
@@ -295,17 +266,10 @@ const runAnalyze = debounce((source: string) => {
     chipMap = undefined;
     console.warn("Failed to build chip offset map:", error);
   }
-  let combinedDiagnostics = [...syntaxDiagnostics];
-  if (ENABLE_SEMANTIC_DIAGNOSTICS) {
-    const propChips = computePropChips(source, result.tokens || []);
-    console.log("propChips", propChips);
-    const semanticDiagnostics = computeSemanticDiagnostics(source, propChips);
-    combinedDiagnostics = [...combinedDiagnostics, ...semanticDiagnostics];
-  }
-  renderDiagnostics(combinedDiagnostics, chipMap);
-  renderFormatted(result.formatted || "", syntaxDiagnostics);
+  renderDiagnostics(diagnostics, chipMap);
+  renderFormatted(result.formatted || "", diagnostics);
   if (editorView) {
-    const cmDiags = analyzerToCmDiagnostics(combinedDiagnostics, source.length);
+    const cmDiags = analyzerToCmDiagnostics(diagnostics, source.length);
     editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
   }
   lastTokens = result.tokens || [];
