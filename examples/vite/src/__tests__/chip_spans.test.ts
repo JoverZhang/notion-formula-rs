@@ -14,7 +14,7 @@ describe("buildChipOffsetMap", () => {
   });
 
   it("compresses a single chip span", () => {
-    const source = "prop(\"Title\") + 1";
+    const source = 'prop("Title") + 1';
     const chipSpans: ChipSpan[] = [{ start: 0, end: 13 }];
     const map = buildChipOffsetMap(source.length, chipSpans);
 
@@ -36,7 +36,7 @@ describe("buildChipOffsetMap", () => {
   });
 
   it("maps single chip boundaries exactly", () => {
-    const source = "prop(\"Title\")";
+    const source = 'prop("Title")';
     const chipSpans: ChipSpan[] = [{ start: 0, end: 13 }];
     const map = buildChipOffsetMap(source.length, chipSpans);
 
@@ -50,7 +50,7 @@ describe("buildChipOffsetMap", () => {
   });
 
   it("single chip roundtrip boundaries", () => {
-    const source = "prop(\"Title\")";
+    const source = 'prop("Title")';
     const chipSpans: ChipSpan[] = [{ start: 0, end: 13 }];
     const map = buildChipOffsetMap(source.length, chipSpans);
 
@@ -63,7 +63,7 @@ describe("buildChipOffsetMap", () => {
   });
 
   it("maps positions around multiple chips", () => {
-    const source = "a + prop(\"X\") + prop(\"Y\")";
+    const source = 'a + prop("X") + prop("Y")';
     const chipSpans: ChipSpan[] = [
       { start: 4, end: 13 },
       { start: 16, end: 25 },
@@ -80,7 +80,7 @@ describe("buildChipOffsetMap", () => {
   });
 
   it("multi chip roundtrip boundaries", () => {
-    const source = "a + prop(\"X\") + prop(\"Y\")";
+    const source = 'a + prop("X") + prop("Y")';
     const chipSpans: ChipSpan[] = [
       { start: 4, end: 13 },
       { start: 16, end: 25 },
@@ -96,7 +96,7 @@ describe("buildChipOffsetMap", () => {
   });
 
   it("maps multi-chip boundaries exactly", () => {
-    const source = "a + prop(\"X\") + prop(\"Y\")";
+    const source = 'a + prop("X") + prop("Y")';
     const chipSpans: ChipSpan[] = [
       { start: 4, end: 13 },
       { start: 16, end: 25 },
