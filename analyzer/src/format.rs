@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::parser::{infix_binding_power, prefix_binding_power};
 use crate::source_map::SourceMap;
-use crate::token::{CommentKind, Span, Token, TokenKind};
+use crate::token::{CommentKind, Lit, LitKind, Span, Token, TokenKind};
 
 const INDENT: usize = 2;
 const MAX_WIDTH: usize = 80;
@@ -96,9 +96,74 @@ impl Rendered {
     }
 }
 
+fn format_expr_one_line(expr: &Expr) -> String {
+    format_expr_one_line_with_prec(expr, 0)
+}
+
+fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
+    match &expr.kind {
+        ExprKind::Ident(sym) => sym.text.clone(),
+        ExprKind::Group { inner } => {
+            let inner = format_expr_one_line_with_prec(inner, 0);
+            format!("({})", inner)
+        }
+        ExprKind::Lit(lit) => render_literal(lit),
+
+        ExprKind::Call { callee, args } => {
+            let mut s = String::new();
+            s.push_str(&callee.text);
+            s.push('(');
+            for (i, a) in args.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                s.push_str(&format_expr_one_line_with_prec(a, 0));
+            }
+            s.push(')');
+            s
+        }
+
+        ExprKind::Unary { op, expr: inner } => {
+            let op_str = unop_str(op.node);
+            let inner = format_expr_one_line_with_prec(inner, prefix_binding_power(op.node));
+            format!("{}{}", op_str, inner)
+        }
+
+        ExprKind::Binary { op, left, right } => {
+            let (l_bp, r_bp) = infix_binding_power(op.node);
+            let this_prec = l_bp;
+
+            let l = format_expr_one_line_with_prec(left, l_bp);
+            let r = format_expr_one_line_with_prec(right, r_bp);
+
+            let op_str = binop_str(op.node);
+            let combined = format!("{} {} {}", l, op_str, r);
+
+            if this_prec < parent_prec {
+                format!("({})", combined)
+            } else {
+                combined
+            }
+        }
+
+        ExprKind::Ternary {
+            cond,
+            then,
+            otherwise,
+        } => {
+            let cond = format_expr_one_line_with_prec(cond, 0);
+            let then = format_expr_one_line_with_prec(then, 0);
+            let otherwise = format_expr_one_line_with_prec(otherwise, 0);
+            format!("{} ? {} : {}", cond, then, otherwise)
+        }
+
+        ExprKind::Error => "<error>".into(),
+    }
+}
+
 pub fn format_expr(expr: &Expr, source: &str, tokens: &[Token]) -> String {
     let mut fmt = Formatter::new(source, tokens);
-    let one_line = expr.pretty();
+    let one_line = format_expr_one_line(expr);
     let has_newline = fmt.expr_has_newline(expr);
     let force_multiline = fmt.forces_multiline(expr) || has_newline;
 
@@ -162,15 +227,9 @@ impl<'a> Formatter<'a> {
         match &expr.kind {
             ExprKind::Ident(sym) => Rendered::single(indent, sym.text.clone()),
             ExprKind::Group { inner } => self.format_group(expr, indent, parent_prec, inner),
-            ExprKind::Lit(lit) => match lit.kind {
-                crate::token::LitKind::Number => Rendered::single(indent, lit.symbol.text.clone()),
-                crate::token::LitKind::String => {
-                    Rendered::single(indent, escape_string(&lit.symbol.text))
-                }
-                crate::token::LitKind::Bool => Rendered::single(indent, lit.symbol.text.clone()),
-            },
+            ExprKind::Lit(lit) => Rendered::single(indent, render_literal(lit)),
             ExprKind::Call { callee, args } => {
-                self.format_call(expr, indent, parent_prec, callee.text.clone(), args)
+                self.format_call(expr, indent, parent_prec, &callee.text, args)
             }
             ExprKind::Unary { op, expr: inner } => {
                 self.format_unary(expr, indent, parent_prec, op.node, inner)
@@ -224,10 +283,7 @@ impl<'a> Formatter<'a> {
         inner: &Expr,
     ) -> Rendered {
         let bp = prefix_binding_power(op);
-        let op_str = match op {
-            UnOpKind::Not => "!",
-            UnOpKind::Neg => "-",
-        };
+        let op_str = unop_str(op);
 
         let has_newline = self.expr_has_newline(expr);
 
@@ -381,7 +437,7 @@ impl<'a> Formatter<'a> {
         expr: &Expr,
         indent: usize,
         _parent_prec: u8,
-        callee: String,
+        callee: &str,
         args: &[Expr],
     ) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
@@ -708,6 +764,20 @@ fn binop_str(op: BinOpKind) -> &'static str {
         Slash => "/",
         Percent => "%",
         Caret => "^",
+    }
+}
+
+fn unop_str(op: UnOpKind) -> &'static str {
+    match op {
+        UnOpKind::Not => "!",
+        UnOpKind::Neg => "-",
+    }
+}
+
+fn render_literal(lit: &Lit) -> String {
+    match lit.kind {
+        LitKind::Number | LitKind::Bool => lit.symbol.text.clone(),
+        LitKind::String => escape_string(&lit.symbol.text),
     }
 }
 

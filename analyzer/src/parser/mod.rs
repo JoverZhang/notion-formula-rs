@@ -4,7 +4,6 @@ use crate::token::{LitKind, NodeId, Span, Token, TokenKind, TokenRange};
 use crate::tokenstream::TokenCursor;
 
 mod expr;
-mod pretty;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]

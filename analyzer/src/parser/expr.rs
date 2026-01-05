@@ -10,7 +10,10 @@ impl<'a> Parser<'a> {
 
         if !self.same_kind(self.cur_kind(), &TokenKind::Eof) {
             let tok = self.cur().clone();
-            self.diagnostics.emit_error(tok.span, format!("unexpected token {:?} after expression", tok.kind));
+            self.diagnostics.emit_error(
+                tok.span,
+                format!("unexpected token {:?} after expression", tok.kind),
+            );
         }
         self.finish(expr)
     }

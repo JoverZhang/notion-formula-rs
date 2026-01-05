@@ -1,25 +1,25 @@
-use crate::analyze;
+use crate::{analyze, format_expr};
 
-fn assert_pretty_idempotent(input: &str) {
+fn assert_format_idempotent(input: &str) {
     let a1 = analyze(input).unwrap();
     assert!(
         a1.diagnostics.is_empty(),
         "expected no parse errors for input {input}, got {:?}",
         a1.diagnostics
     );
-    let p1 = a1.expr.pretty();
-    let a2 = analyze(&p1).unwrap();
+    let f1 = format_expr(&a1.expr, input, &a1.tokens);
+    let a2 = analyze(&f1).unwrap();
     assert!(
         a2.diagnostics.is_empty(),
-        "pretty-produced input should parse cleanly: {p1}, errors: {:?}",
+        "format-produced input should parse cleanly: {f1}, errors: {:?}",
         a2.diagnostics
     );
-    let p2 = a2.expr.pretty();
-    assert_eq!(p1, p2, "input: {input}");
+    let f2 = format_expr(&a2.expr, &f1, &a2.tokens);
+    assert_eq!(f1, f2, "input: {input}");
 }
 
 #[test]
-fn test_pretty_idempotence_cases() {
+fn test_format_idempotence_cases() {
     let cases = [
         "1+2*3",
         "(1+2)*3",
@@ -36,6 +36,6 @@ fn test_pretty_idempotence_cases() {
     ];
 
     for input in cases {
-        assert_pretty_idempotent(input);
+        assert_format_idempotent(input);
     }
 }

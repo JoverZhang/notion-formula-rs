@@ -1,8 +1,8 @@
+use analyzer::semantic::Context;
 use analyzer::{
     Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind,
     byte_offset_to_utf16,
 };
-use analyzer::semantic::Context;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 

@@ -28,7 +28,10 @@ pub struct Context {
 
 impl Context {
     pub fn lookup(&self, name: &str) -> Option<Ty> {
-        self.properties.iter().find(|p| p.name == name).map(|p| p.ty)
+        self.properties
+            .iter()
+            .find(|p| p.name == name)
+            .map(|p| p.ty)
     }
 }
 

@@ -2,8 +2,8 @@ mod common;
 
 use std::path::Path;
 
-use analyzer::{analyze, analyze_with_context, format_diagnostics};
 use analyzer::semantic::{Context, Property, Ty};
+use analyzer::{analyze, analyze_with_context, format_diagnostics};
 use common::golden::run_golden_dir;
 
 #[test]
