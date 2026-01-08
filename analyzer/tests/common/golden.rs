@@ -15,7 +15,7 @@ where
 
     inputs.sort();
 
-    let bless = std::env::var("BLESS").is_ok() || std::env::var("UPDATE_GOLDEN").is_ok();
+    let bless = std::env::var("BLESS").is_ok();
 
     for input in inputs {
         let source = fs::read_to_string(&input)

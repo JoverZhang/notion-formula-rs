@@ -36,23 +36,9 @@ struct AnalyzeResult {
 }
 
 #[wasm_bindgen]
-pub fn analyze(source: String) -> JsValue {
-    let result = match analyzer::analyze(&source) {
-        Ok(output) => analyze_output(&source, output),
-        Err(diag) => AnalyzeResult {
-            diagnostics: vec![diag_to_view(&source, &diag)],
-            tokens: Vec::new(),
-            formatted: String::new(),
-        },
-    };
-
-    serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
-}
-
-#[wasm_bindgen(js_name = analyzeWithContext)]
-pub fn analyze_with_context(source: String, context_json: String) -> JsValue {
-    let result = match serde_json::from_str::<Context>(&context_json) {
-        Ok(ctx) => match analyzer::analyze_with_context(&source, ctx) {
+pub fn analyze(source: String, context_json: Option<String>) -> JsValue {
+    let result = match context_json.as_deref().map(str::trim) {
+        None | Some("") => match analyzer::analyze(&source) {
             Ok(output) => analyze_output(&source, output),
             Err(diag) => AnalyzeResult {
                 diagnostics: vec![diag_to_view(&source, &diag)],
@@ -60,22 +46,32 @@ pub fn analyze_with_context(source: String, context_json: String) -> JsValue {
                 formatted: String::new(),
             },
         },
-        Err(_) => {
-            let mut result = match analyzer::analyze(&source) {
+        Some(context_json) => match serde_json::from_str::<Context>(context_json) {
+            Ok(ctx) => match analyzer::analyze_with_context(&source, ctx) {
                 Ok(output) => analyze_output(&source, output),
                 Err(diag) => AnalyzeResult {
                     diagnostics: vec![diag_to_view(&source, &diag)],
                     tokens: Vec::new(),
                     formatted: String::new(),
                 },
-            };
+            },
+            Err(_) => {
+                let mut result = match analyzer::analyze(&source) {
+                    Ok(output) => analyze_output(&source, output),
+                    Err(diag) => AnalyzeResult {
+                        diagnostics: vec![diag_to_view(&source, &diag)],
+                        tokens: Vec::new(),
+                        formatted: String::new(),
+                    },
+                };
 
-            let sm = SourceMap::new(&source);
-            result
-                .diagnostics
-                .push(invalid_context_diag_view(&source, &sm));
-            result
-        }
+                let sm = SourceMap::new(&source);
+                result
+                    .diagnostics
+                    .push(invalid_context_diag_view(&source, &sm));
+                result
+            }
+        },
     };
 
     serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)

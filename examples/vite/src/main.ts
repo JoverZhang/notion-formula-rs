@@ -1,5 +1,5 @@
 import "./style.css";
-import init, { analyzeWithContext } from "./pkg/analyzer_wasm.js";
+import init, { analyze } from "./pkg/analyzer_wasm.js";
 import { RangeSetBuilder, EditorState } from "@codemirror/state";
 import { linter } from "@codemirror/lint";
 import { StateField, StateEffect } from "@codemirror/state";
@@ -232,7 +232,7 @@ let lastSortedTokens: Token[] = [];
 const runAnalyze = debounce((source: string) => {
   let result: AnalyzeResult | null = null;
   try {
-    result = analyzeWithContext(source, CONTEXT_JSON) as AnalyzeResult;
+    result = analyze(source, CONTEXT_JSON) as AnalyzeResult;
   } catch (error) {
     formattedEl.textContent = "(analysis failed)";
     diagnosticsEl.innerHTML = "";

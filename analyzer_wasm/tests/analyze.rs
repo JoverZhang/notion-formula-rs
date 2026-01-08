@@ -31,7 +31,7 @@ struct TokenView {
 }
 
 fn analyze_value(source: &str) -> AnalyzeResult {
-    let value = analyzer_wasm::analyze(source.to_string());
+    let value = analyzer_wasm::analyze(source.to_string(), None);
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
 }
 
