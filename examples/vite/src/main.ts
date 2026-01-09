@@ -1,15 +1,9 @@
 import "./style.css";
-import init, { analyze } from "./pkg/analyzer_wasm.js";
-import { RangeSetBuilder, EditorState } from "@codemirror/state";
+import init, * as wasm from "./pkg/analyzer_wasm.js";
+import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { linter } from "@codemirror/lint";
-import { StateField, StateEffect } from "@codemirror/state";
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
-import {
-  Decoration,
-  DecorationSet,
-  EditorView,
-  keymap,
-} from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
 import { defaultKeymap } from "@codemirror/commands";
 import {
   computeTokenDecorationRanges,
@@ -19,15 +13,6 @@ import {
   tokenDecoStateField,
 } from "./editor_decorations";
 import type { Token } from "./editor_decorations";
-import { buildChipOffsetMap, computeChipSpans } from "./chip_spans";
-import type { ChipOffsetMap } from "./chip_spans";
-
-const DEFAULT_SOURCE = `if (
-  prop( "feeling" ) == "😀",
-    "I am absolutely not pretending.",
-      "This is fine 🔥")
-`;
-const DEBOUNCE_MS = 80;
 
 type Diagnostic = {
   kind?: string;
@@ -46,13 +31,80 @@ type AnalyzeResult = {
   tokens?: Token[];
 };
 
+type AnalyzerFn = (source: string, contextJson?: string) => AnalyzeResult;
+
+type RelatedRow = {
+  id: string;
+  Text: string;
+  Number: number;
+  Select: "A" | "B" | "C";
+};
+
+type BaseRow = {
+  id: string;
+  Text: string;
+  Number: number;
+  Select: "A" | "B" | "C";
+  Date: string;
+  Relation: string[];
+};
+
 const PROPERTY_SCHEMA = [
-  { name: "Title", type: "String" },
-  { name: "feeling", type: "String" },
-  { name: "Status", type: "String" },
-  { name: "Due Date", type: "Date" },
+  { name: "Text", type: "String" },
+  { name: "Number", type: "Number" },
+  { name: "Select", type: "String" },
+  { name: "Date", type: "Date" },
+  { name: "Relation", type: "Unknown" },
 ] as const;
 const CONTEXT_JSON = JSON.stringify({ properties: PROPERTY_SCHEMA });
+const DEBOUNCE_MS = 80;
+
+const RELATED_TABLE: RelatedRow[] = [
+  { id: "rel-1", Text: "North Star", Number: 3, Select: "A" },
+  { id: "rel-2", Text: "Blueprint", Number: 8, Select: "B" },
+  { id: "rel-3", Text: "Pulse", Number: 5, Select: "C" },
+];
+
+const BASE_ROWS: BaseRow[] = [
+  {
+    id: "row-1",
+    Text: "Morning draft",
+    Number: 12,
+    Select: "A",
+    Date: "2024-05-14",
+    Relation: ["rel-1", "rel-2"],
+  },
+  {
+    id: "row-2",
+    Text: "Client check-in",
+    Number: 7,
+    Select: "B",
+    Date: "2024-06-02",
+    Relation: ["rel-3"],
+  },
+  {
+    id: "row-3",
+    Text: "QA pass",
+    Number: 4,
+    Select: "C",
+    Date: "2024-06-09",
+    Relation: ["rel-2"],
+  },
+  {
+    id: "row-4",
+    Text: "Wrap report",
+    Number: 18,
+    Select: "A",
+    Date: "2024-06-16",
+    Relation: ["rel-1", "rel-3"],
+  },
+];
+
+const FORMULA_SAMPLES = [
+  `if(prop("Number") > 10, prop("Text"), "Needs review")`,
+  `formatDate(prop("Date"), "YYYY-MM-DD")`,
+  `prop("Select") + " • " + prop("Text")`,
+];
 
 function expectEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
@@ -62,15 +114,13 @@ function expectEl<T extends Element>(selector: string): T {
   return el;
 }
 
-const editorParentEl = expectEl<HTMLElement>("#editor");
-const cursorInfoEl = expectEl<HTMLElement>("#cursor-info");
-const warningEl = expectEl<HTMLElement>("#hl-warning");
-const formattedEl = expectEl<HTMLElement>("#formatted");
-const diagnosticsEl = expectEl<HTMLUListElement>("#diagnostics");
+const appEl = expectEl<HTMLElement>("#app");
 
 const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
 const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
-  create() { return []; },
+  create() {
+    return [];
+  },
   update(value, tr) {
     for (const e of tr.effects) {
       if (e.is(setLintDiagnosticsEffect)) return e.value;
@@ -78,8 +128,6 @@ const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
     return value;
   },
 });
-
-type AnalyzerDiagnostic = Diagnostic; // 你现有的 type，建议直接改名
 
 function toCmSeverity(kind?: string): "error" | "warning" | "info" {
   if (kind === "warning") return "warning";
@@ -92,7 +140,7 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 function analyzerToCmDiagnostics(
-  diags: AnalyzerDiagnostic[],
+  diags: Diagnostic[],
   docLen: number,
 ): CmDiagnostic[] {
   const out: CmDiagnostic[] = [];
@@ -102,7 +150,6 @@ function analyzerToCmDiagnostics(
     if (typeof start !== "number") continue;
 
     const from = clamp(start, 0, docLen);
-    // when end is missing, give a minimum range to avoid 0 length causing it to be invisible
     const toRaw = typeof end === "number" ? end : start + 1;
     const to = clamp(Math.max(toRaw, from + 1), 0, docLen);
 
@@ -116,7 +163,6 @@ function analyzerToCmDiagnostics(
   return out;
 }
 
-
 function debounce<T extends unknown[]>(fn: (...args: T) => void, delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   return (...args: T) => {
@@ -127,12 +173,12 @@ function debounce<T extends unknown[]>(fn: (...args: T) => void, delay: number) 
   };
 }
 
-function renderDiagnostics(diagnostics: Diagnostic[], chipMap?: ChipOffsetMap) {
-  diagnosticsEl.innerHTML = "";
+function renderDiagnostics(listEl: HTMLUListElement, diagnostics: Diagnostic[]) {
+  listEl.innerHTML = "";
   if (!diagnostics || diagnostics.length === 0) {
     const li = document.createElement("li");
     li.textContent = "No diagnostics";
-    diagnosticsEl.appendChild(li);
+    listEl.appendChild(li);
     return;
   }
 
@@ -141,16 +187,12 @@ function renderDiagnostics(diagnostics: Diagnostic[], chipMap?: ChipOffsetMap) {
     const kind = diag.kind || "error";
     const line = diag.span?.line ?? 0;
     const col = diag.span?.col ?? 0;
-    const chipPos =
-      chipMap && typeof diag.span?.start === "number"
-        ? ` (chipPos=${chipMap.toChipPos(diag.span.start)})`
-        : "";
-    li.textContent = `${kind}: ${diag.message} @ ${line}:${col}${chipPos}`;
-    diagnosticsEl.appendChild(li);
+    li.textContent = `${kind}: ${diag.message} @ ${line}:${col}`;
+    listEl.appendChild(li);
   });
 }
 
-function renderFormatted(formatted: string, diagnostics: Diagnostic[]) {
+function renderFormatted(formattedEl: HTMLElement, formatted: string, diagnostics: Diagnostic[]) {
   if (!formatted && diagnostics && diagnostics.length > 0) {
     formattedEl.textContent = "(no formatted output due to fatal error)";
     return;
@@ -158,7 +200,7 @@ function renderFormatted(formatted: string, diagnostics: Diagnostic[]) {
   formattedEl.textContent = formatted || "";
 }
 
-function setWarningVisible(visible: boolean) {
+function setWarningVisible(warningEl: HTMLElement, visible: boolean) {
   warningEl.classList.toggle("hidden", !visible);
 }
 
@@ -182,111 +224,250 @@ function buildTokenDecorations(
   return { ok, decos: builder.finish() };
 }
 
-function findTokenBefore(tokens: Token[], cursor: number): Token | null {
-  let match: Token | null = null;
-  for (const token of tokens) {
-    if (!token || token.kind === "Eof") {
-      continue;
-    }
-    const start = token.span?.start;
-    const end = token.span?.end;
-    if (typeof start !== "number" || typeof end !== "number") {
-      continue;
-    }
-    if (end <= cursor || start < cursor) {
-      match = token;
-    }
-  }
-  return match;
+function createTableHeader(labels: string[]): HTMLTableSectionElement {
+  const thead = document.createElement("thead");
+  const row = document.createElement("tr");
+  labels.forEach((label) => {
+    const th = document.createElement("th");
+    th.textContent = label;
+    row.appendChild(th);
+  });
+  thead.appendChild(row);
+  return thead;
 }
 
-function findTokenAfter(tokens: Token[], cursor: number): Token | null {
-  for (const token of tokens) {
-    if (!token || token.kind === "Eof") {
-      continue;
-    }
-    const start = token.span?.start;
-    const end = token.span?.end;
-    if (typeof start !== "number" || typeof end !== "number") {
-      continue;
-    }
-    if (start >= cursor || end > cursor) {
-      return token;
-    }
+function createBaseTableSection(): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "base-section pane";
+
+  const title = document.createElement("h1");
+  title.textContent = "Base Table";
+  section.appendChild(title);
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "section-subtitle";
+  subtitle.textContent = "Read-only mock data with a relation into RelatedTable.";
+  section.appendChild(subtitle);
+
+  const grid = document.createElement("div");
+  grid.className = "table-grid";
+
+  const relatedMap = new Map(RELATED_TABLE.map((row) => [row.id, row]));
+
+  const baseCard = document.createElement("div");
+  baseCard.className = "table-card";
+  const baseCardTitle = document.createElement("h2");
+  baseCardTitle.textContent = "Tasks";
+  baseCard.appendChild(baseCardTitle);
+
+  const baseTable = document.createElement("table");
+  baseTable.appendChild(createTableHeader(["Text", "Number", "Select", "Date", "Relation"]));
+  const baseBody = document.createElement("tbody");
+
+  BASE_ROWS.forEach((row) => {
+    const tr = document.createElement("tr");
+
+    [row.Text, row.Number.toString(), row.Select, row.Date].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    const relationTd = document.createElement("td");
+    const pillWrap = document.createElement("div");
+    pillWrap.className = "rel-pill-group";
+    row.Relation.forEach((relId) => {
+      const relRow = relatedMap.get(relId);
+      const pill = document.createElement("span");
+      pill.className = "rel-pill";
+      pill.textContent = relRow ? relRow.Text : relId;
+      pillWrap.appendChild(pill);
+    });
+    relationTd.appendChild(pillWrap);
+    tr.appendChild(relationTd);
+
+    baseBody.appendChild(tr);
+  });
+
+  baseTable.appendChild(baseBody);
+  baseCard.appendChild(baseTable);
+
+  const relatedCard = document.createElement("div");
+  relatedCard.className = "table-card";
+  const relatedTitle = document.createElement("h2");
+  relatedTitle.textContent = "RelatedTable";
+  relatedCard.appendChild(relatedTitle);
+
+  const relatedTable = document.createElement("table");
+  relatedTable.appendChild(createTableHeader(["Text", "Number", "Select"]));
+  const relatedBody = document.createElement("tbody");
+  RELATED_TABLE.forEach((row) => {
+    const tr = document.createElement("tr");
+    [row.Text, row.Number.toString(), row.Select].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+    relatedBody.appendChild(tr);
+  });
+  relatedTable.appendChild(relatedBody);
+  relatedCard.appendChild(relatedTable);
+
+  grid.appendChild(baseCard);
+  grid.appendChild(relatedCard);
+  section.appendChild(grid);
+
+  return section;
+}
+
+function resolveAnalyzeFn(): { fn: AnalyzerFn; passContext: boolean } | null {
+  const analyze = (wasm as Record<string, unknown>).analyze;
+  const analyzeWithContext = (wasm as Record<string, unknown>).analyzeWithContext;
+
+  if (typeof analyze === "function") {
+    return {
+      fn: analyze as AnalyzerFn,
+      passContext: typeof analyzeWithContext === "function",
+    };
   }
+
+  if (typeof analyzeWithContext === "function") {
+    return {
+      fn: ((source: string, contextJson?: string) =>
+        (analyzeWithContext as AnalyzerFn)(source, contextJson)) as AnalyzerFn,
+      passContext: true,
+    };
+  }
+
   return null;
 }
 
-function renderCursorInfo(cursor: number, tokens: Token[]) {
-  const before = findTokenBefore(tokens, cursor);
-  const after = findTokenAfter(tokens, cursor);
-  const beforeKind = before?.kind ?? "none";
-  const afterKind = after?.kind ?? "none";
-  cursorInfoEl.textContent = `Cursor: ${cursor} | before: ${beforeKind} | after: ${afterKind}`;
-}
+type FormulaPanel = {
+  editorView: EditorView;
+  runAnalyze: (source: string) => void;
+  setWasmReady: (ready: boolean) => void;
+};
 
-let editorView: EditorView | null = null;
-let lastTokens: Token[] = [];
-let lastSortedTokens: Token[] = [];
+let analyzeFn: AnalyzerFn | null = null;
+let shouldPassContext = false;
 
-const runAnalyze = debounce((source: string) => {
-  let result: AnalyzeResult | null = null;
-  try {
-    result = analyze(source, CONTEXT_JSON) as AnalyzeResult;
-  } catch (error) {
-    formattedEl.textContent = "(analysis failed)";
-    diagnosticsEl.innerHTML = "";
-    const li = document.createElement("li");
-    li.textContent = "error: analyze() threw; see console";
-    diagnosticsEl.appendChild(li);
-    setWarningVisible(false);
-    if (editorView) {
-      editorView.dispatch({ effects: setTokenDecosEffect.of(Decoration.none) });
-    }
-    console.error(error);
-    return;
-  }
-
-  if (!result) {
-    formattedEl.textContent = "(no result)";
-    diagnosticsEl.innerHTML = "";
-    setWarningVisible(false);
-    if (editorView) {
-      editorView.dispatch({ effects: setTokenDecosEffect.of(Decoration.none) });
-    }
-    return;
-  }
-
-  const diagnostics = result.diagnostics || [];
-  const chipSpans = computeChipSpans(source, result.tokens || []);
-  let chipMap: ChipOffsetMap | undefined;
-  try {
-    chipMap = buildChipOffsetMap(source.length, chipSpans);
-  } catch (error) {
-    chipMap = undefined;
-    console.warn("Failed to build chip offset map:", error);
-  }
-  renderDiagnostics(diagnostics, chipMap);
-  renderFormatted(result.formatted || "", diagnostics);
-  if (editorView) {
-    const cmDiags = analyzerToCmDiagnostics(diagnostics, source.length);
-    editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
-  }
-  lastTokens = result.tokens || [];
-  lastSortedTokens = sortTokens(lastTokens);
-  const { ok, decos } = buildTokenDecorations(source, lastSortedTokens);
-  setWarningVisible(!ok);
-  if (editorView) {
-    editorView.dispatch({ effects: setTokenDecosEffect.of(ok ? decos : Decoration.none) });
-    renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
-  }
-}, DEBOUNCE_MS);
-
-async function start() {
+function createFormulaPanel(
+  mountEl: HTMLElement,
+  label: string,
+  initialSource: string,
+): FormulaPanel {
   let wasmReady = false;
-  editorView = new EditorView({
+
+  const panel = document.createElement("section");
+  panel.className = "formula-panel pane";
+
+  const leftCol = document.createElement("div");
+  leftCol.className = "formula-left";
+
+  const labelEl = document.createElement("div");
+  labelEl.className = "formula-label";
+  labelEl.textContent = label;
+  leftCol.appendChild(labelEl);
+
+  const warningEl = document.createElement("div");
+  warningEl.className = "warning hidden";
+  warningEl.textContent = "Token spans overlap or exceed the document length.";
+  leftCol.appendChild(warningEl);
+
+  const editorEl = document.createElement("div");
+  editorEl.className = "editor";
+  leftCol.appendChild(editorEl);
+
+  const diagTitle = document.createElement("div");
+  diagTitle.className = "diagnostics-title";
+  diagTitle.textContent = "Diagnostics";
+  leftCol.appendChild(diagTitle);
+
+  const diagnosticsEl = document.createElement("ul");
+  diagnosticsEl.className = "diag-list";
+  leftCol.appendChild(diagnosticsEl);
+
+  const rightCol = document.createElement("div");
+  rightCol.className = "result-panel";
+
+  const resultTitle = document.createElement("div");
+  resultTitle.className = "result-title";
+  resultTitle.textContent = "Result";
+  rightCol.appendChild(resultTitle);
+
+  const resultPlaceholder = document.createElement("div");
+  resultPlaceholder.className = "result-placeholder";
+  resultPlaceholder.textContent = "Evaluator not implemented yet";
+  rightCol.appendChild(resultPlaceholder);
+
+  const formattedLabel = document.createElement("div");
+  formattedLabel.className = "result-subtitle";
+  formattedLabel.textContent = "Formatted";
+  rightCol.appendChild(formattedLabel);
+
+  const formattedEl = document.createElement("pre");
+  formattedEl.className = "result-formatted";
+  rightCol.appendChild(formattedEl);
+
+  panel.appendChild(leftCol);
+  panel.appendChild(rightCol);
+  mountEl.appendChild(panel);
+
+  const runAnalyze = debounce((source: string) => {
+    if (!wasmReady || !analyzeFn) {
+      return;
+    }
+
+    let result: AnalyzeResult | null = null;
+    try {
+      result = shouldPassContext
+        ? analyzeFn(source, CONTEXT_JSON)
+        : analyzeFn(source);
+    } catch (error) {
+      formattedEl.textContent = "(analysis failed)";
+      renderDiagnostics(diagnosticsEl, [
+        { kind: "error", message: "analyze() threw; see console" },
+      ]);
+      setWarningVisible(warningEl, false);
+      if (editorView) {
+        editorView.dispatch({ effects: setTokenDecosEffect.of(Decoration.none) });
+        editorView.dispatch({ effects: setLintDiagnosticsEffect.of([]) });
+      }
+      console.error(error);
+      return;
+    }
+
+    if (!result) {
+      formattedEl.textContent = "(no result)";
+      renderDiagnostics(diagnosticsEl, []);
+      setWarningVisible(warningEl, false);
+      if (editorView) {
+        editorView.dispatch({ effects: setTokenDecosEffect.of(Decoration.none) });
+        editorView.dispatch({ effects: setLintDiagnosticsEffect.of([]) });
+      }
+      return;
+    }
+
+    const diagnostics = result.diagnostics || [];
+    renderDiagnostics(diagnosticsEl, diagnostics);
+    renderFormatted(formattedEl, result.formatted || "", diagnostics);
+
+    if (editorView) {
+      const cmDiags = analyzerToCmDiagnostics(diagnostics, source.length);
+      editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
+    }
+
+    const sortedTokens = sortTokens(result.tokens || []);
+    const { ok, decos } = buildTokenDecorations(source, sortedTokens);
+    setWarningVisible(warningEl, !ok);
+    if (editorView) {
+      editorView.dispatch({ effects: setTokenDecosEffect.of(ok ? decos : Decoration.none) });
+    }
+  }, DEBOUNCE_MS);
+
+  const editorView = new EditorView({
     state: EditorState.create({
-      doc: DEFAULT_SOURCE,
+      doc: initialSource,
       extensions: [
         keymap.of(defaultKeymap),
         EditorView.lineWrapping,
@@ -296,20 +477,59 @@ async function start() {
           if (update.docChanged && wasmReady) {
             runAnalyze(update.state.doc.toString());
           }
-          if (update.selectionSet) {
-            renderCursorInfo(update.state.selection.main.head, lastSortedTokens);
-          }
         }),
         linter((view) => view.state.field(lintDiagnosticsStateField)),
       ],
     }),
-    parent: editorParentEl,
+    parent: editorEl,
   });
 
-  renderCursorInfo(editorView.state.selection.main.head, lastSortedTokens);
+  renderDiagnostics(diagnosticsEl, []);
+
+  return {
+    editorView,
+    runAnalyze: (source: string) => runAnalyze(source),
+    setWasmReady: (ready: boolean) => {
+      wasmReady = ready;
+    },
+  };
+}
+
+async function start() {
+  const layout = document.createElement("div");
+  layout.className = "layout";
+
+  const baseSection = createBaseTableSection();
+  layout.appendChild(baseSection);
+
+  const divider = document.createElement("hr");
+  divider.className = "divider";
+  layout.appendChild(divider);
+
+  const formulaSection = document.createElement("section");
+  formulaSection.className = "formula-section";
+  layout.appendChild(formulaSection);
+
+  const panels = FORMULA_SAMPLES.map((sample, index) =>
+    createFormulaPanel(formulaSection, `Formula ${index + 1}`, sample),
+  );
+
+  appEl.appendChild(layout);
+
   await init();
-  wasmReady = true;
-  runAnalyze(editorView.state.doc.toString());
+  const resolved = resolveAnalyzeFn();
+  if (!resolved) {
+    console.error("Analyzer exports not found.");
+    return;
+  }
+
+  analyzeFn = resolved.fn;
+  shouldPassContext = resolved.passContext;
+
+  panels.forEach((panel) => {
+    panel.setWasmReady(true);
+    panel.runAnalyze(panel.editorView.state.doc.toString());
+  });
 }
 
 start();
