@@ -1,8 +1,9 @@
-import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
+import { defaultKeymap } from "@codemirror/commands";
 import { linter } from "@codemirror/lint";
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
+import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
-import { defaultKeymap } from "@codemirror/commands";
+import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
 import {
   computeTokenDecorationRanges,
   getTokenSpanIssues,
@@ -10,7 +11,6 @@ import {
   sortTokens,
   tokenDecoStateField,
 } from "../editor_decorations";
-import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
 import type { Token } from "../editor_decorations";
 
 type FormulaPanelView = {
@@ -98,7 +98,10 @@ function setWarningVisible(warningEl: HTMLElement, visible: boolean) {
   warningEl.classList.toggle("hidden", !visible);
 }
 
-function buildTokenDecorations(source: string, tokens: Token[]): { ok: boolean; decos: DecorationSet } {
+function buildTokenDecorations(
+  source: string,
+  tokens: Token[],
+): { ok: boolean; decos: DecorationSet } {
   if (!tokens || tokens.length === 0) {
     return { ok: true, decos: Decoration.none };
   }

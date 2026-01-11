@@ -13,6 +13,8 @@ export function createRootLayoutView() {
   return {
     root,
     slots: { tables, panels },
-    mount(parent: HTMLElement) { parent.appendChild(root); },
+    mount(parent: HTMLElement) {
+      parent.appendChild(root);
+    },
   };
 }

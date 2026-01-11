@@ -7,12 +7,12 @@ import {
 } from "../editor_decorations";
 
 describe("computePropChips", () => {
-  it("detects prop(\"Title\")", () => {
-    const source = "prop(\"Title\")";
+  it('detects prop("Title")', () => {
+    const source = 'prop("Title")';
     const tokens: Token[] = [
       { kind: "Ident", text: "prop", span: { start: 0, end: 4 } },
       { kind: "OpenParen", text: "(", span: { start: 4, end: 5 } },
-      { kind: "String", text: "\"Title\"", span: { start: 5, end: 12 } },
+      { kind: "String", text: '"Title"', span: { start: 5, end: 12 } },
       { kind: "CloseParen", text: ")", span: { start: 12, end: 13 } },
       { kind: "Eof", text: "", span: { start: 13, end: 13 } },
     ];
@@ -29,11 +29,11 @@ describe("computePropChips", () => {
 
 describe("computeTokenDecorationRanges", () => {
   it("covers all non-trivia tokens and skips Eof", () => {
-    const source = "prop(\"Title\") + 1 +";
+    const source = 'prop("Title") + 1 +';
     const tokens: Token[] = [
       { kind: "Ident", text: "prop", span: { start: 0, end: 4 } },
       { kind: "OpenParen", text: "(", span: { start: 4, end: 5 } },
-      { kind: "String", text: "\"Title\"", span: { start: 5, end: 12 } },
+      { kind: "String", text: '"Title"', span: { start: 5, end: 12 } },
       { kind: "CloseParen", text: ")", span: { start: 12, end: 13 } },
       { kind: "Plus", text: "+", span: { start: 14, end: 15 } },
       { kind: "Number", text: "1", span: { start: 16, end: 17 } },
@@ -59,9 +59,7 @@ describe("computeTokenDecorationRanges", () => {
 
 describe("getTokenSpanIssues", () => {
   it("flags out-of-bounds spans without overlap", () => {
-    const tokens: Token[] = [
-      { kind: "Ident", span: { start: 0, end: 4 } },
-    ];
+    const tokens: Token[] = [{ kind: "Ident", span: { start: 0, end: 4 } }];
 
     expect(getTokenSpanIssues(3, tokens)).toEqual({ outOfBounds: true, overlap: false });
   });

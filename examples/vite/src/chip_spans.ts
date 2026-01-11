@@ -30,13 +30,18 @@ export function buildChipOffsetMap(docLen: number, chipSpans: ChipSpan[]): ChipO
       throw new Error(`Invalid chip span range ${formatSpan(span)} for docLen=${docLen}`);
     }
     if (prevSpan) {
-      if (span.start < prevSpan.start || (span.start === prevSpan.start && span.end < prevSpan.end)) {
+      if (
+        span.start < prevSpan.start ||
+        (span.start === prevSpan.start && span.end < prevSpan.end)
+      ) {
         throw new Error(
           `Chip spans must be sorted by start/end: prev=${formatSpan(prevSpan)} next=${formatSpan(span)}`,
         );
       }
       if (span.start < prevSpan.end) {
-        throw new Error(`Chip spans overlap: prev=${formatSpan(prevSpan)} next=${formatSpan(span)}`);
+        throw new Error(
+          `Chip spans overlap: prev=${formatSpan(prevSpan)} next=${formatSpan(span)}`,
+        );
       }
     }
     prevSpan = span;

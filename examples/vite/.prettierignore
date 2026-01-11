@@ -2,3 +2,5 @@ node_modules/
 dist/
 pkg/
 src/pkg/
+*.snap
+pnpm-lock.yaml

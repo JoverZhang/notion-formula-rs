@@ -3,13 +3,13 @@ import type { Token } from "../editor_decorations";
 export type FormulaId = "f1" | "f2" | "f3";
 
 export type AnalyzerDiagnostic = {
-  kind?: string;
-  message?: string;
-  span?: {
-    start?: number;
-    end?: number;
-    line?: number;
-    col?: number;
+  kind: string;
+  message: string;
+  span: {
+    start: number;
+    end: number;
+    line: number;
+    col: number;
   };
 };
 

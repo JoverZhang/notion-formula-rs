@@ -1,5 +1,5 @@
-import type { AppState, AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
 import { analyzeSource, initWasm } from "../analyzer/wasm_client";
+import type { AppState, AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
 
 const DEBOUNCE_MS = 80;
 
@@ -103,7 +103,7 @@ export class AppVM {
         formula.formatted = result.formatted || "";
         formula.status = "ok";
       }
-    } catch (error) {
+    } catch {
       const diag: AnalyzerDiagnostic = {
         kind: "error",
         message: "analysis failed",

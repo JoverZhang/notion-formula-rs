@@ -2,14 +2,14 @@ import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 
 export type Token = {
-  kind?: string;
-  span?: {
-    start?: number;
-    end?: number;
-    line?: number;
-    col?: number;
+  kind: string;
+  span: {
+    start: number;
+    end: number;
+    line: number;
+    col: number;
   };
-  text?: string;
+  text: string;
 };
 
 export type Chip = {
@@ -40,12 +40,13 @@ export const tokenDecoStateField = StateField.define<DecorationSet>({
 
     return token;
   },
-  provide: (field) =>
-    EditorView.decorations.from(field),
+  provide: (field) => EditorView.decorations.from(field),
 });
 
 function isTriviaKind(kind: string): boolean {
-  return kind === "DocComment" || kind === "LineComment" || kind === "BlockComment" || kind === "Newline";
+  return (
+    kind === "DocComment" || kind === "LineComment" || kind === "BlockComment" || kind === "Newline"
+  );
 }
 
 export function sortTokens(tokens: Token[]): Token[] {
@@ -119,7 +120,7 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     }
 
     const rawText = stringToken.text ?? source.slice(stringStart, stringEnd);
-    const hasQuotes = rawText.startsWith("\"") && rawText.endsWith("\"");
+    const hasQuotes = rawText.startsWith('"') && rawText.endsWith('"');
     const argContentStart = stringStart + (hasQuotes ? 1 : 0);
     const argContentEnd = stringEnd - (hasQuotes ? 1 : 0);
     const argValue = source.slice(argContentStart, argContentEnd);
@@ -144,7 +145,10 @@ export type TokenDecorationRange = {
   className: string;
 };
 
-export function computeTokenDecorationRanges(docLen: number, tokens: Token[]): TokenDecorationRange[] {
+export function computeTokenDecorationRanges(
+  docLen: number,
+  tokens: Token[],
+): TokenDecorationRange[] {
   if (!tokens || tokens.length === 0) {
     return [];
   }
