@@ -3,6 +3,7 @@ import { linter } from "@codemirror/lint";
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
+import { PROPERTY_SCHEMA } from "../app/context";
 import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
 import {
   buildChipOffsetMap,
@@ -12,6 +13,13 @@ import {
 } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
 import {
+  chipDecoStateField,
+  formulaIdFacet,
+  setChipDecosEffect,
+  type ChipDecorationRange,
+} from "../editor/chip_decorations";
+import {
+  computePropChips,
   computeTokenDecorationRanges,
   getTokenSpanIssues,
   setTokenDecosEffect,
@@ -26,6 +34,8 @@ type FormulaPanelView = {
   mount(parent: HTMLElement): void;
   update(state: FormulaState): void;
 };
+
+const VALID_PROP_NAMES = new Set(PROPERTY_SCHEMA.map((prop) => prop.name));
 
 const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
 const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
@@ -50,16 +60,37 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function analyzerToCmDiagnostics(diags: AnalyzerDiagnostic[], docLen: number): CmDiagnostic[] {
+function remapDiagnosticToChip(
+  from: number,
+  to: number,
+  chipSpans: ChipSpan[] | undefined,
+): { from: number; to: number } {
+  if (!chipSpans || chipSpans.length === 0) return { from, to };
+  for (const span of chipSpans) {
+    if (from < span.end && to > span.start) {
+      return { from: span.start, to: span.end };
+    }
+  }
+  return { from, to };
+}
+
+function analyzerToCmDiagnostics(
+  diags: AnalyzerDiagnostic[],
+  docLen: number,
+  chipSpans?: ChipSpan[],
+): CmDiagnostic[] {
   const out: CmDiagnostic[] = [];
   for (const d of diags) {
     const start = d.span?.start;
     const end = d.span?.end;
     if (typeof start !== "number") continue;
 
-    const from = clamp(start, 0, docLen);
+    let from = clamp(start, 0, docLen);
     const toRaw = typeof end === "number" ? end : start + 1;
-    const to = clamp(Math.max(toRaw, from + 1), 0, docLen);
+    let to = clamp(Math.max(toRaw, from + 1), 0, docLen);
+    const remapped = remapDiagnosticToChip(from, to, chipSpans);
+    from = clamp(remapped.from, 0, docLen);
+    to = clamp(Math.max(remapped.to, from + 1), 0, docLen);
 
     out.push({
       from,
@@ -200,7 +231,9 @@ export function createFormulaPanelView(opts: {
       extensions: [
         keymap.of(defaultKeymap),
         EditorView.lineWrapping,
+        formulaIdFacet.of(opts.id),
         tokenDecoStateField,
+        chipDecoStateField,
         lintDiagnosticsStateField,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -217,6 +250,8 @@ export function createFormulaPanelView(opts: {
   let lastCmDiagnostics: CmDiagnostic[] = [];
   let lastTokenRanges: TokenDecorationRange[] = [];
   let lastChipSpans: ChipSpan[] = [];
+  let lastChipUiRanges: ChipDecorationRange[] = [];
+  let lastValidChipSpans: ChipSpan[] = [];
   let lastChipMap: ChipOffsetMap | null = null;
   let lastFormatted = "";
   let lastStatus: FormulaState["status"] = "idle";
@@ -240,8 +275,8 @@ export function createFormulaPanelView(opts: {
     toChipPos: (rawPos) => (lastChipMap ? lastChipMap.toChipPos(rawPos) : rawPos),
     toRawPos: (chipPos) => (lastChipMap ? lastChipMap.toRawPos(chipPos) : chipPos),
     // Future chip UI must reflect actual chip widgets/decorations here.
-    isChipUiEnabled: () => false,
-    getChipUiCount: () => 0,
+    isChipUiEnabled: () => true,
+    getChipUiCount: () => lastChipUiRanges.length,
   });
 
   return {
@@ -258,10 +293,6 @@ export function createFormulaPanelView(opts: {
       renderDiagnostics(diagnosticsEl, state.diagnostics);
       renderFormatted(formattedEl, state.formatted, state.diagnostics);
 
-      const cmDiags = analyzerToCmDiagnostics(state.diagnostics, state.source.length);
-      lastCmDiagnostics = cmDiags;
-      editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
-
       const sortedTokens = sortTokens(state.tokens || []);
       const { ok, decos, ranges } = buildTokenDecorations(state.source, sortedTokens);
       lastTokenRanges = ranges;
@@ -269,12 +300,39 @@ export function createFormulaPanelView(opts: {
       editorView.dispatch({ effects: setTokenDecosEffect.of(ok ? decos : Decoration.none) });
 
       try {
+        const docLen = state.source.length;
+        const chips = computePropChips(state.source, sortedTokens);
+        const validChips = chips.filter((chip) => VALID_PROP_NAMES.has(chip.argValue));
+        lastChipUiRanges = validChips
+          .map((chip) => ({
+            from: chip.spanStart,
+            to: chip.spanEnd,
+            propName: chip.argValue,
+          }))
+          .filter((range) => range.from >= 0 && range.to > range.from && range.to <= docLen);
+        lastValidChipSpans = validChips
+          .map((chip) => ({ start: chip.spanStart, end: chip.spanEnd }))
+          .filter((span) => span.start >= 0 && span.end > span.start && span.end <= docLen)
+          .sort((a, b) => a.start - b.start || a.end - b.end);
+        editorView.dispatch({ effects: setChipDecosEffect.of(lastChipUiRanges) });
+
         lastChipSpans = computeChipSpans(state.source, sortedTokens);
         lastChipMap = buildChipOffsetMap(state.source.length, lastChipSpans);
       } catch {
         lastChipSpans = [];
+        lastChipUiRanges = [];
+        lastValidChipSpans = [];
         lastChipMap = null;
+        editorView.dispatch({ effects: setChipDecosEffect.of([]) });
       }
+
+      const cmDiags = analyzerToCmDiagnostics(
+        state.diagnostics,
+        state.source.length,
+        lastValidChipSpans,
+      );
+      lastCmDiagnostics = cmDiags;
+      editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
     },
   };
 }

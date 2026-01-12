@@ -1,4 +1,5 @@
 export const PROPERTY_SCHEMA = [
+  { name: "Title", type: "String" },
   { name: "Text", type: "String" },
   { name: "Number", type: "Number" },
   { name: "Select", type: "String" },

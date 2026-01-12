@@ -104,11 +104,6 @@ test("chip spans and mapping are exposed (UI not required)", async ({ page }) =>
   await waitForTokenCount(page, "f1", 0);
   await waitForChipSpans(page, "f1");
 
-  const chipUiCount = await page.evaluate<number>(() => {
-    const dbg = globalThis.__nf_debug;
-    return dbg ? dbg.getChipUiCount("f1") : 0;
-  });
-
   const chipInfo = await page.evaluate<ChipInfo | null>(() => {
     const dbg = globalThis.__nf_debug;
     const spans = dbg?.getChipSpans("f1") ?? [];
@@ -122,7 +117,6 @@ test("chip spans and mapping are exposed (UI not required)", async ({ page }) =>
     return { chipPos, chipStart, roundTrip, docLen, spanCount: spans.length };
   });
 
-  expect(chipUiCount).toBe(0);
   expect(chipInfo).not.toBeNull();
   expect(chipInfo?.spanCount ?? 0).toBeGreaterThanOrEqual(1);
   expect(chipInfo?.chipPos).toBe(chipInfo?.chipStart);
@@ -142,6 +136,19 @@ test("chip UI is rendered for valid prop(...) (enable when chip UI is implemente
     return dbg && dbg.getChipUiCount("f1") > 0;
   });
 
-  // Optional DOM check once implemented (requires a stable marker):
-  // expect(page.locator('[data-testid="prop-chip"][data-formula-id="f1"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="prop-chip"][data-formula-id="f1"][data-prop-name="Title"]'),
+  ).toHaveCount(1);
+
+  const sample = 'prop("Title") + 1 + sum(2, 3)';
+  await setEditorContent(page, "f1", sample);
+  await waitForTokenCount(page, "f1", 5);
+
+  const tokenDecoCount = await page.evaluate<number>(() => {
+    const dbg = globalThis.__nf_debug;
+    return dbg ? dbg.getTokenDecorations("f1").length : 0;
+  });
+
+  expect(tokenDecoCount).toBeGreaterThan(5);
+  expect(tokenDecoCount).not.toBe(1);
 });

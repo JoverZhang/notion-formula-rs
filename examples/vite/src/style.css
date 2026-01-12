@@ -164,6 +164,21 @@ tbody td {
   border-right: none;
 }
 
+.nf-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--pill);
+  color: var(--pill-ink);
+  border: 1px solid #e4d4c0;
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .diagnostics-title {
   font-size: 12px;
   text-transform: uppercase;
