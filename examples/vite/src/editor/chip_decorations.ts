@@ -22,7 +22,7 @@ export const formulaIdFacet = Facet.define<FormulaId, FormulaId>({
   combine: (values) => values[0] ?? "f1",
 });
 
-export const setChipDecosEffect = StateEffect.define<ChipDecorationRange[]>();
+export const setChipDecoListEffect = StateEffect.define<ChipDecorationRange[]>();
 
 class PropChipWidget extends WidgetType {
   private readonly formulaId: FormulaId;
@@ -138,7 +138,7 @@ export const chipDecoStateField = StateField.define<DecorationSet>({
   update(value, tr) {
     let decorations = value;
     for (const effect of tr.effects) {
-      if (effect.is(setChipDecosEffect)) {
+      if (effect.is(setChipDecoListEffect)) {
         const formulaId = tr.state.facet(formulaIdFacet);
         decorations = buildChipDecorationSet(effect.value, formulaId);
       }
@@ -160,7 +160,7 @@ export const chipRangesField = StateField.define<RangeSet<ChipRangeValue>>({
   update(value, tr) {
     let ranges = value;
     for (const effect of tr.effects) {
-      if (effect.is(setChipDecosEffect)) {
+      if (effect.is(setChipDecoListEffect)) {
         ranges = buildChipRangeSet(effect.value);
       }
     }

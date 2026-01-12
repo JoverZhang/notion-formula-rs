@@ -12,14 +12,14 @@ import {
   chipDecoStateField,
   chipRangesField,
   formulaIdFacet,
-  setChipDecosEffect,
+  setChipDecoListEffect,
   type ChipDecorationRange,
 } from "../editor/chip_decorations";
 import {
   computePropChips,
   computeTokenDecorationRanges,
   getTokenSpanIssues,
-  setTokenDecosEffect,
+  setTokenDecoListEffect,
   sortTokens,
   type Chip,
   type TokenDecorationRange,
@@ -232,9 +232,9 @@ function setWarningVisible(warningEl: HTMLElement, visible: boolean) {
 function buildTokenDecorations(
   source: string,
   tokens: Token[],
-): { ok: boolean; decos: DecorationSet; ranges: TokenDecorationRange[] } {
+): { ok: boolean; decoSet: DecorationSet; ranges: TokenDecorationRange[] } {
   if (!tokens || tokens.length === 0) {
-    return { ok: true, decos: Decoration.none, ranges: [] };
+    return { ok: true, decoSet: Decoration.none, ranges: [] };
   }
 
   const builder = new RangeSetBuilder<Decoration>();
@@ -246,7 +246,7 @@ function buildTokenDecorations(
 
   const issues = getTokenSpanIssues(docLen, tokens);
   const ok = !issues.outOfBounds && !issues.overlap;
-  return { ok, decos: builder.finish(), ranges };
+  return { ok, decoSet: builder.finish(), ranges };
 }
 
 export function createFormulaPanelView(opts: {
@@ -398,10 +398,10 @@ export function createFormulaPanelView(opts: {
       renderFormatted(formattedEl, state.formatted, state.diagnostics);
 
       const sortedTokens = sortTokens(state.tokens || []);
-      const { ok, decos, ranges } = buildTokenDecorations(state.source, sortedTokens);
+      const { ok, decoSet, ranges } = buildTokenDecorations(state.source, sortedTokens);
       lastTokenRanges = ranges;
       setWarningVisible(warningEl, !ok);
-      editorView.dispatch({ effects: setTokenDecosEffect.of(ok ? decos : Decoration.none) });
+      editorView.dispatch({ effects: setTokenDecoListEffect.of(ok ? decoSet : Decoration.none) });
 
       try {
         const docLen = state.source.length;
@@ -419,11 +419,11 @@ export function createFormulaPanelView(opts: {
           .map((chip) => ({ start: chip.spanStart, end: chip.spanEnd }))
           .filter((span) => span.start >= 0 && span.end > span.start && span.end <= docLen)
           .sort((a, b) => a.start - b.start || a.end - b.end);
-        editorView.dispatch({ effects: setChipDecosEffect.of(lastChipUiRanges) });
+        editorView.dispatch({ effects: setChipDecoListEffect.of(lastChipUiRanges) });
       } catch {
         lastChipUiRanges = [];
         lastValidChipSpans = [];
-        editorView.dispatch({ effects: setChipDecosEffect.of([]) });
+        editorView.dispatch({ effects: setChipDecoListEffect.of([]) });
       }
 
       try {

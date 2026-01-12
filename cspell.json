@@ -1,13 +1,14 @@
 {
   "words": [
     "binop",
+    "keymap",
     "lparen",
     "rparen",
     "lparen_idx",
-    "rparen_idx",
     "peekable",
     "prec",
     "punct",
+    "rparen_idx",
     "toks",
     "tokenstream",
     "tokenrange",

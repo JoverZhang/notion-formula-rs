@@ -20,7 +20,7 @@ export type Chip = {
   argValue: string;
 };
 
-export const setTokenDecosEffect = StateEffect.define<DecorationSet>();
+export const setTokenDecoListEffect = StateEffect.define<DecorationSet>();
 
 export const tokenDecoStateField = StateField.define<DecorationSet>({
   create() {
@@ -29,7 +29,7 @@ export const tokenDecoStateField = StateField.define<DecorationSet>({
   update(value, tr) {
     let token = value;
     for (const effect of tr.effects) {
-      if (effect.is(setTokenDecosEffect)) {
+      if (effect.is(setTokenDecoListEffect)) {
         token = effect.value;
       }
     }
