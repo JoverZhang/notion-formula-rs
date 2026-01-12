@@ -10,12 +10,8 @@ pub fn lex(input: &str) -> LexOutput {
     let mut tokens = Vec::new();
     let mut diagnostics = Vec::new();
     let mut iter = input.char_indices().peekable();
-    let mut stop_lexing = false;
 
     while let Some((start, ch)) = iter.next() {
-        if stop_lexing {
-            break;
-        }
         // Skip spaces/tabs but keep newlines as trivia tokens.
         if matches!(ch, ' ' | '\t' | '\r') {
             continue;
@@ -92,7 +88,6 @@ pub fn lex(input: &str) -> LexOutput {
                         },
                         "unexpected char '=' (did you mean '==')".to_string(),
                     ));
-                    stop_lexing = true;
                     break;
                 }
             }
@@ -116,7 +111,6 @@ pub fn lex(input: &str) -> LexOutput {
                         },
                         "unexpected char '&' (did you mean '&&')".to_string(),
                     ));
-                    stop_lexing = true;
                     break;
                 }
             }
@@ -132,7 +126,6 @@ pub fn lex(input: &str) -> LexOutput {
                         },
                         "unexpected char '|' (did you mean '||')".to_string(),
                     ));
-                    stop_lexing = true;
                     break;
                 }
             }
@@ -189,7 +182,6 @@ pub fn lex(input: &str) -> LexOutput {
                             },
                             "unterminated block comment".to_string(),
                         ));
-                        stop_lexing = true;
                         break;
                     }
 
@@ -237,14 +229,9 @@ pub fn lex(input: &str) -> LexOutput {
                             },
                             "unterminated string literal".to_string(),
                         ));
-                        stop_lexing = true;
                         break;
                     }
                 };
-
-                if stop_lexing {
-                    break;
-                }
 
                 tokens.push(Token {
                     kind: TokenKind::Literal(Lit {
@@ -321,7 +308,6 @@ pub fn lex(input: &str) -> LexOutput {
                     },
                     format!("unexpected char '{}'", ch),
                 ));
-                stop_lexing = true;
                 break;
             }
         };

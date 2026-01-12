@@ -68,12 +68,12 @@ async function waitForChipSpans(page: Page, id: FormulaId) {
 
 async function waitForChipUiCount(page: Page, id: FormulaId, minCount: number) {
   await page.waitForFunction(
-    ([formulaId, min]) => {
+    ({ formulaId, min }) => {
       const dbg = globalThis.__nf_debug;
       if (!dbg) return false;
       return dbg.getChipUiCount(formulaId) >= min;
     },
-    [id, minCount],
+    { formulaId: id, min: minCount },
     { timeout: 5_000 },
   );
 }

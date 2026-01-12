@@ -21,6 +21,7 @@ import {
   getTokenSpanIssues,
   setTokenDecosEffect,
   sortTokens,
+  type Chip,
   type TokenDecorationRange,
   tokenDecoStateField,
 } from "../editor_decorations";
@@ -32,7 +33,16 @@ type FormulaPanelView = {
   update(state: FormulaState): void;
 };
 
-const VALID_PROP_NAMES = new Set(PROPERTY_SCHEMA.map((prop) => prop.name));
+type PropName = (typeof PROPERTY_SCHEMA)[number]["name"];
+const VALID_PROP_NAMES = new Set<PropName>(PROPERTY_SCHEMA.map((prop) => prop.name));
+
+function isValidPropName(name: string): name is PropName {
+  return VALID_PROP_NAMES.has(name as PropName);
+}
+
+function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
+  return isValidPropName(chip.argValue);
+}
 
 const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
 const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
@@ -71,11 +81,7 @@ function remapDiagnosticToChip(
   return { from, to };
 }
 
-function chipIntersectsRange(
-  chip: ChipDecorationRange,
-  from: number,
-  to: number,
-): boolean {
+function chipIntersectsRange(chip: ChipDecorationRange, from: number, to: number): boolean {
   return from < chip.to && to > chip.from;
 }
 
@@ -364,7 +370,14 @@ export function createFormulaPanelView(opts: {
     // Future chip UI must reflect actual chip widgets/decorations here.
     isChipUiEnabled: () => true,
     getChipUiCount: () => lastChipUiRanges.length,
-    getChipUiRanges: () => lastChipUiRanges,
+    getChipUiRanges: () =>
+      lastChipUiRanges.map((range) => ({
+        from: range.from,
+        to: range.to,
+        propName: range.propName,
+        hasError: range.hasError ?? false,
+        hasWarning: range.hasWarning ?? false,
+      })),
     setSelectionHead: (pos) => {
       editorView.dispatch({ selection: { anchor: pos } });
       editorView.focus();
@@ -393,7 +406,7 @@ export function createFormulaPanelView(opts: {
       try {
         const docLen = state.source.length;
         const chips = computePropChips(state.source, sortedTokens);
-        const validChips = chips.filter((chip) => VALID_PROP_NAMES.has(chip.argValue));
+        const validChips = chips.filter(isValidPropChip);
         const rawChipRanges = validChips
           .map((chip) => ({
             from: chip.spanStart,
@@ -401,11 +414,7 @@ export function createFormulaPanelView(opts: {
             propName: chip.argValue,
           }))
           .filter((range) => range.from >= 0 && range.to > range.from && range.to <= docLen);
-        lastChipUiRanges = applyDiagnosticsToChipRanges(
-          rawChipRanges,
-          state.diagnostics,
-          docLen,
-        );
+        lastChipUiRanges = applyDiagnosticsToChipRanges(rawChipRanges, state.diagnostics, docLen);
         lastValidChipSpans = validChips
           .map((chip) => ({ start: chip.spanStart, end: chip.spanEnd }))
           .filter((span) => span.start >= 0 && span.end > span.start && span.end <= docLen)

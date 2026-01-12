@@ -91,6 +91,7 @@ class PropChipWidget extends WidgetType {
 class ChipRangeValue extends RangeValue {}
 
 const chipRangeValue = new ChipRangeValue();
+const emptyChipRanges = RangeSet.empty as RangeSet<ChipRangeValue>;
 
 function buildChipDecorationSet(
   ranges: ChipDecorationRange[],
@@ -119,7 +120,7 @@ function buildChipDecorationSet(
 
 function buildChipRangeSet(ranges: ChipDecorationRange[]): RangeSet<ChipRangeValue> {
   if (!ranges || ranges.length === 0) {
-    return RangeSet.empty;
+    return emptyChipRanges;
   }
   const builder = new RangeSetBuilder<ChipRangeValue>();
   const sortedRanges = [...ranges].sort((a, b) => a.from - b.from || a.to - b.to);
@@ -154,7 +155,7 @@ export const chipDecoStateField = StateField.define<DecorationSet>({
 
 export const chipRangesField = StateField.define<RangeSet<ChipRangeValue>>({
   create() {
-    return RangeSet.empty;
+    return emptyChipRanges;
   },
   update(value, tr) {
     let ranges = value;

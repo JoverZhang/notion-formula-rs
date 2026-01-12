@@ -1,5 +1,13 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+fmt:
+  cargo fmt --all && cd examples/vite && pnpm -s run format:fix
+
+check:
+  cargo check && cd examples/vite && pnpm -s run check
+
+test: test-analyzer test-analyzer_wasm test-example-vite
+
 test-analyzer:
   cargo test -p analyzer
 
@@ -15,4 +23,3 @@ test-example-vite:
 run-example-vite:
   cd examples/vite && pnpm -s run wasm:build && npm run dev
 
-test-all: test-analyzer test-analyzer_wasm test-example-vite

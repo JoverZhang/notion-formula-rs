@@ -213,9 +213,11 @@ fn test_empty_input_eof_span() {
 fn test_unterminated_string_error() {
     let output = lex("\"abc");
     assert_eq!(output.diagnostics.len(), 1);
-    assert!(output.diagnostics[0]
-        .message
-        .contains("unterminated string"));
+    assert!(
+        output.diagnostics[0]
+            .message
+            .contains("unterminated string")
+    );
 }
 
 #[test]
@@ -247,13 +249,16 @@ fn test_unterminated_string_recovers_partial_tokens() {
     let output = lex(input);
     assert!(output.tokens.len() > 0);
     assert_eq!(output.diagnostics.len(), 1);
-    assert!(output.diagnostics[0]
-        .message
-        .contains("unterminated string"));
+    assert!(
+        output.diagnostics[0]
+            .message
+            .contains("unterminated string")
+    );
 
-    let has_prop = output.tokens.iter().any(|tok| {
-        matches!(&tok.kind, TokenKind::Ident(sym) if sym.text == "prop")
-    });
+    let has_prop = output
+        .tokens
+        .iter()
+        .any(|tok| matches!(&tok.kind, TokenKind::Ident(sym) if sym.text == "prop"));
     let has_number = output.tokens.iter().any(|tok| {
         matches!(
             &tok.kind,
