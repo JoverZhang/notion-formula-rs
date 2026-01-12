@@ -1,7 +1,13 @@
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import type { FormulaId } from "../app/types";
 import type { TokenDecorationRange } from "../editor_decorations";
-import type { DebugCmDiag, DebugTokenDeco, NfDebug, PanelDebugHandle } from "./common";
+import type {
+  DebugChipUiRange,
+  DebugCmDiag,
+  DebugTokenDeco,
+  NfDebug,
+  PanelDebugHandle,
+} from "./common";
 
 export function isDebugEnabled(): boolean {
   if (typeof window !== "object" || window === null) return false;
@@ -32,6 +38,16 @@ function normalizeCmDiagnostics(diags: CmDiagnostic[]): DebugCmDiag[] {
       message: diag.message,
     }),
   );
+}
+
+function normalizeChipUiRanges(ranges: DebugChipUiRange[]): DebugChipUiRange[] {
+  return ranges.map((range) => ({
+    from: range.from,
+    to: range.to,
+    propName: range.propName,
+    hasError: range.hasError,
+    hasWarning: range.hasWarning,
+  }));
 }
 
 function getHandle(id: FormulaId): PanelDebugHandle {
@@ -72,11 +88,17 @@ function createDebugApi(): NfDebug {
         .getChipSpans()
         .map((span) => ({ start: span.start, end: span.end }));
     },
+    getChipUiRanges(id) {
+      return normalizeChipUiRanges(getHandle(id).getChipUiRanges());
+    },
     toChipPos(id, rawUtf16Pos) {
       return getHandle(id).toChipPos(rawUtf16Pos);
     },
     toRawPos(id, chipPos) {
       return getHandle(id).toRawPos(chipPos);
+    },
+    setSelectionHead(id, pos) {
+      return getHandle(id).setSelectionHead(pos);
     },
     isChipUiEnabled() {
       return getAnyHandle()?.isChipUiEnabled() ?? false;

@@ -179,6 +179,14 @@ tbody td {
   cursor: pointer;
 }
 
+.nf-chip--error {
+  border-bottom: 2px solid #c2441a;
+}
+
+.nf-chip--warning {
+  border-bottom: 2px solid #d39c00;
+}
+
 .diagnostics-title {
   font-size: 12px;
   text-transform: uppercase;

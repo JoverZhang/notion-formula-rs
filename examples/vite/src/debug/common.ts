@@ -11,6 +11,13 @@ export type DebugCmDiag = {
   severity: CmSeverity;
   message: string;
 };
+export type DebugChipUiRange = {
+  from: number;
+  to: number;
+  propName: string;
+  hasError: boolean;
+  hasWarning: boolean;
+};
 
 export interface NfDebug {
   listPanels(): FormulaId[];
@@ -26,8 +33,10 @@ export interface NfDebug {
   getCmDiagnostics(id: FormulaId): DebugCmDiag[];
   getTokenDecorations(id: FormulaId): DebugTokenDeco[];
   getChipSpans(id: FormulaId): { start: number; end: number }[];
+  getChipUiRanges(id: FormulaId): DebugChipUiRange[];
   toChipPos(id: FormulaId, rawUtf16Pos: number): number;
   toRawPos(id: FormulaId, chipPos: number): number;
+  setSelectionHead(id: FormulaId, pos: number): void;
   isChipUiEnabled(): boolean;
   getChipUiCount(id: FormulaId): number;
 }
@@ -49,8 +58,10 @@ export type PanelDebugHandle = {
   getCmDiagnostics(): CmDiagnostic[];
   getTokenDecorations(): TokenDecorationRange[];
   getChipSpans(): ChipSpan[];
+  getChipUiRanges(): DebugChipUiRange[];
   toChipPos(rawUtf16Pos: number): number;
   toRawPos(chipPos: number): number;
+  setSelectionHead(pos: number): void;
   isChipUiEnabled(): boolean;
   getChipUiCount(): number;
 };

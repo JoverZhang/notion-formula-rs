@@ -66,6 +66,18 @@ async function waitForChipSpans(page: Page, id: FormulaId) {
   );
 }
 
+async function waitForChipUiCount(page: Page, id: FormulaId, minCount: number) {
+  await page.waitForFunction(
+    ([formulaId, min]) => {
+      const dbg = globalThis.__nf_debug;
+      if (!dbg) return false;
+      return dbg.getChipUiCount(formulaId) >= min;
+    },
+    [id, minCount],
+    { timeout: 5_000 },
+  );
+}
+
 test.beforeEach(async ({ page }) => {
   await gotoDebug(page);
 });
@@ -162,22 +174,18 @@ test("chip spans and mapping are exposed (UI not required)", async ({ page }) =>
 test("chip UI is rendered for valid prop(...) (enable when chip UI is implemented)", async ({
   page,
 }) => {
-  await setEditorContent(page, "f1", 'prop("Title")');
-  await waitForTokenCount(page, "f1", 0);
-  await waitForChipSpans(page, "f1");
-
-  await page.waitForFunction(() => {
-    const dbg = globalThis.__nf_debug;
-    return dbg && dbg.getChipUiCount("f1") > 0;
-  });
-
-  await expect(
-    page.locator('[data-testid="prop-chip"][data-formula-id="f1"][data-prop-name="Title"]'),
-  ).toHaveCount(1);
-
-  const sample = 'prop("Title") + 1 + sum(2, 3)';
+  const sample = 'if(prop("Number") > 10, prop("Text"), "Needs review")';
   await setEditorContent(page, "f1", sample);
   await waitForTokenCount(page, "f1", 5);
+  await waitForChipSpans(page, "f1");
+  await waitForChipUiCount(page, "f1", 2);
+
+  await expect(
+    page.locator('[data-testid="prop-chip"][data-formula-id="f1"][data-prop-name="Number"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="prop-chip"][data-formula-id="f1"][data-prop-name="Text"]'),
+  ).toHaveCount(1);
 
   const tokenDecoCount = await page.evaluate<number>(() => {
     const dbg = globalThis.__nf_debug;
@@ -186,4 +194,62 @@ test("chip UI is rendered for valid prop(...) (enable when chip UI is implemente
 
   expect(tokenDecoCount).toBeGreaterThan(5);
   expect(tokenDecoCount).not.toBe(1);
+});
+
+test("arrow navigation jumps over chip ranges", async ({ page }) => {
+  await setEditorContent(page, "f1", 'prop("Title")');
+  await waitForTokenCount(page, "f1", 0);
+  await waitForChipUiCount(page, "f1", 1);
+
+  const chipRange = await page.evaluate(() => {
+    const dbg = globalThis.__nf_debug;
+    if (!dbg) return null;
+    const ranges = dbg.getChipUiRanges("f1");
+    return ranges.length ? { from: ranges[0].from, to: ranges[0].to } : null;
+  });
+
+  expect(chipRange).not.toBeNull();
+  if (!chipRange) return;
+
+  await page.evaluate((pos) => {
+    const dbg = globalThis.__nf_debug;
+    dbg?.setSelectionHead("f1", pos);
+  }, chipRange.to);
+  await page.keyboard.press("ArrowLeft");
+
+  const leftHead = await page.evaluate(() => {
+    const dbg = globalThis.__nf_debug;
+    return dbg?.getSelectionHead("f1") ?? -1;
+  });
+  expect(leftHead).toBe(chipRange.from);
+
+  await page.evaluate((pos) => {
+    const dbg = globalThis.__nf_debug;
+    dbg?.setSelectionHead("f1", pos);
+  }, chipRange.from);
+  await page.keyboard.press("ArrowRight");
+
+  const rightHead = await page.evaluate(() => {
+    const dbg = globalThis.__nf_debug;
+    return dbg?.getSelectionHead("f1") ?? -1;
+  });
+  expect(rightHead).toBe(chipRange.to);
+});
+
+test("chips reflect diagnostics when ranges intersect", async ({ page }) => {
+  await setEditorContent(page, "f1", 'if(prop("Title"))');
+  await waitForTokenCount(page, "f1", 0);
+  await waitForDiagnostics(page, "f1");
+  await waitForChipUiCount(page, "f1", 1);
+
+  const chipStatus = await page.evaluate(() => {
+    const dbg = globalThis.__nf_debug;
+    if (!dbg) return { count: 0, flagged: 0 };
+    const ranges = dbg.getChipUiRanges("f1") ?? [];
+    const flagged = ranges.filter((range) => range.hasError || range.hasWarning).length;
+    return { count: ranges.length, flagged };
+  });
+
+  expect(chipStatus.count).toBeGreaterThan(0);
+  expect(chipStatus.flagged).toBeGreaterThan(0);
 });

@@ -13,7 +13,9 @@ import {
 } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
 import {
+  chipAtomicRangesExt,
   chipDecoStateField,
+  chipRangesField,
   formulaIdFacet,
   setChipDecosEffect,
   type ChipDecorationRange,
@@ -72,6 +74,64 @@ function remapDiagnosticToChip(
     }
   }
   return { from, to };
+}
+
+function chipIntersectsRange(
+  chip: ChipDecorationRange,
+  from: number,
+  to: number,
+): boolean {
+  return from < chip.to && to > chip.from;
+}
+
+function applyDiagnosticsToChipRanges(
+  ranges: ChipDecorationRange[],
+  diagnostics: AnalyzerDiagnostic[],
+  docLen: number,
+): ChipDecorationRange[] {
+  if (!ranges || ranges.length === 0) return [];
+  if (!diagnostics || diagnostics.length === 0) {
+    return ranges.map((range) => ({
+      ...range,
+      hasError: false,
+      hasWarning: false,
+      message: undefined,
+    }));
+  }
+
+  return ranges.map((range) => {
+    let hasError = false;
+    let hasWarning = false;
+    let message: string | undefined;
+    for (const diag of diagnostics) {
+      const start = diag.span?.start;
+      if (typeof start !== "number") continue;
+      const end = diag.span?.end;
+      const from = clamp(start, 0, docLen);
+      const toRaw = typeof end === "number" ? end : start + 1;
+      const to = clamp(Math.max(toRaw, from + 1), 0, docLen);
+      if (!chipIntersectsRange(range, from, to)) continue;
+
+      const kind = diag.kind ?? "error";
+      if (kind === "warning") {
+        hasWarning = true;
+        if (!message) message = diag.message;
+      } else if (kind === "info") {
+        if (!message) message = diag.message;
+      } else {
+        if (!hasError) {
+          message = diag.message;
+        }
+        hasError = true;
+      }
+    }
+    return {
+      ...range,
+      hasError,
+      hasWarning,
+      message,
+    };
+  });
 }
 
 function analyzerToCmDiagnostics(
@@ -234,6 +294,8 @@ export function createFormulaPanelView(opts: {
         formulaIdFacet.of(opts.id),
         tokenDecoStateField,
         chipDecoStateField,
+        chipRangesField,
+        chipAtomicRangesExt,
         lintDiagnosticsStateField,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -277,6 +339,11 @@ export function createFormulaPanelView(opts: {
     // Future chip UI must reflect actual chip widgets/decorations here.
     isChipUiEnabled: () => true,
     getChipUiCount: () => lastChipUiRanges.length,
+    getChipUiRanges: () => lastChipUiRanges,
+    setSelectionHead: (pos) => {
+      editorView.dispatch({ selection: { anchor: pos } });
+      editorView.focus();
+    },
   });
 
   return {
@@ -303,27 +370,35 @@ export function createFormulaPanelView(opts: {
         const docLen = state.source.length;
         const chips = computePropChips(state.source, sortedTokens);
         const validChips = chips.filter((chip) => VALID_PROP_NAMES.has(chip.argValue));
-        lastChipUiRanges = validChips
+        const rawChipRanges = validChips
           .map((chip) => ({
             from: chip.spanStart,
             to: chip.spanEnd,
             propName: chip.argValue,
           }))
           .filter((range) => range.from >= 0 && range.to > range.from && range.to <= docLen);
+        lastChipUiRanges = applyDiagnosticsToChipRanges(
+          rawChipRanges,
+          state.diagnostics,
+          docLen,
+        );
         lastValidChipSpans = validChips
           .map((chip) => ({ start: chip.spanStart, end: chip.spanEnd }))
           .filter((span) => span.start >= 0 && span.end > span.start && span.end <= docLen)
           .sort((a, b) => a.start - b.start || a.end - b.end);
         editorView.dispatch({ effects: setChipDecosEffect.of(lastChipUiRanges) });
+      } catch {
+        lastChipUiRanges = [];
+        lastValidChipSpans = [];
+        editorView.dispatch({ effects: setChipDecosEffect.of([]) });
+      }
 
+      try {
         lastChipSpans = computeChipSpans(state.source, sortedTokens);
         lastChipMap = buildChipOffsetMap(state.source.length, lastChipSpans);
       } catch {
         lastChipSpans = [];
-        lastChipUiRanges = [];
-        lastValidChipSpans = [];
         lastChipMap = null;
-        editorView.dispatch({ effects: setChipDecosEffect.of([]) });
       }
 
       const cmDiags = analyzerToCmDiagnostics(
