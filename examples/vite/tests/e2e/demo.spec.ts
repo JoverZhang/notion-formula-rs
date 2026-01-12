@@ -146,6 +146,21 @@ test("chips remain rendered when later unterminated string causes syntax error",
   expect(decoCount).toBeGreaterThan(1);
 });
 
+test("diagnostics list uses chip positions and omits raw offsets", async ({ page }) => {
+  const broken = 'if(prop("Title") == "x", "ok", "Needs review)';
+  await setEditorContent(page, "f1", broken);
+  await waitForDiagnostics(page, "f1");
+  await waitForChipUiCount(page, "f1", 1);
+
+  const diagText = await page
+    .locator('[data-testid="formula-diagnostics"][data-formula-id="f1"]')
+    .innerText();
+
+  expect(diagText).toContain("chipPos=");
+  expect(diagText).not.toMatch(/ at \d+/);
+  expect(diagText).not.toMatch(/pos \d+/);
+});
+
 test("chip spans and mapping are exposed (UI not required)", async ({ page }) => {
   await setEditorContent(page, "f1", 'prop("Title")');
   await waitForTokenCount(page, "f1", 0);

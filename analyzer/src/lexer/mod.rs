@@ -90,7 +90,7 @@ pub fn lex(input: &str) -> LexOutput {
                             start: start as u32,
                             end: (start + 1) as u32,
                         },
-                        format!("unexpected char '=' at {} (did you mean '==')", start),
+                        "unexpected char '=' (did you mean '==')".to_string(),
                     ));
                     stop_lexing = true;
                     break;
@@ -114,7 +114,7 @@ pub fn lex(input: &str) -> LexOutput {
                             start: start as u32,
                             end: (start + 1) as u32,
                         },
-                        format!("unexpected char '&' at {} (did you mean '&&')", start),
+                        "unexpected char '&' (did you mean '&&')".to_string(),
                     ));
                     stop_lexing = true;
                     break;
@@ -130,7 +130,7 @@ pub fn lex(input: &str) -> LexOutput {
                             start: start as u32,
                             end: (start + 1) as u32,
                         },
-                        format!("unexpected char '|' at {} (did you mean '||')", start),
+                        "unexpected char '|' (did you mean '||')".to_string(),
                     ));
                     stop_lexing = true;
                     break;
@@ -187,7 +187,7 @@ pub fn lex(input: &str) -> LexOutput {
                                 start: start as u32,
                                 end: input.len() as u32,
                             },
-                            format!("unterminated block comment starting at {}", start),
+                            "unterminated block comment".to_string(),
                         ));
                         stop_lexing = true;
                         break;
@@ -235,7 +235,7 @@ pub fn lex(input: &str) -> LexOutput {
                                 start: start as u32,
                                 end: input.len() as u32,
                             },
-                            format!("unterminated string literal at {}", start),
+                            "unterminated string literal".to_string(),
                         ));
                         stop_lexing = true;
                         break;
@@ -319,7 +319,7 @@ pub fn lex(input: &str) -> LexOutput {
                         start: start as u32,
                         end: (start + ch.len_utf8()) as u32,
                     },
-                    format!("unexpected char '{}' at {}", ch, start),
+                    format!("unexpected char '{}'", ch),
                 ));
                 stop_lexing = true;
                 break;

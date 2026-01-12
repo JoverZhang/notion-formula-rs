@@ -1,7 +1,7 @@
 === INPUT ===
 if(prop("Number") > 10, prop("Text"), "Needs review)
 === OUTPUT ===
-error: unterminated string literal at 38
+error: unterminated string literal
   --> <input>:1:39 [38..53]
 error: expected ')', found Eof
   --> <input>:2:1 [53..53]

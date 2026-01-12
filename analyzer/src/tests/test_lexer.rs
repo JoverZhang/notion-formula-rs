@@ -197,7 +197,8 @@ fn test_lex_error_unknown_char() {
     assert_eq!(output.diagnostics.len(), 1);
     assert!(output.diagnostics[0].message.contains("unexpected char"));
     assert!(output.diagnostics[0].message.contains("@"));
-    assert!(output.diagnostics[0].message.contains("0"));
+    assert_eq!(output.diagnostics[0].span.start, 0);
+    assert_eq!(output.diagnostics[0].span.end, 1);
 }
 
 #[test]

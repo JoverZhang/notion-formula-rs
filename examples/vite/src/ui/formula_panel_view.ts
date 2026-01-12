@@ -5,12 +5,7 @@ import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirr
 import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
 import { PROPERTY_SCHEMA } from "../app/context";
 import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
-import {
-  buildChipOffsetMap,
-  computeChipSpans,
-  type ChipOffsetMap,
-  type ChipSpan,
-} from "../chip_spans";
+import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
 import {
   chipAtomicRangesExt,
@@ -162,7 +157,36 @@ function analyzerToCmDiagnostics(
   return out;
 }
 
-function renderDiagnostics(listEl: HTMLUListElement, diagnostics: AnalyzerDiagnostic[]) {
+function formatChipPosLabel(
+  diag: AnalyzerDiagnostic,
+  chipMap: ChipOffsetMap | null,
+  chipSpans: ChipSpan[],
+): string | null {
+  if (!chipMap) return null;
+  const start = diag.span?.start;
+  const end = diag.span?.end;
+  if (typeof start !== "number") return null;
+  const rawEnd = typeof end === "number" ? end : start + 1;
+  const normalizedEnd = Math.max(rawEnd, start + 1);
+
+  for (const span of chipSpans) {
+    if (start < span.end && normalizedEnd > span.start) {
+      const chipStart = chipMap.toChipPos(span.start);
+      return `chipPos=[${chipStart},${chipStart + 1})`;
+    }
+  }
+
+  const chipStart = chipMap.toChipPos(start);
+  const chipEnd = chipMap.toChipPos(normalizedEnd);
+  return `chipPos=[${chipStart},${Math.max(chipEnd, chipStart + 1)})`;
+}
+
+function renderDiagnostics(
+  listEl: HTMLUListElement,
+  diagnostics: AnalyzerDiagnostic[],
+  chipMap: ChipOffsetMap | null,
+  chipSpans: ChipSpan[],
+) {
   listEl.innerHTML = "";
   if (!diagnostics || diagnostics.length === 0) {
     const li = document.createElement("li");
@@ -176,7 +200,9 @@ function renderDiagnostics(listEl: HTMLUListElement, diagnostics: AnalyzerDiagno
     const kind = diag.kind || "error";
     const line = diag.span?.line ?? 0;
     const col = diag.span?.col ?? 0;
-    li.textContent = `${kind}: ${diag.message} @ ${line}:${col}`;
+    const chipLabel = formatChipPosLabel(diag, chipMap, chipSpans);
+    const position = chipLabel ? `${chipLabel} line=${line} col=${col}` : `line=${line} col=${col}`;
+    li.textContent = `${kind}: ${diag.message} ${position}`;
     listEl.appendChild(li);
   });
 }
@@ -311,7 +337,6 @@ export function createFormulaPanelView(opts: {
   let lastDiagnostics: AnalyzerDiagnostic[] = [];
   let lastCmDiagnostics: CmDiagnostic[] = [];
   let lastTokenRanges: TokenDecorationRange[] = [];
-  let lastChipSpans: ChipSpan[] = [];
   let lastChipUiRanges: ChipDecorationRange[] = [];
   let lastValidChipSpans: ChipSpan[] = [];
   let lastChipMap: ChipOffsetMap | null = null;
@@ -319,7 +344,7 @@ export function createFormulaPanelView(opts: {
   let lastStatus: FormulaState["status"] = "idle";
   let lastSource = opts.initialSource;
 
-  renderDiagnostics(diagnosticsEl, []);
+  renderDiagnostics(diagnosticsEl, [], null, []);
 
   registerPanelDebug(opts.id, {
     getState: () => ({
@@ -333,7 +358,7 @@ export function createFormulaPanelView(opts: {
     getAnalyzerDiagnostics: () => lastDiagnostics,
     getCmDiagnostics: () => lastCmDiagnostics,
     getTokenDecorations: () => lastTokenRanges,
-    getChipSpans: () => lastChipSpans,
+    getChipSpans: () => lastValidChipSpans,
     toChipPos: (rawPos) => (lastChipMap ? lastChipMap.toChipPos(rawPos) : rawPos),
     toRawPos: (chipPos) => (lastChipMap ? lastChipMap.toRawPos(chipPos) : chipPos),
     // Future chip UI must reflect actual chip widgets/decorations here.
@@ -357,7 +382,6 @@ export function createFormulaPanelView(opts: {
       lastDiagnostics = state.diagnostics;
       lastFormatted = state.formatted;
 
-      renderDiagnostics(diagnosticsEl, state.diagnostics);
       renderFormatted(formattedEl, state.formatted, state.diagnostics);
 
       const sortedTokens = sortTokens(state.tokens || []);
@@ -394,13 +418,12 @@ export function createFormulaPanelView(opts: {
       }
 
       try {
-        lastChipSpans = computeChipSpans(state.source, sortedTokens);
-        lastChipMap = buildChipOffsetMap(state.source.length, lastChipSpans);
+        lastChipMap = buildChipOffsetMap(state.source.length, lastValidChipSpans);
       } catch {
-        lastChipSpans = [];
         lastChipMap = null;
       }
 
+      renderDiagnostics(diagnosticsEl, state.diagnostics, lastChipMap, lastValidChipSpans);
       const cmDiags = analyzerToCmDiagnostics(
         state.diagnostics,
         state.source.length,

@@ -1,5 +1,3 @@
-import { computePropChips, type Token } from "./editor_decorations";
-
 export type ChipSpan = {
   start: number;
   end: number;
@@ -9,15 +7,6 @@ export type ChipOffsetMap = {
   toChipPos: (rawUtf16Pos: number) => number;
   toRawPos: (chipPos: number) => number;
 };
-
-export function computeChipSpans(source: string, tokens: Token[]): ChipSpan[] {
-  const chips = computePropChips(source, tokens);
-  const spans = chips.map((chip) => ({
-    start: chip.spanStart,
-    end: chip.spanEnd,
-  }));
-  return spans.sort((a, b) => a.start - b.start || a.end - b.end);
-}
 
 function formatSpan(span: ChipSpan): string {
   return `{start:${span.start},end:${span.end}}`;
