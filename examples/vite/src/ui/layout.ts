@@ -1,6 +1,7 @@
 export function createRootLayoutView() {
   const root = document.createElement("div");
   root.className = "layout";
+  root.setAttribute("data-testid", "app-root");
 
   const tables = document.createElement("div");
   const divider = document.createElement("hr");

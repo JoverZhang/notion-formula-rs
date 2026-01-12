@@ -7,11 +7,16 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "typecheck": "pnpm -s run typecheck:app && pnpm -s run typecheck:tests",
+    "typecheck:app": "tsc -p tsconfig.json --noEmit --pretty false",
+    "typecheck:tests": "tsc -p tests/tsconfig.json --noEmit --pretty false",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
+    "format": "prettier . --check",
+    "format:fix": "prettier . --write",
+    "check": "pnpm -s run typecheck && pnpm -s run lint && pnpm -s run format",
     "wasm:build": "wasm-pack build ../../analyzer_wasm --target web --out-dir src/pkg"
   },
   "dependencies": {
@@ -22,6 +27,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^25.0.6",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.31.0",

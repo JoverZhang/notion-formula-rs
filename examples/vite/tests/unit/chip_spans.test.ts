@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChipOffsetMap, type ChipSpan } from "../chip_spans";
+import { buildChipOffsetMap, type ChipSpan } from "../../src/chip_spans";
 
 describe("buildChipOffsetMap", () => {
   it("maps identity when there are no chips", () => {

@@ -5,10 +5,18 @@ import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirr
 import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
 import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
 import {
+  buildChipOffsetMap,
+  computeChipSpans,
+  type ChipOffsetMap,
+  type ChipSpan,
+} from "../chip_spans";
+import { registerPanelDebug } from "../debug/debug_bridge";
+import {
   computeTokenDecorationRanges,
   getTokenSpanIssues,
   setTokenDecosEffect,
   sortTokens,
+  type TokenDecorationRange,
   tokenDecoStateField,
 } from "../editor_decorations";
 import type { Token } from "../editor_decorations";
@@ -101,9 +109,9 @@ function setWarningVisible(warningEl: HTMLElement, visible: boolean) {
 function buildTokenDecorations(
   source: string,
   tokens: Token[],
-): { ok: boolean; decos: DecorationSet } {
+): { ok: boolean; decos: DecorationSet; ranges: TokenDecorationRange[] } {
   if (!tokens || tokens.length === 0) {
-    return { ok: true, decos: Decoration.none };
+    return { ok: true, decos: Decoration.none, ranges: [] };
   }
 
   const builder = new RangeSetBuilder<Decoration>();
@@ -115,7 +123,7 @@ function buildTokenDecorations(
 
   const issues = getTokenSpanIssues(docLen, tokens);
   const ok = !issues.outOfBounds && !issues.overlap;
-  return { ok, decos: builder.finish() };
+  return { ok, decos: builder.finish(), ranges };
 }
 
 export function createFormulaPanelView(opts: {
@@ -126,6 +134,8 @@ export function createFormulaPanelView(opts: {
 }): FormulaPanelView {
   const panel = document.createElement("section");
   panel.className = "formula-panel pane";
+  panel.setAttribute("data-testid", "formula-panel");
+  panel.setAttribute("data-formula-id", opts.id);
 
   const leftCol = document.createElement("div");
   leftCol.className = "formula-left";
@@ -142,6 +152,8 @@ export function createFormulaPanelView(opts: {
 
   const editorEl = document.createElement("div");
   editorEl.className = "editor";
+  editorEl.setAttribute("data-testid", "formula-editor");
+  editorEl.setAttribute("data-formula-id", opts.id);
   leftCol.appendChild(editorEl);
 
   const diagTitle = document.createElement("div");
@@ -151,6 +163,8 @@ export function createFormulaPanelView(opts: {
 
   const diagnosticsEl = document.createElement("ul");
   diagnosticsEl.className = "diag-list";
+  diagnosticsEl.setAttribute("data-testid", "formula-diagnostics");
+  diagnosticsEl.setAttribute("data-formula-id", opts.id);
   leftCol.appendChild(diagnosticsEl);
 
   const rightCol = document.createElement("div");
@@ -173,6 +187,8 @@ export function createFormulaPanelView(opts: {
 
   const formattedEl = document.createElement("pre");
   formattedEl.className = "result-formatted";
+  formattedEl.setAttribute("data-testid", "formula-formatted");
+  formattedEl.setAttribute("data-formula-id", opts.id);
   rightCol.appendChild(formattedEl);
 
   panel.appendChild(leftCol);
@@ -197,7 +213,33 @@ export function createFormulaPanelView(opts: {
     parent: editorEl,
   });
 
+  let lastDiagnostics: AnalyzerDiagnostic[] = [];
+  let lastCmDiagnostics: CmDiagnostic[] = [];
+  let lastTokenRanges: TokenDecorationRange[] = [];
+  let lastChipSpans: ChipSpan[] = [];
+  let lastChipMap: ChipOffsetMap | null = null;
+  let lastFormatted = "";
+  let lastStatus: FormulaState["status"] = "idle";
+  let lastSource = opts.initialSource;
+
   renderDiagnostics(diagnosticsEl, []);
+
+  registerPanelDebug(opts.id, {
+    getState: () => ({
+      source: lastSource,
+      formatted: lastFormatted,
+      diagnosticsCount: lastDiagnostics.length,
+      tokenCount: lastTokenRanges.length,
+      status: lastStatus,
+    }),
+    getSelectionHead: () => editorView.state.selection.main.head,
+    getAnalyzerDiagnostics: () => lastDiagnostics,
+    getCmDiagnostics: () => lastCmDiagnostics,
+    getTokenDecorations: () => lastTokenRanges,
+    getChipSpans: () => lastChipSpans,
+    toChipPos: (rawPos) => (lastChipMap ? lastChipMap.toChipPos(rawPos) : rawPos),
+    toRawPos: (chipPos) => (lastChipMap ? lastChipMap.toRawPos(chipPos) : chipPos),
+  });
 
   return {
     root: panel,
@@ -205,16 +247,31 @@ export function createFormulaPanelView(opts: {
       parent.appendChild(panel);
     },
     update(state: FormulaState) {
+      lastSource = state.source;
+      lastStatus = state.status;
+      lastDiagnostics = state.diagnostics;
+      lastFormatted = state.formatted;
+
       renderDiagnostics(diagnosticsEl, state.diagnostics);
       renderFormatted(formattedEl, state.formatted, state.diagnostics);
 
       const cmDiags = analyzerToCmDiagnostics(state.diagnostics, state.source.length);
+      lastCmDiagnostics = cmDiags;
       editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiags) });
 
       const sortedTokens = sortTokens(state.tokens || []);
-      const { ok, decos } = buildTokenDecorations(state.source, sortedTokens);
+      const { ok, decos, ranges } = buildTokenDecorations(state.source, sortedTokens);
+      lastTokenRanges = ranges;
       setWarningVisible(warningEl, !ok);
       editorView.dispatch({ effects: setTokenDecosEffect.of(ok ? decos : Decoration.none) });
+
+      try {
+        lastChipSpans = computeChipSpans(state.source, sortedTokens);
+        lastChipMap = buildChipOffsetMap(state.source.length, lastChipSpans);
+      } catch {
+        lastChipSpans = [];
+        lastChipMap = null;
+      }
     },
   };
 }
