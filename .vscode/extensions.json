@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "rust-lang.rust-analyzer",
+    "editorconfig.editorconfig",
+    "usernamehw.errorlens"
+  ]
+}

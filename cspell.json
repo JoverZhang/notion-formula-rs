@@ -1,15 +1,15 @@
 {
-    "words": [
-        "binop",
-        "lparen",
-        "rparen",
-        "lparen_idx",
-        "rparen_idx",
-        "peekable",
-        "prec",
-        "punct",
-        "toks",
-        "tokenstream",
-        "tokenrange",
-    ]
+  "words": [
+    "binop",
+    "lparen",
+    "rparen",
+    "lparen_idx",
+    "rparen_idx",
+    "peekable",
+    "prec",
+    "punct",
+    "toks",
+    "tokenstream",
+    "tokenrange",
+  ]
 }
