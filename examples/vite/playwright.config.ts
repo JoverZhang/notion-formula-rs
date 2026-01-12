@@ -18,7 +18,7 @@ export default defineConfig({
     command: "pnpm run dev -- --host localhost --port 5173 --strictPort",
     url: "http://localhost:5173/?debug=1",
     reuseExistingServer: true,
-    timeout: 30_000,
+    timeout: 5_000,
     stdout: "pipe",
     stderr: "pipe",
   },

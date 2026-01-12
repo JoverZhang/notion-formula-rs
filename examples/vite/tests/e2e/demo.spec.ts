@@ -36,25 +36,34 @@ async function waitForTokenCount(page: Page, id: FormulaId, minCount: number) {
       return Boolean(state && state.tokenCount > min);
     },
     [id, minCount],
+    { timeout: 5_000 },
   );
 }
 
 async function waitForDiagnostics(page: Page, id: FormulaId) {
-  await page.waitForFunction((formulaId) => {
-    const dbg = globalThis.__nf_debug;
-    if (!dbg) return false;
-    const diags = dbg.getAnalyzerDiagnostics(formulaId) ?? [];
-    return diags.length > 0;
-  }, id);
+  await page.waitForFunction(
+    (formulaId) => {
+      const dbg = globalThis.__nf_debug;
+      if (!dbg) return false;
+      const diags = dbg.getAnalyzerDiagnostics(formulaId) ?? [];
+      return diags.length > 0;
+    },
+    id,
+    { timeout: 5_000 },
+  );
 }
 
 async function waitForChipSpans(page: Page, id: FormulaId) {
-  await page.waitForFunction((formulaId) => {
-    const dbg = globalThis.__nf_debug;
-    if (!dbg) return false;
-    const spans = dbg.getChipSpans(formulaId) ?? [];
-    return spans.length > 0;
-  }, id);
+  await page.waitForFunction(
+    (formulaId) => {
+      const dbg = globalThis.__nf_debug;
+      if (!dbg) return false;
+      const spans = dbg.getChipSpans(formulaId) ?? [];
+      return spans.length > 0;
+    },
+    id,
+    { timeout: 5_000 },
+  );
 }
 
 test.beforeEach(async ({ page }) => {
@@ -97,6 +106,32 @@ test("diagnostics propagate to UI and CodeMirror lint", async ({ page }) => {
   const domDiagItems = page.locator('[data-testid="formula-diagnostics"][data-formula-id="f1"] li');
   await expect(domDiagItems.first()).toBeVisible();
   await expect(domDiagItems.first()).not.toHaveText(/No diagnostics/i);
+});
+
+test("chips remain rendered when later unterminated string causes syntax error", async ({
+  page,
+}) => {
+  const broken = 'if(prop("Number") > 10, prop("Text"), "Needs review)';
+  await setEditorContent(page, "f1", broken);
+  await waitForDiagnostics(page, "f1");
+  await waitForTokenCount(page, "f1", 0);
+
+  const tokenCount = await page.evaluate<number>(() => {
+    const dbg = globalThis.__nf_debug;
+    return dbg ? dbg.getState("f1").tokenCount : 0;
+  });
+  expect(tokenCount).toBeGreaterThan(0);
+
+  await page.waitForFunction(() => {
+    const dbg = globalThis.__nf_debug;
+    return dbg ? dbg.getChipUiCount("f1") >= 2 : false;
+  });
+
+  const decoCount = await page.evaluate<number>(() => {
+    const dbg = globalThis.__nf_debug;
+    return dbg ? dbg.getTokenDecorations("f1").length : 0;
+  });
+  expect(decoCount).toBeGreaterThan(1);
 });
 
 test("chip spans and mapping are exposed (UI not required)", async ({ page }) => {

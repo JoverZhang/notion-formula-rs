@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "typecheck": "pnpm -s run typecheck:app && pnpm -s run typecheck:tests",
@@ -17,7 +17,7 @@
     "format": "prettier . --check",
     "format:fix": "prettier . --write",
     "check": "pnpm -s run typecheck && pnpm -s run lint && pnpm -s run format",
-    "wasm:build": "wasm-pack build ../../analyzer_wasm --target web --out-dir src/pkg"
+    "wasm:build": "wasm-pack build ../../analyzer_wasm --target web --out-dir ../examples/vite/src/pkg"
   },
   "dependencies": {
     "@codemirror/commands": "^6.6.2",

@@ -26,23 +26,10 @@ fn diagnostics_golden() {
                         ty: Ty::String,
                     }],
                 };
-                analyze_with_context(source, ctx).unwrap_or_else(|e| {
-                    panic!(
-                        "analyze_with_context() returned Err for {:?}: {:?}\n\
-                         (If lexer errors should be golden-tested too, change analyze() \
-                         to return ParseOutput with diagnostics even on fatal errors.)",
-                        path, e
-                    )
-                })
+                analyze_with_context(source, ctx)
+                    .expect("analyze_with_context() should return ParseOutput")
             } else {
-                analyze(source).unwrap_or_else(|e| {
-                    panic!(
-                        "analyze() returned Err for {:?}: {:?}\n\
-                         (If lexer errors should be golden-tested too, change analyze() \
-                         to return ParseOutput with diagnostics even on fatal errors.)",
-                        path, e
-                    )
-                })
+                analyze(source).expect("analyze() should return ParseOutput")
             };
 
             format_diagnostics(source, out.diagnostics)

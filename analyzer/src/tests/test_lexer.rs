@@ -2,7 +2,7 @@ use crate::lexer::lex;
 use crate::token::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
 
 fn tokens(input: &str) -> Vec<Token> {
-    lex(input).unwrap()
+    lex(input).tokens
 }
 
 fn kinds(input: &str) -> Vec<TokenKind> {
@@ -172,28 +172,32 @@ fn test_whitespace_skipping_spans() {
 
 #[test]
 fn test_lex_error_single_equals() {
-    let err = lex("=").unwrap_err();
-    assert!(err.contains("did you mean '=='"));
+    let output = lex("=");
+    assert_eq!(output.diagnostics.len(), 1);
+    assert!(output.diagnostics[0].message.contains("did you mean '=='"));
 }
 
 #[test]
 fn test_lex_error_single_and() {
-    let err = lex("&").unwrap_err();
-    assert!(err.contains("did you mean '&&'"));
+    let output = lex("&");
+    assert_eq!(output.diagnostics.len(), 1);
+    assert!(output.diagnostics[0].message.contains("did you mean '&&'"));
 }
 
 #[test]
 fn test_lex_error_single_or() {
-    let err = lex("|").unwrap_err();
-    assert!(err.contains("did you mean '||'"));
+    let output = lex("|");
+    assert_eq!(output.diagnostics.len(), 1);
+    assert!(output.diagnostics[0].message.contains("did you mean '||'"));
 }
 
 #[test]
 fn test_lex_error_unknown_char() {
-    let err = lex("@").unwrap_err();
-    assert!(err.contains("unexpected char"));
-    assert!(err.contains("@"));
-    assert!(err.contains("0"));
+    let output = lex("@");
+    assert_eq!(output.diagnostics.len(), 1);
+    assert!(output.diagnostics[0].message.contains("unexpected char"));
+    assert!(output.diagnostics[0].message.contains("@"));
+    assert!(output.diagnostics[0].message.contains("0"));
 }
 
 #[test]
@@ -206,8 +210,11 @@ fn test_empty_input_eof_span() {
 
 #[test]
 fn test_unterminated_string_error() {
-    let err = lex("\"abc").unwrap_err();
-    assert!(err.contains("unterminated string"));
+    let output = lex("\"abc");
+    assert_eq!(output.diagnostics.len(), 1);
+    assert!(output.diagnostics[0]
+        .message
+        .contains("unterminated string"));
 }
 
 #[test]
@@ -231,4 +238,31 @@ fn test_comment_tokens() {
             TokenKind::Eof
         ]
     );
+}
+
+#[test]
+fn test_unterminated_string_recovers_partial_tokens() {
+    let input = r#"if(prop("Number") > 10, prop("Text"), "Needs review)"#;
+    let output = lex(input);
+    assert!(output.tokens.len() > 0);
+    assert_eq!(output.diagnostics.len(), 1);
+    assert!(output.diagnostics[0]
+        .message
+        .contains("unterminated string"));
+
+    let has_prop = output.tokens.iter().any(|tok| {
+        matches!(&tok.kind, TokenKind::Ident(sym) if sym.text == "prop")
+    });
+    let has_number = output.tokens.iter().any(|tok| {
+        matches!(
+            &tok.kind,
+            TokenKind::Literal(Lit {
+                kind: LitKind::String,
+                symbol
+            }) if symbol.text == r#""Number""#
+        )
+    });
+
+    assert!(has_prop);
+    assert!(has_number);
 }

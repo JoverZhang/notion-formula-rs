@@ -1,0 +1,1 @@
+if(prop("Number") > 10, prop("Text"), "Needs review)

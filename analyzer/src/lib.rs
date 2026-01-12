@@ -14,16 +14,12 @@ mod tokenstream;
 pub use parser::ParseOutput;
 
 pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
-    let tokens = lex(&text).map_err(|msg| diagnostics::Diagnostic {
-        kind: diagnostics::DiagnosticKind::Error,
-        message: msg,
-        span: Span { start: 0, end: 0 },
-        labels: vec![],
-        notes: vec![],
-    })?;
-    let token_cursor = TokenCursor::new(&text, tokens);
+    let lex_output = lex(&text);
+    let token_cursor = TokenCursor::new(&text, lex_output.tokens);
     let mut parser = Parser::new(token_cursor);
-    Ok(parser.parse_expr())
+    let mut output = parser.parse_expr();
+    output.diagnostics.extend(lex_output.diagnostics);
+    Ok(output)
 }
 
 pub fn analyze_with_context(

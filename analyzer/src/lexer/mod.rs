@@ -1,10 +1,21 @@
+use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::token::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
 
-pub fn lex(input: &str) -> Result<Vec<Token>, String> {
+pub struct LexOutput {
+    pub tokens: Vec<Token>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+pub fn lex(input: &str) -> LexOutput {
     let mut tokens = Vec::new();
+    let mut diagnostics = Vec::new();
     let mut iter = input.char_indices().peekable();
+    let mut stop_lexing = false;
 
     while let Some((start, ch)) = iter.next() {
+        if stop_lexing {
+            break;
+        }
         // Skip spaces/tabs but keep newlines as trivia tokens.
         if matches!(ch, ' ' | '\t' | '\r') {
             continue;
@@ -74,10 +85,15 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     let (_, _) = iter.next().unwrap();
                     TokenKind::EqEq
                 } else {
-                    return Err(format!(
-                        "unexpected char '=' at {} (did you mean '==')",
-                        start
+                    diagnostics.push(make_error(
+                        Span {
+                            start: start as u32,
+                            end: (start + 1) as u32,
+                        },
+                        format!("unexpected char '=' at {} (did you mean '==')", start),
                     ));
+                    stop_lexing = true;
+                    break;
                 }
             }
             '!' => {
@@ -93,10 +109,15 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     let (_, _) = iter.next().unwrap();
                     TokenKind::AndAnd
                 } else {
-                    return Err(format!(
-                        "unexpected char '&' at {} (did you mean '&&')",
-                        start
+                    diagnostics.push(make_error(
+                        Span {
+                            start: start as u32,
+                            end: (start + 1) as u32,
+                        },
+                        format!("unexpected char '&' at {} (did you mean '&&')", start),
                     ));
+                    stop_lexing = true;
+                    break;
                 }
             }
             '|' => {
@@ -104,10 +125,15 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     let (_, _) = iter.next().unwrap();
                     TokenKind::OrOr
                 } else {
-                    return Err(format!(
-                        "unexpected char '|' at {} (did you mean '||')",
-                        start
+                    diagnostics.push(make_error(
+                        Span {
+                            start: start as u32,
+                            end: (start + 1) as u32,
+                        },
+                        format!("unexpected char '|' at {} (did you mean '||')", start),
                     ));
+                    stop_lexing = true;
+                    break;
                 }
             }
 
@@ -156,7 +182,15 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                     }
 
                     if !terminated {
-                        return Err(format!("unterminated block comment starting at {}", start));
+                        diagnostics.push(make_error(
+                            Span {
+                                start: start as u32,
+                                end: input.len() as u32,
+                            },
+                            format!("unterminated block comment starting at {}", start),
+                        ));
+                        stop_lexing = true;
+                        break;
                     }
 
                     tokens.push(Token {
@@ -196,9 +230,21 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
                 let end = match end {
                     Some(end) => end,
                     None => {
-                        return Err(format!("unterminated string literal at {}", start));
+                        diagnostics.push(make_error(
+                            Span {
+                                start: start as u32,
+                                end: input.len() as u32,
+                            },
+                            format!("unterminated string literal at {}", start),
+                        ));
+                        stop_lexing = true;
+                        break;
                     }
                 };
+
+                if stop_lexing {
+                    break;
+                }
 
                 tokens.push(Token {
                     kind: TokenKind::Literal(Lit {
@@ -268,7 +314,15 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
             }
 
             _ => {
-                return Err(format!("unexpected char '{}' at {}", ch, start));
+                diagnostics.push(make_error(
+                    Span {
+                        start: start as u32,
+                        end: (start + ch.len_utf8()) as u32,
+                    },
+                    format!("unexpected char '{}' at {}", ch, start),
+                ));
+                stop_lexing = true;
+                break;
             }
         };
 
@@ -300,7 +354,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
         },
     });
 
-    Ok(tokens)
+    LexOutput {
+        tokens,
+        diagnostics,
+    }
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -309,4 +366,14 @@ fn is_ident_start(c: char) -> bool {
 
 fn is_ident_continue(c: char) -> bool {
     c == '_' || c.is_ascii_alphanumeric() || c.len_utf8() > 1
+}
+
+fn make_error(span: Span, message: String) -> Diagnostic {
+    Diagnostic {
+        kind: DiagnosticKind::Error,
+        message,
+        span,
+        labels: vec![],
+        notes: vec![],
+    }
 }
