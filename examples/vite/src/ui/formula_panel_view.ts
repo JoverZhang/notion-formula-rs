@@ -239,6 +239,9 @@ export function createFormulaPanelView(opts: {
     getChipSpans: () => lastChipSpans,
     toChipPos: (rawPos) => (lastChipMap ? lastChipMap.toChipPos(rawPos) : rawPos),
     toRawPos: (chipPos) => (lastChipMap ? lastChipMap.toRawPos(chipPos) : chipPos),
+    // Future chip UI must reflect actual chip widgets/decorations here.
+    isChipUiEnabled: () => false,
+    getChipUiCount: () => 0,
   });
 
   return {

@@ -28,12 +28,12 @@ export interface NfDebug {
   getChipSpans(id: FormulaId): { start: number; end: number }[];
   toChipPos(id: FormulaId, rawUtf16Pos: number): number;
   toRawPos(id: FormulaId, chipPos: number): number;
+  isChipUiEnabled(): boolean;
+  getChipUiCount(id: FormulaId): number;
 }
 
 declare global {
-  interface Window {
-    __nf_debug?: NfDebug;
-  }
+  var __nf_debug: NfDebug | undefined;
 }
 
 export type PanelDebugHandle = {
@@ -51,9 +51,6 @@ export type PanelDebugHandle = {
   getChipSpans(): ChipSpan[];
   toChipPos(rawUtf16Pos: number): number;
   toRawPos(chipPos: number): number;
+  isChipUiEnabled(): boolean;
+  getChipUiCount(): number;
 };
-
-export function getWindow(): Window | undefined {
-  const w = (globalThis as unknown as { window?: unknown }).window;
-  return typeof w === "object" && w !== null ? (w as Window) : undefined;
-}

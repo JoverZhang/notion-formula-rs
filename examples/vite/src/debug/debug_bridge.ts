@@ -1,17 +1,10 @@
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import type { FormulaId } from "../app/types";
 import type { TokenDecorationRange } from "../editor_decorations";
-import {
-  getWindow,
-  type DebugCmDiag,
-  type DebugTokenDeco,
-  type NfDebug,
-  type PanelDebugHandle,
-} from "./common";
+import type { DebugCmDiag, DebugTokenDeco, NfDebug, PanelDebugHandle } from "./common";
 
 export function isDebugEnabled(): boolean {
-  const w = getWindow();
-  if (!w) return false;
+  if (typeof window !== "object" || window === null) return false;
   const env = import.meta.env as unknown as { DEV?: boolean; MODE?: string };
   if (env.DEV || env.MODE === "test") return true;
   const params = new URLSearchParams(window.location.search);
@@ -49,6 +42,11 @@ function getHandle(id: FormulaId): PanelDebugHandle {
   return handle;
 }
 
+function getAnyHandle(): PanelDebugHandle | null {
+  const iter = panelHandles.values().next();
+  return iter.done ? null : iter.value;
+}
+
 function createDebugApi(): NfDebug {
   return {
     listPanels() {
@@ -80,14 +78,19 @@ function createDebugApi(): NfDebug {
     toRawPos(id, chipPos) {
       return getHandle(id).toRawPos(chipPos);
     },
+    isChipUiEnabled() {
+      return getAnyHandle()?.isChipUiEnabled() ?? false;
+    },
+    getChipUiCount(id) {
+      return getHandle(id).getChipUiCount();
+    },
   };
 }
 
 function ensureDebugApi() {
   if (!DEBUG_ENABLED) return;
-  const w = getWindow();
-  if (w && !w.__nf_debug) {
-    w.__nf_debug = createDebugApi();
+  if (!window.__nf_debug) {
+    window.__nf_debug = createDebugApi();
   }
 }
 
