@@ -59,4 +59,4 @@ async function start() {
   }
 }
 
-await start();
+start().catch((e) => console.error(e));

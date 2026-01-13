@@ -1,0 +1,120 @@
+name: CI + Deploy Vite demo to GitHub Pages
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI (via just)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- Rust toolchain ----
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Install just
+        run: cargo install just --locked
+
+      # ---- Node (>=20) ----
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: examples/vite/pnpm-lock.yaml
+
+      # ---- pnpm via Corepack + packageManager ----
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Show tool versions
+        run: |
+          node -v
+          corepack --version
+          corepack pnpm -v
+
+      - name: Install Vite deps
+        working-directory: examples/vite
+        run: pnpm i --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: examples/vite
+        run: pnpm exec playwright install --with-deps
+
+      - name: Run tests via just
+        run: just test
+
+  deploy:
+    name: Deploy Pages
+    needs: ci
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: examples/vite/pnpm-lock.yaml
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Vite deps
+        working-directory: examples/vite
+        run: pnpm i --frozen-lockfile
+
+      - name: Build WASM
+        working-directory: examples/vite
+        run: pnpm -s run wasm:build
+
+      - name: Build Vite (GitHub Pages base)
+        working-directory: examples/vite
+        env:
+          GITHUB_PAGES: "true"
+        run: pnpm -s run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: examples/vite/dist
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
