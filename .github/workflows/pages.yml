@@ -9,9 +9,13 @@ on:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "10.28.0"
+
 jobs:
   ci:
-    name: CI (via just)
+    name: CI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,22 +35,22 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
-      # ---- Node (>=20) ----
+      # ---- Node + pnpm (pinned) ----
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: examples/vite/pnpm-lock.yaml
 
-      # ---- pnpm via Corepack + packageManager ----
-      - name: Enable Corepack
-        run: corepack enable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
 
       - name: Show tool versions
         run: |
           node -v
-          corepack --version
-          corepack pnpm -v
+          pnpm -v
 
       - name: Install Vite deps
         working-directory: examples/vite
@@ -85,14 +89,17 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
 
+      # ---- Node + pnpm (pinned) ----
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: examples/vite/pnpm-lock.yaml
 
-      - name: Enable Corepack
-        run: corepack enable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
 
       - name: Install Vite deps
         working-directory: examples/vite
