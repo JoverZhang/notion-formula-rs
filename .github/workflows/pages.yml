@@ -36,16 +36,16 @@ jobs:
         run: cargo install just --locked
 
       # ---- Node + pnpm (pinned) ----
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: examples/vite/pnpm-lock.yaml
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
 
       - name: Show tool versions
         run: |
@@ -90,16 +90,16 @@ jobs:
         run: cargo install wasm-pack --locked
 
       # ---- Node + pnpm (pinned) ----
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: examples/vite/pnpm-lock.yaml
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
 
       - name: Install Vite deps
         working-directory: examples/vite
