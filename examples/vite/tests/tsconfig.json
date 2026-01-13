@@ -1,7 +1,11 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2020"],
+    "lib": [
+      "ES2020",
+      // For Playwright page objects only
+      "DOM"
+    ],
     "types": ["node", "@playwright/test"]
   },
   "include": ["../playwright.config.ts", "e2e/**/*"]

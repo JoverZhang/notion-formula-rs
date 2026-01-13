@@ -42,7 +42,9 @@ export interface NfDebug {
 }
 
 declare global {
-  var __nf_debug: NfDebug | undefined;
+  interface Window {
+    __nf_debug?: NfDebug;
+  }
 }
 
 export type PanelDebugHandle = {

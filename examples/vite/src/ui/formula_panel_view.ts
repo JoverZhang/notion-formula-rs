@@ -253,10 +253,11 @@ export function createFormulaPanelView(opts: {
   id: FormulaId;
   label: string;
   initialSource: string;
+  note?: string;
   onSourceChange: (id: FormulaId, source: string) => void;
 }): FormulaPanelView {
   const panel = document.createElement("section");
-  panel.className = "formula-panel pane";
+  panel.className = "formula-panel";
   panel.setAttribute("data-testid", "formula-panel");
   panel.setAttribute("data-formula-id", opts.id);
 
@@ -267,6 +268,13 @@ export function createFormulaPanelView(opts: {
   labelEl.className = "formula-label";
   labelEl.textContent = opts.label;
   leftCol.appendChild(labelEl);
+
+  if (opts.note) {
+    const noteEl = document.createElement("div");
+    noteEl.className = "formula-note";
+    noteEl.textContent = opts.note;
+    leftCol.appendChild(noteEl);
+  }
 
   const warningEl = document.createElement("div");
   warningEl.className = "warning hidden";
