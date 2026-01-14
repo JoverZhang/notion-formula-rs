@@ -1,6 +1,7 @@
 use crate::{lexer::lex, parser::Parser, tokenstream::TokenCursor};
 
 mod ast;
+pub mod completion;
 mod diagnostics;
 mod format;
 mod lexer;
@@ -37,3 +38,4 @@ pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 pub use format::format_expr;
 pub use source_map::{SourceMap, byte_offset_to_utf16};
 pub use token::{LitKind, Span, Token, TokenKind};
+pub use completion::{complete_with_context, CompletionItem, CompletionKind, CompletionOutput};

@@ -4,6 +4,8 @@ mod common;
 #[cfg(test)]
 mod test_ast_regression;
 #[cfg(test)]
+mod test_completion;
+#[cfg(test)]
 mod test_errors;
 #[cfg(test)]
 mod test_format_idempotence;
