@@ -14,6 +14,8 @@ pub struct CompletionItem {
     pub kind: CompletionKind,
     pub insert_text: String,
     pub detail: Option<String>,
+    pub is_disabled: bool,
+    pub disabled_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,8 +51,6 @@ pub fn complete_with_context(
         end: cursor_u32,
     };
 
-    let x = default_replace;
-
     if tokens.is_empty()
         || tokens
             .iter()
@@ -77,6 +77,8 @@ pub fn complete_with_context(
                         kind: CompletionKind::Operator,
                         insert_text: "(".to_string(),
                         detail: None,
+                        is_disabled: false,
+                        disabled_reason: None,
                     }]
                 } else {
                     items
@@ -93,6 +95,8 @@ pub fn complete_with_context(
                         kind: CompletionKind::Literal,
                         insert_text: "\"".to_string(),
                         detail: None,
+                        is_disabled: false,
+                        disabled_reason: None,
                     }]
                 } else {
                     items
@@ -110,6 +114,8 @@ pub fn complete_with_context(
                             kind: CompletionKind::Property,
                             insert_text: prop.name.clone(),
                             detail: None,
+                            is_disabled: prop.disabled_reason.is_some(),
+                            disabled_reason: prop.disabled_reason.clone(),
                         })
                         .collect::<Vec<_>>()
                 })
@@ -143,31 +149,49 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     let mut items = Vec::new();
     if let Some(ctx) = ctx {
         items.extend(prop_variable_items(ctx));
+        items.extend(ctx.functions.iter().map(|func| {
+            let detail = func.detail.clone().or_else(|| {
+                Some(format!(
+                    "{}({}) -> {}",
+                    func.name,
+                    format_param_list(&func.params),
+                    format_ty(func.ret)
+                ))
+            });
+            CompletionItem {
+                label: func.name.clone(),
+                kind: CompletionKind::Function,
+                insert_text: func.name.clone(),
+                detail,
+                is_disabled: false,
+                disabled_reason: None,
+            }
+        }));
     }
-    items.extend(builtin_functions().iter().map(|name| CompletionItem {
-        label: (*name).to_string(),
-        kind: CompletionKind::Function,
-        insert_text: (*name).to_string(),
-        detail: None,
-    }));
     items.extend(vec![
         CompletionItem {
             label: "true".to_string(),
             kind: CompletionKind::Keyword,
             insert_text: "true".to_string(),
             detail: None,
+            is_disabled: false,
+            disabled_reason: None,
         },
         CompletionItem {
             label: "false".to_string(),
             kind: CompletionKind::Keyword,
             insert_text: "false".to_string(),
             detail: None,
+            is_disabled: false,
+            disabled_reason: None,
         },
         CompletionItem {
             label: "(".to_string(),
             kind: CompletionKind::Operator,
             insert_text: "(".to_string(),
             detail: None,
+            is_disabled: false,
+            disabled_reason: None,
         },
     ]);
     items
@@ -177,22 +201,51 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     if ctx.properties.is_empty() {
         return Vec::new();
     }
-    ctx.properties
-        .iter()
-        .map(|prop| {
-            let label = format!("prop(\"{}\")", prop.name);
-            CompletionItem {
-                label: label.clone(),
-                kind: CompletionKind::Property,
-                insert_text: label,
-                detail: None,
-            }
-        })
-        .collect()
+    let mut enabled = Vec::new();
+    let mut disabled = Vec::new();
+    for prop in &ctx.properties {
+        let label = format!("prop(\"{}\")", prop.name);
+        let item = CompletionItem {
+            label: label.clone(),
+            kind: CompletionKind::Property,
+            insert_text: label,
+            detail: None,
+            is_disabled: prop.disabled_reason.is_some(),
+            disabled_reason: prop.disabled_reason.clone(),
+        };
+        if prop.disabled_reason.is_some() {
+            disabled.push(item);
+        } else {
+            enabled.push(item);
+        }
+    }
+    enabled.extend(disabled);
+    enabled
 }
 
-fn builtin_functions() -> &'static [&'static str] {
-    &["if", "sum"]
+fn format_param_list(params: &[semantic::ParamSig]) -> String {
+    params
+        .iter()
+        .map(|param| {
+            let mut label = format_ty(param.ty).to_string();
+            if param.optional {
+                label.push('?');
+            }
+            label
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn format_ty(ty: semantic::Ty) -> &'static str {
+    match ty {
+        semantic::Ty::Number => "number",
+        semantic::Ty::String => "string",
+        semantic::Ty::Boolean => "boolean",
+        semantic::Ty::Date => "date",
+        semantic::Ty::Null => "null",
+        semantic::Ty::Unknown => "unknown",
+    }
 }
 
 fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {

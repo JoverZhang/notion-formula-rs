@@ -1,5 +1,5 @@
 use crate::completion::{CompletionOutput, complete_with_context};
-use crate::semantic::{Context, Property, Ty};
+use crate::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
 use crate::token::Span;
 
 fn complete_fixture(input: &str, ctx: Option<Context>) -> (CompletionOutput, u32) {
@@ -30,10 +30,46 @@ fn completion_at_document_start() {
             Property {
                 name: "Title".to_string(),
                 ty: Ty::String,
+                disabled_reason: None,
             },
             Property {
                 name: "Age".to_string(),
                 ty: Ty::Number,
+                disabled_reason: None,
+            },
+        ],
+        functions: vec![
+            FunctionSig {
+                name: "if".to_string(),
+                params: vec![
+                    ParamSig {
+                        name: None,
+                        ty: Ty::Boolean,
+                        optional: false,
+                    },
+                    ParamSig {
+                        name: None,
+                        ty: Ty::Unknown,
+                        optional: false,
+                    },
+                    ParamSig {
+                        name: None,
+                        ty: Ty::Unknown,
+                        optional: false,
+                    },
+                ],
+                ret: Ty::Unknown,
+                detail: None,
+            },
+            FunctionSig {
+                name: "sum".to_string(),
+                params: vec![ParamSig {
+                    name: None,
+                    ty: Ty::Number,
+                    optional: false,
+                }],
+                ret: Ty::Number,
+                detail: None,
             },
         ],
     };
@@ -51,8 +87,37 @@ fn completion_at_document_start() {
 }
 
 #[test]
+fn completion_at_document_start_without_context_has_no_functions() {
+    let (output, cursor) = complete_fixture("$0", None);
+    let labels: Vec<&str> = output
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect();
+    assert!(!labels.contains(&"if"));
+    assert!(!labels.contains(&"sum"));
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
 fn completion_at_document_start_without_properties_has_no_prop_variables() {
-    let ctx = Context { properties: vec![] };
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![
+            FunctionSig {
+                name: "if".to_string(),
+                params: vec![],
+                ret: Ty::Unknown,
+                detail: None,
+            },
+            FunctionSig {
+                name: "sum".to_string(),
+                params: vec![],
+                ret: Ty::Number,
+                detail: None,
+            },
+        ],
+    };
     let (output, cursor) = complete_fixture("$0", Some(ctx));
     let labels: Vec<&str> = output
         .items
@@ -89,12 +154,15 @@ fn completion_after_prop_ident_with_context() {
             Property {
                 name: "Title".to_string(),
                 ty: Ty::String,
+                disabled_reason: None,
             },
             Property {
                 name: "Age".to_string(),
                 ty: Ty::Number,
+                disabled_reason: None,
             },
         ],
+        functions: vec![],
     };
     let (output, cursor) = complete_fixture("prop$0", Some(ctx));
     let labels: Vec<&str> = output
@@ -125,12 +193,15 @@ fn completion_after_prop_lparen_with_context() {
             Property {
                 name: "Title".to_string(),
                 ty: Ty::String,
+                disabled_reason: None,
             },
             Property {
                 name: "Age".to_string(),
                 ty: Ty::Number,
+                disabled_reason: None,
             },
         ],
+        functions: vec![],
     };
     let (output, cursor) = complete_fixture("prop($0", Some(ctx));
     let labels: Vec<&str> = output
@@ -161,12 +232,15 @@ fn completion_inside_prop_string_with_context() {
             Property {
                 name: "Title".to_string(),
                 ty: Ty::String,
+                disabled_reason: None,
             },
             Property {
                 name: "Age".to_string(),
                 ty: Ty::Number,
+                disabled_reason: None,
             },
         ],
+        functions: vec![],
     };
     let (output, cursor) = complete_fixture(r#"prop("$0")"#, Some(ctx));
     let labels: Vec<&str> = output
@@ -214,12 +288,15 @@ fn completion_prefix_prop_identifier_with_context() {
             Property {
                 name: "Title".to_string(),
                 ty: Ty::String,
+                disabled_reason: None,
             },
             Property {
                 name: "Age".to_string(),
                 ty: Ty::Number,
+                disabled_reason: None,
             },
         ],
+        functions: vec![],
     };
     let (output, cursor) = complete_fixture("pro$0", Some(ctx));
     let labels: Vec<&str> = output
@@ -229,5 +306,57 @@ fn completion_prefix_prop_identifier_with_context() {
         .collect();
     assert_eq!(labels[0], r#"prop("Title")"#);
     assert_eq!(labels[1], r#"prop("Age")"#);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_disabled_property_marking() {
+    let ctx = Context {
+        properties: vec![
+            Property {
+                name: "Title".to_string(),
+                ty: Ty::String,
+                disabled_reason: None,
+            },
+            Property {
+                name: "Age".to_string(),
+                ty: Ty::Number,
+                disabled_reason: Some("cycle".to_string()),
+            },
+        ],
+        functions: vec![],
+    };
+    let (output, cursor) = complete_fixture("$0", Some(ctx.clone()));
+    let age_item = output
+        .items
+        .iter()
+        .find(|item| item.label == r#"prop("Age")"#)
+        .expect("expected prop(\"Age\") item");
+    assert!(age_item.is_disabled);
+    assert_eq!(age_item.disabled_reason.as_deref(), Some("cycle"));
+    let title_item = output
+        .items
+        .iter()
+        .find(|item| item.label == r#"prop("Title")"#)
+        .expect("expected prop(\"Title\") item");
+    assert!(!title_item.is_disabled);
+    assert_eq!(title_item.disabled_reason, None);
+    assert_replace_contains_cursor(output.replace, cursor);
+
+    let (output, cursor) = complete_fixture(r#"prop("$0")"#, Some(ctx));
+    let age_item = output
+        .items
+        .iter()
+        .find(|item| item.label == "Age")
+        .expect("expected Age item");
+    assert!(age_item.is_disabled);
+    assert_eq!(age_item.disabled_reason.as_deref(), Some("cycle"));
+    let title_item = output
+        .items
+        .iter()
+        .find(|item| item.label == "Title")
+        .expect("expected Title item");
+    assert!(!title_item.is_disabled);
+    assert_eq!(title_item.disabled_reason, None);
     assert_replace_contains_cursor(output.replace, cursor);
 }

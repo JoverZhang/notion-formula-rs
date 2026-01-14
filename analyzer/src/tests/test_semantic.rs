@@ -24,7 +24,9 @@ fn test_prop_ok() {
         properties: vec![Property {
             name: "Title".into(),
             ty: Ty::String,
+            disabled_reason: None,
         }],
+        functions: vec![],
     };
     let diags = run_semantic("prop(\"Title\")", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
@@ -69,7 +71,9 @@ fn test_if_ok() {
         properties: vec![Property {
             name: "Done".into(),
             ty: Ty::Boolean,
+            disabled_reason: None,
         }],
+        functions: vec![],
     };
     let diags = run_semantic("if(prop(\"Done\"), 1, 2)", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);

@@ -24,7 +24,9 @@ fn diagnostics_golden() {
                     properties: vec![Property {
                         name: "Title".into(),
                         ty: Ty::String,
+                        disabled_reason: None,
                     }],
+                    functions: vec![],
                 };
                 analyze_with_context(source, ctx)
                     .expect("analyze_with_context() should return ParseOutput")

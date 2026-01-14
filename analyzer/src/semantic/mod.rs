@@ -15,15 +15,32 @@ pub enum Ty {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FunctionSig {
+    pub name: String,
+    pub params: Vec<ParamSig>,
+    pub ret: Ty,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParamSig {
+    pub name: Option<String>,
+    pub ty: Ty,
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Property {
     pub name: String,
     #[serde(rename = "type")]
     pub ty: Ty,
+    pub disabled_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Context {
     pub properties: Vec<Property>,
+    pub functions: Vec<FunctionSig>,
 }
 
 impl Context {
