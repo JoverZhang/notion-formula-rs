@@ -49,13 +49,15 @@ pub fn complete_with_context(
         end: cursor_u32,
     };
 
+    let x = default_replace;
+
     if tokens.is_empty()
         || tokens
             .iter()
             .all(|token| matches!(token.kind, TokenKind::Eof))
     {
         let items = if cursor == 0 {
-            expr_start_items()
+            expr_start_items(ctx)
         } else {
             Vec::new()
         };
@@ -67,24 +69,34 @@ pub fn complete_with_context(
 
     match detect_prop_state(&tokens, cursor_u32) {
         PropState::AfterPropIdent => {
+            let items = ctx.map(prop_variable_items).unwrap_or_default();
             return CompletionOutput {
-                items: vec![CompletionItem {
-                    label: "(".to_string(),
-                    kind: CompletionKind::Operator,
-                    insert_text: "(".to_string(),
-                    detail: None,
-                }],
+                items: if items.is_empty() {
+                    vec![CompletionItem {
+                        label: "(".to_string(),
+                        kind: CompletionKind::Operator,
+                        insert_text: "(".to_string(),
+                        detail: None,
+                    }]
+                } else {
+                    items
+                },
                 replace: default_replace,
             };
         }
         PropState::AfterPropLParen => {
+            let items = ctx.map(prop_variable_items).unwrap_or_default();
             return CompletionOutput {
-                items: vec![CompletionItem {
-                    label: "\"".to_string(),
-                    kind: CompletionKind::Literal,
-                    insert_text: "\"".to_string(),
-                    detail: None,
-                }],
+                items: if items.is_empty() {
+                    vec![CompletionItem {
+                        label: "\"".to_string(),
+                        kind: CompletionKind::Literal,
+                        insert_text: "\"".to_string(),
+                        detail: None,
+                    }]
+                } else {
+                    items
+                },
                 replace: default_replace,
             };
         }
@@ -111,7 +123,9 @@ pub fn complete_with_context(
     }
 
     let prev_token = prev_non_trivia(tokens.as_slice(), cursor_u32);
-    if !is_expr_start_position(prev_token.map(|(_, token)| token)) {
+    let prev_token = prev_token.map(|(_, token)| token);
+    let is_prop_prefix = is_prop_prefix_at_cursor(tokens.as_slice(), cursor_u32);
+    if !is_expr_start_position(prev_token) && !is_prop_prefix {
         return CompletionOutput {
             items: Vec::new(),
             replace: default_replace,
@@ -120,31 +134,23 @@ pub fn complete_with_context(
 
     let replace = replace_span_for_expr_start(tokens.as_slice(), cursor_u32);
     CompletionOutput {
-        items: expr_start_items(),
+        items: expr_start_items(ctx),
         replace,
     }
 }
 
-fn expr_start_items() -> Vec<CompletionItem> {
-    vec![
-        CompletionItem {
-            label: "prop(\"".to_string(),
-            kind: CompletionKind::Snippet,
-            insert_text: "prop(\"".to_string(),
-            detail: Some("Property reference".to_string()),
-        },
-        CompletionItem {
-            label: "if(".to_string(),
-            kind: CompletionKind::Snippet,
-            insert_text: "if(".to_string(),
-            detail: Some("if(condition, then, else)".to_string()),
-        },
-        CompletionItem {
-            label: "sum(".to_string(),
-            kind: CompletionKind::Snippet,
-            insert_text: "sum(".to_string(),
-            detail: Some("sum(number)".to_string()),
-        },
+fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
+    let mut items = Vec::new();
+    if let Some(ctx) = ctx {
+        items.extend(prop_variable_items(ctx));
+    }
+    items.extend(builtin_functions().iter().map(|name| CompletionItem {
+        label: (*name).to_string(),
+        kind: CompletionKind::Function,
+        insert_text: (*name).to_string(),
+        detail: None,
+    }));
+    items.extend(vec![
         CompletionItem {
             label: "true".to_string(),
             kind: CompletionKind::Keyword,
@@ -163,7 +169,30 @@ fn expr_start_items() -> Vec<CompletionItem> {
             insert_text: "(".to_string(),
             detail: None,
         },
-    ]
+    ]);
+    items
+}
+
+fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
+    if ctx.properties.is_empty() {
+        return Vec::new();
+    }
+    ctx.properties
+        .iter()
+        .map(|prop| {
+            let label = format!("prop(\"{}\")", prop.name);
+            CompletionItem {
+                label: label.clone(),
+                kind: CompletionKind::Property,
+                insert_text: label,
+                detail: None,
+            }
+        })
+        .collect()
+}
+
+fn builtin_functions() -> &'static [&'static str] {
+    &["if", "sum"]
 }
 
 fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
@@ -214,7 +243,9 @@ fn prev_non_trivia_before(tokens: &[Token], idx: usize) -> Option<(usize, &Token
 
 fn token_containing_cursor(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
     tokens.iter().enumerate().find(|(_, token)| {
-        token.span.start <= cursor && cursor < token.span.end && !matches!(token.kind, TokenKind::Eof)
+        token.span.start <= cursor
+            && cursor < token.span.end
+            && !matches!(token.kind, TokenKind::Eof)
     })
 }
 
@@ -231,6 +262,11 @@ fn is_expr_start_position(prev_token: Option<&Token>) -> bool {
 fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span {
     if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
         if matches!(token.kind, TokenKind::Ident(_)) {
+            return token.span;
+        }
+    }
+    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
+        if matches!(token.kind, TokenKind::Ident(_)) && token.span.end == cursor {
             return token.span;
         }
     }
@@ -294,6 +330,17 @@ fn detect_prop_state(tokens: &[Token], cursor: u32) -> PropState {
 
 fn is_prop_ident(token: &Token) -> bool {
     matches!(token.kind, TokenKind::Ident(ref symbol) if symbol.text == "prop")
+}
+
+fn is_prop_prefix_at_cursor(tokens: &[Token], cursor: u32) -> bool {
+    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
+        if let TokenKind::Ident(ref symbol) = token.kind {
+            if token.span.end == cursor {
+                return "prop".starts_with(symbol.text.as_str());
+            }
+        }
+    }
+    false
 }
 
 fn string_content_span(span: Span) -> Span {
