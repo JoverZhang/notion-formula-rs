@@ -1,4 +1,4 @@
-use crate::completion::{CompletionOutput, complete_with_context};
+use crate::completion::{CompletionData, CompletionOutput, complete_with_context};
 use crate::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
 use crate::token::Span;
 
@@ -83,6 +83,28 @@ fn completion_at_document_start() {
     assert_eq!(labels[1], "prop(\"Age\")");
     assert!(labels.contains(&"if"));
     assert!(labels.contains(&"sum"));
+    let age_item = output
+        .items
+        .iter()
+        .find(|item| item.label == r#"prop("Age")"#)
+        .expect("expected prop(\"Age\") item");
+    assert_eq!(
+        age_item.data,
+        Some(CompletionData::PropExpr {
+            property_name: "Age".to_string()
+        })
+    );
+    let if_item = output
+        .items
+        .iter()
+        .find(|item| item.label == "if")
+        .expect("expected if item");
+    assert_eq!(
+        if_item.data,
+        Some(CompletionData::Function {
+            name: "if".to_string()
+        })
+    );
     assert_replace_contains_cursor(output.replace, cursor);
 }
 
@@ -249,6 +271,17 @@ fn completion_inside_prop_string_with_context() {
         .map(|item| item.label.as_str())
         .collect();
     assert_eq!(labels, vec!["Title", "Age"]);
+    let age_item = output
+        .items
+        .iter()
+        .find(|item| item.label == "Age")
+        .expect("expected Age item");
+    assert_eq!(
+        age_item.data,
+        Some(CompletionData::PropertyName {
+            name: "Age".to_string()
+        })
+    );
 
     let text = r#"prop("")"#;
     let quote_start = text.find('"').expect("expected opening quote");
@@ -522,6 +555,58 @@ fn completion_type_ranking_number_prefers_number_props() {
         .position(|item| item.label == r#"prop("Title")"#)
         .expect("expected prop(\"Title\") item");
     assert!(age_idx < title_idx);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_type_ranking_handles_nontrivial_property_names() {
+    let ctx = Context {
+        properties: vec![
+            Property {
+                name: "Title (new)".to_string(),
+                ty: Ty::Number,
+                disabled_reason: None,
+            },
+            Property {
+                name: "Age".to_string(),
+                ty: Ty::String,
+                disabled_reason: None,
+            },
+        ],
+        functions: vec![FunctionSig {
+            name: "sum".to_string(),
+            params: vec![ParamSig {
+                name: None,
+                ty: Ty::Number,
+                optional: false,
+            }],
+            ret: Ty::Number,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("sum($0", Some(ctx));
+    let title_item = output
+        .items
+        .iter()
+        .find(|item| item.label == r#"prop("Title (new)")"#)
+        .expect("expected prop(\"Title (new)\") item");
+    assert_eq!(
+        title_item.data,
+        Some(CompletionData::PropExpr {
+            property_name: "Title (new)".to_string()
+        })
+    );
+    let title_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == r#"prop("Title (new)")"#)
+        .expect("expected prop(\"Title (new)\") item");
+    let age_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == r#"prop("Age")"#)
+        .expect("expected prop(\"Age\") item");
+    assert!(title_idx < age_idx);
     assert_replace_contains_cursor(output.replace, cursor);
 }
 

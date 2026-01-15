@@ -17,6 +17,7 @@ pub struct CompletionItem {
     pub detail: Option<String>,
     pub is_disabled: bool,
     pub disabled_reason: Option<String>,
+    pub data: Option<CompletionData>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +28,13 @@ pub enum CompletionKind {
     Operator,
     Literal,
     Snippet,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompletionData {
+    Function { name: String },
+    PropertyName { name: String },
+    PropExpr { property_name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,6 +103,7 @@ pub fn complete_with_context(
                         detail: None,
                         is_disabled: false,
                         disabled_reason: None,
+                        data: None,
                     }]
                 } else {
                     items
@@ -114,6 +123,7 @@ pub fn complete_with_context(
                         detail: None,
                         is_disabled: false,
                         disabled_reason: None,
+                        data: None,
                     }]
                 } else {
                     items
@@ -134,6 +144,9 @@ pub fn complete_with_context(
                             detail: None,
                             is_disabled: prop.disabled_reason.is_some(),
                             disabled_reason: prop.disabled_reason.clone(),
+                            data: Some(CompletionData::PropertyName {
+                                name: prop.name.clone(),
+                            }),
                         })
                         .collect::<Vec<_>>()
                 })
@@ -192,6 +205,9 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
                 detail,
                 is_disabled: false,
                 disabled_reason: None,
+                data: Some(CompletionData::Function {
+                    name: func.name.clone(),
+                }),
             }
         }));
     }
@@ -203,6 +219,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             detail: None,
             is_disabled: false,
             disabled_reason: None,
+            data: None,
         },
         CompletionItem {
             label: "false".to_string(),
@@ -211,6 +228,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             detail: None,
             is_disabled: false,
             disabled_reason: None,
+            data: None,
         },
         CompletionItem {
             label: "(".to_string(),
@@ -219,6 +237,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             detail: None,
             is_disabled: false,
             disabled_reason: None,
+            data: None,
         },
     ]);
     items
@@ -239,6 +258,9 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
             detail: None,
             is_disabled: prop.disabled_reason.is_some(),
             disabled_reason: prop.disabled_reason.clone(),
+            data: Some(CompletionData::PropExpr {
+                property_name: prop.name.clone(),
+            }),
         };
         if prop.disabled_reason.is_some() {
             disabled.push(item);
@@ -425,33 +447,26 @@ fn apply_type_ranking(
 }
 
 fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Option<semantic::Ty> {
+    if let Some(data) = &item.data {
+        let ctx = ctx?;
+        return match data {
+            CompletionData::Function { name } => ctx
+                .functions
+                .iter()
+                .find(|func| func.name == *name)
+                .map(|func| func.ret),
+            CompletionData::PropertyName { name } => ctx.lookup(name),
+            CompletionData::PropExpr { property_name } => ctx.lookup(property_name),
+        };
+    }
+
     match item.kind {
         CompletionKind::Keyword => match item.label.as_str() {
-            "true" | "false" => return Some(semantic::Ty::Boolean),
-            _ => {}
+            "true" | "false" => Some(semantic::Ty::Boolean),
+            _ => None,
         },
-        CompletionKind::Property => {
-            if let Some(ctx) = ctx {
-                if let Some(name) = parse_prop_call_label(&item.label) {
-                    return ctx.lookup(name);
-                }
-                return ctx.lookup(&item.label);
-            }
-        }
-        CompletionKind::Function => {
-            if let Some(ctx) = ctx {
-                if let Some(func) = ctx.functions.iter().find(|func| func.name == item.label) {
-                    return Some(func.ret);
-                }
-            }
-        }
-        _ => {}
+        _ => None,
     }
-    None
-}
-
-fn parse_prop_call_label(label: &str) -> Option<&str> {
-    label.strip_prefix("prop(\"")?.strip_suffix("\")")
 }
 
 fn type_match_score(expected: semantic::Ty, actual: Option<semantic::Ty>) -> i32 {
