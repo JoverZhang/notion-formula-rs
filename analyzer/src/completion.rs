@@ -6,6 +6,7 @@ use crate::token::{LitKind, Span, Token, TokenKind};
 pub struct CompletionOutput {
     pub items: Vec<CompletionItem>,
     pub replace: Span,
+    pub signature_help: Option<SignatureHelp>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,12 +29,26 @@ pub enum CompletionKind {
     Snippet,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureHelp {
+    pub label: String,
+    pub params: Vec<String>,
+    pub active_param: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PropState {
     AfterPropIdent,
     AfterPropLParen,
     InPropStringContent(Span),
     None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CallContext {
+    callee: String,
+    lparen_idx: usize,
+    arg_index: usize,
 }
 
 /// Compute completions using byte offsets for the cursor and replace span.
@@ -64,6 +79,7 @@ pub fn complete_with_context(
         return CompletionOutput {
             items,
             replace: default_replace,
+            signature_help: None,
         };
     }
 
@@ -84,6 +100,7 @@ pub fn complete_with_context(
                     items
                 },
                 replace: default_replace,
+                signature_help: None,
             };
         }
         PropState::AfterPropLParen => {
@@ -102,6 +119,7 @@ pub fn complete_with_context(
                     items
                 },
                 replace: default_replace,
+                signature_help: None,
             };
         }
         PropState::InPropStringContent(content_span) => {
@@ -123,10 +141,13 @@ pub fn complete_with_context(
             return CompletionOutput {
                 items,
                 replace: content_span,
+                signature_help: None,
             };
         }
         PropState::None => {}
     }
+
+    let (signature_help, expected_ty) = signature_help_at_cursor(tokens.as_slice(), cursor_u32, ctx);
 
     let prev_token = prev_non_trivia(tokens.as_slice(), cursor_u32);
     let prev_token = prev_token.map(|(_, token)| token);
@@ -135,13 +156,19 @@ pub fn complete_with_context(
         return CompletionOutput {
             items: Vec::new(),
             replace: default_replace,
+            signature_help,
         };
     }
 
     let replace = replace_span_for_expr_start(tokens.as_slice(), cursor_u32);
+    let mut items = expr_start_items(ctx);
+    if expected_ty.is_some() {
+        apply_type_ranking(&mut items, expected_ty, ctx);
+    }
     CompletionOutput {
-        items: expr_start_items(ctx),
+        items,
         replace,
+        signature_help,
     }
 }
 
@@ -245,6 +272,197 @@ fn format_ty(ty: semantic::Ty) -> &'static str {
         semantic::Ty::Date => "date",
         semantic::Ty::Null => "null",
         semantic::Ty::Unknown => "unknown",
+    }
+}
+
+fn ty_name(ty: semantic::Ty) -> &'static str {
+    match ty {
+        semantic::Ty::Number => "Number",
+        semantic::Ty::String => "String",
+        semantic::Ty::Boolean => "Boolean",
+        semantic::Ty::Date => "Date",
+        semantic::Ty::Null => "Null",
+        semantic::Ty::Unknown => "Any",
+    }
+}
+
+fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
+    let params = sig
+        .params
+        .iter()
+        .map(|param| {
+            let mut ty = ty_name(param.ty).to_string();
+            if param.optional {
+                ty.push('?');
+            }
+            if let Some(name) = &param.name {
+                format!("{name}: {ty}")
+            } else {
+                ty
+            }
+        })
+        .collect::<Vec<_>>();
+    let label = format!(
+        "{}({}) -> {}",
+        sig.name,
+        params.join(", "),
+        ty_name(sig.ret)
+    );
+    (label, params)
+}
+
+fn signature_help_at_cursor(
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+) -> (Option<SignatureHelp>, Option<semantic::Ty>) {
+    let ctx = match ctx {
+        Some(ctx) => ctx,
+        None => return (None, None),
+    };
+    let call_ctx = match detect_call_context(tokens, cursor) {
+        Some(call_ctx) => call_ctx,
+        None => return (None, None),
+    };
+    let func = match ctx.functions.iter().find(|func| func.name == call_ctx.callee) {
+        Some(func) => func,
+        None => return (None, None),
+    };
+    let (label, params) = format_signature(func);
+    let active_param = if params.is_empty() {
+        0
+    } else {
+        call_ctx.arg_index.min(params.len() - 1)
+    };
+    let expected_ty = func.params.get(active_param).map(|param| param.ty);
+    (
+        Some(SignatureHelp {
+            label,
+            params,
+            active_param,
+        }),
+        expected_ty,
+    )
+}
+
+fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallContext> {
+    let mut stack = Vec::new();
+    for (idx, token) in tokens.iter().enumerate() {
+        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+            continue;
+        }
+        if token.span.start >= cursor {
+            break;
+        }
+        match token.kind {
+            TokenKind::OpenParen => stack.push(idx),
+            TokenKind::CloseParen => {
+                let _ = stack.pop();
+            }
+            _ => {}
+        }
+    }
+    let lparen_idx = *stack.last()?;
+    let (_, callee_token) = prev_non_trivia_before(tokens, lparen_idx)?;
+    let TokenKind::Ident(ref symbol) = callee_token.kind else {
+        return None;
+    };
+    let mut arg_index = 0usize;
+    let mut depth = 0i32;
+    for token in tokens.iter().skip(lparen_idx + 1) {
+        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+            continue;
+        }
+        if token.span.start >= cursor {
+            break;
+        }
+        match token.kind {
+            TokenKind::OpenParen => depth += 1,
+            TokenKind::CloseParen => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+            TokenKind::Comma => {
+                if depth == 0 {
+                    arg_index += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    Some(CallContext {
+        callee: symbol.text.clone(),
+        lparen_idx,
+        arg_index,
+    })
+}
+
+fn apply_type_ranking(
+    items: &mut Vec<CompletionItem>,
+    expected_ty: Option<semantic::Ty>,
+    ctx: Option<&semantic::Context>,
+) {
+    let expected_ty = match expected_ty {
+        Some(expected_ty) => expected_ty,
+        None => return,
+    };
+    let mut scored = items
+        .drain(..)
+        .enumerate()
+        .map(|(idx, item)| {
+            let actual = item_result_ty(&item, ctx);
+            let score = type_match_score(expected_ty, actual);
+            (idx, item, score)
+        })
+        .collect::<Vec<_>>();
+    scored.sort_by(|(a_idx, a_item, a_score), (b_idx, b_item, b_score)| {
+        let a_key = (a_item.is_disabled, -a_score, *a_idx as i32);
+        let b_key = (b_item.is_disabled, -b_score, *b_idx as i32);
+        a_key.cmp(&b_key)
+    });
+    items.extend(scored.into_iter().map(|(_, item, _)| item));
+}
+
+fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Option<semantic::Ty> {
+    match item.kind {
+        CompletionKind::Keyword => match item.label.as_str() {
+            "true" | "false" => return Some(semantic::Ty::Boolean),
+            _ => {}
+        },
+        CompletionKind::Property => {
+            if let Some(ctx) = ctx {
+                if let Some(name) = parse_prop_call_label(&item.label) {
+                    return ctx.lookup(name);
+                }
+                return ctx.lookup(&item.label);
+            }
+        }
+        CompletionKind::Function => {
+            if let Some(ctx) = ctx {
+                if let Some(func) = ctx.functions.iter().find(|func| func.name == item.label) {
+                    return Some(func.ret);
+                }
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
+fn parse_prop_call_label(label: &str) -> Option<&str> {
+    label.strip_prefix("prop(\"")?.strip_suffix("\")")
+}
+
+fn type_match_score(expected: semantic::Ty, actual: Option<semantic::Ty>) -> i32 {
+    if expected == semantic::Ty::Unknown {
+        return 1;
+    }
+    match actual {
+        Some(actual_ty) if actual_ty == semantic::Ty::Unknown => 0,
+        Some(actual_ty) if actual_ty == expected => 2,
+        Some(_) => -1,
+        None => 0,
     }
 }
 

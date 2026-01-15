@@ -7,4 +7,4 @@ export const PROPERTY_SCHEMA = [
   { name: "Relation", type: "Unknown" },
 ] as const;
 
-export const CONTEXT_JSON = JSON.stringify({ properties: PROPERTY_SCHEMA });
+export const CONTEXT_JSON = JSON.stringify({ properties: PROPERTY_SCHEMA, functions: [] });

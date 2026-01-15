@@ -360,3 +360,220 @@ fn completion_disabled_property_marking() {
     assert_eq!(title_item.disabled_reason, None);
     assert_replace_contains_cursor(output.replace, cursor);
 }
+
+#[test]
+fn completion_signature_help_active_param_first_arg() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![
+                ParamSig {
+                    name: Some("condition".to_string()),
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("then".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("else".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("if($0", Some(ctx));
+    let sig = output.signature_help.expect("expected signature help");
+    assert_eq!(sig.active_param, 0);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_signature_help_active_param_second_arg() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![
+                ParamSig {
+                    name: Some("condition".to_string()),
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("then".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("else".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("if(true, $0", Some(ctx));
+    let sig = output.signature_help.expect("expected signature help");
+    assert_eq!(sig.active_param, 1);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_signature_help_ignores_nested_commas() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![
+                ParamSig {
+                    name: Some("condition".to_string()),
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("then".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("else".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("if(true, sum(1,2), $0", Some(ctx));
+    let sig = output.signature_help.expect("expected signature help");
+    assert_eq!(sig.active_param, 2);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_type_ranking_number_prefers_number_props() {
+    let ctx = Context {
+        properties: vec![
+            Property {
+                name: "Title".to_string(),
+                ty: Ty::String,
+                disabled_reason: None,
+            },
+            Property {
+                name: "Age".to_string(),
+                ty: Ty::Number,
+                disabled_reason: None,
+            },
+        ],
+        functions: vec![
+            FunctionSig {
+                name: "if".to_string(),
+                params: vec![
+                    ParamSig {
+                        name: None,
+                        ty: Ty::Boolean,
+                        optional: false,
+                    },
+                    ParamSig {
+                        name: None,
+                        ty: Ty::Unknown,
+                        optional: false,
+                    },
+                    ParamSig {
+                        name: None,
+                        ty: Ty::Unknown,
+                        optional: false,
+                    },
+                ],
+                ret: Ty::Unknown,
+                detail: None,
+            },
+            FunctionSig {
+                name: "sum".to_string(),
+                params: vec![ParamSig {
+                    name: None,
+                    ty: Ty::Number,
+                    optional: false,
+                }],
+                ret: Ty::Number,
+                detail: None,
+            },
+        ],
+    };
+    let (output, cursor) = complete_fixture("sum($0", Some(ctx));
+    let age_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == r#"prop("Age")"#)
+        .expect("expected prop(\"Age\") item");
+    let title_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == r#"prop("Title")"#)
+        .expect("expected prop(\"Title\") item");
+    assert!(age_idx < title_idx);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_type_ranking_boolean_prefers_literals() {
+    let ctx = Context {
+        properties: vec![
+            Property {
+                name: "Title".to_string(),
+                ty: Ty::String,
+                disabled_reason: None,
+            },
+            Property {
+                name: "Age".to_string(),
+                ty: Ty::Number,
+                disabled_reason: None,
+            },
+        ],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![
+                ParamSig {
+                    name: None,
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: None,
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: None,
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("if($0", Some(ctx));
+    let true_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == "true")
+        .expect("expected true item");
+    let title_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == r#"prop("Title")"#)
+        .expect("expected prop(\"Title\") item");
+    assert!(true_idx < title_idx);
+    assert_replace_contains_cursor(output.replace, cursor);
+}

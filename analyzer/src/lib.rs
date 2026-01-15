@@ -33,7 +33,9 @@ pub fn analyze_with_context(
     Ok(output)
 }
 
-pub use completion::{CompletionItem, CompletionKind, CompletionOutput, complete_with_context};
+pub use completion::{
+    complete_with_context, CompletionItem, CompletionKind, CompletionOutput, SignatureHelp,
+};
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 pub use format::format_expr;
