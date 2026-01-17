@@ -10,6 +10,13 @@ pub struct CompletionOutput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    pub replace: Span,
+    pub insert: String,
+    pub new_cursor: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionItem {
     pub label: String,
     pub kind: CompletionKind,
@@ -18,6 +25,7 @@ pub struct CompletionItem {
     pub is_disabled: bool,
     pub disabled_reason: Option<String>,
     pub data: Option<CompletionData>,
+    pub text_edit: Option<TextEdit>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,17 +92,20 @@ pub fn complete_with_context(
         } else {
             Vec::new()
         };
-        return CompletionOutput {
-            items,
-            replace: default_replace,
-            signature_help: None,
-        };
+        return finalize_output(
+            CompletionOutput {
+                items,
+                replace: default_replace,
+                signature_help: None,
+            },
+            ctx,
+        );
     }
 
-    match detect_prop_state(&tokens, cursor_u32) {
+    let output = match detect_prop_state(&tokens, cursor_u32) {
         PropState::AfterPropIdent => {
             let items = ctx.map(prop_variable_items).unwrap_or_default();
-            return CompletionOutput {
+            CompletionOutput {
                 items: if items.is_empty() {
                     vec![CompletionItem {
                         label: "(".to_string(),
@@ -104,17 +115,18 @@ pub fn complete_with_context(
                         is_disabled: false,
                         disabled_reason: None,
                         data: None,
+                        text_edit: None,
                     }]
                 } else {
                     items
                 },
                 replace: default_replace,
                 signature_help: None,
-            };
+            }
         }
         PropState::AfterPropLParen => {
             let items = ctx.map(prop_variable_items).unwrap_or_default();
-            return CompletionOutput {
+            CompletionOutput {
                 items: if items.is_empty() {
                     vec![CompletionItem {
                         label: "\"".to_string(),
@@ -124,13 +136,14 @@ pub fn complete_with_context(
                         is_disabled: false,
                         disabled_reason: None,
                         data: None,
+                        text_edit: None,
                     }]
                 } else {
                     items
                 },
                 replace: default_replace,
                 signature_help: None,
-            };
+            }
         }
         PropState::InPropStringContent(content_span) => {
             let items = ctx
@@ -147,41 +160,116 @@ pub fn complete_with_context(
                             data: Some(CompletionData::PropertyName {
                                 name: prop.name.clone(),
                             }),
+                            text_edit: None,
                         })
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            return CompletionOutput {
+            CompletionOutput {
                 items,
                 replace: content_span,
                 signature_help: None,
-            };
+            }
         }
-        PropState::None => {}
+        PropState::None => {
+            let (signature_help, expected_ty) =
+                signature_help_at_cursor(tokens.as_slice(), cursor_u32, ctx);
+
+            let prev_token = prev_non_trivia(tokens.as_slice(), cursor_u32);
+            let prev_token = prev_token.map(|(_, token)| token);
+            let is_prop_prefix = is_prop_prefix_at_cursor(tokens.as_slice(), cursor_u32);
+            let mut items = expr_start_items(ctx);
+            if !is_expr_start_position(prev_token)
+                && !is_prop_prefix
+                && !prefix_matches_completion(tokens.as_slice(), cursor_u32, &items)
+            {
+                CompletionOutput {
+                    items: Vec::new(),
+                    replace: default_replace,
+                    signature_help,
+                }
+            } else {
+                let replace = replace_span_for_expr_start(tokens.as_slice(), cursor_u32);
+                if expected_ty.is_some() {
+                    apply_type_ranking(&mut items, expected_ty, ctx);
+                }
+                CompletionOutput {
+                    items,
+                    replace,
+                    signature_help,
+                }
+            }
+        }
+    };
+
+    finalize_output(output, ctx)
+}
+
+fn prefix_matches_completion(tokens: &[Token], cursor: u32, items: &[CompletionItem]) -> bool {
+    let Some(prefix) = ident_prefix_at_cursor(tokens, cursor) else {
+        return false;
+    };
+    items.iter().any(|item| item.label.starts_with(prefix))
+}
+
+fn ident_prefix_at_cursor<'a>(tokens: &'a [Token], cursor: u32) -> Option<&'a str> {
+    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
+        if let TokenKind::Ident(ref symbol) = token.kind {
+            return Some(symbol.text.as_str());
+        }
     }
+    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
+        if token.span.end == cursor {
+            if let TokenKind::Ident(ref symbol) = token.kind {
+                return Some(symbol.text.as_str());
+            }
+        }
+    }
+    None
+}
 
-    let (signature_help, expected_ty) = signature_help_at_cursor(tokens.as_slice(), cursor_u32, ctx);
+fn finalize_output(
+    mut output: CompletionOutput,
+    ctx: Option<&semantic::Context>,
+) -> CompletionOutput {
+    attach_text_edits(output.replace, &mut output.items, ctx);
+    output
+}
 
-    let prev_token = prev_non_trivia(tokens.as_slice(), cursor_u32);
-    let prev_token = prev_token.map(|(_, token)| token);
-    let is_prop_prefix = is_prop_prefix_at_cursor(tokens.as_slice(), cursor_u32);
-    if !is_expr_start_position(prev_token) && !is_prop_prefix {
-        return CompletionOutput {
-            items: Vec::new(),
-            replace: default_replace,
-            signature_help,
+fn attach_text_edits(
+    output_replace: Span,
+    items: &mut [CompletionItem],
+    _ctx: Option<&semantic::Context>,
+) {
+    for item in items {
+        if item.is_disabled {
+            item.text_edit = None;
+            continue;
+        }
+
+        let edit = match &item.data {
+            Some(CompletionData::Function { name }) => {
+                let insert = format!("{name}(");
+                let insert_len = u32::try_from(insert.len()).unwrap_or(u32::MAX);
+                Some(TextEdit {
+                    replace: output_replace,
+                    insert,
+                    new_cursor: output_replace.start.saturating_add(insert_len),
+                })
+            }
+            Some(CompletionData::PropExpr { .. }) | Some(CompletionData::PropertyName { .. }) => {
+                let insert = item.insert_text.clone();
+                let insert_len = u32::try_from(insert.len()).unwrap_or(u32::MAX);
+                Some(TextEdit {
+                    replace: output_replace,
+                    insert,
+                    new_cursor: output_replace.start.saturating_add(insert_len),
+                })
+            }
+            _ => None,
         };
-    }
 
-    let replace = replace_span_for_expr_start(tokens.as_slice(), cursor_u32);
-    let mut items = expr_start_items(ctx);
-    if expected_ty.is_some() {
-        apply_type_ranking(&mut items, expected_ty, ctx);
-    }
-    CompletionOutput {
-        items,
-        replace,
-        signature_help,
+        item.text_edit = edit;
     }
 }
 
@@ -208,6 +296,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
                 data: Some(CompletionData::Function {
                     name: func.name.clone(),
                 }),
+                text_edit: None,
             }
         }));
     }
@@ -220,6 +309,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             is_disabled: false,
             disabled_reason: None,
             data: None,
+            text_edit: None,
         },
         CompletionItem {
             label: "false".to_string(),
@@ -229,6 +319,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             is_disabled: false,
             disabled_reason: None,
             data: None,
+            text_edit: None,
         },
         CompletionItem {
             label: "(".to_string(),
@@ -238,6 +329,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             is_disabled: false,
             disabled_reason: None,
             data: None,
+            text_edit: None,
         },
     ]);
     items
@@ -261,6 +353,7 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
             data: Some(CompletionData::PropExpr {
                 property_name: prop.name.clone(),
             }),
+            text_edit: None,
         };
         if prop.disabled_reason.is_some() {
             disabled.push(item);
