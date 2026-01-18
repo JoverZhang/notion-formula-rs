@@ -127,20 +127,7 @@ pub fn complete_with_context(
         PropState::AfterPropLParen => {
             let items = ctx.map(prop_variable_items).unwrap_or_default();
             CompletionOutput {
-                items: if items.is_empty() {
-                    vec![CompletionItem {
-                        label: "\"".to_string(),
-                        kind: CompletionKind::Literal,
-                        insert_text: "\"".to_string(),
-                        detail: None,
-                        is_disabled: false,
-                        disabled_reason: None,
-                        data: None,
-                        text_edit: None,
-                    }]
-                } else {
-                    items
-                },
+                items: if items.is_empty() { vec![] } else { items },
                 replace: default_replace,
                 signature_help: None,
             }
@@ -439,7 +426,11 @@ fn signature_help_at_cursor(
         Some(call_ctx) => call_ctx,
         None => return (None, None),
     };
-    let func = match ctx.functions.iter().find(|func| func.name == call_ctx.callee) {
+    let func = match ctx
+        .functions
+        .iter()
+        .find(|func| func.name == call_ctx.callee)
+    {
         Some(func) => func,
         None => return (None, None),
     };

@@ -270,7 +270,7 @@ fn completion_after_prop_lparen_without_context() {
         .iter()
         .map(|item| item.label.as_str())
         .collect();
-    assert_eq!(labels, vec!["\""]);
+    assert!(labels.is_empty());
     assert_replace_contains_cursor(output.replace, cursor);
 }
 
