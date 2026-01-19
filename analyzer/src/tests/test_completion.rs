@@ -399,6 +399,76 @@ fn completion_after_complete_atom_suppresses_expr_start() {
 }
 
 #[test]
+fn completion_when_expecting_separator_in_call_suppresses_expr_start() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![
+                ParamSig {
+                    name: None,
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: None,
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: None,
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("if(true$0", Some(ctx));
+    assert!(output.items.is_empty());
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_inside_call_arg_after_comma_suggests_expr_start_items() {
+    let ctx = Context {
+        properties: vec![Property {
+            name: "Title".to_string(),
+            ty: Ty::String,
+            disabled_reason: None,
+        }],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![
+                ParamSig {
+                    name: Some("condition".to_string()),
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("then".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("else".to_string()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("if(true, $0", Some(ctx));
+    assert!(!output.items.is_empty());
+    assert!(output.items.iter().any(|item| item.label == r#"prop("Title")"#));
+    assert!(output.items.iter().any(|item| item.label == "true"));
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
 fn completion_prefix_prop_identifier_with_context() {
     let ctx = Context {
         properties: vec![

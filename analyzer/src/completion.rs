@@ -68,6 +68,28 @@ struct CallContext {
     arg_index: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CompletionLocation {
+    PropAfterIdent,
+    PropAfterLParen,
+    PropStringContent { content_span: Span },
+    ExprStart,
+    CallArgExprStart {
+        callee: String,
+        arg_index: usize,
+        expected: Option<semantic::Ty>,
+    },
+    SeparatorExpected { kind: SeparatorKind },
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SeparatorKind {
+    Comma,
+    CloseParen,
+    Unknown,
+}
+
 /// Compute completions using byte offsets for the cursor and replace span.
 pub fn complete_with_context(
     text: &str,
@@ -103,8 +125,171 @@ pub fn complete_with_context(
         );
     }
 
-    let output = match detect_prop_state(&tokens, cursor_u32) {
-        PropState::AfterPropIdent => {
+    let location = detect_location(tokens.as_slice(), cursor_u32, ctx);
+    let signature_help = match location {
+        CompletionLocation::PropAfterIdent
+        | CompletionLocation::PropAfterLParen
+        | CompletionLocation::PropStringContent { .. } => None,
+        _ => signature_help_at_cursor(tokens.as_slice(), cursor_u32, ctx).0,
+    };
+
+    let mut output = complete_at_location(location, ctx, tokens.as_slice(), cursor_u32);
+    output.signature_help = signature_help;
+
+    finalize_output(output, ctx)
+}
+
+fn detect_location(
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+) -> CompletionLocation {
+    match detect_prop_state(tokens, cursor) {
+        PropState::AfterPropIdent => return CompletionLocation::PropAfterIdent,
+        PropState::AfterPropLParen => return CompletionLocation::PropAfterLParen,
+        PropState::InPropStringContent(content_span) => {
+            return CompletionLocation::PropStringContent { content_span };
+        }
+        PropState::None => {}
+    }
+
+    if let Some(call_ctx) = detect_call_context(tokens, cursor) {
+        if let Some(kind) = separator_expected_in_call(tokens, cursor) {
+            return CompletionLocation::SeparatorExpected { kind };
+        }
+        if should_show_expr_start_completions_in_context(tokens, cursor, ctx) {
+            let expected = ctx
+                .and_then(|ctx| {
+                    ctx.functions
+                        .iter()
+                        .find(|func| func.name == call_ctx.callee)
+                        .and_then(|func| func.params.get(call_ctx.arg_index))
+                })
+                .map(|param| param.ty);
+            return CompletionLocation::CallArgExprStart {
+                callee: call_ctx.callee,
+                arg_index: call_ctx.arg_index,
+                expected,
+            };
+        }
+
+        return CompletionLocation::None;
+    }
+
+    if should_show_expr_start_completions_in_context(tokens, cursor, ctx) {
+        CompletionLocation::ExprStart
+    } else {
+        CompletionLocation::None
+    }
+}
+
+fn is_prefix_editing_ident(tokens: &[Token], cursor: u32) -> Option<(Span, String)> {
+    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
+        if let TokenKind::Ident(ref symbol) = token.kind {
+            if token.span.start < cursor && cursor <= token.span.end && !symbol.text.is_empty() {
+                return Some((token.span, symbol.text.clone()));
+            }
+        }
+    }
+
+    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
+        if token.span.end == cursor {
+            if let TokenKind::Ident(ref symbol) = token.kind {
+                if !symbol.text.is_empty() {
+                    return Some((token.span, symbol.text.clone()));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn should_show_expr_start_completions(tokens: &[Token], cursor: u32) -> bool {
+    let prev = prev_non_trivia(tokens, cursor).map(|(_, token)| token);
+    let prop_prefix = is_prop_prefix_at_cursor(tokens, cursor);
+    if is_expr_start_position(prev) {
+        return true;
+    }
+    if prop_prefix {
+        return true;
+    }
+    is_prefix_editing_ident(tokens, cursor).is_some()
+}
+
+fn should_show_expr_start_completions_in_context(
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+) -> bool {
+    if !should_show_expr_start_completions(tokens, cursor) {
+        return false;
+    }
+
+    let prev = prev_non_trivia(tokens, cursor).map(|(_, token)| token);
+    if is_expr_start_position(prev) || is_prop_prefix_at_cursor(tokens, cursor) {
+        return true;
+    }
+
+    let Some((_, ident)) = is_prefix_editing_ident(tokens, cursor) else {
+        return false;
+    };
+    prefix_matches_completion_without_items(&ident, ctx)
+}
+
+fn prefix_matches_completion_without_items(prefix: &str, ctx: Option<&semantic::Context>) -> bool {
+    if "true".starts_with(prefix) || "false".starts_with(prefix) {
+        return true;
+    }
+
+    let Some(ctx) = ctx else {
+        return false;
+    };
+
+    if !ctx.properties.is_empty() && "prop(\"".starts_with(prefix) {
+        return true;
+    }
+
+    ctx.functions.iter().any(|func| func.name.starts_with(prefix))
+}
+
+fn separator_expected_in_call(tokens: &[Token], cursor: u32) -> Option<SeparatorKind> {
+    let (_, prev_token) = prev_non_trivia(tokens, cursor)?;
+    if prev_token.span.end != cursor {
+        return None;
+    }
+
+    match &prev_token.kind {
+        TokenKind::CloseParen | TokenKind::Literal(_) => Some(next_separator_kind(tokens, cursor)),
+        TokenKind::Ident(_) => match is_prefix_editing_ident(tokens, cursor) {
+            Some((span, _)) if cursor < span.end => None,
+            Some((span, _)) if cursor == span.end => Some(next_separator_kind(tokens, cursor)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn next_separator_kind(tokens: &[Token], cursor: u32) -> SeparatorKind {
+    match next_non_trivia(tokens, cursor).map(|(_, token)| &token.kind) {
+        Some(TokenKind::Comma) => SeparatorKind::Comma,
+        Some(TokenKind::CloseParen) => SeparatorKind::CloseParen,
+        _ => SeparatorKind::Unknown,
+    }
+}
+
+fn complete_at_location(
+    loc: CompletionLocation,
+    ctx: Option<&semantic::Context>,
+    tokens: &[Token],
+    cursor: u32,
+) -> CompletionOutput {
+    let default_replace = Span {
+        start: cursor,
+        end: cursor,
+    };
+    match loc {
+        CompletionLocation::PropAfterIdent => {
             let items = ctx.map(prop_variable_items).unwrap_or_default();
             CompletionOutput {
                 items: if items.is_empty() {
@@ -127,7 +312,7 @@ pub fn complete_with_context(
                 signature_help: None,
             }
         }
-        PropState::AfterPropLParen => {
+        CompletionLocation::PropAfterLParen => {
             let items = ctx.map(prop_variable_items).unwrap_or_default();
             CompletionOutput {
                 items: if items.is_empty() { vec![] } else { items },
@@ -135,7 +320,7 @@ pub fn complete_with_context(
                 signature_help: None,
             }
         }
-        PropState::InPropStringContent(content_span) => {
+        CompletionLocation::PropStringContent { content_span } => {
             let items = ctx
                 .map(|ctx| {
                     ctx.properties
@@ -163,61 +348,26 @@ pub fn complete_with_context(
                 signature_help: None,
             }
         }
-        PropState::None => {
-            let (signature_help, expected_ty) =
-                signature_help_at_cursor(tokens.as_slice(), cursor_u32, ctx);
-
-            let prev_token = prev_non_trivia(tokens.as_slice(), cursor_u32);
-            let prev_token = prev_token.map(|(_, token)| token);
-            let is_prop_prefix = is_prop_prefix_at_cursor(tokens.as_slice(), cursor_u32);
+        CompletionLocation::ExprStart => CompletionOutput {
+            items: expr_start_items(ctx),
+            replace: replace_span_for_expr_start(tokens, cursor),
+            signature_help: None,
+        },
+        CompletionLocation::CallArgExprStart { expected, .. } => {
             let mut items = expr_start_items(ctx);
-            if !is_expr_start_position(prev_token)
-                && !is_prop_prefix
-                && !prefix_matches_completion(tokens.as_slice(), cursor_u32, &items)
-            {
-                CompletionOutput {
-                    items: Vec::new(),
-                    replace: default_replace,
-                    signature_help,
-                }
-            } else {
-                let replace = replace_span_for_expr_start(tokens.as_slice(), cursor_u32);
-                if expected_ty.is_some() {
-                    apply_type_ranking(&mut items, expected_ty, ctx);
-                }
-                CompletionOutput {
-                    items,
-                    replace,
-                    signature_help,
-                }
+            apply_type_ranking(&mut items, expected, ctx);
+            CompletionOutput {
+                items,
+                replace: replace_span_for_expr_start(tokens, cursor),
+                signature_help: None,
             }
         }
-    };
-
-    finalize_output(output, ctx)
-}
-
-fn prefix_matches_completion(tokens: &[Token], cursor: u32, items: &[CompletionItem]) -> bool {
-    let Some(prefix) = ident_prefix_at_cursor(tokens, cursor) else {
-        return false;
-    };
-    items.iter().any(|item| item.label.starts_with(prefix))
-}
-
-fn ident_prefix_at_cursor<'a>(tokens: &'a [Token], cursor: u32) -> Option<&'a str> {
-    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
-        if let TokenKind::Ident(ref symbol) = token.kind {
-            return Some(symbol.text.as_str());
-        }
+        CompletionLocation::SeparatorExpected { .. } | CompletionLocation::None => CompletionOutput {
+            items: Vec::new(),
+            replace: default_replace,
+            signature_help: None,
+        },
     }
-    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
-        if token.span.end == cursor {
-            if let TokenKind::Ident(ref symbol) = token.kind {
-                return Some(symbol.text.as_str());
-            }
-        }
-    }
-    None
 }
 
 fn finalize_output(
