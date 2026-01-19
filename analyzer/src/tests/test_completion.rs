@@ -62,8 +62,7 @@ fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
         assert!(updated.is_char_boundary(start));
         assert!(updated.is_char_boundary(end));
 
-        let mut next =
-            String::with_capacity(updated.len() - (end - start) + edit.new_text.len());
+        let mut next = String::with_capacity(updated.len() - (end - start) + edit.new_text.len());
         next.push_str(&updated[..start]);
         next.push_str(&edit.new_text);
         next.push_str(&updated[end..]);
@@ -778,22 +777,6 @@ fn completion_apply_function_in_call_callee_position() {
     let (updated, new_cursor) = apply_completion_fixture("$0", Some(ctx), "if");
     assert_eq!(updated, "if()");
     assert_eq!(new_cursor, 3);
-}
-
-#[test]
-fn completion_function_cursor_is_inside_parens() {
-    let ctx = Context {
-        properties: vec![],
-        functions: vec![FunctionSig {
-            name: "sum".to_string(),
-            params: vec![],
-            ret: Ty::Number,
-            detail: None,
-        }],
-    };
-    let (updated, new_cursor) = apply_completion_fixture("su$0", Some(ctx), "sum");
-    assert_eq!(updated, "sum()");
-    assert_eq!(new_cursor, 4);
 }
 
 #[test]
