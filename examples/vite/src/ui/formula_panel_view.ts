@@ -3,7 +3,8 @@ import { linter } from "@codemirror/lint";
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
-import { PROPERTY_SCHEMA } from "../app/context";
+import { completeSource, type CompletionItem, type SignatureHelp } from "../analyzer/wasm_client";
+import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
 import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
@@ -15,6 +16,7 @@ import {
   setChipDecoListEffect,
   type ChipDecorationRange,
 } from "../editor/chip_decorations";
+import { applyCompletion } from "../editor/text_edits";
 import {
   computePropChips,
   computeTokenDecorationRanges,
@@ -213,18 +215,6 @@ function renderDiagnostics(
   });
 }
 
-function renderFormatted(
-  formattedEl: HTMLElement,
-  formatted: string,
-  diagnostics: AnalyzerDiagnostic[],
-) {
-  if (!formatted && diagnostics && diagnostics.length > 0) {
-    formattedEl.textContent = "(no formatted output due to fatal error)";
-    return;
-  }
-  formattedEl.textContent = formatted || "";
-}
-
 function setWarningVisible(warningEl: HTMLElement, visible: boolean) {
   warningEl.classList.toggle("hidden", !visible);
 }
@@ -287,6 +277,48 @@ export function createFormulaPanelView(opts: {
   editorEl.setAttribute("data-formula-id", opts.id);
   leftCol.appendChild(editorEl);
 
+  const actionsRow = document.createElement("div");
+  actionsRow.className = "formula-actions";
+  leftCol.appendChild(actionsRow);
+
+  const formatBtn = document.createElement("button");
+  formatBtn.className = "format-button";
+  formatBtn.type = "button";
+  formatBtn.textContent = "Format";
+  formatBtn.setAttribute("data-testid", "format-button");
+  formatBtn.setAttribute("data-formula-id", opts.id);
+  actionsRow.appendChild(formatBtn);
+
+  const formatStatus = document.createElement("div");
+  formatStatus.className = "format-status";
+  formatStatus.setAttribute("data-testid", "format-status");
+  formatStatus.setAttribute("data-formula-id", opts.id);
+  actionsRow.appendChild(formatStatus);
+
+  const completionPanel = document.createElement("div");
+  completionPanel.className = "completion-panel";
+  completionPanel.setAttribute("data-testid", "completion-panel");
+  completionPanel.setAttribute("data-formula-id", opts.id);
+  leftCol.appendChild(completionPanel);
+
+  const completionHeader = document.createElement("div");
+  completionHeader.className = "completion-header";
+  completionHeader.textContent = "Suggestions";
+  completionPanel.appendChild(completionHeader);
+
+  const signatureEl = document.createElement("div");
+  signatureEl.className = "completion-signature hidden";
+  completionPanel.appendChild(signatureEl);
+
+  const itemsEl = document.createElement("ul");
+  itemsEl.className = "completion-items";
+  completionPanel.appendChild(itemsEl);
+
+  const emptyEl = document.createElement("div");
+  emptyEl.className = "completion-empty";
+  emptyEl.textContent = "No suggestions";
+  completionPanel.appendChild(emptyEl);
+
   const diagTitle = document.createElement("div");
   diagTitle.className = "diagnostics-title";
   diagTitle.textContent = "Diagnostics";
@@ -298,37 +330,184 @@ export function createFormulaPanelView(opts: {
   diagnosticsEl.setAttribute("data-formula-id", opts.id);
   leftCol.appendChild(diagnosticsEl);
 
-  const rightCol = document.createElement("div");
-  rightCol.className = "result-panel";
-
-  const resultTitle = document.createElement("div");
-  resultTitle.className = "result-title";
-  resultTitle.textContent = "Result";
-  rightCol.appendChild(resultTitle);
-
-  const resultPlaceholder = document.createElement("div");
-  resultPlaceholder.className = "result-placeholder";
-  resultPlaceholder.textContent = "Evaluator not implemented yet";
-  rightCol.appendChild(resultPlaceholder);
-
-  const formattedLabel = document.createElement("div");
-  formattedLabel.className = "result-subtitle";
-  formattedLabel.textContent = "Formatted";
-  rightCol.appendChild(formattedLabel);
-
-  const formattedEl = document.createElement("pre");
-  formattedEl.className = "result-formatted";
-  formattedEl.setAttribute("data-testid", "formula-formatted");
-  formattedEl.setAttribute("data-formula-id", opts.id);
-  rightCol.appendChild(formattedEl);
-
   panel.appendChild(leftCol);
-  panel.appendChild(rightCol);
+
+  let completionItems: CompletionItem[] = [];
+  let signatureHelp: SignatureHelp | null = null;
+  let selectedIndex = -1;
+  let completionTimer: ReturnType<typeof setTimeout> | null = null;
+  let statusTimer: ReturnType<typeof setTimeout> | null = null;
+  const COMPLETION_DEBOUNCE_MS = 120;
+
+  function setStatus(text: string, kind: "ok" | "warning" | "error" | "muted") {
+    formatStatus.textContent = text;
+    formatStatus.dataset.kind = kind;
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+      formatStatus.textContent = "";
+      delete formatStatus.dataset.kind;
+      statusTimer = null;
+    }, 2200);
+  }
+
+  function renderSignature(sig: SignatureHelp | null) {
+    if (!sig) {
+      signatureEl.classList.add("hidden");
+      signatureEl.textContent = "";
+      return;
+    }
+    signatureEl.classList.remove("hidden");
+    const params = sig.params.map((p, idx) => (idx === sig.active_param ? `[${p}]` : p));
+    signatureEl.textContent = `${sig.label} ${params.length ? "— " + params.join(", ") : ""}`;
+  }
+
+  function renderItems() {
+    itemsEl.innerHTML = "";
+    if (!completionItems || completionItems.length === 0) {
+      emptyEl.classList.remove("hidden");
+      return;
+    }
+    emptyEl.classList.add("hidden");
+
+    completionItems.forEach((item, idx) => {
+      const li = document.createElement("li");
+      li.className = "completion-item";
+      if (idx === selectedIndex) li.classList.add("is-selected");
+      if (item.is_disabled) li.classList.add("is-disabled");
+      li.setAttribute("data-completion-index", String(idx));
+
+      const main = document.createElement("div");
+      main.className = "completion-item-main";
+      const label = document.createElement("div");
+      label.className = "completion-item-label";
+      label.textContent = item.label;
+      const meta = document.createElement("div");
+      meta.className = "completion-item-meta";
+      const detail = item.detail ?? (item.is_disabled ? item.disabled_reason ?? "" : "");
+      meta.textContent = detail;
+      main.append(label, meta);
+      li.appendChild(main);
+
+      li.addEventListener("mouseenter", () => {
+        if (!completionItems.length) return;
+        selectedIndex = idx;
+        renderItems();
+      });
+
+      li.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+      });
+
+      li.addEventListener("click", () => {
+        applyCompletionItem(idx);
+      });
+
+      itemsEl.appendChild(li);
+    });
+  }
+
+  function rerenderCompletions() {
+    renderSignature(signatureHelp);
+    if (selectedIndex >= completionItems.length) selectedIndex = completionItems.length - 1;
+    renderItems();
+  }
+
+  function requestCompletions(view: EditorView) {
+    if (completionTimer) clearTimeout(completionTimer);
+    completionTimer = setTimeout(() => {
+      completionTimer = null;
+      const source = view.state.doc.toString();
+      const cursor = view.state.selection.main.head;
+      try {
+        const output = completeSource(source, cursor, CONTEXT_JSON);
+        completionItems = output.items ?? [];
+        signatureHelp = output.signature_help ?? null;
+      } catch {
+        completionItems = [];
+        signatureHelp = null;
+      }
+      if (completionItems.length === 0) selectedIndex = -1;
+      rerenderCompletions();
+    }, COMPLETION_DEBOUNCE_MS);
+  }
+
+  function selectNext(delta: number) {
+    if (!completionItems.length) return;
+    if (selectedIndex < 0) {
+      selectedIndex = delta > 0 ? 0 : completionItems.length - 1;
+    } else {
+      selectedIndex = (selectedIndex + delta + completionItems.length) % completionItems.length;
+    }
+    renderItems();
+  }
+
+  function applyCompletionItem(index: number): boolean {
+    const item = completionItems[index];
+    if (!item || item.is_disabled || !item.primary_edit) return false;
+
+    const source = editorView.state.doc.toString();
+    const { newText, newCursor } = applyCompletion(source, item);
+    const edits = [item.primary_edit, ...(item.additional_edits ?? [])];
+    const changes = edits
+      .map((e) => ({ from: e.range.start, to: e.range.end, insert: e.new_text }))
+      .sort((a, b) => a.from - b.from || a.to - b.to);
+
+    editorView.dispatch({
+      changes,
+      selection: { anchor: Math.max(0, Math.min(newCursor, newText.length)) },
+    });
+    editorView.focus();
+
+    selectedIndex = -1;
+    requestCompletions(editorView);
+    return true;
+  }
 
   const editorView = new EditorView({
     state: EditorState.create({
       doc: opts.initialSource,
       extensions: [
+        keymap.of([
+          {
+            key: "ArrowDown",
+            run: () => {
+              if (!completionItems.length) return false;
+              selectNext(1);
+              return true;
+            },
+          },
+          {
+            key: "ArrowUp",
+            run: () => {
+              if (!completionItems.length) return false;
+              selectNext(-1);
+              return true;
+            },
+          },
+          {
+            key: "Escape",
+            run: () => {
+              if (selectedIndex < 0) return false;
+              selectedIndex = -1;
+              renderItems();
+              return true;
+            },
+          },
+          {
+            key: "Enter",
+            run: () => {
+              if (selectedIndex < 0) return false;
+              return applyCompletionItem(selectedIndex);
+            },
+          },
+          {
+            key: "Tab",
+            run: () => {
+              if (selectedIndex < 0) return false;
+              return applyCompletionItem(selectedIndex);
+            },
+          },
+        ]),
         keymap.of(defaultKeymap),
         EditorView.lineWrapping,
         formulaIdFacet.of(opts.id),
@@ -340,6 +519,9 @@ export function createFormulaPanelView(opts: {
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             opts.onSourceChange(opts.id, update.state.doc.toString());
+          }
+          if (update.docChanged || update.selectionSet) {
+            requestCompletions(update.view);
           }
         }),
         linter((view) => view.state.field(lintDiagnosticsStateField)),
@@ -359,6 +541,27 @@ export function createFormulaPanelView(opts: {
   let lastSource = opts.initialSource;
 
   renderDiagnostics(diagnosticsEl, [], null, []);
+  rerenderCompletions();
+
+  formatBtn.addEventListener("click", () => {
+    const formatted = lastFormatted || "";
+    if (!formatted) {
+      setStatus("Format unavailable", lastDiagnostics.length ? "error" : "muted");
+      return;
+    }
+    const current = editorView.state.doc.toString();
+    if (current === formatted) {
+      setStatus("No change", "muted");
+      return;
+    }
+    const cursor = editorView.state.selection.main.head;
+    editorView.dispatch({
+      changes: { from: 0, to: editorView.state.doc.length, insert: formatted },
+      selection: { anchor: Math.min(cursor, formatted.length) },
+    });
+    editorView.focus();
+    setStatus("Formatted", lastDiagnostics.length ? "warning" : "ok");
+  });
 
   registerPanelDebug(opts.id, {
     getState: () => ({
@@ -402,8 +605,6 @@ export function createFormulaPanelView(opts: {
       lastStatus = state.status;
       lastDiagnostics = state.diagnostics;
       lastFormatted = state.formatted;
-
-      renderFormatted(formattedEl, state.formatted, state.diagnostics);
 
       const sortedTokens = sortTokens(state.tokens || []);
       const { ok, decoSet, ranges } = buildTokenDecorations(state.source, sortedTokens);

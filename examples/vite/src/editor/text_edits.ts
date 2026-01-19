@@ -1,0 +1,52 @@
+export type TextRange = { start: number; end: number };
+
+export type TextEdit = {
+  range: TextRange;
+  new_text: string;
+};
+
+export type CompletionItem = {
+  label: string;
+  kind: string;
+  insert_text: string;
+  primary_edit: TextEdit | null;
+  cursor: number | null;
+  additional_edits: TextEdit[];
+  detail: string | null;
+  is_disabled: boolean;
+  disabled_reason: string | null;
+};
+
+function compareEditsDesc(a: TextEdit, b: TextEdit): number {
+  return b.range.start - a.range.start || b.range.end - a.range.end;
+}
+
+export function applyTextEdits(text: string, edits: TextEdit[]): string {
+  if (!edits.length) return text;
+  const sorted = [...edits].sort(compareEditsDesc);
+  let updated = text;
+
+  for (const edit of sorted) {
+    const start = edit.range.start;
+    const end = edit.range.end;
+    if (start < 0 || end < start || end > updated.length) continue;
+    updated = updated.slice(0, start) + edit.new_text + updated.slice(end);
+  }
+
+  return updated;
+}
+
+export function applyCompletion(
+  text: string,
+  item: Pick<CompletionItem, "primary_edit" | "additional_edits" | "cursor">,
+): { newText: string; newCursor: number } {
+  const primary = item.primary_edit;
+  if (!primary) return { newText: text, newCursor: 0 };
+
+  const edits = [primary, ...(item.additional_edits ?? [])];
+  const newText = applyTextEdits(text, edits);
+  const fallbackCursor = primary.range.start + primary.new_text.length;
+  const newCursor = Math.max(0, Math.min(item.cursor ?? fallbackCursor, newText.length));
+  return { newText, newCursor };
+}
+

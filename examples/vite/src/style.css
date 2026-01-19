@@ -255,7 +255,7 @@ body {
   padding: 18px;
   box-shadow: var(--shadow);
   display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) minmax(220px, 0.8fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
 }
@@ -303,6 +303,154 @@ body {
   border-right: none;
 }
 
+.formula-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.format-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.format-button:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.format-status {
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 16px;
+}
+
+.format-status[data-kind="ok"] {
+  color: #16794c;
+}
+
+[data-theme="dark"] .format-status[data-kind="ok"] {
+  color: #5ee090;
+}
+
+.format-status[data-kind="warning"] {
+  color: #8a5b00;
+}
+
+[data-theme="dark"] .format-status[data-kind="warning"] {
+  color: #f7c66f;
+}
+
+.format-status[data-kind="error"] {
+  color: var(--danger);
+}
+
+.completion-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: var(--surface-muted);
+  display: grid;
+  gap: 8px;
+}
+
+.completion-header {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.completion-signature {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.completion-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.completion-item {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.completion-item:hover {
+  background: rgba(120, 120, 140, 0.12);
+}
+
+[data-theme="dark"] .completion-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.completion-item.is-selected {
+  background: rgba(120, 120, 140, 0.18);
+  outline: 1px solid var(--border-strong);
+}
+
+[data-theme="dark"] .completion-item.is-selected {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.completion-item.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.completion-item-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.completion-item-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.completion-item-meta {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+
+.completion-empty {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 6px 2px;
+}
+
 .cm-selectionBackground {
   background: var(--selection) !important;
 }
@@ -343,46 +491,6 @@ body {
   padding: 0 4px;
   font-size: 13px;
   color: var(--danger);
-}
-
-.result-panel {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
-  background: var(--surface-muted);
-  display: grid;
-  gap: 10px;
-}
-
-.result-title {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.result-subtitle {
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.result-placeholder {
-  font-size: 14px;
-  color: var(--text);
-}
-
-.result-formatted {
-  margin: 0;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px dashed var(--border);
-  background: var(--surface);
-  min-height: 68px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  white-space: pre-wrap;
 }
 
 .warning {
@@ -463,9 +571,5 @@ body {
   .page-header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .formula-panel {
-    grid-template-columns: 1fr;
   }
 }
