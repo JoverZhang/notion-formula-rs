@@ -1,0 +1,515 @@
+use crate::completion::{
+    CompletionData, CompletionItem, CompletionOutput, TextEdit, complete_with_context,
+};
+use crate::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
+use crate::token::Span;
+
+#[derive(Clone, Default)]
+pub struct ContextBuilder {
+    properties: Vec<Property>,
+    functions: Vec<FunctionSig>,
+}
+
+pub fn ctx() -> ContextBuilder {
+    ContextBuilder::default()
+}
+
+impl ContextBuilder {
+    pub fn prop(mut self, name: impl Into<String>, ty: Ty) -> Self {
+        self.properties.push(Property {
+            name: name.into(),
+            ty,
+            disabled_reason: None,
+        });
+        self
+    }
+
+    pub fn disabled_prop(
+        mut self,
+        name: impl Into<String>,
+        ty: Ty,
+        reason: impl Into<String>,
+    ) -> Self {
+        self.properties.push(Property {
+            name: name.into(),
+            ty,
+            disabled_reason: Some(reason.into()),
+        });
+        self
+    }
+
+    pub fn func(self, name: impl Into<String>) -> FuncBuilder {
+        FuncBuilder {
+            parent: self,
+            name: name.into(),
+            params: Vec::new(),
+            ret: Ty::Unknown,
+            detail: None,
+        }
+    }
+
+    pub fn func_if(self) -> ContextBuilder {
+        self.func("if")
+            .params([
+                ParamSig {
+                    name: Some("condition".into()),
+                    ty: Ty::Boolean,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("then".into()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+                ParamSig {
+                    name: Some("else".into()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                },
+            ])
+            .ret(Ty::Unknown)
+            .finish()
+    }
+
+    pub fn func_sum(self) -> ContextBuilder {
+        self.func("sum")
+            .params([ParamSig {
+                name: None,
+                ty: Ty::Number,
+                optional: false,
+            }])
+            .ret(Ty::Number)
+            .finish()
+    }
+
+    pub fn build(self) -> Context {
+        Context {
+            properties: self.properties,
+            functions: self.functions,
+        }
+    }
+}
+
+pub struct FuncBuilder {
+    parent: ContextBuilder,
+    name: String,
+    params: Vec<ParamSig>,
+    ret: Ty,
+    detail: Option<String>,
+}
+
+impl FuncBuilder {
+    pub fn params<const N: usize>(mut self, params: [ParamSig; N]) -> Self {
+        self.params.extend(params);
+        self
+    }
+
+    pub fn param(mut self, p: ParamSig) -> Self {
+        self.params.push(p);
+        self
+    }
+
+    pub fn ret(mut self, ty: Ty) -> Self {
+        self.ret = ty;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn finish(mut self) -> ContextBuilder {
+        self.parent.functions.push(FunctionSig {
+            name: self.name,
+            params: self.params,
+            ret: self.ret,
+            detail: self.detail.take(),
+        });
+        self.parent
+    }
+}
+
+// ----------------------------
+// Completion Test DSL
+// ----------------------------
+
+pub fn t(input_with_cursor: &str) -> CompletionTestBuilder {
+    CompletionTestBuilder::new(input_with_cursor)
+}
+
+pub struct CompletionTestBuilder {
+    #[allow(dead_code)]
+    input_with_cursor: String,
+    replaced: String,
+    cursor: u32,
+    ctx: Option<Context>,
+    output: Option<CompletionOutput>,
+}
+
+impl CompletionTestBuilder {
+    fn new(input_with_cursor: &str) -> Self {
+        let cursor = input_with_cursor
+            .find("$0")
+            .expect("fixture must contain $0 marker");
+        let text = input_with_cursor.to_string();
+        let replaced = text.replace("$0", "");
+        assert!(
+            replaced.len() + 2 == text.len(),
+            "fixture must contain exactly one $0 marker"
+        );
+
+        Self {
+            input_with_cursor: text,
+            replaced,
+            cursor: cursor as u32,
+            ctx: None,
+            output: None,
+        }
+    }
+
+    pub fn ctx(mut self, ctx: Context) -> Self {
+        self.ctx = Some(ctx);
+        self
+    }
+
+    pub fn no_ctx(mut self) -> Self {
+        self.ctx = None;
+        self
+    }
+
+    fn ensure_run(&mut self) -> &CompletionOutput {
+        if self.output.is_none() {
+            let out =
+                complete_with_context(&self.replaced, self.cursor as usize, self.ctx.as_ref());
+            self.output = Some(out);
+        }
+        self.output.as_ref().unwrap()
+    }
+
+    #[allow(dead_code)]
+    pub fn output(&mut self) -> &CompletionOutput {
+        self.ensure_run()
+    }
+
+    #[allow(dead_code)]
+    pub fn run(mut self) -> Self {
+        let _ = self.ensure_run();
+        self
+    }
+
+    pub fn expect_replace_contains_cursor(mut self) -> Self {
+        let cursor = self.cursor;
+        let out = self.ensure_run();
+        assert!(
+            out.replace.start <= cursor && cursor <= out.replace.end,
+            "replace span must contain cursor: {:?} vs {}",
+            out.replace,
+            cursor
+        );
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn labels(&mut self) -> Vec<&str> {
+        let out = self.ensure_run();
+        out.items.iter().map(|i| i.label.as_str()).collect()
+    }
+
+    pub fn expect_not_empty(mut self) -> Self {
+        let out = self.ensure_run();
+        assert!(
+            !out.items.is_empty(),
+            "expected at least one completion item"
+        );
+        self
+    }
+
+    pub fn expect_empty(mut self) -> Self {
+        let out = self.ensure_run();
+        assert!(
+            out.items.is_empty(),
+            "expected no completion items, got {}",
+            out.items.len()
+        );
+        self
+    }
+
+    pub fn expect_labels(mut self, expected: &[&str]) -> Self {
+        let out = self.ensure_run();
+        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+        assert_eq!(labels, expected, "labels mismatch");
+        self
+    }
+
+    pub fn expect_contains(mut self, expected: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
+        let out = self.ensure_run();
+        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+        for e in expected {
+            let e = e.as_ref();
+            assert!(
+                labels.iter().any(|l| *l == e),
+                "missing completion label: {e}\nactual labels: {labels:?}"
+            );
+        }
+        self
+    }
+
+    pub fn expect_no_label_prefix(mut self, prefix: &str) -> Self {
+        let out = self.ensure_run();
+        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+        assert!(
+            !labels.iter().any(|l| l.starts_with(prefix)),
+            "expected no labels starting with {prefix:?}\nactual labels: {labels:?}"
+        );
+        self
+    }
+
+    pub fn expect_not_contains(
+        mut self,
+        expected: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Self {
+        let out = self.ensure_run();
+        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+        for e in expected {
+            let e = e.as_ref();
+            assert!(
+                !labels.iter().any(|l| *l == e),
+                "expected NOT to contain label: {e}\nactual labels: {labels:?}"
+            );
+        }
+        self
+    }
+
+    pub fn expect_replace(mut self, expected: Span) -> Self {
+        let out = self.ensure_run();
+        assert_eq!(out.replace, expected, "replace span mismatch");
+        self
+    }
+
+    pub fn expect_prefix(mut self, expected_prefix: &[&str]) -> Self {
+        let out = self.ensure_run();
+        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+        assert!(
+            labels.len() >= expected_prefix.len(),
+            "expected at least {} items, got {}\nactual labels: {labels:?}",
+            expected_prefix.len(),
+            labels.len()
+        );
+        for (idx, exp) in expected_prefix.iter().enumerate() {
+            assert_eq!(
+                labels[idx], *exp,
+                "prefix mismatch at index {idx}\nactual labels: {labels:?}"
+            );
+        }
+        self
+    }
+
+    pub fn expect_order(mut self, before: &str, after: &str) -> Self {
+        let out = self.ensure_run();
+        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+        let b = labels
+            .iter()
+            .position(|l| *l == before)
+            .unwrap_or_else(|| panic!("missing label {before}\nactual labels: {labels:?}"));
+        let a = labels
+            .iter()
+            .position(|l| *l == after)
+            .unwrap_or_else(|| panic!("missing label {after}\nactual labels: {labels:?}"));
+        assert!(
+            b < a,
+            "expected {before} before {after}, but got {b} >= {a}\nactual labels: {labels:?}"
+        );
+        self
+    }
+
+    pub fn item(&mut self, label: &str) -> &CompletionItem {
+        let out = self.ensure_run();
+        out.items
+            .iter()
+            .find(|i| i.label == label)
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+                panic!("missing completion item for label {label}\nactual labels: {labels:?}")
+            })
+    }
+
+    pub fn expect_item_data(mut self, label: &str, data: CompletionData) -> Self {
+        let item = { self.item(label).clone() };
+        assert_eq!(item.data, Some(data), "unexpected data for item {label}");
+        self
+    }
+
+    pub fn expect_item_disabled(mut self, label: &str, reason: Option<&str>) -> Self {
+        let item = { self.item(label).clone() };
+        assert!(item.is_disabled, "expected item {label} to be disabled");
+        assert_eq!(
+            item.disabled_reason.as_deref(),
+            reason,
+            "disabled_reason mismatch for {label}"
+        );
+        self
+    }
+
+    pub fn expect_item_no_primary_edit(mut self, label: &str) -> Self {
+        let item = { self.item(label).clone() };
+        assert!(
+            item.primary_edit.is_none(),
+            "expected item {label} to have no primary_edit"
+        );
+        self
+    }
+
+    pub fn expect_item_cursor_after_lparen(mut self, label: &str) -> Self {
+        let replace_start = self.ensure_run().replace.start;
+        let item = { self.item(label).clone() };
+
+        let lparen_idx = item
+            .insert_text
+            .find('(')
+            .expect("completion insert_text must contain '('");
+        assert!(
+            item.cursor.is_some(),
+            "completion item must provide an explicit cursor"
+        );
+        assert_eq!(
+            item.cursor,
+            Some(replace_start + (lparen_idx as u32) + 1),
+            "cursor mismatch for {label}"
+        );
+        self
+    }
+
+    // ----- signature help -----
+
+    pub fn expect_sig_active(mut self, active_param: usize) -> Self {
+        let out = self.ensure_run();
+        let sig = out
+            .signature_help
+            .as_ref()
+            .expect("expected signature help");
+        assert_eq!(sig.active_param, active_param);
+        self
+    }
+
+    // ----- apply completion -----
+
+    pub fn apply(mut self, label: &str) -> ApplyResult {
+        let replaced = self.replaced.clone();
+        let out = self.ensure_run();
+        let item = out
+            .items
+            .iter()
+            .find(|i| i.label == label)
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+                panic!("missing completion item for label {label}\nactual labels: {labels:?}")
+            });
+
+        assert!(
+            !item.is_disabled,
+            "completion item {label} is disabled and must not be applicable"
+        );
+        let primary = item.primary_edit.as_ref().expect("expected primary edit");
+        assert_eq!(
+            primary.range, out.replace,
+            "primary edit range must match output replace span"
+        );
+
+        let mut edits = Vec::with_capacity(1 + item.additional_edits.len());
+        edits.push(primary.clone());
+        edits.extend(item.additional_edits.iter().cloned());
+
+        let updated = apply_text_edits(&replaced, &edits);
+        let new_cursor = item.cursor.unwrap_or_else(|| {
+            out.replace
+                .start
+                .saturating_add(primary.new_text.len() as u32)
+        });
+        assert!((new_cursor as usize) <= updated.len());
+
+        ApplyResult {
+            updated,
+            cursor: new_cursor,
+        }
+    }
+}
+
+pub struct ApplyResult {
+    pub updated: String,
+    pub cursor: u32,
+}
+
+impl ApplyResult {
+    /// If `expected` contains exactly one `$0`, this asserts both:
+    /// - updated text equals expected with `$0` removed
+    /// - cursor equals the byte index where `$0` was
+    ///
+    /// Otherwise, only asserts updated text.
+    pub fn expect_text(self, expected: &str) -> Self {
+        let mut idx = None;
+
+        // fast scan: find + ensure exactly one marker
+        if let Some(i) = expected.find("$0") {
+            let count = expected.matches("$0").count();
+            idx = Some(i);
+            assert_eq!(
+                count, 1,
+                "expected_text must contain exactly one `$0` marker"
+            );
+        }
+
+        if let Some(cursor_idx) = idx {
+            let expected_text = expected.replace("$0", "");
+            assert_eq!(self.updated, expected_text, "text mismatch");
+            assert_eq!(self.cursor, cursor_idx as u32, "cursor mismatch");
+        } else {
+            assert_eq!(self.updated, expected, "text mismatch");
+        }
+
+        self
+    }
+}
+
+fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
+    let mut edits_with_idx = edits
+        .iter()
+        .enumerate()
+        .map(|(idx, edit)| (idx, edit))
+        .collect::<Vec<_>>();
+    edits_with_idx.sort_by(|(a_idx, a), (b_idx, b)| {
+        let a_key = (
+            std::cmp::Reverse(a.range.start),
+            std::cmp::Reverse(a.range.end),
+            *a_idx,
+        );
+        let b_key = (
+            std::cmp::Reverse(b.range.start),
+            std::cmp::Reverse(b.range.end),
+            *b_idx,
+        );
+        a_key.cmp(&b_key)
+    });
+
+    let mut updated = original.to_string();
+    for (_, edit) in edits_with_idx {
+        let start = edit.range.start as usize;
+        let end = edit.range.end as usize;
+        assert!(start <= end);
+        assert!(end <= updated.len());
+        assert!(updated.is_char_boundary(start));
+        assert!(updated.is_char_boundary(end));
+
+        let mut next = String::with_capacity(updated.len() - (end - start) + edit.new_text.len());
+        next.push_str(&updated[..start]);
+        next.push_str(&edit.new_text);
+        next.push_str(&updated[end..]);
+        updated = next;
+    }
+    updated
+}
+
+pub fn prop_label(name: &str) -> String {
+    format!(r#"prop("{name}")"#)
+}

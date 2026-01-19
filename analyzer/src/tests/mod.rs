@@ -2,6 +2,8 @@
 #[cfg(test)]
 mod common;
 #[cfg(test)]
+mod completion_dsl;
+#[cfg(test)]
 mod test_ast_regression;
 #[cfg(test)]
 mod test_completion;
