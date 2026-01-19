@@ -346,7 +346,9 @@ fn complete_at_location(
         },
         CompletionLocation::CallArgExprStart { expected, .. } => {
             let mut items = expr_start_items(ctx);
-            apply_type_ranking(&mut items, expected, ctx);
+            if expected.is_some() {
+                apply_type_ranking(&mut items, expected, ctx);
+            }
             CompletionOutput {
                 items,
                 replace: replace_span_for_expr_start(tokens, cursor),

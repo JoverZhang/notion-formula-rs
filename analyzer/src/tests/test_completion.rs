@@ -723,12 +723,12 @@ fn completion_type_ranking_handles_nontrivial_property_names() {
         properties: vec![
             Property {
                 name: "Title (new)".to_string(),
-                ty: Ty::Number,
+                ty: Ty::String,
                 disabled_reason: None,
             },
             Property {
                 name: "Age".to_string(),
-                ty: Ty::String,
+                ty: Ty::Number,
                 disabled_reason: None,
             },
         ],
@@ -765,7 +765,7 @@ fn completion_type_ranking_handles_nontrivial_property_names() {
         .iter()
         .position(|item| item.label == r#"prop("Age")"#)
         .expect("expected prop(\"Age\") item");
-    assert!(title_idx < age_idx);
+    assert!(age_idx < title_idx);
     assert_replace_contains_cursor(output.replace, cursor);
 }
 
@@ -776,6 +776,11 @@ fn completion_type_ranking_boolean_prefers_literals() {
             Property {
                 name: "Title".to_string(),
                 ty: Ty::String,
+                disabled_reason: None,
+            },
+            Property {
+                name: "Flag".to_string(),
+                ty: Ty::Boolean,
                 disabled_reason: None,
             },
             Property {
@@ -813,12 +818,64 @@ fn completion_type_ranking_boolean_prefers_literals() {
         .iter()
         .position(|item| item.label == "true")
         .expect("expected true item");
+    let false_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == "false")
+        .expect("expected false item");
+    let flag_idx = output
+        .items
+        .iter()
+        .position(|item| item.label == r#"prop("Flag")"#)
+        .expect("expected prop(\"Flag\") item");
     let title_idx = output
         .items
         .iter()
         .position(|item| item.label == r#"prop("Title")"#)
         .expect("expected prop(\"Title\") item");
     assert!(true_idx < title_idx);
+    assert!(false_idx < title_idx);
+    assert!(flag_idx < title_idx);
+    assert_replace_contains_cursor(output.replace, cursor);
+}
+
+#[test]
+fn completion_type_ranking_unknown_argument_does_not_filter_items() {
+    let ctx = Context {
+        properties: vec![
+            Property {
+                name: "Title".to_string(),
+                ty: Ty::String,
+                disabled_reason: None,
+            },
+            Property {
+                name: "Age".to_string(),
+                ty: Ty::Number,
+                disabled_reason: None,
+            },
+        ],
+        functions: vec![FunctionSig {
+            name: "id".to_string(),
+            params: vec![ParamSig {
+                name: None,
+                ty: Ty::Unknown,
+                optional: false,
+            }],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, cursor) = complete_fixture("id($0", Some(ctx));
+    let title_exists = output
+        .items
+        .iter()
+        .any(|item| item.label == r#"prop("Title")"#);
+    let age_exists = output
+        .items
+        .iter()
+        .any(|item| item.label == r#"prop("Age")"#);
+    assert!(title_exists, "expected prop(\"Title\") item");
+    assert!(age_exists, "expected prop(\"Age\") item");
     assert_replace_contains_cursor(output.replace, cursor);
 }
 
