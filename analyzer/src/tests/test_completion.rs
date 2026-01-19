@@ -40,8 +40,16 @@ fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
         .map(|(idx, edit)| (idx, edit))
         .collect::<Vec<_>>();
     edits_with_idx.sort_by(|(a_idx, a), (b_idx, b)| {
-        let a_key = (std::cmp::Reverse(a.range.start), *a_idx);
-        let b_key = (std::cmp::Reverse(b.range.start), *b_idx);
+        let a_key = (
+            std::cmp::Reverse(a.range.start),
+            std::cmp::Reverse(a.range.end),
+            *a_idx,
+        );
+        let b_key = (
+            std::cmp::Reverse(b.range.start),
+            std::cmp::Reverse(b.range.end),
+            *b_idx,
+        );
         a_key.cmp(&b_key)
     });
 
@@ -770,6 +778,56 @@ fn completion_apply_function_in_call_callee_position() {
     let (updated, new_cursor) = apply_completion_fixture("$0", Some(ctx), "if");
     assert_eq!(updated, "if()");
     assert_eq!(new_cursor, 3);
+}
+
+#[test]
+fn completion_function_cursor_is_inside_parens() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "sum".to_string(),
+            params: vec![],
+            ret: Ty::Number,
+            detail: None,
+        }],
+    };
+    let (updated, new_cursor) = apply_completion_fixture("su$0", Some(ctx), "sum");
+    assert_eq!(updated, "sum()");
+    assert_eq!(new_cursor, 4);
+}
+
+#[test]
+fn completion_function_insert_text_contains_lparen() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![],
+            ret: Ty::Unknown,
+            detail: None,
+        }],
+    };
+    let (output, _cursor) = complete_fixture("$0", Some(ctx));
+    let item = pick_item(&output, "if");
+
+    assert_eq!(
+        item.data,
+        Some(CompletionData::Function {
+            name: "if".to_string()
+        })
+    );
+    let lparen_idx = item
+        .insert_text
+        .find('(')
+        .expect("function completion insert_text must contain '('");
+    assert!(
+        item.cursor.is_some(),
+        "function completion must provide an explicit cursor"
+    );
+    assert_eq!(
+        item.cursor,
+        Some(output.replace.start + (lparen_idx as u32) + 1)
+    );
 }
 
 #[test]

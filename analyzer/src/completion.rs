@@ -246,10 +246,16 @@ fn attach_primary_edits(
         });
 
         item.cursor = match &item.data {
-            Some(CompletionData::Function { .. }) => item
-                .insert_text
-                .find('(')
-                .map(|idx| output_replace.start.saturating_add((idx as u32).saturating_add(1))),
+            Some(CompletionData::Function { .. }) => {
+                // Function completions are expected to include `(` (e.g. `sum()`), so the editor
+                // can place the cursor inside the parentheses. If the inserted text does not
+                // contain `(`, we leave cursor placement to the default behavior.
+                item.insert_text.find('(').map(|idx| {
+                    output_replace
+                        .start
+                        .saturating_add((idx as u32).saturating_add(1))
+                })
+            }
             _ => None,
         };
     }
