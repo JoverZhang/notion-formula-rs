@@ -72,14 +72,18 @@ struct CallContext {
 enum CompletionLocation {
     PropAfterIdent,
     PropAfterLParen,
-    PropStringContent { content_span: Span },
+    PropStringContent {
+        content_span: Span,
+    },
     ExprStart,
     CallArgExprStart {
         callee: String,
         arg_index: usize,
         expected: Option<semantic::Ty>,
     },
-    SeparatorExpected { kind: SeparatorKind },
+    SeparatorExpected {
+        kind: SeparatorKind,
+    },
     None,
 }
 
@@ -208,13 +212,7 @@ fn is_prefix_editing_ident(tokens: &[Token], cursor: u32) -> Option<(Span, Strin
 fn should_show_expr_start_completions(tokens: &[Token], cursor: u32) -> bool {
     let prev = prev_non_trivia(tokens, cursor).map(|(_, token)| token);
     let prop_prefix = is_prop_prefix_at_cursor(tokens, cursor);
-    if is_expr_start_position(prev) {
-        return true;
-    }
-    if prop_prefix {
-        return true;
-    }
-    is_prefix_editing_ident(tokens, cursor).is_some()
+    is_expr_start_position(prev) || prop_prefix
 }
 
 fn should_show_expr_start_completions_in_context(
@@ -222,12 +220,7 @@ fn should_show_expr_start_completions_in_context(
     cursor: u32,
     ctx: Option<&semantic::Context>,
 ) -> bool {
-    if !should_show_expr_start_completions(tokens, cursor) {
-        return false;
-    }
-
-    let prev = prev_non_trivia(tokens, cursor).map(|(_, token)| token);
-    if is_expr_start_position(prev) || is_prop_prefix_at_cursor(tokens, cursor) {
+    if should_show_expr_start_completions(tokens, cursor) {
         return true;
     }
 
@@ -250,7 +243,9 @@ fn prefix_matches_completion_without_items(prefix: &str, ctx: Option<&semantic::
         return true;
     }
 
-    ctx.functions.iter().any(|func| func.name.starts_with(prefix))
+    ctx.functions
+        .iter()
+        .any(|func| func.name.starts_with(prefix))
 }
 
 fn separator_expected_in_call(tokens: &[Token], cursor: u32) -> Option<SeparatorKind> {
@@ -261,11 +256,7 @@ fn separator_expected_in_call(tokens: &[Token], cursor: u32) -> Option<Separator
 
     match &prev_token.kind {
         TokenKind::CloseParen | TokenKind::Literal(_) => Some(next_separator_kind(tokens, cursor)),
-        TokenKind::Ident(_) => match is_prefix_editing_ident(tokens, cursor) {
-            Some((span, _)) if cursor < span.end => None,
-            Some((span, _)) if cursor == span.end => Some(next_separator_kind(tokens, cursor)),
-            _ => None,
-        },
+        TokenKind::Ident(_) => Some(next_separator_kind(tokens, cursor)),
         _ => None,
     }
 }
@@ -362,11 +353,13 @@ fn complete_at_location(
                 signature_help: None,
             }
         }
-        CompletionLocation::SeparatorExpected { .. } | CompletionLocation::None => CompletionOutput {
-            items: Vec::new(),
-            replace: default_replace,
-            signature_help: None,
-        },
+        CompletionLocation::SeparatorExpected { .. } | CompletionLocation::None => {
+            CompletionOutput {
+                items: Vec::new(),
+                replace: default_replace,
+                signature_help: None,
+            }
+        }
     }
 }
 

@@ -463,7 +463,12 @@ fn completion_inside_call_arg_after_comma_suggests_expr_start_items() {
     };
     let (output, cursor) = complete_fixture("if(true, $0", Some(ctx));
     assert!(!output.items.is_empty());
-    assert!(output.items.iter().any(|item| item.label == r#"prop("Title")"#));
+    assert!(
+        output
+            .items
+            .iter()
+            .any(|item| item.label == r#"prop("Title")"#)
+    );
     assert!(output.items.iter().any(|item| item.label == "true"));
     assert_replace_contains_cursor(output.replace, cursor);
 }
