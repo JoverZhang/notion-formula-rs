@@ -11,9 +11,8 @@ pub struct CompletionOutput {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextEdit {
-    pub replace: Span,
-    pub insert: String,
-    pub new_cursor: u32,
+    pub range: Span,
+    pub new_text: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,11 +20,13 @@ pub struct CompletionItem {
     pub label: String,
     pub kind: CompletionKind,
     pub insert_text: String,
+    pub primary_edit: Option<TextEdit>,
+    pub cursor: Option<u32>,
+    pub additional_edits: Vec<TextEdit>,
     pub detail: Option<String>,
     pub is_disabled: bool,
     pub disabled_reason: Option<String>,
     pub data: Option<CompletionData>,
-    pub text_edit: Option<TextEdit>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,11 +112,13 @@ pub fn complete_with_context(
                         label: "(".to_string(),
                         kind: CompletionKind::Operator,
                         insert_text: "(".to_string(),
+                        primary_edit: None,
+                        cursor: None,
+                        additional_edits: Vec::new(),
                         detail: None,
                         is_disabled: false,
                         disabled_reason: None,
                         data: None,
-                        text_edit: None,
                     }]
                 } else {
                     items
@@ -141,13 +144,15 @@ pub fn complete_with_context(
                             label: prop.name.clone(),
                             kind: CompletionKind::Property,
                             insert_text: prop.name.clone(),
+                            primary_edit: None,
+                            cursor: None,
+                            additional_edits: Vec::new(),
                             detail: None,
                             is_disabled: prop.disabled_reason.is_some(),
                             disabled_reason: prop.disabled_reason.clone(),
                             data: Some(CompletionData::PropertyName {
                                 name: prop.name.clone(),
                             }),
-                            text_edit: None,
                         })
                         .collect::<Vec<_>>()
                 })
@@ -219,44 +224,34 @@ fn finalize_output(
     mut output: CompletionOutput,
     ctx: Option<&semantic::Context>,
 ) -> CompletionOutput {
-    attach_text_edits(output.replace, &mut output.items, ctx);
+    attach_primary_edits(output.replace, &mut output.items, ctx);
     output
 }
 
-fn attach_text_edits(
+fn attach_primary_edits(
     output_replace: Span,
     items: &mut [CompletionItem],
     _ctx: Option<&semantic::Context>,
 ) {
     for item in items {
         if item.is_disabled {
-            item.text_edit = None;
+            item.primary_edit = None;
+            item.cursor = None;
             continue;
         }
 
-        let edit = match &item.data {
-            Some(CompletionData::Function { name }) => {
-                let insert = format!("{name}(");
-                let insert_len = u32::try_from(insert.len()).unwrap_or(u32::MAX);
-                Some(TextEdit {
-                    replace: output_replace,
-                    insert,
-                    new_cursor: output_replace.start.saturating_add(insert_len),
-                })
-            }
-            Some(CompletionData::PropExpr { .. }) | Some(CompletionData::PropertyName { .. }) => {
-                let insert = item.insert_text.clone();
-                let insert_len = u32::try_from(insert.len()).unwrap_or(u32::MAX);
-                Some(TextEdit {
-                    replace: output_replace,
-                    insert,
-                    new_cursor: output_replace.start.saturating_add(insert_len),
-                })
-            }
+        item.primary_edit = Some(TextEdit {
+            range: output_replace,
+            new_text: item.insert_text.clone(),
+        });
+
+        item.cursor = match &item.data {
+            Some(CompletionData::Function { .. }) => item
+                .insert_text
+                .find('(')
+                .map(|idx| output_replace.start.saturating_add((idx as u32).saturating_add(1))),
             _ => None,
         };
-
-        item.text_edit = edit;
     }
 }
 
@@ -276,14 +271,16 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             CompletionItem {
                 label: func.name.clone(),
                 kind: CompletionKind::Function,
-                insert_text: func.name.clone(),
+                insert_text: format!("{}()", func.name),
+                primary_edit: None,
+                cursor: None,
+                additional_edits: Vec::new(),
                 detail,
                 is_disabled: false,
                 disabled_reason: None,
                 data: Some(CompletionData::Function {
                     name: func.name.clone(),
                 }),
-                text_edit: None,
             }
         }));
     }
@@ -292,31 +289,37 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             label: "true".to_string(),
             kind: CompletionKind::Keyword,
             insert_text: "true".to_string(),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
             detail: None,
             is_disabled: false,
             disabled_reason: None,
             data: None,
-            text_edit: None,
         },
         CompletionItem {
             label: "false".to_string(),
             kind: CompletionKind::Keyword,
             insert_text: "false".to_string(),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
             detail: None,
             is_disabled: false,
             disabled_reason: None,
             data: None,
-            text_edit: None,
         },
         CompletionItem {
             label: "(".to_string(),
             kind: CompletionKind::Operator,
             insert_text: "(".to_string(),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
             detail: None,
             is_disabled: false,
             disabled_reason: None,
             data: None,
-            text_edit: None,
         },
     ]);
     items
@@ -334,13 +337,15 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
             label: label.clone(),
             kind: CompletionKind::Property,
             insert_text: label,
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
             detail: None,
             is_disabled: prop.disabled_reason.is_some(),
             disabled_reason: prop.disabled_reason.clone(),
             data: Some(CompletionData::PropExpr {
                 property_name: prop.name.clone(),
             }),
-            text_edit: None,
         };
         if prop.disabled_reason.is_some() {
             disabled.push(item);

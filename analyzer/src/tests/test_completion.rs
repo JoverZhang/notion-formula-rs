@@ -33,21 +33,71 @@ fn pick_item<'a>(output: &'a CompletionOutput, label: &str) -> &'a CompletionIte
         .unwrap_or_else(|| panic!("missing completion item for label {label}"))
 }
 
-fn apply_text_edit(original: &str, edit: &TextEdit) -> (String, u32) {
-    let start = edit.replace.start as usize;
-    let end = edit.replace.end as usize;
-    assert!(start <= end);
-    assert!(end <= original.len());
-    assert!(original.is_char_boundary(start));
-    assert!(original.is_char_boundary(end));
+fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
+    let mut edits_with_idx = edits
+        .iter()
+        .enumerate()
+        .map(|(idx, edit)| (idx, edit))
+        .collect::<Vec<_>>();
+    edits_with_idx.sort_by(|(a_idx, a), (b_idx, b)| {
+        let a_key = (std::cmp::Reverse(a.range.start), *a_idx);
+        let b_key = (std::cmp::Reverse(b.range.start), *b_idx);
+        a_key.cmp(&b_key)
+    });
 
-    let mut updated = String::with_capacity(original.len() - (end - start) + edit.insert.len());
-    updated.push_str(&original[..start]);
-    updated.push_str(&edit.insert);
-    updated.push_str(&original[end..]);
+    let mut updated = original.to_string();
+    for (_, edit) in edits_with_idx {
+        let start = edit.range.start as usize;
+        let end = edit.range.end as usize;
+        assert!(start <= end);
+        assert!(end <= updated.len());
+        assert!(updated.is_char_boundary(start));
+        assert!(updated.is_char_boundary(end));
 
-    assert!(edit.new_cursor as usize <= updated.len());
-    (updated, edit.new_cursor)
+        let mut next =
+            String::with_capacity(updated.len() - (end - start) + edit.new_text.len());
+        next.push_str(&updated[..start]);
+        next.push_str(&edit.new_text);
+        next.push_str(&updated[end..]);
+        updated = next;
+    }
+    updated
+}
+
+fn apply_completion_fixture(input: &str, ctx: Option<Context>, label: &str) -> (String, u32) {
+    let cursor = input.find("$0").expect("fixture must contain $0 marker");
+    let text = input.to_string();
+    let replaced = text.replace("$0", "");
+    assert!(
+        replaced.len() + 2 == text.len(),
+        "fixture must contain exactly one $0 marker"
+    );
+
+    let output = complete_with_context(&replaced, cursor, ctx.as_ref());
+    let item = pick_item(&output, label);
+    assert!(
+        !item.is_disabled,
+        "completion item {label} is disabled and must not be applicable"
+    );
+    let primary_edit = item.primary_edit.as_ref().expect("expected primary edit");
+    assert_eq!(
+        primary_edit.range, output.replace,
+        "primary edit range must match output replace span"
+    );
+
+    let mut edits = Vec::with_capacity(1 + item.additional_edits.len());
+    edits.push(primary_edit.clone());
+    edits.extend(item.additional_edits.iter().cloned());
+
+    let updated = apply_text_edits(&replaced, &edits);
+    let cursor = item.cursor.unwrap_or_else(|| {
+        output
+            .replace
+            .start
+            .saturating_add(primary_edit.new_text.len() as u32)
+    });
+    assert!(cursor as usize <= updated.len());
+    (updated, cursor)
 }
 
 #[test]
@@ -691,58 +741,49 @@ fn completion_type_ranking_boolean_prefers_literals() {
 }
 
 #[test]
-fn completion_apply_function_inserts_lparen_and_moves_cursor() {
-    let ctx = Context {
-        properties: vec![],
-        functions: vec![FunctionSig {
-            name: "if".to_string(),
-            params: vec![],
-            ret: Ty::Unknown,
-            detail: None,
-        }],
-    };
-    let (output, _cursor) = complete_fixture("$0", Some(ctx));
-    let item = pick_item(&output, "if");
-    let edit = item.text_edit.as_ref().expect("expected text edit");
-    let (updated, new_cursor) = apply_text_edit("", edit);
-    assert_eq!(updated, "if(");
-    assert_eq!(new_cursor, 3);
-}
-
-#[test]
-fn completion_apply_function_replaces_prefix() {
+fn completion_apply_function_inserts_parens_and_moves_cursor_inside() {
     let ctx = Context {
         properties: vec![],
         functions: vec![FunctionSig {
             name: "sum".to_string(),
             params: vec![],
-            ret: Ty::Number,
+            ret: Ty::Unknown,
             detail: None,
         }],
     };
-    let (output, _cursor) = complete_fixture("su$0", Some(ctx));
-    let item = pick_item(&output, "sum");
-    let edit = item.text_edit.as_ref().expect("expected text edit");
-    let (updated, new_cursor) = apply_text_edit("su", edit);
-    assert_eq!(updated, "sum(");
+    let (updated, new_cursor) = apply_completion_fixture("su$0", Some(ctx), "sum");
+    assert_eq!(updated, "sum()");
     assert_eq!(new_cursor, 4);
 }
 
 #[test]
-fn completion_apply_prop_expr_places_cursor_at_end() {
+fn completion_apply_function_in_call_callee_position() {
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig {
+            name: "if".to_string(),
+            params: vec![],
+            ret: Ty::Number,
+            detail: None,
+        }],
+    };
+    let (updated, new_cursor) = apply_completion_fixture("$0", Some(ctx), "if");
+    assert_eq!(updated, "if()");
+    assert_eq!(new_cursor, 3);
+}
+
+#[test]
+fn completion_apply_prop_expr_does_not_add_parens() {
     let ctx = Context {
         properties: vec![Property {
-            name: "Age".to_string(),
-            ty: Ty::Number,
+            name: "Title".to_string(),
+            ty: Ty::String,
             disabled_reason: None,
         }],
         functions: vec![],
     };
-    let (output, _cursor) = complete_fixture("$0", Some(ctx));
-    let item = pick_item(&output, r#"prop("Age")"#);
-    let edit = item.text_edit.as_ref().expect("expected text edit");
-    let expected = r#"prop("Age")"#;
-    let (updated, new_cursor) = apply_text_edit("", edit);
+    let expected = r#"prop("Title")"#;
+    let (updated, new_cursor) = apply_completion_fixture("pr$0", Some(ctx), expected);
     assert_eq!(updated, expected);
     assert_eq!(new_cursor, expected.len() as u32);
 }
@@ -751,24 +792,21 @@ fn completion_apply_prop_expr_places_cursor_at_end() {
 fn completion_apply_property_name_inside_prop_string() {
     let ctx = Context {
         properties: vec![Property {
-            name: "Age".to_string(),
+            name: "Title".to_string(),
             ty: Ty::Number,
             disabled_reason: None,
         }],
         functions: vec![],
     };
-    let (output, _cursor) = complete_fixture(r#"prop("$0")"#, Some(ctx));
-    let item = pick_item(&output, "Age");
-    let edit = item.text_edit.as_ref().expect("expected text edit");
-    let (updated, new_cursor) = apply_text_edit(r#"prop("")"#, edit);
-    let expected = r#"prop("Age")"#;
-    let expected_cursor = expected.find("Age").unwrap() + "Age".len();
+    let (updated, new_cursor) = apply_completion_fixture(r#"prop("$0")"#, Some(ctx), "Title");
+    let expected = r#"prop("Title")"#;
+    let expected_cursor = expected.find("Title").unwrap() + "Title".len();
     assert_eq!(updated, expected);
     assert_eq!(new_cursor as usize, expected_cursor);
 }
 
 #[test]
-fn completion_disabled_item_has_no_text_edit() {
+fn completion_disabled_item_has_no_primary_edit() {
     let ctx = Context {
         properties: vec![Property {
             name: "Age".to_string(),
@@ -780,5 +818,5 @@ fn completion_disabled_item_has_no_text_edit() {
     let (output, _cursor) = complete_fixture("$0", Some(ctx));
     let item = pick_item(&output, r#"prop("Age")"#);
     assert!(item.is_disabled);
-    assert!(item.text_edit.is_none());
+    assert!(item.primary_edit.is_none());
 }
