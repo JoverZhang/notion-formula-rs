@@ -63,9 +63,28 @@ fn completion_after_complete_atom_suppresses_expr_start() {
 fn completion_when_expecting_separator_in_call_suppresses_expr_start() {
     let c = ctx().func_if().build();
 
-    t("if(true$0")
+    // Cursor is at the end of a complete literal inside a call arg; expect separator and suppress
+    // expr-start completions.
+    t("if(true$0)")
         .ctx(c)
         .expect_empty()
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_inside_call_arg_strictly_inside_ident_does_not_expect_separator() {
+    let c = ctx()
+        .props_demo_basic()
+        .func_if()
+        .func_sum()
+        .build();
+
+    // Cursor is strictly inside the identifier token `true`.
+    t("if(tr$0ue)")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_symbols(&[DemoSymbol::True])
+        .expect_contains_props(&[DemoProp::Title])
         .expect_replace_contains_cursor();
 }
 
@@ -97,6 +116,22 @@ fn completion_inside_call_arg_at_ident_end_allows_extending_prop_prefix_completi
         .ctx(c)
         .expect_not_empty()
         .expect_contains_props(&[DemoProp::Title])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_inside_call_arg_ident_end_prefix_allows_completions() {
+    let c = ctx()
+        .props_demo_basic()
+        .func_if()
+        .func_sum()
+        .build();
+
+    // Keep the cursor at the end of the identifier token itself (not at the start of `)`).
+    t("if(fa$0")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_symbols(&[DemoSymbol::False])
         .expect_replace_contains_cursor();
 }
 

@@ -262,8 +262,11 @@ fn separator_expected_in_call(
     ctx: Option<&semantic::Context>,
 ) -> Option<SeparatorKind> {
     if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
-        if matches!(token.kind, TokenKind::Ident(_)) {
-            // If the cursor is inside an identifier token, the user is still editing the name.
+        if matches!(token.kind, TokenKind::Ident(_))
+            && token.span.start < cursor
+            && cursor < token.span.end
+        {
+            // Cursor is strictly inside the identifier; user is editing the name.
             // Don't treat this as a "separator expected" position.
             return None;
         }
