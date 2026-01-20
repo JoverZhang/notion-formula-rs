@@ -130,7 +130,7 @@ fn detect_location(
     ctx: Option<&semantic::Context>,
 ) -> CompletionLocation {
     if let Some(call_ctx) = detect_call_context(tokens, cursor) {
-        if let Some(kind) = separator_expected_in_call(tokens, cursor) {
+        if let Some(kind) = separator_expected_in_call(tokens, cursor, ctx) {
             return CompletionLocation::SeparatorExpected { kind };
         }
         if should_show_expr_start_completions_in_context(tokens, cursor, ctx) {
@@ -221,7 +221,54 @@ fn prefix_matches_completion_without_items(prefix: &str, ctx: Option<&semantic::
     false
 }
 
-fn separator_expected_in_call(tokens: &[Token], cursor: u32) -> Option<SeparatorKind> {
+fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>) -> bool {
+    if prefix.is_empty() {
+        return false;
+    }
+
+    if "true".starts_with(prefix) && prefix != "true" {
+        return true;
+    }
+    if "false".starts_with(prefix) && prefix != "false" {
+        return true;
+    }
+
+    let Some(ctx) = ctx else {
+        return false;
+    };
+
+    if ctx
+        .functions
+        .iter()
+        .any(|func| func.name.starts_with(prefix) && func.name != prefix)
+    {
+        return true;
+    }
+
+    if ctx
+        .properties
+        .iter()
+        .any(|prop| prop.name.starts_with(prefix) && prop.name != prefix)
+    {
+        return true;
+    }
+
+    false
+}
+
+fn separator_expected_in_call(
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+) -> Option<SeparatorKind> {
+    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
+        if matches!(token.kind, TokenKind::Ident(_)) {
+            // If the cursor is inside an identifier token, the user is still editing the name.
+            // Don't treat this as a "separator expected" position.
+            return None;
+        }
+    }
+
     let (_, prev_token) = prev_non_trivia(tokens, cursor)?;
     if prev_token.span.end != cursor {
         return None;
@@ -229,7 +276,13 @@ fn separator_expected_in_call(tokens: &[Token], cursor: u32) -> Option<Separator
 
     match &prev_token.kind {
         TokenKind::CloseParen | TokenKind::Literal(_) => Some(next_separator_kind(tokens, cursor)),
-        TokenKind::Ident(_) => Some(next_separator_kind(tokens, cursor)),
+        TokenKind::Ident(symbol) => {
+            if has_extending_completion_prefix(&symbol.text, ctx) {
+                None
+            } else {
+                Some(next_separator_kind(tokens, cursor))
+            }
+        }
         _ => None,
     }
 }

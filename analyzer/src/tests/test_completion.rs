@@ -70,6 +70,37 @@ fn completion_when_expecting_separator_in_call_suppresses_expr_start() {
 }
 
 #[test]
+fn completion_inside_call_arg_at_ident_end_allows_extending_func_prefix_completion() {
+    let c = ctx()
+        .props_demo_basic()
+        .func_if()
+        .func_sum()
+        .build();
+
+    t("if(su$0")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_funcs(&[DemoFunc::Sum])
+        .expect_contains_symbols(&[DemoSymbol::True])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_inside_call_arg_at_ident_end_allows_extending_prop_prefix_completion() {
+    let c = ctx()
+        .props_demo_basic()
+        .func_if()
+        .func_sum()
+        .build();
+
+    t("if(Ti$0")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_props(&[DemoProp::Title])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
 fn completion_inside_call_arg_after_comma_suggests_expr_start_items() {
     let c = ctx().prop("Title", Ty::String).func_if().build();
 
