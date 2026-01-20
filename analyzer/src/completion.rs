@@ -1,6 +1,6 @@
 use crate::lexer::lex;
 use crate::semantic;
-use crate::token::{LitKind, Span, Token, TokenKind};
+use crate::token::{Span, Token, TokenKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionOutput {
@@ -53,15 +53,6 @@ pub struct SignatureHelp {
     pub active_param: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PropState {
-    AfterPropIdent,
-    AfterPropLParen,
-    InPropStringContent(Span),
-    None,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct CallContext {
     callee: String,
     lparen_idx: usize,
@@ -70,11 +61,6 @@ struct CallContext {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CompletionLocation {
-    PropAfterIdent,
-    PropAfterLParen,
-    PropStringContent {
-        content_span: Span,
-    },
     ExprStart,
     CallArgExprStart {
         callee: String,
@@ -130,12 +116,7 @@ pub fn complete_with_context(
     }
 
     let location = detect_location(tokens.as_slice(), cursor_u32, ctx);
-    let signature_help = match location {
-        CompletionLocation::PropAfterIdent
-        | CompletionLocation::PropAfterLParen
-        | CompletionLocation::PropStringContent { .. } => None,
-        _ => signature_help_at_cursor(tokens.as_slice(), cursor_u32, ctx).0,
-    };
+    let signature_help = compute_signature_help_if_in_call(tokens.as_slice(), cursor_u32, ctx);
 
     let mut output = complete_at_location(location, ctx, tokens.as_slice(), cursor_u32);
     output.signature_help = signature_help;
@@ -148,15 +129,6 @@ fn detect_location(
     cursor: u32,
     ctx: Option<&semantic::Context>,
 ) -> CompletionLocation {
-    match detect_prop_state(tokens, cursor) {
-        PropState::AfterPropIdent => return CompletionLocation::PropAfterIdent,
-        PropState::AfterPropLParen => return CompletionLocation::PropAfterLParen,
-        PropState::InPropStringContent(content_span) => {
-            return CompletionLocation::PropStringContent { content_span };
-        }
-        PropState::None => {}
-    }
-
     if let Some(call_ctx) = detect_call_context(tokens, cursor) {
         if let Some(kind) = separator_expected_in_call(tokens, cursor) {
             return CompletionLocation::SeparatorExpected { kind };
@@ -211,8 +183,7 @@ fn is_prefix_editing_ident(tokens: &[Token], cursor: u32) -> Option<(Span, Strin
 
 fn should_show_expr_start_completions(tokens: &[Token], cursor: u32) -> bool {
     let prev = prev_non_trivia(tokens, cursor).map(|(_, token)| token);
-    let prop_prefix = is_prop_prefix_at_cursor(tokens, cursor);
-    is_expr_start_position(prev) || prop_prefix
+    is_expr_start_position(prev)
 }
 
 fn should_show_expr_start_completions_in_context(
@@ -239,13 +210,15 @@ fn prefix_matches_completion_without_items(prefix: &str, ctx: Option<&semantic::
         return false;
     };
 
-    if !ctx.properties.is_empty() && "prop(\"".starts_with(prefix) {
+    if ctx.functions.iter().any(|func| func.name.starts_with(prefix)) {
         return true;
     }
 
-    ctx.functions
-        .iter()
-        .any(|func| func.name.starts_with(prefix))
+    if ctx.properties.iter().any(|prop| prop.name.starts_with(prefix)) {
+        return true;
+    }
+
+    false
 }
 
 fn separator_expected_in_call(tokens: &[Token], cursor: u32) -> Option<SeparatorKind> {
@@ -280,65 +253,6 @@ fn complete_at_location(
         end: cursor,
     };
     match loc {
-        CompletionLocation::PropAfterIdent => {
-            let items = ctx.map(prop_variable_items).unwrap_or_default();
-            CompletionOutput {
-                items: if items.is_empty() {
-                    vec![CompletionItem {
-                        label: "(".to_string(),
-                        kind: CompletionKind::Operator,
-                        insert_text: "(".to_string(),
-                        primary_edit: None,
-                        cursor: None,
-                        additional_edits: Vec::new(),
-                        detail: None,
-                        is_disabled: false,
-                        disabled_reason: None,
-                        data: None,
-                    }]
-                } else {
-                    items
-                },
-                replace: default_replace,
-                signature_help: None,
-            }
-        }
-        CompletionLocation::PropAfterLParen => {
-            let items = ctx.map(prop_variable_items).unwrap_or_default();
-            CompletionOutput {
-                items: if items.is_empty() { vec![] } else { items },
-                replace: default_replace,
-                signature_help: None,
-            }
-        }
-        CompletionLocation::PropStringContent { content_span } => {
-            let items = ctx
-                .map(|ctx| {
-                    ctx.properties
-                        .iter()
-                        .map(|prop| CompletionItem {
-                            label: prop.name.clone(),
-                            kind: CompletionKind::Property,
-                            insert_text: prop.name.clone(),
-                            primary_edit: None,
-                            cursor: None,
-                            additional_edits: Vec::new(),
-                            detail: None,
-                            is_disabled: prop.disabled_reason.is_some(),
-                            disabled_reason: prop.disabled_reason.clone(),
-                            data: Some(CompletionData::PropertyName {
-                                name: prop.name.clone(),
-                            }),
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            CompletionOutput {
-                items,
-                replace: content_span,
-                signature_help: None,
-            }
-        }
         CompletionLocation::ExprStart => CompletionOutput {
             items: expr_start_items(ctx),
             replace: replace_span_for_expr_start(tokens, cursor),
@@ -400,6 +314,11 @@ fn attach_primary_edits(
                         .start
                         .saturating_add((idx as u32).saturating_add(1))
                 })
+            }
+            Some(CompletionData::PropExpr { .. }) => {
+                // Property completions insert the full expression (e.g., `prop("Title")`).
+                // Place the cursor at the end of the inserted text.
+                Some(output_replace.start.saturating_add(item.insert_text.len() as u32))
             }
             _ => None,
         };
@@ -483,11 +402,12 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     let mut enabled = Vec::new();
     let mut disabled = Vec::new();
     for prop in &ctx.properties {
-        let label = format!("prop(\"{}\")", prop.name);
+        let label = prop.name.clone();
+        let insert_text = format!(r#"prop("{}")"#, prop.name);
         let item = CompletionItem {
-            label: label.clone(),
+            label,
             kind: CompletionKind::Property,
-            insert_text: label,
+            insert_text,
             primary_edit: None,
             cursor: None,
             additional_edits: Vec::new(),
@@ -569,42 +489,39 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
     (label, params)
 }
 
-fn signature_help_at_cursor(
+/// Only compute signature help if the cursor is inside a function call argument context
+/// (i.e., after the opening parenthesis).
+fn compute_signature_help_if_in_call(
     tokens: &[Token],
     cursor: u32,
     ctx: Option<&semantic::Context>,
-) -> (Option<SignatureHelp>, Option<semantic::Ty>) {
-    let ctx = match ctx {
-        Some(ctx) => ctx,
-        None => return (None, None),
-    };
-    let call_ctx = match detect_call_context(tokens, cursor) {
-        Some(call_ctx) => call_ctx,
-        None => return (None, None),
-    };
-    let func = match ctx
+) -> Option<SignatureHelp> {
+    let call_ctx = detect_call_context(tokens, cursor)?;
+    let lparen_token = tokens.get(call_ctx.lparen_idx)?;
+
+    // Only show signature help if cursor is after the '(' (inside the call)
+    if cursor < lparen_token.span.end {
+        return None;
+    }
+
+    let ctx = ctx?;
+    let func = ctx
         .functions
         .iter()
-        .find(|func| func.name == call_ctx.callee)
-    {
-        Some(func) => func,
-        None => return (None, None),
-    };
+        .find(|func| func.name == call_ctx.callee)?;
+
     let (label, params) = format_signature(func);
     let active_param = if params.is_empty() {
         0
     } else {
         call_ctx.arg_index.min(params.len() - 1)
     };
-    let expected_ty = func.params.get(active_param).map(|param| param.ty);
-    (
-        Some(SignatureHelp {
-            label,
-            params,
-            active_param,
-        }),
-        expected_ty,
-    )
+
+    Some(SignatureHelp {
+        label,
+        params,
+        active_param,
+    })
 }
 
 fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallContext> {
@@ -800,81 +717,4 @@ fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span {
         start: cursor,
         end: cursor,
     }
-}
-
-fn detect_prop_state(tokens: &[Token], cursor: u32) -> PropState {
-    if let Some((idx, token)) = token_containing_cursor(tokens, cursor) {
-        if let TokenKind::Literal(lit) = &token.kind {
-            if lit.kind == LitKind::String {
-                let content_span = string_content_span(token.span);
-                if span_contains_cursor_inclusive(content_span, cursor) {
-                    if let Some((open_idx, open_token)) = prev_non_trivia_before(tokens, idx) {
-                        if matches!(open_token.kind, TokenKind::OpenParen) {
-                            if let Some((_, ident_token)) = prev_non_trivia_before(tokens, open_idx)
-                            {
-                                if is_prop_ident(ident_token) {
-                                    return PropState::InPropStringContent(content_span);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if let Some((prev_idx, prev_token)) = prev_non_trivia(tokens, cursor) {
-        if matches!(prev_token.kind, TokenKind::OpenParen) && cursor >= prev_token.span.end {
-            if let Some((_, ident_token)) = prev_non_trivia_before(tokens, prev_idx) {
-                if is_prop_ident(ident_token) {
-                    if let Some((_, next_token)) = next_non_trivia(tokens, cursor) {
-                        if cursor <= next_token.span.start {
-                            return PropState::AfterPropLParen;
-                        }
-                    } else {
-                        return PropState::AfterPropLParen;
-                    }
-                }
-            }
-        }
-    }
-
-    if let Some((_, prev_token)) = prev_non_trivia(tokens, cursor) {
-        if is_prop_ident(prev_token) && cursor >= prev_token.span.end {
-            if let Some((_, next_token)) = next_non_trivia(tokens, cursor) {
-                if cursor <= next_token.span.start {
-                    return PropState::AfterPropIdent;
-                }
-            } else {
-                return PropState::AfterPropIdent;
-            }
-        }
-    }
-
-    PropState::None
-}
-
-fn is_prop_ident(token: &Token) -> bool {
-    matches!(token.kind, TokenKind::Ident(ref symbol) if symbol.text == "prop")
-}
-
-fn is_prop_prefix_at_cursor(tokens: &[Token], cursor: u32) -> bool {
-    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
-        if let TokenKind::Ident(ref symbol) = token.kind {
-            if token.span.end == cursor {
-                return "prop".starts_with(symbol.text.as_str());
-            }
-        }
-    }
-    false
-}
-
-fn string_content_span(span: Span) -> Span {
-    let start = span.start.saturating_add(1);
-    let end = span.end.saturating_sub(1);
-    Span { start, end }
-}
-
-fn span_contains_cursor_inclusive(span: Span, cursor: u32) -> bool {
-    span.start <= cursor && cursor <= span.end
 }

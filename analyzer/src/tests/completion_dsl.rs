@@ -1,8 +1,149 @@
 use crate::completion::{
-    CompletionData, CompletionItem, CompletionOutput, TextEdit, complete_with_context,
+    CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit, complete_with_context,
 };
 use crate::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
 use crate::token::Span;
+
+// ----------------------------
+// Demo Properties
+// ----------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemoProp {
+    Title,
+    Age,
+    Flag,
+}
+
+// ----------------------------
+// Demo Functions
+// ----------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemoFunc {
+    If,
+    Sum,
+}
+
+#[allow(dead_code)]
+impl DemoFunc {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DemoFunc::If => "if",
+            DemoFunc::Sum => "sum",
+        }
+    }
+
+    pub fn data(&self) -> CompletionData {
+        CompletionData::Function {
+            name: self.name().to_string(),
+        }
+    }
+
+    pub fn kind(&self) -> CompletionKind {
+        CompletionKind::Function
+    }
+}
+
+// ----------------------------
+// Demo Symbols (keywords/literals/operators)
+// ----------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemoSymbol {
+    True,
+    False,
+    LParen,
+}
+
+#[allow(dead_code)]
+impl DemoSymbol {
+    pub fn label(&self) -> &'static str {
+        match self {
+            DemoSymbol::True => "true",
+            DemoSymbol::False => "false",
+            DemoSymbol::LParen => "(",
+        }
+    }
+
+    pub fn kind(&self) -> CompletionKind {
+        match self {
+            DemoSymbol::True | DemoSymbol::False => CompletionKind::Keyword,
+            DemoSymbol::LParen => CompletionKind::Operator,
+        }
+    }
+
+    pub fn data(&self) -> Option<CompletionData> {
+        None
+    }
+}
+
+// ----------------------------
+// Demo Item (unified enum for all completion items)
+// ----------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DemoItem {
+    Prop(DemoProp),
+    Func(DemoFunc),
+    Symbol(DemoSymbol),
+}
+
+impl DemoItem {
+    pub fn label(&self) -> String {
+        match self {
+            DemoItem::Prop(p) => p.name().to_string(),
+            DemoItem::Func(f) => f.name().to_string(),
+            DemoItem::Symbol(s) => s.label().to_string(),
+        }
+    }
+
+    pub fn matches(&self, item: &CompletionItem) -> bool {
+        match self {
+            DemoItem::Prop(prop) => {
+                item.kind == CompletionKind::Property
+                    && item.data == Some(prop.prop_expr_data())
+                    && item.label == prop.name()
+            }
+            DemoItem::Func(func) => {
+                item.kind == CompletionKind::Function
+                    && item.data == Some(func.data())
+                    && item.label == func.name()
+            }
+            DemoItem::Symbol(sym) => {
+                item.label == sym.label() && item.kind == sym.kind() && item.data.is_none()
+            }
+        }
+    }
+}
+
+impl DemoProp {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DemoProp::Title => "Title",
+            DemoProp::Age => "Age",
+            DemoProp::Flag => "Flag",
+        }
+    }
+
+    pub fn ty(&self) -> Ty {
+        match self {
+            DemoProp::Title => Ty::String,
+            DemoProp::Age => Ty::Number,
+            DemoProp::Flag => Ty::Boolean,
+        }
+    }
+
+    pub fn prop_expr_data(&self) -> CompletionData {
+        CompletionData::PropExpr {
+            property_name: self.name().to_string(),
+        }
+    }
+}
+
+// ----------------------------
+// Context Builder Extensions
+// ----------------------------
 
 #[derive(Clone, Default)]
 pub struct ContextBuilder {
@@ -21,6 +162,21 @@ impl ContextBuilder {
             ty,
             disabled_reason: None,
         });
+        self
+    }
+
+    pub fn props_demo_basic(self) -> Self {
+        self.props(&[DemoProp::Title, DemoProp::Age, DemoProp::Flag])
+    }
+
+    pub fn props(mut self, props: &[DemoProp]) -> Self {
+        for prop in props {
+            self.properties.push(Property {
+                name: prop.name().to_string(),
+                ty: prop.ty(),
+                disabled_reason: None,
+            });
+        }
         self
     }
 
@@ -146,6 +302,7 @@ pub struct CompletionTestBuilder {
     cursor: u32,
     ctx: Option<Context>,
     output: Option<CompletionOutput>,
+    ignore_props: bool,
 }
 
 impl CompletionTestBuilder {
@@ -166,6 +323,7 @@ impl CompletionTestBuilder {
             cursor: cursor as u32,
             ctx: None,
             output: None,
+            ignore_props: false,
         }
     }
 
@@ -177,6 +335,36 @@ impl CompletionTestBuilder {
     pub fn no_ctx(mut self) -> Self {
         self.ctx = None;
         self
+    }
+
+    pub fn ignore_props(mut self) -> Self {
+        self.ignore_props = true;
+        self
+    }
+
+    fn visible_items(&mut self) -> Vec<&CompletionItem> {
+        // Ensure the output is computed before accessing items
+        let _ = self.ensure_run();
+        if !self.ignore_props {
+            return self
+                .output
+                .as_ref()
+                .map(|out| out.items.iter().collect())
+                .unwrap_or_default();
+        }
+        self.output
+            .as_ref()
+            .map(|out| {
+                out.items
+                    .iter()
+                    .filter(|item| {
+                        // Filter out property items
+                        !matches!(item.data, Some(CompletionData::PropExpr { .. }))
+                            && item.kind != CompletionKind::Property
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn ensure_run(&mut self) -> &CompletionOutput {
@@ -236,6 +424,7 @@ impl CompletionTestBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn expect_labels(mut self, expected: &[&str]) -> Self {
         let out = self.ensure_run();
         let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
@@ -243,6 +432,7 @@ impl CompletionTestBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn expect_contains(mut self, expected: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
         let out = self.ensure_run();
         let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
@@ -256,6 +446,7 @@ impl CompletionTestBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn expect_no_label_prefix(mut self, prefix: &str) -> Self {
         let out = self.ensure_run();
         let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
@@ -282,12 +473,14 @@ impl CompletionTestBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn expect_replace(mut self, expected: Span) -> Self {
         let out = self.ensure_run();
         assert_eq!(out.replace, expected, "replace span mismatch");
         self
     }
 
+    #[allow(dead_code)]
     pub fn expect_prefix(mut self, expected_prefix: &[&str]) -> Self {
         let out = self.ensure_run();
         let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
@@ -381,6 +574,78 @@ impl CompletionTestBuilder {
         self
     }
 
+    // ----- new DSL helpers for properties and functions -----
+
+    pub fn expect_prop(mut self, prop: DemoProp) -> Self {
+        let items = self.visible_items();
+        let item = items
+            .iter()
+            .find(|i| i.label == prop.name())
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+                panic!(
+                    "missing completion item for property {:?}\nactual labels: {labels:?}",
+                    prop.name()
+                )
+            });
+        assert!(
+            item.kind == CompletionKind::Property,
+            "expected item to be Property, got {:?}",
+            item.kind
+        );
+        assert_eq!(
+            item.data,
+            Some(prop.prop_expr_data()),
+            "unexpected data for property {:?}",
+            prop.name()
+        );
+        self
+    }
+
+    pub fn expect_func(mut self, name: &str) -> Self {
+        let items = self.visible_items();
+        let item = items
+            .iter()
+            .find(|i| i.label == name)
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+                panic!(
+                    "missing completion item for function {name}\nactual labels: {labels:?}"
+                )
+            });
+        assert!(
+            item.kind == CompletionKind::Function,
+            "expected item to be Function, got {:?}",
+            item.kind
+        );
+        assert_eq!(
+            item.data,
+            Some(CompletionData::Function {
+                name: name.to_string()
+            }),
+            "unexpected data for function {name}"
+        );
+        self
+    }
+
+    pub fn expect_top_labels(mut self, expected: &[&str]) -> Self {
+        let items = self.visible_items();
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(
+            labels.len() >= expected.len(),
+            "expected at least {} items, got {}\nactual labels: {labels:?}",
+            expected.len(),
+            labels.len()
+        );
+        for (idx, exp) in expected.iter().enumerate() {
+            assert_eq!(
+                labels[idx], *exp,
+                "prefix mismatch at index {idx}\nactual labels: {labels:?}"
+            );
+        }
+        self
+    }
+
     // ----- signature help -----
 
     pub fn expect_sig_active(mut self, active_param: usize) -> Self {
@@ -390,6 +655,114 @@ impl CompletionTestBuilder {
             .as_ref()
             .expect("expected signature help");
         assert_eq!(sig.active_param, active_param);
+        self
+    }
+
+    pub fn expect_no_signature_help(mut self) -> Self {
+        let out = self.ensure_run();
+        assert!(
+            out.signature_help.is_none(),
+            "expected no signature help, got: {:?}",
+            out.signature_help
+        );
+        self
+    }
+
+    // ----- typed DSL helpers -----
+
+    fn find_item(&mut self, expected: DemoItem) -> &CompletionItem {
+        let items = self.visible_items();
+        items
+            .iter()
+            .find(|i| expected.matches(i))
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+                panic!(
+                    "missing completion item for {:?}\nactual labels: {labels:?}",
+                    expected.label()
+                )
+            })
+    }
+
+    pub fn expect_contains_items(mut self, expected: &[DemoItem]) -> Self {
+        for item in expected {
+            self.find_item(*item);
+        }
+        self
+    }
+
+    pub fn expect_contains_props(mut self, expected: &[DemoProp]) -> Self {
+        for prop in expected {
+            self.find_item(DemoItem::Prop(*prop));
+        }
+        self
+    }
+
+    pub fn expect_contains_funcs(mut self, expected: &[DemoFunc]) -> Self {
+        for func in expected {
+            self.find_item(DemoItem::Func(*func));
+        }
+        self
+    }
+
+    pub fn expect_contains_symbols(mut self, expected: &[DemoSymbol]) -> Self {
+        for sym in expected {
+            self.find_item(DemoItem::Symbol(*sym));
+        }
+        self
+    }
+
+    pub fn expect_top_items(mut self, expected: &[DemoItem]) -> Self {
+        let items = self.visible_items();
+        assert!(
+            items.len() >= expected.len(),
+            "expected at least {} items, got {}\nactual labels: {:?}",
+            expected.len(),
+            items.len(),
+            items.iter().map(|i| i.label.as_str()).collect::<Vec<_>>()
+        );
+        for (idx, exp) in expected.iter().enumerate() {
+            assert!(
+                exp.matches(items[idx]),
+                "item mismatch at index {}: expected {:?}, got {:?}",
+                idx,
+                exp.label(),
+                items[idx].label
+            );
+        }
+        self
+    }
+
+    pub fn expect_order_items(mut self, a: DemoItem, b: DemoItem) -> Self {
+        let items = self.visible_items();
+        let a_idx = items
+            .iter()
+            .position(|i| a.matches(i))
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+                panic!(
+                    "missing completion item for {:?}\nactual labels: {labels:?}",
+                    a.label()
+                )
+            });
+        let b_idx = items
+            .iter()
+            .position(|i| b.matches(i))
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+                panic!(
+                    "missing completion item for {:?}\nactual labels: {labels:?}",
+                    b.label()
+                )
+            });
+        assert!(
+            a_idx < b_idx,
+            "expected {:?} before {:?}, but got {} >= {}",
+            a.label(),
+            b.label(),
+            a_idx,
+            b_idx
+        );
         self
     }
 
@@ -510,6 +883,7 @@ fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
     updated
 }
 
+#[allow(dead_code)]
 pub fn prop_label(name: &str) -> String {
     format!(r#"prop("{name}")"#)
 }
