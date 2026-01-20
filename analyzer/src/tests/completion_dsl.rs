@@ -1,15 +1,15 @@
 use crate::completion::{
-    CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit, complete_with_context,
+    CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
+    complete_with_context,
 };
 use crate::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
-use crate::token::Span;
 
 // ----------------------------
 // Demo Properties
 // ----------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DemoProp {
+pub enum Prop {
     Title,
     Age,
     Flag,
@@ -20,17 +20,17 @@ pub enum DemoProp {
 // ----------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DemoFunc {
+pub enum Func {
     If,
     Sum,
 }
 
 #[allow(dead_code)]
-impl DemoFunc {
+impl Func {
     pub fn name(&self) -> &'static str {
         match self {
-            DemoFunc::If => "if",
-            DemoFunc::Sum => "sum",
+            Func::If => "if",
+            Func::Sum => "sum",
         }
     }
 
@@ -50,26 +50,26 @@ impl DemoFunc {
 // ----------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DemoSymbol {
+pub enum Symbol {
     True,
     False,
     LParen,
 }
 
 #[allow(dead_code)]
-impl DemoSymbol {
+impl Symbol {
     pub fn label(&self) -> &'static str {
         match self {
-            DemoSymbol::True => "true",
-            DemoSymbol::False => "false",
-            DemoSymbol::LParen => "(",
+            Symbol::True => "true",
+            Symbol::False => "false",
+            Symbol::LParen => "(",
         }
     }
 
     pub fn kind(&self) -> CompletionKind {
         match self {
-            DemoSymbol::True | DemoSymbol::False => CompletionKind::Keyword,
-            DemoSymbol::LParen => CompletionKind::Operator,
+            Symbol::True | Symbol::False => CompletionKind::Keyword,
+            Symbol::LParen => CompletionKind::Operator,
         }
     }
 
@@ -83,54 +83,54 @@ impl DemoSymbol {
 // ----------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DemoItem {
-    Prop(DemoProp),
-    Func(DemoFunc),
-    Symbol(DemoSymbol),
+pub enum Item {
+    Prop(Prop),
+    Func(Func),
+    Symbol(Symbol),
 }
 
-impl DemoItem {
+impl Item {
     pub fn label(&self) -> String {
         match self {
-            DemoItem::Prop(p) => p.name().to_string(),
-            DemoItem::Func(f) => f.name().to_string(),
-            DemoItem::Symbol(s) => s.label().to_string(),
+            Item::Prop(p) => p.name().to_string(),
+            Item::Func(f) => f.name().to_string(),
+            Item::Symbol(s) => s.label().to_string(),
         }
     }
 
     pub fn matches(&self, item: &CompletionItem) -> bool {
         match self {
-            DemoItem::Prop(prop) => {
+            Item::Prop(prop) => {
                 item.kind == CompletionKind::Property
                     && item.data == Some(prop.prop_expr_data())
                     && item.label == prop.name()
             }
-            DemoItem::Func(func) => {
+            Item::Func(func) => {
                 item.kind == CompletionKind::Function
                     && item.data == Some(func.data())
                     && item.label == func.name()
             }
-            DemoItem::Symbol(sym) => {
+            Item::Symbol(sym) => {
                 item.label == sym.label() && item.kind == sym.kind() && item.data.is_none()
             }
         }
     }
 }
 
-impl DemoProp {
+impl Prop {
     pub fn name(&self) -> &'static str {
         match self {
-            DemoProp::Title => "Title",
-            DemoProp::Age => "Age",
-            DemoProp::Flag => "Flag",
+            Prop::Title => "Title",
+            Prop::Age => "Age",
+            Prop::Flag => "Flag",
         }
     }
 
     pub fn ty(&self) -> Ty {
         match self {
-            DemoProp::Title => Ty::String,
-            DemoProp::Age => Ty::Number,
-            DemoProp::Flag => Ty::Boolean,
+            Prop::Title => Ty::String,
+            Prop::Age => Ty::Number,
+            Prop::Flag => Ty::Boolean,
         }
     }
 
@@ -166,10 +166,10 @@ impl ContextBuilder {
     }
 
     pub fn props_demo_basic(self) -> Self {
-        self.props(&[DemoProp::Title, DemoProp::Age, DemoProp::Flag])
+        self.props(&[Prop::Title, Prop::Age, Prop::Flag])
     }
 
-    pub fn props(mut self, props: &[DemoProp]) -> Self {
+    pub fn props(mut self, props: &[Prop]) -> Self {
         for prop in props {
             self.properties.push(Property {
                 name: prop.name().to_string(),
@@ -376,17 +376,6 @@ impl CompletionTestBuilder {
         self.output.as_ref().unwrap()
     }
 
-    #[allow(dead_code)]
-    pub fn output(&mut self) -> &CompletionOutput {
-        self.ensure_run()
-    }
-
-    #[allow(dead_code)]
-    pub fn run(mut self) -> Self {
-        let _ = self.ensure_run();
-        self
-    }
-
     pub fn expect_replace_contains_cursor(mut self) -> Self {
         let cursor = self.cursor;
         let out = self.ensure_run();
@@ -397,12 +386,6 @@ impl CompletionTestBuilder {
             cursor
         );
         self
-    }
-
-    #[allow(dead_code)]
-    pub fn labels(&mut self) -> Vec<&str> {
-        let out = self.ensure_run();
-        out.items.iter().map(|i| i.label.as_str()).collect()
     }
 
     pub fn expect_not_empty(mut self) -> Self {
@@ -424,76 +407,12 @@ impl CompletionTestBuilder {
         self
     }
 
-    #[allow(dead_code)]
-    pub fn expect_labels(mut self, expected: &[&str]) -> Self {
+    pub fn expect_not_contains(mut self, expected: &[Item]) -> Self {
         let out = self.ensure_run();
-        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
-        assert_eq!(labels, expected, "labels mismatch");
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_contains(mut self, expected: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
-        let out = self.ensure_run();
-        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
         for e in expected {
-            let e = e.as_ref();
             assert!(
-                labels.iter().any(|l| *l == e),
-                "missing completion label: {e}\nactual labels: {labels:?}"
-            );
-        }
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_no_label_prefix(mut self, prefix: &str) -> Self {
-        let out = self.ensure_run();
-        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
-        assert!(
-            !labels.iter().any(|l| l.starts_with(prefix)),
-            "expected no labels starting with {prefix:?}\nactual labels: {labels:?}"
-        );
-        self
-    }
-
-    pub fn expect_not_contains(
-        mut self,
-        expected: impl IntoIterator<Item = impl AsRef<str>>,
-    ) -> Self {
-        let out = self.ensure_run();
-        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
-        for e in expected {
-            let e = e.as_ref();
-            assert!(
-                !labels.iter().any(|l| *l == e),
-                "expected NOT to contain label: {e}\nactual labels: {labels:?}"
-            );
-        }
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_replace(mut self, expected: Span) -> Self {
-        let out = self.ensure_run();
-        assert_eq!(out.replace, expected, "replace span mismatch");
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn expect_prefix(mut self, expected_prefix: &[&str]) -> Self {
-        let out = self.ensure_run();
-        let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
-        assert!(
-            labels.len() >= expected_prefix.len(),
-            "expected at least {} items, got {}\nactual labels: {labels:?}",
-            expected_prefix.len(),
-            labels.len()
-        );
-        for (idx, exp) in expected_prefix.iter().enumerate() {
-            assert_eq!(
-                labels[idx], *exp,
-                "prefix mismatch at index {idx}\nactual labels: {labels:?}"
+                !out.items.iter().any(|i| e.matches(i)),
+                "expected NOT to contain item: {e:?}"
             );
         }
         self
@@ -576,7 +495,7 @@ impl CompletionTestBuilder {
 
     // ----- new DSL helpers for properties and functions -----
 
-    pub fn expect_prop(mut self, prop: DemoProp) -> Self {
+    pub fn expect_prop(mut self, prop: Prop) -> Self {
         let items = self.visible_items();
         let item = items
             .iter()
@@ -604,15 +523,10 @@ impl CompletionTestBuilder {
 
     pub fn expect_func(mut self, name: &str) -> Self {
         let items = self.visible_items();
-        let item = items
-            .iter()
-            .find(|i| i.label == name)
-            .unwrap_or_else(|| {
-                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-                panic!(
-                    "missing completion item for function {name}\nactual labels: {labels:?}"
-                )
-            });
+        let item = items.iter().find(|i| i.label == name).unwrap_or_else(|| {
+            let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+            panic!("missing completion item for function {name}\nactual labels: {labels:?}")
+        });
         assert!(
             item.kind == CompletionKind::Function,
             "expected item to be Function, got {:?}",
@@ -670,7 +584,7 @@ impl CompletionTestBuilder {
 
     // ----- typed DSL helpers -----
 
-    fn find_item(&mut self, expected: DemoItem) -> &CompletionItem {
+    fn find_item(&mut self, expected: Item) -> &CompletionItem {
         let items = self.visible_items();
         items
             .iter()
@@ -684,35 +598,35 @@ impl CompletionTestBuilder {
             })
     }
 
-    pub fn expect_contains_items(mut self, expected: &[DemoItem]) -> Self {
+    pub fn expect_contains_items(mut self, expected: &[Item]) -> Self {
         for item in expected {
             self.find_item(*item);
         }
         self
     }
 
-    pub fn expect_contains_props(mut self, expected: &[DemoProp]) -> Self {
+    pub fn expect_contains_props(mut self, expected: &[Prop]) -> Self {
         for prop in expected {
-            self.find_item(DemoItem::Prop(*prop));
+            self.find_item(Item::Prop(*prop));
         }
         self
     }
 
-    pub fn expect_contains_funcs(mut self, expected: &[DemoFunc]) -> Self {
+    pub fn expect_contains_funcs(mut self, expected: &[Func]) -> Self {
         for func in expected {
-            self.find_item(DemoItem::Func(*func));
+            self.find_item(Item::Func(*func));
         }
         self
     }
 
-    pub fn expect_contains_symbols(mut self, expected: &[DemoSymbol]) -> Self {
+    pub fn expect_contains_symbols(mut self, expected: &[Symbol]) -> Self {
         for sym in expected {
-            self.find_item(DemoItem::Symbol(*sym));
+            self.find_item(Item::Symbol(*sym));
         }
         self
     }
 
-    pub fn expect_top_items(mut self, expected: &[DemoItem]) -> Self {
+    pub fn expect_top_items(mut self, expected: &[Item]) -> Self {
         let items = self.visible_items();
         assert!(
             items.len() >= expected.len(),
@@ -733,28 +647,22 @@ impl CompletionTestBuilder {
         self
     }
 
-    pub fn expect_order_items(mut self, a: DemoItem, b: DemoItem) -> Self {
+    pub fn expect_order_items(mut self, a: Item, b: Item) -> Self {
         let items = self.visible_items();
-        let a_idx = items
-            .iter()
-            .position(|i| a.matches(i))
-            .unwrap_or_else(|| {
-                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-                panic!(
-                    "missing completion item for {:?}\nactual labels: {labels:?}",
-                    a.label()
-                )
-            });
-        let b_idx = items
-            .iter()
-            .position(|i| b.matches(i))
-            .unwrap_or_else(|| {
-                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-                panic!(
-                    "missing completion item for {:?}\nactual labels: {labels:?}",
-                    b.label()
-                )
-            });
+        let a_idx = items.iter().position(|i| a.matches(i)).unwrap_or_else(|| {
+            let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+            panic!(
+                "missing completion item for {:?}\nactual labels: {labels:?}",
+                a.label()
+            )
+        });
+        let b_idx = items.iter().position(|i| b.matches(i)).unwrap_or_else(|| {
+            let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+            panic!(
+                "missing completion item for {:?}\nactual labels: {labels:?}",
+                b.label()
+            )
+        });
         assert!(
             a_idx < b_idx,
             "expected {:?} before {:?}, but got {} >= {}",

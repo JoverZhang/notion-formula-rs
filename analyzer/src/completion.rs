@@ -210,11 +210,19 @@ fn prefix_matches_completion_without_items(prefix: &str, ctx: Option<&semantic::
         return false;
     };
 
-    if ctx.functions.iter().any(|func| func.name.starts_with(prefix)) {
+    if ctx
+        .functions
+        .iter()
+        .any(|func| func.name.starts_with(prefix))
+    {
         return true;
     }
 
-    if ctx.properties.iter().any(|prop| prop.name.starts_with(prefix)) {
+    if ctx
+        .properties
+        .iter()
+        .any(|prop| prop.name.starts_with(prefix))
+    {
         return true;
     }
 
@@ -374,7 +382,11 @@ fn attach_primary_edits(
             Some(CompletionData::PropExpr { .. }) => {
                 // Property completions insert the full expression (e.g., `prop("Title")`).
                 // Place the cursor at the end of the inserted text.
-                Some(output_replace.start.saturating_add(item.insert_text.len() as u32))
+                Some(
+                    output_replace
+                        .start
+                        .saturating_add(item.insert_text.len() as u32),
+                )
             }
             _ => None,
         };
