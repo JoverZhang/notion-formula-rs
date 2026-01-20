@@ -53,4 +53,3 @@ describe("applyCompletion", () => {
     expect(newCursor).toBe(5);
   });
 });
-

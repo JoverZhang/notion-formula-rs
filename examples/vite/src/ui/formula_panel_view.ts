@@ -383,7 +383,7 @@ export function createFormulaPanelView(opts: {
       label.textContent = item.label;
       const meta = document.createElement("div");
       meta.className = "completion-item-meta";
-      const detail = item.detail ?? (item.is_disabled ? item.disabled_reason ?? "" : "");
+      const detail = item.detail ?? (item.is_disabled ? (item.disabled_reason ?? "") : "");
       meta.textContent = detail;
       main.append(label, meta);
       li.appendChild(main);

@@ -49,4 +49,3 @@ export function applyCompletion(
   const newCursor = Math.max(0, Math.min(item.cursor ?? fallbackCursor, newText.length));
   return { newText, newCursor };
 }
-

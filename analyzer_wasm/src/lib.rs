@@ -241,7 +241,12 @@ fn completion_kind_string(kind: analyzer::CompletionKind) -> &'static str {
 
 fn apply_text_edits_bytes(source: &str, edits: &[analyzer::TextEdit]) -> String {
     let mut sorted = edits.to_vec();
-    sorted.sort_by(|a, b| b.range.start.cmp(&a.range.start).then(b.range.end.cmp(&a.range.end)));
+    sorted.sort_by(|a, b| {
+        b.range
+            .start
+            .cmp(&a.range.start)
+            .then(b.range.end.cmp(&a.range.end))
+    });
 
     let mut updated = source.to_string();
     for edit in sorted {
@@ -263,7 +268,10 @@ fn apply_text_edits_bytes(source: &str, edits: &[analyzer::TextEdit]) -> String 
     updated
 }
 
-fn completion_output_to_view(source: &str, output: &analyzer::CompletionOutput) -> CompletionOutputView {
+fn completion_output_to_view(
+    source: &str,
+    output: &analyzer::CompletionOutput,
+) -> CompletionOutputView {
     let replace = simple_span_view(source, output.replace);
     let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelpView {
         label: sig.label.clone(),
