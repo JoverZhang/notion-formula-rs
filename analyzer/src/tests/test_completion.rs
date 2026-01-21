@@ -1,6 +1,6 @@
 use crate::completion::CompletionData;
 use crate::semantic::{ParamSig, Ty};
-use crate::tests::completion_dsl::{Func, Item, Prop, Symbol, ctx, t};
+use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 
 #[test]
 fn completion_at_document_start() {
@@ -12,10 +12,13 @@ fn completion_at_document_start() {
             Item::Prop(Prop::Title),
             Item::Prop(Prop::Age),
             Item::Prop(Prop::Flag),
+            Item::Builtin(Builtin::Not),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
             Item::Func(Func::If),
             Item::Func(Func::Sum),
         ])
-        .expect_contains_symbols(&[Symbol::True, Symbol::False, Symbol::LParen])
+        .expect_contains_builtins(&[Builtin::Not, Builtin::True, Builtin::False])
         .expect_replace_contains_cursor();
 }
 
@@ -38,44 +41,107 @@ fn completion_at_document_start_without_properties_has_no_prop_variables() {
 }
 
 #[test]
-fn completion_after_identifier_suppresses_expr_start() {
+fn completion_after_identifier_shows_after_atom_operators() {
     t("abc$0")
         .no_ctx()
-        .expect_not_contains(&[
-            Item::Func(Func::If),
-            Item::Func(Func::Sum),
-            Item::Symbol(Symbol::True),
-            Item::Symbol(Symbol::False),
-            Item::Symbol(Symbol::LParen),
-            Item::Prop(Prop::Title),
+        .expect_not_empty()
+        .expect_contains_items(&[
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
         ])
+        .expect_not_contains(&[Item::Builtin(Builtin::Not), Item::Builtin(Builtin::True)])
         .expect_replace_contains_cursor();
 }
 
 #[test]
-fn completion_after_complete_atom_suppresses_expr_start() {
+fn completion_after_complete_atom_shows_after_atom_operators() {
     t(r#"prop("Title")$0"#)
         .no_ctx()
+        .expect_not_empty()
+        .expect_contains_items(&[
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
+        ])
+        .expect_not_contains(&[Item::Builtin(Builtin::Not), Item::Builtin(Builtin::True)])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_when_expecting_separator_in_call_shows_after_atom_operators() {
+    let c = ctx().func_if().build();
+
+    t("if(true$0)")
+        .ctx(c)
+        .expect_sig_active(0)
+        .expect_not_empty()
+        .expect_contains_items(&[
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
+        ])
+        .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
         .expect_not_contains(&[
-            Item::Func(Func::If),
-            Item::Func(Func::Sum),
-            Item::Symbol(Symbol::True),
-            Item::Symbol(Symbol::False),
-            Item::Symbol(Symbol::LParen),
-            Item::Prop(Prop::Title),
+            Item::Builtin(Builtin::Not),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
         ])
         .expect_replace_contains_cursor();
 }
 
 #[test]
-fn completion_when_expecting_separator_in_call_suppresses_expr_start() {
-    let c = ctx().func_if().build();
+fn completion_after_atom_in_call_arg_has_operator_completions() {
+    let c = ctx().props_demo_basic().func_if().func_sum().build();
 
-    // Cursor is at the end of a complete literal inside a call arg; expect separator and suppress
-    // expr-start completions.
-    t("if(true$0)")
+    t("if(true$0")
         .ctx(c)
-        .expect_empty()
+        .expect_sig_active(0)
+        .expect_not_empty()
+        .expect_contains_items(&[
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
+        ])
+        .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
+        .expect_not_contains(&[
+            Item::Builtin(Builtin::Not),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
+        ])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_after_atom_in_call_arg_nested_expr_has_operator_completions() {
+    let c = ctx().props_demo_basic().func_if().func_sum().build();
+
+    t("if(sum(1,2)$0")
+        .ctx(c)
+        .expect_sig_active(0)
+        .expect_not_empty()
+        .expect_contains_items(&[
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
+        ])
+        .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_after_atom_at_toplevel_shows_only_operators() {
+    let c = ctx().props_demo_basic().func_if().func_sum().build();
+
+    t("1$0")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_items(&[
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
+        ])
+        .expect_not_contains(&[
+            Item::Prop(Prop::Title),
+            Item::Func(Func::If),
+            Item::Builtin(Builtin::Not),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
+        ])
         .expect_replace_contains_cursor();
 }
 
@@ -87,7 +153,7 @@ fn completion_inside_call_arg_strictly_inside_ident_does_not_expect_separator() 
     t("if(tr$0ue)")
         .ctx(c)
         .expect_not_empty()
-        .expect_contains_symbols(&[Symbol::True])
+        .expect_contains_builtins(&[Builtin::True])
         .expect_contains_props(&[Prop::Title])
         .expect_replace_contains_cursor();
 }
@@ -100,7 +166,7 @@ fn completion_inside_call_arg_at_ident_end_allows_extending_func_prefix_completi
         .ctx(c)
         .expect_not_empty()
         .expect_contains_funcs(&[Func::Sum])
-        .expect_contains_symbols(&[Symbol::True])
+        .expect_contains_builtins(&[Builtin::True])
         .expect_replace_contains_cursor();
 }
 
@@ -123,7 +189,7 @@ fn completion_inside_call_arg_ident_end_prefix_allows_completions() {
     t("if(fa$0")
         .ctx(c)
         .expect_not_empty()
-        .expect_contains_symbols(&[Symbol::False])
+        .expect_contains_builtins(&[Builtin::False])
         .expect_replace_contains_cursor();
 }
 
@@ -134,20 +200,34 @@ fn completion_inside_call_arg_after_comma_suggests_expr_start_items() {
     t("if(true, $0")
         .ctx(c)
         .expect_not_empty()
-        .expect_contains_items(&[Item::Prop(Prop::Title), Item::Symbol(Symbol::True)])
+        .expect_contains_items(&[Item::Prop(Prop::Title), Item::Builtin(Builtin::True)])
         .expect_replace_contains_cursor();
 }
 
 #[test]
-fn completion_inside_call_arg_empty_before_close_paren_shows_items() {
+fn completion_inside_call_arg_empty_before_close_paren_shows_items_and_signature_help() {
     let c = ctx().props_demo_basic().func_sum().build();
 
     // Regression: cursor at `)` token start should still be treated as expr-start inside the call.
     t("sum($0)")
         .ctx(c)
+        .expect_sig_active(0)
         .expect_not_empty()
         .expect_contains_props(&[Prop::Title])
-        .expect_contains_symbols(&[Symbol::True])
+        .expect_contains_builtins(&[Builtin::True])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_inside_call_arg_without_close_paren_shows_items_and_signature_help() {
+    let c = ctx().props_demo_basic().func_sum().build();
+
+    t("sum($0")
+        .ctx(c)
+        .expect_sig_active(0)
+        .expect_not_empty()
+        .expect_contains_props(&[Prop::Title])
+        .expect_contains_builtins(&[Builtin::True])
         .expect_replace_contains_cursor();
 }
 
@@ -261,13 +341,13 @@ fn completion_type_ranking_boolean_prefers_literals() {
     t("if($0")
         .ctx(c)
         .expect_contains_items(&[
-            Item::Symbol(Symbol::True),
-            Item::Symbol(Symbol::False),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
             Item::Prop(Prop::Flag),
             Item::Prop(Prop::Title),
         ])
-        .expect_order_items(Item::Symbol(Symbol::True), Item::Prop(Prop::Title))
-        .expect_order_items(Item::Symbol(Symbol::False), Item::Prop(Prop::Title))
+        .expect_order_items(Item::Builtin(Builtin::True), Item::Prop(Prop::Title))
+        .expect_order_items(Item::Builtin(Builtin::False), Item::Prop(Prop::Title))
         .expect_order_items(Item::Prop(Prop::Flag), Item::Prop(Prop::Title))
         .expect_replace_contains_cursor();
 }
@@ -371,11 +451,11 @@ fn completion_ignore_props_filters_property_items() {
         .ctx(c)
         .ignore_props()
         .expect_top_items(&[
+            Item::Builtin(Builtin::Not),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
             Item::Func(Func::If),
             Item::Func(Func::Sum),
-            Item::Symbol(Symbol::True),
-            Item::Symbol(Symbol::False),
-            Item::Symbol(Symbol::LParen),
         ])
         .expect_replace_contains_cursor();
 }

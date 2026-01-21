@@ -46,30 +46,51 @@ impl Func {
 }
 
 // ----------------------------
-// Demo Symbols (keywords/literals/operators)
+// Builtins (Notion-style identifiers + operators)
 // ----------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Symbol {
+#[allow(dead_code)]
+pub enum Builtin {
+    Not,
     True,
     False,
-    LParen,
+    EqEq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+    Plus,
+    Minus,
+    Star,
+    Slash,
 }
 
 #[allow(dead_code)]
-impl Symbol {
+impl Builtin {
     pub fn label(&self) -> &'static str {
         match self {
-            Symbol::True => "true",
-            Symbol::False => "false",
-            Symbol::LParen => "(",
+            Builtin::Not => "not",
+            Builtin::True => "true",
+            Builtin::False => "false",
+            Builtin::EqEq => "==",
+            Builtin::Ne => "!=",
+            Builtin::Gt => ">",
+            Builtin::Ge => ">=",
+            Builtin::Lt => "<",
+            Builtin::Le => "<=",
+            Builtin::Plus => "+",
+            Builtin::Minus => "-",
+            Builtin::Star => "*",
+            Builtin::Slash => "/",
         }
     }
 
     pub fn kind(&self) -> CompletionKind {
         match self {
-            Symbol::True | Symbol::False => CompletionKind::Keyword,
-            Symbol::LParen => CompletionKind::Operator,
+            Builtin::Not | Builtin::True | Builtin::False => CompletionKind::Builtin,
+            _ => CompletionKind::Operator,
         }
     }
 
@@ -86,7 +107,7 @@ impl Symbol {
 pub enum Item {
     Prop(Prop),
     Func(Func),
-    Symbol(Symbol),
+    Builtin(Builtin),
 }
 
 impl Item {
@@ -94,7 +115,7 @@ impl Item {
         match self {
             Item::Prop(p) => p.name().to_string(),
             Item::Func(f) => f.name().to_string(),
-            Item::Symbol(s) => s.label().to_string(),
+            Item::Builtin(b) => b.label().to_string(),
         }
     }
 
@@ -110,8 +131,8 @@ impl Item {
                     && item.data == Some(func.data())
                     && item.label == func.name()
             }
-            Item::Symbol(sym) => {
-                item.label == sym.label() && item.kind == sym.kind() && item.data.is_none()
+            Item::Builtin(b) => {
+                item.label == b.label() && item.kind == b.kind() && item.data.is_none()
             }
         }
     }
@@ -397,6 +418,7 @@ impl CompletionTestBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn expect_empty(mut self) -> Self {
         let out = self.ensure_run();
         assert!(
@@ -619,9 +641,9 @@ impl CompletionTestBuilder {
         self
     }
 
-    pub fn expect_contains_symbols(mut self, expected: &[Symbol]) -> Self {
-        for sym in expected {
-            self.find_item(Item::Symbol(*sym));
+    pub fn expect_contains_builtins(mut self, expected: &[Builtin]) -> Self {
+        for b in expected {
+            self.find_item(Item::Builtin(*b));
         }
         self
     }

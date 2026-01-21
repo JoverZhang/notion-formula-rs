@@ -32,17 +32,14 @@ pub struct CompletionItem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompletionKind {
     Function,
-    Keyword,
+    Builtin,
     Property,
     Operator,
-    Literal,
-    Snippet,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionData {
     Function { name: String },
-    PropertyName { name: String },
     PropExpr { property_name: String },
 }
 
@@ -53,31 +50,18 @@ pub struct SignatureHelp {
     pub active_param: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct CallContext {
     callee: String,
     lparen_idx: usize,
     arg_index: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum CompletionLocation {
-    ExprStart,
-    CallArgExprStart {
-        callee: String,
-        arg_index: usize,
-        expected: Option<semantic::Ty>,
-    },
-    SeparatorExpected {
-        kind: SeparatorKind,
-    },
-    None,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SeparatorKind {
-    Comma,
-    CloseParen,
-    Unknown,
+enum PositionKind {
+    NeedExpr,
+    AfterAtom,
+    None,
 }
 
 /// Compute completions using byte offsets for the cursor and replace span.
@@ -115,118 +99,77 @@ pub fn complete_with_context(
         );
     }
 
-    let location = detect_location(tokens.as_slice(), cursor_u32, ctx);
-    let signature_help = compute_signature_help_if_in_call(tokens.as_slice(), cursor_u32, ctx);
+    let call_ctx = detect_call_context(tokens.as_slice(), cursor_u32);
+    let signature_help =
+        compute_signature_help_if_in_call(tokens.as_slice(), cursor_u32, ctx, call_ctx.as_ref());
+    let position_kind =
+        detect_position_kind(tokens.as_slice(), cursor_u32, ctx, call_ctx.as_ref());
 
-    let mut output = complete_at_location(location, ctx, tokens.as_slice(), cursor_u32);
+    let mut output = complete_for_position(
+        position_kind,
+        ctx,
+        tokens.as_slice(),
+        cursor_u32,
+        call_ctx.as_ref(),
+    );
     output.signature_help = signature_help;
 
     finalize_output(output, ctx)
 }
 
-fn detect_location(
+fn detect_position_kind(
     tokens: &[Token],
     cursor: u32,
     ctx: Option<&semantic::Context>,
-) -> CompletionLocation {
-    if let Some(call_ctx) = detect_call_context(tokens, cursor) {
-        if let Some(kind) = separator_expected_in_call(tokens, cursor, ctx) {
-            return CompletionLocation::SeparatorExpected { kind };
-        }
-        if should_show_expr_start_completions_in_context(tokens, cursor, ctx) {
-            let expected = ctx
-                .and_then(|ctx| {
-                    ctx.functions
-                        .iter()
-                        .find(|func| func.name == call_ctx.callee)
-                        .and_then(|func| func.params.get(call_ctx.arg_index))
-                })
-                .map(|param| param.ty);
-            return CompletionLocation::CallArgExprStart {
-                callee: call_ctx.callee,
-                arg_index: call_ctx.arg_index,
-                expected,
-            };
-        }
-
-        return CompletionLocation::None;
+    call_ctx: Option<&CallContext>,
+) -> PositionKind {
+    if is_strictly_inside_ident(tokens, cursor) {
+        return PositionKind::NeedExpr;
     }
 
-    if should_show_expr_start_completions_in_context(tokens, cursor, ctx) {
-        CompletionLocation::ExprStart
-    } else {
-        CompletionLocation::None
-    }
-}
-
-fn is_prefix_editing_ident(tokens: &[Token], cursor: u32) -> Option<(Span, String)> {
-    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
-        if let TokenKind::Ident(ref symbol) = token.kind {
-            if token.span.start < cursor && cursor <= token.span.end && !symbol.text.is_empty() {
-                return Some((token.span, symbol.text.clone()));
-            }
-        }
+    if has_extending_ident_prefix(tokens, cursor, ctx) {
+        return PositionKind::NeedExpr;
     }
 
-    if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
-        if token.span.end == cursor {
-            if let TokenKind::Ident(ref symbol) = token.kind {
-                if !symbol.text.is_empty() {
-                    return Some((token.span, symbol.text.clone()));
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn should_show_expr_start_completions(tokens: &[Token], cursor: u32) -> bool {
     let prev = prev_non_trivia_insertion(tokens, cursor).map(|(_, token)| token);
-    is_expr_start_position(prev)
+    if is_expr_start_position(prev) {
+        return PositionKind::NeedExpr;
+    }
+
+    // AfterAtom only makes sense if we're in an expression (either top-level or inside a call).
+    // Call context is computed separately; we treat both cases the same for completion contents.
+    let _ = call_ctx;
+
+    match prev.map(|token| &token.kind) {
+        Some(TokenKind::Ident(_)) | Some(TokenKind::Literal(_)) | Some(TokenKind::CloseParen) => {
+            PositionKind::AfterAtom
+        }
+        _ => PositionKind::None,
+    }
 }
 
-fn should_show_expr_start_completions_in_context(
+fn is_strictly_inside_ident(tokens: &[Token], cursor: u32) -> bool {
+    let Some((_, token)) = token_containing_cursor(tokens, cursor) else {
+        return false;
+    };
+    matches!(token.kind, TokenKind::Ident(_)) && token.span.start < cursor && cursor < token.span.end
+}
+
+fn has_extending_ident_prefix(
     tokens: &[Token],
     cursor: u32,
     ctx: Option<&semantic::Context>,
 ) -> bool {
-    if should_show_expr_start_completions(tokens, cursor) {
-        return true;
-    }
-
-    let Some((_, ident)) = is_prefix_editing_ident(tokens, cursor) else {
+    let Some((_, token)) = prev_non_trivia(tokens, cursor) else {
         return false;
     };
-    prefix_matches_completion_without_items(&ident, ctx)
-}
-
-fn prefix_matches_completion_without_items(prefix: &str, ctx: Option<&semantic::Context>) -> bool {
-    if "true".starts_with(prefix) || "false".starts_with(prefix) {
-        return true;
+    if token.span.end != cursor {
+        return false;
     }
-
-    let Some(ctx) = ctx else {
+    let TokenKind::Ident(ref symbol) = token.kind else {
         return false;
     };
-
-    if ctx
-        .functions
-        .iter()
-        .any(|func| func.name.starts_with(prefix))
-    {
-        return true;
-    }
-
-    if ctx
-        .properties
-        .iter()
-        .any(|prop| prop.name.starts_with(prefix))
-    {
-        return true;
-    }
-
-    false
+    has_extending_completion_prefix(&symbol.text, ctx)
 }
 
 fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>) -> bool {
@@ -238,6 +181,9 @@ fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>
         return true;
     }
     if "false".starts_with(prefix) && prefix != "false" {
+        return true;
+    }
+    if "not".starts_with(prefix) && prefix != "not" {
         return true;
     }
 
@@ -264,65 +210,20 @@ fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>
     false
 }
 
-fn separator_expected_in_call(
-    tokens: &[Token],
-    cursor: u32,
-    ctx: Option<&semantic::Context>,
-) -> Option<SeparatorKind> {
-    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
-        if matches!(token.kind, TokenKind::Ident(_))
-            && token.span.start < cursor
-            && cursor < token.span.end
-        {
-            // Cursor is strictly inside the identifier; user is editing the name.
-            // Don't treat this as a "separator expected" position.
-            return None;
-        }
-    }
-
-    let (_, prev_token) = prev_non_trivia(tokens, cursor)?;
-    if prev_token.span.end != cursor {
-        return None;
-    }
-
-    match &prev_token.kind {
-        TokenKind::CloseParen | TokenKind::Literal(_) => Some(next_separator_kind(tokens, cursor)),
-        TokenKind::Ident(symbol) => {
-            if has_extending_completion_prefix(&symbol.text, ctx) {
-                None
-            } else {
-                Some(next_separator_kind(tokens, cursor))
-            }
-        }
-        _ => None,
-    }
-}
-
-fn next_separator_kind(tokens: &[Token], cursor: u32) -> SeparatorKind {
-    match next_non_trivia(tokens, cursor).map(|(_, token)| &token.kind) {
-        Some(TokenKind::Comma) => SeparatorKind::Comma,
-        Some(TokenKind::CloseParen) => SeparatorKind::CloseParen,
-        _ => SeparatorKind::Unknown,
-    }
-}
-
-fn complete_at_location(
-    loc: CompletionLocation,
+fn complete_for_position(
+    kind: PositionKind,
     ctx: Option<&semantic::Context>,
     tokens: &[Token],
     cursor: u32,
+    call_ctx: Option<&CallContext>,
 ) -> CompletionOutput {
     let default_replace = Span {
         start: cursor,
         end: cursor,
     };
-    match loc {
-        CompletionLocation::ExprStart => CompletionOutput {
-            items: expr_start_items(ctx),
-            replace: replace_span_for_expr_start(tokens, cursor),
-            signature_help: None,
-        },
-        CompletionLocation::CallArgExprStart { expected, .. } => {
+    match kind {
+        PositionKind::NeedExpr => {
+            let expected = expected_call_arg_ty(call_ctx, ctx);
             let mut items = expr_start_items(ctx);
             if expected.is_some() {
                 apply_type_ranking(&mut items, expected, ctx);
@@ -333,13 +234,16 @@ fn complete_at_location(
                 signature_help: None,
             }
         }
-        CompletionLocation::SeparatorExpected { .. } | CompletionLocation::None => {
-            CompletionOutput {
-                items: Vec::new(),
-                replace: default_replace,
-                signature_help: None,
-            }
-        }
+        PositionKind::AfterAtom => CompletionOutput {
+            items: after_atom_items(),
+            replace: default_replace,
+            signature_help: None,
+        },
+        PositionKind::None => CompletionOutput {
+            items: Vec::new(),
+            replace: default_replace,
+            signature_help: None,
+        },
     }
 }
 
@@ -397,6 +301,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     let mut items = Vec::new();
     if let Some(ctx) = ctx {
         items.extend(prop_variable_items(ctx));
+        items.extend(builtin_expr_start_items());
         items.extend(ctx.functions.iter().map(|func| {
             let detail = func.detail.clone().or_else(|| {
                 Some(format!(
@@ -421,46 +326,50 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
                 }),
             }
         }));
+    } else {
+        items.extend(builtin_expr_start_items());
     }
-    items.extend(vec![
-        CompletionItem {
-            label: "true".to_string(),
-            kind: CompletionKind::Keyword,
-            insert_text: "true".to_string(),
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: None,
-            is_disabled: false,
-            disabled_reason: None,
-            data: None,
-        },
-        CompletionItem {
-            label: "false".to_string(),
-            kind: CompletionKind::Keyword,
-            insert_text: "false".to_string(),
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: None,
-            is_disabled: false,
-            disabled_reason: None,
-            data: None,
-        },
-        CompletionItem {
-            label: "(".to_string(),
-            kind: CompletionKind::Operator,
-            insert_text: "(".to_string(),
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: None,
-            is_disabled: false,
-            disabled_reason: None,
-            data: None,
-        },
-    ]);
     items
+}
+
+fn builtin_expr_start_items() -> Vec<CompletionItem> {
+    [
+        ("not", "not"),
+        ("true", "true"),
+        ("false", "false"),
+    ]
+    .into_iter()
+    .map(|(label, insert_text)| CompletionItem {
+        label: label.to_string(),
+        kind: CompletionKind::Builtin,
+        insert_text: insert_text.to_string(),
+        primary_edit: None,
+        cursor: None,
+        additional_edits: Vec::new(),
+        detail: None,
+        is_disabled: false,
+        disabled_reason: None,
+        data: None,
+    })
+    .collect()
+}
+
+fn after_atom_items() -> Vec<CompletionItem> {
+    const OPS: [&str; 10] = ["==", "!=", ">=", ">", "<=", "<", "+", "-", "*", "/"];
+    OPS.into_iter()
+        .map(|op| CompletionItem {
+            label: op.to_string(),
+            kind: CompletionKind::Operator,
+            insert_text: op.to_string(),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
+            detail: None,
+            is_disabled: false,
+            disabled_reason: None,
+            data: None,
+        })
+        .collect()
 }
 
 fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
@@ -563,8 +472,9 @@ fn compute_signature_help_if_in_call(
     tokens: &[Token],
     cursor: u32,
     ctx: Option<&semantic::Context>,
+    call_ctx: Option<&CallContext>,
 ) -> Option<SignatureHelp> {
-    let call_ctx = detect_call_context(tokens, cursor)?;
+    let call_ctx = call_ctx?;
     let lparen_token = tokens.get(call_ctx.lparen_idx)?;
 
     // Only show signature help if cursor is after the '(' (inside the call)
@@ -645,6 +555,19 @@ fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallContext> {
     })
 }
 
+fn expected_call_arg_ty(
+    call_ctx: Option<&CallContext>,
+    ctx: Option<&semantic::Context>,
+) -> Option<semantic::Ty> {
+    let call_ctx = call_ctx?;
+    let ctx = ctx?;
+    ctx.functions
+        .iter()
+        .find(|func| func.name == call_ctx.callee)
+        .and_then(|func| func.params.get(call_ctx.arg_index))
+        .map(|param| param.ty)
+}
+
 fn apply_type_ranking(
     items: &mut Vec<CompletionItem>,
     expected_ty: Option<semantic::Ty>,
@@ -680,14 +603,13 @@ fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Opt
                 .iter()
                 .find(|func| func.name == *name)
                 .map(|func| func.ret),
-            CompletionData::PropertyName { name } => ctx.lookup(name),
             CompletionData::PropExpr { property_name } => ctx.lookup(property_name),
         };
     }
 
     match item.kind {
-        CompletionKind::Keyword => match item.label.as_str() {
-            "true" | "false" => Some(semantic::Ty::Boolean),
+        CompletionKind::Builtin => match item.label.as_str() {
+            "true" | "false" | "not" => Some(semantic::Ty::Boolean),
             _ => None,
         },
         _ => None,
@@ -752,18 +674,6 @@ fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option<(usize, &T
         }
     }
     prev
-}
-
-fn next_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
-    for (idx, token) in tokens.iter().enumerate() {
-        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
-            continue;
-        }
-        if token.span.start >= cursor {
-            return Some((idx, token));
-        }
-    }
-    None
 }
 
 fn prev_non_trivia_before(tokens: &[Token], idx: usize) -> Option<(usize, &Token)> {

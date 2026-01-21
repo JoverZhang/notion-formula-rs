@@ -231,11 +231,9 @@ fn completion_kind_string(kind: analyzer::CompletionKind) -> &'static str {
     use analyzer::CompletionKind::*;
     match kind {
         Function => "Function",
-        Keyword => "Keyword",
+        Builtin => "Builtin",
         Property => "Property",
         Operator => "Operator",
-        Literal => "Literal",
-        Snippet => "Snippet",
     }
 }
 
