@@ -182,7 +182,7 @@ fn is_prefix_editing_ident(tokens: &[Token], cursor: u32) -> Option<(Span, Strin
 }
 
 fn should_show_expr_start_completions(tokens: &[Token], cursor: u32) -> bool {
-    let prev = prev_non_trivia(tokens, cursor).map(|(_, token)| token);
+    let prev = prev_non_trivia_insertion(tokens, cursor).map(|(_, token)| token);
     is_expr_start_position(prev)
 }
 
@@ -709,6 +709,33 @@ fn type_match_score(expected: semantic::Ty, actual: Option<semantic::Ty>) -> i32
 fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor) {
         if !token.is_trivia() && !matches!(token.kind, TokenKind::Eof) {
+            return Some((idx, token));
+        }
+    }
+
+    let mut prev = None;
+    for (idx, token) in tokens.iter().enumerate() {
+        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+            continue;
+        }
+        if token.span.end <= cursor {
+            prev = Some((idx, token));
+        } else {
+            break;
+        }
+    }
+    prev
+}
+
+/// Like `prev_non_trivia`, but treats a cursor at a token boundary (`cursor == token.span.start`)
+/// as an insertion point *before* that token.
+///
+/// This prevents `)` from being treated as the "previous" token when completing immediately
+/// before a close-paren, while still treating a cursor strictly inside a token as "within" it.
+fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor) {
+        if token.span.start < cursor && !token.is_trivia() && !matches!(token.kind, TokenKind::Eof)
+        {
             return Some((idx, token));
         }
     }

@@ -139,6 +139,31 @@ fn completion_inside_call_arg_after_comma_suggests_expr_start_items() {
 }
 
 #[test]
+fn completion_inside_call_arg_empty_before_close_paren_shows_items() {
+    let c = ctx().props_demo_basic().func_sum().build();
+
+    // Regression: cursor at `)` token start should still be treated as expr-start inside the call.
+    t("sum($0)")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_props(&[Prop::Title])
+        .expect_contains_symbols(&[Symbol::True])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_inside_call_arg_empty_before_close_paren_second_arg_shows_items() {
+    let c = ctx().props_demo_basic().func_if().func_sum().build();
+
+    // Regression: same as above, but for a later argument position in a call.
+    t("if(true, $0)")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_contains_props(&[Prop::Title])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
 fn completion_with_property_prefix() {
     let c = ctx()
         .prop("Title", Ty::String)
