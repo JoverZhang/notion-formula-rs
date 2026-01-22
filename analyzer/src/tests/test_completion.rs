@@ -164,6 +164,37 @@ fn completion_inside_call_arg_at_ident_end_allows_extending_prop_prefix_completi
 }
 
 #[test]
+fn completion_items_disabled_inside_prop_string_literal() {
+    let c = ctx().props_demo_basic().build();
+
+    t(r#"prop("$0")"#)
+        .ctx(c)
+        .expect_empty()
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_items_disabled_inside_plain_string_literal() {
+    let c = ctx().props_demo_basic().func_if().func_sum().build();
+
+    t(r#""abc$0def""#)
+        .ctx(c)
+        .expect_empty()
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_items_disabled_but_signature_help_kept_inside_call_string_arg() {
+    let c = ctx().func_if().build();
+
+    t(r#"if("a$0", 1, 2)"#)
+        .ctx(c)
+        .expect_empty()
+        .expect_sig_active(0)
+        .expect_replace_contains_cursor();
+}
+
+#[test]
 fn completion_inside_call_arg_ident_end_prefix_allows_completions() {
     let c = ctx().props_demo_basic().func_if().func_sum().build();
 

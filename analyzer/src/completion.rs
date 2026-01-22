@@ -1,6 +1,6 @@
 use crate::lexer::lex;
 use crate::semantic;
-use crate::token::{Span, Token, TokenKind};
+use crate::token::{LitKind, Span, Token, TokenKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionOutput {
@@ -102,8 +102,12 @@ pub fn complete_with_context(
     let call_ctx = detect_call_context(tokens.as_slice(), cursor_u32);
     let signature_help =
         compute_signature_help_if_in_call(tokens.as_slice(), cursor_u32, ctx, call_ctx.as_ref());
-    let position_kind =
-        detect_position_kind(tokens.as_slice(), cursor_u32, ctx, call_ctx.as_ref());
+    let in_string = cursor_strictly_inside_string_literal(tokens.as_slice(), cursor_u32);
+    let position_kind = if in_string {
+        PositionKind::None
+    } else {
+        detect_position_kind(tokens.as_slice(), cursor_u32, ctx, call_ctx.as_ref())
+    };
 
     let mut output = complete_for_position(
         position_kind,
@@ -153,6 +157,16 @@ fn is_strictly_inside_ident(tokens: &[Token], cursor: u32) -> bool {
         return false;
     };
     matches!(token.kind, TokenKind::Ident(_)) && token.span.start < cursor && cursor < token.span.end
+}
+
+fn cursor_strictly_inside_string_literal(tokens: &[Token], cursor: u32) -> bool {
+    let Some((_, token)) = token_containing_cursor(tokens, cursor) else {
+        return false;
+    };
+    let TokenKind::Literal(ref lit) = token.kind else {
+        return false;
+    };
+    lit.kind == LitKind::String && token.span.start < cursor && cursor < token.span.end
 }
 
 fn has_extending_ident_prefix(
