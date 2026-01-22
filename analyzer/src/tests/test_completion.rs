@@ -45,10 +45,7 @@ fn completion_after_identifier_shows_after_atom_operators() {
     t("abc$0")
         .no_ctx()
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
         .expect_not_contains(&[Item::Builtin(Builtin::Not), Item::Builtin(Builtin::True)])
         .expect_replace_contains_cursor();
 }
@@ -58,10 +55,7 @@ fn completion_after_complete_atom_shows_after_atom_operators() {
     t(r#"prop("Title")$0"#)
         .no_ctx()
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
         .expect_not_contains(&[Item::Builtin(Builtin::Not), Item::Builtin(Builtin::True)])
         .expect_replace_contains_cursor();
 }
@@ -74,10 +68,7 @@ fn completion_when_expecting_separator_in_call_shows_after_atom_operators() {
         .ctx(c)
         .expect_sig_active(0)
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
         .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
         .expect_not_contains(&[
             Item::Builtin(Builtin::Not),
@@ -95,10 +86,7 @@ fn completion_after_atom_in_call_arg_has_operator_completions() {
         .ctx(c)
         .expect_sig_active(0)
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
         .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
         .expect_not_contains(&[
             Item::Builtin(Builtin::Not),
@@ -116,10 +104,7 @@ fn completion_after_atom_in_call_arg_nested_expr_has_operator_completions() {
         .ctx(c)
         .expect_sig_active(0)
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
         .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
         .expect_replace_contains_cursor();
 }
@@ -131,10 +116,7 @@ fn completion_after_atom_at_toplevel_shows_only_operators() {
     t("1$0")
         .ctx(c)
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
             Item::Func(Func::If),
@@ -417,6 +399,26 @@ fn completion_apply_property_with_prefix() {
         .ctx(c)
         .apply("Title")
         .expect_text(r#"prop("Title")$0"#);
+}
+
+#[test]
+fn completion_apply_property_before_property() {
+    let c = ctx().props_demo_basic().build();
+
+    t(r#"$0prop("Title")"#)
+        .ctx(c)
+        .apply("Age")
+        .expect_text(r#"prop("Age")$0prop("Title")"#);
+}
+
+#[test]
+fn completion_apply_function_before_call() {
+    let c = ctx().func_if().func_sum().build();
+
+    t("$0sum(1,2)")
+        .ctx(c)
+        .apply("if")
+        .expect_text("if($0)sum(1,2)");
 }
 
 #[test]

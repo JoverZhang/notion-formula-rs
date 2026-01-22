@@ -708,9 +708,19 @@ fn is_expr_start_position(prev_token: Option<&Token>) -> bool {
 }
 
 fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span {
-    if let Some((_, token)) = token_containing_cursor(tokens, cursor) {
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor) {
         if matches!(token.kind, TokenKind::Ident(_)) {
-            return token.span;
+            // At an expr-start position, completing before an existing expression should insert
+            // instead of replacing tokens to the right.
+            if cursor == token.span.start {
+                return Span {
+                    start: cursor,
+                    end: cursor,
+                };
+            }
+
+            // If the cursor is actually inside the identifier token, treat it as prefix editing.
+            return tokens[idx].span;
         }
     }
     if let Some((_, token)) = prev_non_trivia(tokens, cursor) {
