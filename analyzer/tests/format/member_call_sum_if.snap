@@ -1,1 +1,4 @@
+=== INPUT ===
+sum(1,2).if(true,3)
+=== OUTPUT ===
 sum(1, 2).if(true, 3)

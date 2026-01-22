@@ -1,4 +1,4 @@
-use analyzer::semantic::Context;
+use analyzer::semantic::{Context, builtins_functions};
 use analyzer::{
     Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind,
     byte_offset_to_utf16,
@@ -77,7 +77,13 @@ struct CompletionOutputView {
 #[wasm_bindgen]
 pub fn analyze(source: String, context_json: Option<String>) -> JsValue {
     let result = match context_json.as_deref().map(str::trim) {
-        None | Some("") => match analyzer::analyze(&source) {
+        None | Some("") => match analyzer::analyze_with_context(
+            &source,
+            Context {
+                properties: vec![],
+                functions: builtins_functions(),
+            },
+        ) {
             Ok(output) => analyze_output(&source, output),
             Err(diag) => AnalyzeResult {
                 diagnostics: vec![diag_to_view(&source, &diag)],
@@ -86,14 +92,17 @@ pub fn analyze(source: String, context_json: Option<String>) -> JsValue {
             },
         },
         Some(context_json) => match serde_json::from_str::<Context>(context_json) {
-            Ok(ctx) => match analyzer::analyze_with_context(&source, ctx) {
-                Ok(output) => analyze_output(&source, output),
-                Err(diag) => AnalyzeResult {
-                    diagnostics: vec![diag_to_view(&source, &diag)],
-                    tokens: Vec::new(),
-                    formatted: String::new(),
-                },
-            },
+            Ok(mut ctx) => {
+                ctx.functions = builtins_functions();
+                match analyzer::analyze_with_context(&source, ctx) {
+                    Ok(output) => analyze_output(&source, output),
+                    Err(diag) => AnalyzeResult {
+                        diagnostics: vec![diag_to_view(&source, &diag)],
+                        tokens: Vec::new(),
+                        formatted: String::new(),
+                    },
+                }
+            }
             Err(_) => {
                 let mut result = match analyzer::analyze(&source) {
                     Ok(output) => analyze_output(&source, output),
@@ -119,7 +128,8 @@ pub fn analyze(source: String, context_json: Option<String>) -> JsValue {
 #[wasm_bindgen]
 pub fn complete(source: String, cursor_utf16: usize, context_json: Option<String>) -> JsValue {
     let cursor_byte = utf16_offset_to_byte(&source, cursor_utf16);
-    let ctx = parse_context(context_json.as_deref());
+    let mut ctx = parse_context(context_json.as_deref());
+    ctx.as_mut().unwrap().functions = builtins_functions();
 
     let output = analyzer::complete_with_context(&source, cursor_byte, ctx.as_ref());
     let view = completion_output_to_view(&source, &output);

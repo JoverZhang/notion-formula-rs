@@ -62,7 +62,7 @@ fn completion_after_atom_shows_operators_and_postfix_methods() {
         ])
         .expect_replace_contains_cursor();
 
-    t("sum(1,2)$0")
+    t("sum(1,2,3)$0")
         .ctx(c.clone())
         .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Symbol(Symbol::DotIf)]);
 
@@ -303,7 +303,7 @@ fn completion_signature_help_active_param_second_arg() {
 fn completion_signature_help_ignores_nested_commas() {
     let c = ctx().func_if().build();
 
-    t("if(true, sum(1,2), $0")
+    t("if(true, sum(1,2,3), $0")
         .ctx(c)
         .expect_sig_active(2)
         .expect_replace_contains_cursor();
@@ -320,6 +320,22 @@ fn completion_type_ranking_number_prefers_number_props() {
     t("sum($0")
         .ctx(c)
         .expect_order("Age", "Title")
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_type_ranking_sum_union_accepts_number_list_props() {
+    let c = ctx()
+        .prop("Title", Ty::String)
+        .prop("Age", Ty::Number)
+        .prop("Nums", Ty::List(Box::new(Ty::Number)))
+        .func_sum()
+        .build();
+
+    t("sum($0")
+        .ctx(c)
+        .expect_order("Age", "Title")
+        .expect_order("Nums", "Title")
         .expect_replace_contains_cursor();
 }
 
@@ -370,6 +386,7 @@ fn completion_type_ranking_unknown_argument_does_not_filter_items() {
             name: None,
             ty: Ty::Unknown,
             optional: false,
+            variadic: false,
         })
         .ret(Ty::Unknown)
         .finish()
@@ -442,10 +459,10 @@ fn completion_apply_property_before_property() {
 fn completion_apply_function_before_call() {
     let c = ctx().func_if().func_sum().build();
 
-    t("$0sum(1,2)")
+    t("$0sum(1,2,3)")
         .ctx(c)
         .apply("if")
-        .expect_text("if($0)sum(1,2)");
+        .expect_text("if($0)sum(1,2,3)");
 }
 
 #[test]
@@ -457,10 +474,10 @@ fn completion_apply_postfix_if_inserts_parens_and_moves_cursor_inside() {
         .apply(".if")
         .expect_text("(1+1).if($0)");
 
-    t("sum(1,2)$0")
+    t("sum(1,2,3)$0")
         .ctx(c)
         .apply(".if")
-        .expect_text("sum(1,2).if($0)");
+        .expect_text("sum(1,2,3).if($0)");
 }
 
 #[test]
@@ -518,4 +535,12 @@ fn signature_help_only_inside_call() {
 
     // Signature help appears after opening paren
     t("if($0").ctx(c).expect_sig_active(0);
+}
+
+#[test]
+fn signature_help_label_sum_union_variadic() {
+    let c = ctx().func_sum().build();
+    t("sum($0")
+        .ctx(c)
+        .expect_sig_label("sum(values: number | number[], ...) -> number");
 }

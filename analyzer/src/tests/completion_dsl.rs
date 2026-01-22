@@ -258,6 +258,7 @@ impl ContextBuilder {
             params: Vec::new(),
             ret: Ty::Unknown,
             detail: None,
+            min_args: 0,
         }
     }
 
@@ -268,16 +269,19 @@ impl ContextBuilder {
                     name: Some("condition".into()),
                     ty: Ty::Boolean,
                     optional: false,
+                    variadic: false,
                 },
                 ParamSig {
                     name: Some("then".into()),
                     ty: Ty::Unknown,
                     optional: false,
+                    variadic: false,
                 },
                 ParamSig {
                     name: Some("else".into()),
                     ty: Ty::Unknown,
                     optional: false,
+                    variadic: false,
                 },
             ])
             .ret(Ty::Unknown)
@@ -286,24 +290,14 @@ impl ContextBuilder {
 
     pub fn func_sum(self) -> ContextBuilder {
         self.func("sum")
-            .params([
-                ParamSig {
-                    name: None,
-                    ty: Ty::Number,
-                    optional: false,
-                },
-                ParamSig {
-                    name: None,
-                    ty: Ty::Number,
-                    optional: false,
-                },
-                ParamSig {
-                    name: None,
-                    ty: Ty::Number,
-                    optional: false,
-                },
-            ])
+            .param(ParamSig {
+                name: Some("values".into()),
+                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
+                optional: false,
+                variadic: true,
+            })
             .ret(Ty::Number)
+            .min_args(1)
             .finish()
     }
 
@@ -321,6 +315,7 @@ pub struct FuncBuilder {
     params: Vec<ParamSig>,
     ret: Ty,
     detail: Option<String>,
+    min_args: usize,
 }
 
 impl FuncBuilder {
@@ -339,6 +334,11 @@ impl FuncBuilder {
         self
     }
 
+    pub fn min_args(mut self, min_args: usize) -> Self {
+        self.min_args = min_args;
+        self
+    }
+
     #[allow(dead_code)]
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
@@ -351,6 +351,7 @@ impl FuncBuilder {
             params: self.params,
             ret: self.ret,
             detail: self.detail.take(),
+            min_args: self.min_args,
         });
         self.parent
     }
@@ -639,6 +640,16 @@ impl CompletionTestBuilder {
             .as_ref()
             .expect("expected signature help");
         assert_eq!(sig.active_param, active_param);
+        self
+    }
+
+    pub fn expect_sig_label(mut self, label: &str) -> Self {
+        let out = self.ensure_run();
+        let sig = out
+            .signature_help
+            .as_ref()
+            .expect("expected signature help");
+        assert_eq!(sig.label, label);
         self
     }
 

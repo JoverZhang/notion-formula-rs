@@ -3,7 +3,7 @@ use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::token::{LitKind, Span};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum Ty {
     Number,
@@ -12,6 +12,19 @@ pub enum Ty {
     Date,
     Null,
     Unknown,
+    List(Box<Ty>),
+    Union(Vec<Ty>),
+}
+
+pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
+    if matches!(expected, Ty::Unknown) || matches!(actual, Ty::Unknown) {
+        return true;
+    }
+    match (expected, actual) {
+        (Ty::Union(branches), actual) => branches.iter().any(|t| ty_accepts(t, actual)),
+        (Ty::List(e), Ty::List(a)) => ty_accepts(e, a),
+        _ => expected == actual,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,6 +33,8 @@ pub struct FunctionSig {
     pub params: Vec<ParamSig>,
     pub ret: Ty,
     pub detail: Option<String>,
+    #[serde(default)]
+    pub min_args: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,6 +42,8 @@ pub struct ParamSig {
     pub name: Option<String>,
     pub ty: Ty,
     pub optional: bool,
+    #[serde(default)]
+    pub variadic: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,10 +54,88 @@ pub struct Property {
     pub disabled_reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Context {
     pub properties: Vec<Property>,
     pub functions: Vec<FunctionSig>,
+}
+
+impl FunctionSig {
+    pub fn is_variadic(&self) -> bool {
+        self.params.last().is_some_and(|p| p.variadic)
+    }
+
+    pub fn fixed_params_len(&self) -> usize {
+        if self.is_variadic() {
+            self.params.len().saturating_sub(1)
+        } else {
+            self.params.len()
+        }
+    }
+
+    pub fn effective_min_args(&self) -> usize {
+        if self.min_args > 0 {
+            return self.min_args;
+        }
+        if self.is_variadic() {
+            self.fixed_params_len()
+        } else {
+            self.params.len()
+        }
+    }
+
+    pub fn param_for_arg_index(&self, idx: usize) -> Option<&ParamSig> {
+        if idx < self.params.len() {
+            return self.params.get(idx);
+        }
+        if self.is_variadic() {
+            return self.params.last();
+        }
+        None
+    }
+}
+
+pub fn builtins_functions() -> Vec<FunctionSig> {
+    vec![
+        FunctionSig {
+            name: "if".into(),
+            params: vec![
+                ParamSig {
+                    name: Some("condition".into()),
+                    ty: Ty::Boolean,
+                    optional: false,
+                    variadic: false,
+                },
+                ParamSig {
+                    name: Some("then".into()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                    variadic: false,
+                },
+                ParamSig {
+                    name: Some("else".into()),
+                    ty: Ty::Unknown,
+                    optional: false,
+                    variadic: false,
+                },
+            ],
+            ret: Ty::Unknown,
+            detail: Some("if(condition, then, else)".into()),
+            min_args: 0,
+        },
+        FunctionSig {
+            name: "sum".into(),
+            params: vec![ParamSig {
+                name: Some("values".into()),
+                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
+                optional: false,
+                variadic: true,
+            }],
+            ret: Ty::Number,
+            detail: Some("sum(number|number[], ...)".into()),
+            min_args: 1,
+        },
+    ]
 }
 
 impl Context {
@@ -48,7 +143,7 @@ impl Context {
         self.properties
             .iter()
             .find(|p| p.name == name)
-            .map(|p| p.ty)
+            .map(|p| p.ty.clone())
     }
 }
 
@@ -174,36 +269,81 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
 
                 match name {
                     "if" => analyze_if(expr, args, ctx, diags),
-                    "sum" => analyze_sum(expr, args, ctx, diags),
-                    _ => {
-                        let mut arg_tys = Vec::with_capacity(args.len());
-                        for arg in args {
-                            arg_tys.push(analyze_expr_inner(arg, ctx, diags));
-                        }
-
-                        for (idx, (arg, ty)) in args.iter().zip(arg_tys.iter()).enumerate() {
-                            let Some(param) = sig.params.get(idx) else {
-                                continue;
-                            };
-                            if param.ty != Ty::Unknown && *ty != Ty::Unknown && param.ty != *ty {
-                                emit_error(
-                                    diags,
-                                    arg.span,
-                                    format!(
-                                        "argument type mismatch: expected {:?}, got {:?}",
-                                        param.ty, ty
-                                    ),
-                                );
-                            }
-                        }
-
-                        sig.ret
-                    }
+                    _ => analyze_call(expr, sig, args, ctx, diags),
                 }
             }
         },
         ExprKind::Error => Ty::Unknown,
     }
+}
+
+fn analyze_call(
+    expr: &Expr,
+    sig: &FunctionSig,
+    args: &[Expr],
+    ctx: &Context,
+    diags: &mut Vec<Diagnostic>,
+) -> Ty {
+    debug_assert!(
+        sig.params
+            .iter()
+            .take(sig.params.len().saturating_sub(1))
+            .all(|p| !p.variadic),
+        "only the last param may be variadic"
+    );
+
+    let mut arg_tys = Vec::with_capacity(args.len());
+    for arg in args {
+        arg_tys.push(analyze_expr_inner(arg, ctx, diags));
+    }
+
+    if sig.is_variadic() {
+        let required = sig.effective_min_args().max(sig.fixed_params_len());
+        if args.len() < required {
+            let plural = if required == 1 { "" } else { "s" };
+            emit_error(
+                diags,
+                expr.span,
+                format!(
+                    "{}() expects at least {} argument{}",
+                    sig.name, required, plural
+                ),
+            );
+        }
+    } else if args.len() != sig.params.len() {
+        let expected = sig.params.len();
+        let plural = if expected == 1 { "" } else { "s" };
+        emit_error(
+            diags,
+            expr.span,
+            format!(
+                "{}() expects exactly {} argument{}",
+                sig.name, expected, plural
+            ),
+        );
+    }
+
+    for (idx, (arg, ty)) in args.iter().zip(arg_tys.iter()).enumerate() {
+        let Some(param) = sig.param_for_arg_index(idx) else {
+            continue;
+        };
+        if !ty_accepts(&param.ty, ty) {
+            if sig.name == "sum" {
+                emit_error(diags, arg.span, "sum() expects number arguments");
+            } else {
+                emit_error(
+                    diags,
+                    arg.span,
+                    format!(
+                        "argument type mismatch: expected {:?}, got {:?}",
+                        param.ty, ty
+                    ),
+                );
+            }
+        }
+    }
+
+    sig.ret.clone()
 }
 
 fn analyze_prop(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnostic>) -> Ty {
@@ -252,26 +392,6 @@ fn analyze_if(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnos
     }
 
     join_types(then_ty, otherwise_ty)
-}
-
-fn analyze_sum(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnostic>) -> Ty {
-    if args.is_empty() {
-        emit_error(diags, expr.span, "sum() expects at least 1 argument");
-        return Ty::Number;
-    }
-
-    let mut arg_tys = Vec::with_capacity(args.len());
-    for arg in args {
-        arg_tys.push(analyze_expr_inner(arg, ctx, diags));
-    }
-
-    for (arg, ty) in args.iter().zip(arg_tys.iter()) {
-        if *ty != Ty::Unknown && *ty != Ty::Number {
-            emit_error(diags, arg.span, "sum() expects number arguments");
-        }
-    }
-
-    Ty::Number
 }
 
 fn join_types(a: Ty, b: Ty) -> Ty {

@@ -328,7 +328,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
                     "{}({}) -> {}",
                     func.name,
                     format_param_list(&func.params),
-                    format_ty(func.ret)
+                    format_ty(&func.ret)
                 ))
             });
             CompletionItem {
@@ -450,7 +450,7 @@ fn format_param_list(params: &[semantic::ParamSig]) -> String {
     params
         .iter()
         .map(|param| {
-            let mut label = format_ty(param.ty).to_string();
+            let mut label = format_ty(&param.ty);
             if param.optional {
                 label.push('?');
             }
@@ -460,25 +460,20 @@ fn format_param_list(params: &[semantic::ParamSig]) -> String {
         .join(", ")
 }
 
-fn format_ty(ty: semantic::Ty) -> &'static str {
+fn format_ty(ty: &semantic::Ty) -> String {
     match ty {
-        semantic::Ty::Number => "number",
-        semantic::Ty::String => "string",
-        semantic::Ty::Boolean => "boolean",
-        semantic::Ty::Date => "date",
-        semantic::Ty::Null => "null",
-        semantic::Ty::Unknown => "unknown",
-    }
-}
-
-fn ty_name(ty: semantic::Ty) -> &'static str {
-    match ty {
-        semantic::Ty::Number => "Number",
-        semantic::Ty::String => "String",
-        semantic::Ty::Boolean => "Boolean",
-        semantic::Ty::Date => "Date",
-        semantic::Ty::Null => "Null",
-        semantic::Ty::Unknown => "Any",
+        semantic::Ty::Number => "number".into(),
+        semantic::Ty::String => "string".into(),
+        semantic::Ty::Boolean => "boolean".into(),
+        semantic::Ty::Date => "date".into(),
+        semantic::Ty::Null => "null".into(),
+        semantic::Ty::Unknown => "unknown".into(),
+        semantic::Ty::List(inner) => format!("{}[]", format_ty(inner)),
+        semantic::Ty::Union(types) => types
+            .iter()
+            .map(format_ty)
+            .collect::<Vec<_>>()
+            .join(" | "),
     }
 }
 
@@ -487,7 +482,7 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
         .params
         .iter()
         .map(|param| {
-            let mut ty = ty_name(param.ty).to_string();
+            let mut ty = format_ty(&param.ty);
             if param.optional {
                 ty.push('?');
             }
@@ -498,11 +493,18 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
             }
         })
         .collect::<Vec<_>>();
+    let mut label_params = params.join(", ");
+    if sig.is_variadic() {
+        if !label_params.is_empty() {
+            label_params.push_str(", ");
+        }
+        label_params.push_str("...");
+    }
     let label = format!(
         "{}({}) -> {}",
         sig.name,
-        params.join(", "),
-        ty_name(sig.ret)
+        label_params,
+        format_ty(&sig.ret)
     );
     (label, params)
 }
@@ -605,8 +607,8 @@ fn expected_call_arg_ty(
     ctx.functions
         .iter()
         .find(|func| func.name == call_ctx.callee)
-        .and_then(|func| func.params.get(call_ctx.arg_index))
-        .map(|param| param.ty)
+        .and_then(|func| func.param_for_arg_index(call_ctx.arg_index))
+        .map(|param| param.ty.clone())
 }
 
 fn apply_type_ranking(
@@ -623,7 +625,7 @@ fn apply_type_ranking(
         .enumerate()
         .map(|(idx, item)| {
             let actual = item_result_ty(&item, ctx);
-            let score = type_match_score(expected_ty, actual);
+            let score = type_match_score(expected_ty.clone(), actual);
             (idx, item, score)
         })
         .collect::<Vec<_>>();
@@ -643,7 +645,7 @@ fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Opt
                 .functions
                 .iter()
                 .find(|func| func.name == *name)
-                .map(|func| func.ret),
+                .map(|func| func.ret.clone()),
             CompletionData::PropExpr { property_name } => ctx.lookup(property_name),
             CompletionData::PostfixMethod { .. } => None,
         };
@@ -659,12 +661,12 @@ fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Opt
 }
 
 fn type_match_score(expected: semantic::Ty, actual: Option<semantic::Ty>) -> i32 {
-    if expected == semantic::Ty::Unknown {
+    if matches!(expected, semantic::Ty::Unknown) {
         return 1;
     }
     match actual {
-        Some(actual_ty) if actual_ty == semantic::Ty::Unknown => 0,
-        Some(actual_ty) if actual_ty == expected => 2,
+        Some(actual_ty) if matches!(actual_ty, semantic::Ty::Unknown) => 0,
+        Some(actual_ty) if semantic::ty_accepts(&expected, &actual_ty) => 2,
         Some(_) => -1,
         None => 0,
     }

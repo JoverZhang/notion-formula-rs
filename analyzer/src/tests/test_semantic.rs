@@ -18,8 +18,11 @@ fn assert_single_diag(diags: Vec<crate::Diagnostic>, message: &str, span: Span) 
     assert_eq!(diags[0].span, span);
 }
 
-fn ctx_with_if() -> Context {
-    let mut ctx = Context::default();
+fn ctx_with_builtins() -> Context {
+    let mut ctx = Context {
+        properties: vec![],
+        functions: vec![],
+    };
     ctx.functions.push(crate::semantic::FunctionSig {
         name: "if".into(),
         params: vec![
@@ -27,68 +30,55 @@ fn ctx_with_if() -> Context {
                 name: Some("condition".into()),
                 ty: Ty::Boolean,
                 optional: false,
+                variadic: false,
             },
             crate::semantic::ParamSig {
                 name: Some("then".into()),
                 ty: Ty::Unknown,
                 optional: false,
+                variadic: false,
             },
             crate::semantic::ParamSig {
                 name: Some("else".into()),
                 ty: Ty::Unknown,
                 optional: false,
+                variadic: false,
             },
         ],
         ret: Ty::Unknown,
         detail: None,
+        min_args: 0,
     });
-    ctx
-}
-
-fn ctx_with_sum() -> Context {
-    let mut ctx = Context::default();
     ctx.functions.push(crate::semantic::FunctionSig {
         name: "sum".into(),
-        params: vec![
-            crate::semantic::ParamSig {
-                name: None,
-                ty: Ty::Number,
-                optional: false,
-            },
-            crate::semantic::ParamSig {
-                name: None,
-                ty: Ty::Number,
-                optional: false,
-            },
-            crate::semantic::ParamSig {
-                name: None,
-                ty: Ty::Number,
-                optional: false,
-            },
-        ],
+        params: vec![crate::semantic::ParamSig {
+            name: Some("values".into()),
+            ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
+            optional: false,
+            variadic: true,
+        }],
         ret: Ty::Number,
         detail: None,
+        min_args: 1,
     });
     ctx
 }
 
 #[test]
 fn test_prop_ok() {
-    let ctx = Context {
-        properties: vec![Property {
-            name: "Title".into(),
-            ty: Ty::String,
-            disabled_reason: None,
-        }],
-        functions: vec![],
-    };
+    let mut ctx = ctx_with_builtins();
+    ctx.properties.push(Property {
+        name: "Title".into(),
+        ty: Ty::String,
+        disabled_reason: None,
+    });
     let diags = run_semantic("prop(\"Title\")", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
 }
 
 #[test]
 fn test_prop_missing() {
-    let ctx = Context::default();
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("prop(\"Missing\")", ctx);
     assert_single_diag(
         diags,
@@ -99,7 +89,7 @@ fn test_prop_missing() {
 
 #[test]
 fn test_prop_arg_not_string_literal() {
-    let ctx = Context::default();
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("prop(123)", ctx);
     assert_single_diag(
         diags,
@@ -110,7 +100,7 @@ fn test_prop_arg_not_string_literal() {
 
 #[test]
 fn test_prop_arity() {
-    let ctx = Context::default();
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("prop(\"Title\",\"x\")", ctx);
     assert_single_diag(
         diags,
@@ -121,7 +111,7 @@ fn test_prop_arity() {
 
 #[test]
 fn test_if_ok() {
-    let mut ctx = ctx_with_if();
+    let mut ctx = ctx_with_builtins();
     ctx.properties.push(Property {
         name: "Done".into(),
         ty: Ty::Boolean,
@@ -133,7 +123,7 @@ fn test_if_ok() {
 
 #[test]
 fn test_if_cond_not_bool() {
-    let ctx = ctx_with_if();
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("if(1, 1, 2)", ctx);
     assert_single_diag(
         diags,
@@ -144,15 +134,22 @@ fn test_if_cond_not_bool() {
 
 #[test]
 fn test_sum_ok() {
-    let ctx = ctx_with_sum();
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("sum(1)", ctx);
+    assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
+}
+
+#[test]
+fn test_sum_variadic_ok() {
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("sum(1,2,3)", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
 }
 
 #[test]
 fn test_sum_arg_not_number() {
-    let ctx = ctx_with_sum();
-    let diags = run_semantic("sum(1,\"x\")", ctx);
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("sum(1,\"x\",2)", ctx);
     assert_single_diag(
         diags,
         "sum() expects number arguments",
@@ -162,7 +159,7 @@ fn test_sum_arg_not_number() {
 
 #[test]
 fn test_sum_arity() {
-    let ctx = ctx_with_sum();
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("sum()", ctx);
     assert_single_diag(
         diags,
@@ -173,14 +170,34 @@ fn test_sum_arity() {
 
 #[test]
 fn test_unknown_function_does_not_crash() {
-    let ctx = Context::default();
+    let ctx = ctx_with_builtins();
     let diags = run_semantic("noSuchFn(1)", ctx);
-    assert_single_diag(diags, "unknown function: noSuchFn", Span { start: 0, end: 11 });
+    assert_single_diag(
+        diags,
+        "unknown function: noSuchFn",
+        Span { start: 0, end: 11 },
+    );
 }
 
 #[test]
 fn test_sum_type_mismatch_emits_error() {
-    let ctx = ctx_with_sum();
-    let diags = run_semantic("sum(\"a\", 1, 2)", ctx);
-    assert_single_diag(diags, "sum() expects number arguments", Span { start: 4, end: 7 });
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("sum(\"a\")", ctx);
+    assert_single_diag(
+        diags,
+        "sum() expects number arguments",
+        Span { start: 4, end: 7 },
+    );
+}
+
+#[test]
+fn test_sum_accepts_number_list_property() {
+    let mut ctx = ctx_with_builtins();
+    ctx.properties.push(Property {
+        name: "Nums".into(),
+        ty: Ty::List(Box::new(Ty::Number)),
+        disabled_reason: None,
+    });
+    let diags = run_semantic("sum(prop(\"Nums\"))", ctx);
+    assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
 }
