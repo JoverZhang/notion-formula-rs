@@ -2,7 +2,7 @@ mod common;
 
 use std::path::Path;
 
-use analyzer::semantic::{Context, Property, Ty};
+use analyzer::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
 use analyzer::{analyze, analyze_with_context, format_diagnostics};
 use common::golden::run_golden_dir;
 
@@ -26,7 +26,52 @@ fn diagnostics_golden() {
                         ty: Ty::String,
                         disabled_reason: None,
                     }],
-                    functions: vec![],
+                    functions: vec![
+                        FunctionSig {
+                            name: "if".into(),
+                            params: vec![
+                                ParamSig {
+                                    name: Some("condition".into()),
+                                    ty: Ty::Boolean,
+                                    optional: false,
+                                },
+                                ParamSig {
+                                    name: Some("then".into()),
+                                    ty: Ty::Unknown,
+                                    optional: false,
+                                },
+                                ParamSig {
+                                    name: Some("else".into()),
+                                    ty: Ty::Unknown,
+                                    optional: false,
+                                },
+                            ],
+                            ret: Ty::Unknown,
+                            detail: None,
+                        },
+                        FunctionSig {
+                            name: "sum".into(),
+                            params: vec![
+                                ParamSig {
+                                    name: None,
+                                    ty: Ty::Number,
+                                    optional: false,
+                                },
+                                ParamSig {
+                                    name: None,
+                                    ty: Ty::Number,
+                                    optional: false,
+                                },
+                                ParamSig {
+                                    name: None,
+                                    ty: Ty::Number,
+                                    optional: false,
+                                },
+                            ],
+                            ret: Ty::Number,
+                            detail: None,
+                        },
+                    ],
                 };
                 analyze_with_context(source, ctx)
                     .expect("analyze_with_context() should return ParseOutput")

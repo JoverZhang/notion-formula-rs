@@ -58,6 +58,10 @@ pub fn analyze_expr(expr: &Expr, ctx: &Context) -> (Ty, Vec<Diagnostic>) {
     (ty, diags)
 }
 
+fn lookup_function<'a>(ctx: &'a Context, name: &str) -> Option<&'a FunctionSig> {
+    ctx.functions.iter().find(|f| f.name == name)
+}
+
 fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -> Ty {
     match &expr.kind {
         ExprKind::Lit(lit) => match lit.kind {
@@ -75,10 +79,19 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
             // Phase 8: minimal typing. For `.if(cond, otherwise)` we treat it like:
             // `if(cond, receiver, otherwise)` for inference/diagnostics only.
             if method.text == "if" && args.len() == 2 {
+                if lookup_function(ctx, "if").is_none() {
+                    let _ = analyze_expr_inner(receiver, ctx, diags);
+                    for arg in args {
+                        let _ = analyze_expr_inner(arg, ctx, diags);
+                    }
+                    emit_error(diags, expr.span, "unknown function: if");
+                    return Ty::Unknown;
+                }
+
                 let cond_ty = analyze_expr_inner(&args[0], ctx, diags);
                 let then_ty = analyze_expr_inner(receiver, ctx, diags);
                 let otherwise_ty = analyze_expr_inner(&args[1], ctx, diags);
-                if cond_ty != Ty::Boolean {
+                if cond_ty != Ty::Unknown && cond_ty != Ty::Boolean {
                     emit_error(diags, args[0].span, "if() condition must be boolean");
                 }
                 join_types(then_ty, otherwise_ty)
@@ -150,13 +163,43 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
         }
         ExprKind::Call { callee, args } => match callee.text.as_str() {
             "prop" => analyze_prop(expr, args, ctx, diags),
-            "if" => analyze_if(expr, args, ctx, diags),
-            "sum" => analyze_sum(expr, args, ctx, diags),
-            _ => {
-                for arg in args {
-                    let _ = analyze_expr_inner(arg, ctx, diags);
+            name => {
+                let Some(sig) = lookup_function(ctx, name) else {
+                    for arg in args {
+                        let _ = analyze_expr_inner(arg, ctx, diags);
+                    }
+                    emit_error(diags, expr.span, format!("unknown function: {}", name));
+                    return Ty::Unknown;
+                };
+
+                match name {
+                    "if" => analyze_if(expr, args, ctx, diags),
+                    "sum" => analyze_sum(expr, args, ctx, diags),
+                    _ => {
+                        let mut arg_tys = Vec::with_capacity(args.len());
+                        for arg in args {
+                            arg_tys.push(analyze_expr_inner(arg, ctx, diags));
+                        }
+
+                        for (idx, (arg, ty)) in args.iter().zip(arg_tys.iter()).enumerate() {
+                            let Some(param) = sig.params.get(idx) else {
+                                continue;
+                            };
+                            if param.ty != Ty::Unknown && *ty != Ty::Unknown && param.ty != *ty {
+                                emit_error(
+                                    diags,
+                                    arg.span,
+                                    format!(
+                                        "argument type mismatch: expected {:?}, got {:?}",
+                                        param.ty, ty
+                                    ),
+                                );
+                            }
+                        }
+
+                        sig.ret
+                    }
                 }
-                Ty::Unknown
             }
         },
         ExprKind::Error => Ty::Unknown,
@@ -204,7 +247,7 @@ fn analyze_if(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnos
     let then_ty = analyze_expr_inner(&args[1], ctx, diags);
     let otherwise_ty = analyze_expr_inner(&args[2], ctx, diags);
 
-    if cond_ty != Ty::Boolean {
+    if cond_ty != Ty::Unknown && cond_ty != Ty::Boolean {
         emit_error(diags, args[0].span, "if() condition must be boolean");
     }
 
@@ -223,7 +266,7 @@ fn analyze_sum(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagno
     }
 
     for (arg, ty) in args.iter().zip(arg_tys.iter()) {
-        if *ty != Ty::Number {
+        if *ty != Ty::Unknown && *ty != Ty::Number {
             emit_error(diags, arg.span, "sum() expects number arguments");
         }
     }

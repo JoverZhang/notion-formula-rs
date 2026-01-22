@@ -123,7 +123,9 @@ impl Symbol {
 
     pub fn data(&self) -> Option<CompletionData> {
         match self {
-            Symbol::DotIf => Some(CompletionData::PostfixIf),
+            Symbol::DotIf => Some(CompletionData::PostfixMethod {
+                name: "if".to_string(),
+            }),
         }
     }
 }
@@ -284,11 +286,23 @@ impl ContextBuilder {
 
     pub fn func_sum(self) -> ContextBuilder {
         self.func("sum")
-            .params([ParamSig {
-                name: None,
-                ty: Ty::Number,
-                optional: false,
-            }])
+            .params([
+                ParamSig {
+                    name: None,
+                    ty: Ty::Number,
+                    optional: false,
+                },
+                ParamSig {
+                    name: None,
+                    ty: Ty::Number,
+                    optional: false,
+                },
+                ParamSig {
+                    name: None,
+                    ty: Ty::Number,
+                    optional: false,
+                },
+            ])
             .ret(Ty::Number)
             .finish()
     }

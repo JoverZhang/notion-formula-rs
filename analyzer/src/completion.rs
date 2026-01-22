@@ -41,7 +41,7 @@ pub enum CompletionKind {
 pub enum CompletionData {
     Function { name: String },
     PropExpr { property_name: String },
-    PostfixIf,
+    PostfixMethod { name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -250,7 +250,7 @@ fn complete_for_position(
             }
         }
         PositionKind::AfterAtom => CompletionOutput {
-            items: after_atom_items(),
+            items: after_atom_items(ctx),
             replace: default_replace,
             signature_help: None,
         },
@@ -307,7 +307,7 @@ fn attach_primary_edits(
                         .saturating_add(item.insert_text.len() as u32),
                 )
             }
-            Some(CompletionData::PostfixIf) => item.insert_text.find('(').map(|idx| {
+            Some(CompletionData::PostfixMethod { .. }) => item.insert_text.find('(').map(|idx| {
                 output_replace
                     .start
                     .saturating_add((idx as u32).saturating_add(1))
@@ -374,19 +374,43 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
     .collect()
 }
 
-fn after_atom_items() -> Vec<CompletionItem> {
-    vec![CompletionItem {
-        label: ".if".to_string(),
+fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
+    const OPS: [&str; 10] = ["==", "!=", ">=", ">", "<=", "<", "+", "-", "*", "/"];
+
+    let mut items = Vec::new();
+    items.extend(OPS.into_iter().map(|op| CompletionItem {
+        label: op.to_string(),
         kind: CompletionKind::Operator,
-        insert_text: ".if()".to_string(),
+        insert_text: op.to_string(),
         primary_edit: None,
         cursor: None,
         additional_edits: Vec::new(),
         detail: None,
         is_disabled: false,
         disabled_reason: None,
-        data: Some(CompletionData::PostfixIf),
-    }]
+        data: None,
+    }));
+
+    if let Some(ctx) = ctx {
+        if ctx.functions.iter().any(|f| f.name == "if") {
+            items.push(CompletionItem {
+                label: ".if".to_string(),
+                kind: CompletionKind::Operator,
+                insert_text: ".if()".to_string(),
+                primary_edit: None,
+                cursor: None,
+                additional_edits: Vec::new(),
+                detail: None,
+                is_disabled: false,
+                disabled_reason: None,
+                data: Some(CompletionData::PostfixMethod {
+                    name: "if".to_string(),
+                }),
+            });
+        }
+    }
+
+    items
 }
 
 fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
@@ -621,7 +645,7 @@ fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Opt
                 .find(|func| func.name == *name)
                 .map(|func| func.ret),
             CompletionData::PropExpr { property_name } => ctx.lookup(property_name),
-            CompletionData::PostfixIf => None,
+            CompletionData::PostfixMethod { .. } => None,
         };
     }
 

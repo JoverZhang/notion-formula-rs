@@ -18,6 +18,60 @@ fn assert_single_diag(diags: Vec<crate::Diagnostic>, message: &str, span: Span) 
     assert_eq!(diags[0].span, span);
 }
 
+fn ctx_with_if() -> Context {
+    let mut ctx = Context::default();
+    ctx.functions.push(crate::semantic::FunctionSig {
+        name: "if".into(),
+        params: vec![
+            crate::semantic::ParamSig {
+                name: Some("condition".into()),
+                ty: Ty::Boolean,
+                optional: false,
+            },
+            crate::semantic::ParamSig {
+                name: Some("then".into()),
+                ty: Ty::Unknown,
+                optional: false,
+            },
+            crate::semantic::ParamSig {
+                name: Some("else".into()),
+                ty: Ty::Unknown,
+                optional: false,
+            },
+        ],
+        ret: Ty::Unknown,
+        detail: None,
+    });
+    ctx
+}
+
+fn ctx_with_sum() -> Context {
+    let mut ctx = Context::default();
+    ctx.functions.push(crate::semantic::FunctionSig {
+        name: "sum".into(),
+        params: vec![
+            crate::semantic::ParamSig {
+                name: None,
+                ty: Ty::Number,
+                optional: false,
+            },
+            crate::semantic::ParamSig {
+                name: None,
+                ty: Ty::Number,
+                optional: false,
+            },
+            crate::semantic::ParamSig {
+                name: None,
+                ty: Ty::Number,
+                optional: false,
+            },
+        ],
+        ret: Ty::Number,
+        detail: None,
+    });
+    ctx
+}
+
 #[test]
 fn test_prop_ok() {
     let ctx = Context {
@@ -67,21 +121,19 @@ fn test_prop_arity() {
 
 #[test]
 fn test_if_ok() {
-    let ctx = Context {
-        properties: vec![Property {
-            name: "Done".into(),
-            ty: Ty::Boolean,
-            disabled_reason: None,
-        }],
-        functions: vec![],
-    };
+    let mut ctx = ctx_with_if();
+    ctx.properties.push(Property {
+        name: "Done".into(),
+        ty: Ty::Boolean,
+        disabled_reason: None,
+    });
     let diags = run_semantic("if(prop(\"Done\"), 1, 2)", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
 }
 
 #[test]
 fn test_if_cond_not_bool() {
-    let ctx = Context::default();
+    let ctx = ctx_with_if();
     let diags = run_semantic("if(1, 1, 2)", ctx);
     assert_single_diag(
         diags,
@@ -92,14 +144,14 @@ fn test_if_cond_not_bool() {
 
 #[test]
 fn test_sum_ok() {
-    let ctx = Context::default();
+    let ctx = ctx_with_sum();
     let diags = run_semantic("sum(1,2,3)", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
 }
 
 #[test]
 fn test_sum_arg_not_number() {
-    let ctx = Context::default();
+    let ctx = ctx_with_sum();
     let diags = run_semantic("sum(1,\"x\")", ctx);
     assert_single_diag(
         diags,
@@ -110,11 +162,25 @@ fn test_sum_arg_not_number() {
 
 #[test]
 fn test_sum_arity() {
-    let ctx = Context::default();
+    let ctx = ctx_with_sum();
     let diags = run_semantic("sum()", ctx);
     assert_single_diag(
         diags,
         "sum() expects at least 1 argument",
         Span { start: 0, end: 5 },
     );
+}
+
+#[test]
+fn test_unknown_function_does_not_crash() {
+    let ctx = Context::default();
+    let diags = run_semantic("noSuchFn(1)", ctx);
+    assert_single_diag(diags, "unknown function: noSuchFn", Span { start: 0, end: 11 });
+}
+
+#[test]
+fn test_sum_type_mismatch_emits_error() {
+    let ctx = ctx_with_sum();
+    let diags = run_semantic("sum(\"a\", 1, 2)", ctx);
+    assert_single_diag(diags, "sum() expects number arguments", Span { start: 4, end: 7 });
 }
