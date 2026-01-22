@@ -8,7 +8,6 @@ pub enum BinOpKind {
     Ne,
     Ge,
     Gt,
-    Dot,
     AndAnd,
     OrOr,
     Plus,
@@ -45,6 +44,11 @@ pub enum ExprKind {
     },
     Call {
         callee: Symbol,
+        args: Vec<Expr>,
+    },
+    MemberCall {
+        receiver: Box<Expr>,
+        method: Symbol,
         args: Vec<Expr>,
     },
     Lit(Lit),

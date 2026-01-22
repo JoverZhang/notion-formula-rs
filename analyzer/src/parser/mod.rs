@@ -213,7 +213,6 @@ pub fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
         Plus | Minus => (9, 10),
         Star | Slash | Percent => (11, 12),
         Caret => (13, 13),
-        Dot => todo!(),
     }
 }
 

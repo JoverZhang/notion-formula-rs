@@ -67,6 +67,29 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
         },
         ExprKind::Ident(_) => Ty::Unknown,
         ExprKind::Group { inner } => analyze_expr_inner(inner, ctx, diags),
+        ExprKind::MemberCall {
+            receiver,
+            method,
+            args,
+        } => {
+            // Phase 8: minimal typing. For `.if(cond, otherwise)` we treat it like:
+            // `if(cond, receiver, otherwise)` for inference/diagnostics only.
+            if method.text == "if" && args.len() == 2 {
+                let cond_ty = analyze_expr_inner(&args[0], ctx, diags);
+                let then_ty = analyze_expr_inner(receiver, ctx, diags);
+                let otherwise_ty = analyze_expr_inner(&args[1], ctx, diags);
+                if cond_ty != Ty::Boolean {
+                    emit_error(diags, args[0].span, "if() condition must be boolean");
+                }
+                join_types(then_ty, otherwise_ty)
+            } else {
+                let _ = analyze_expr_inner(receiver, ctx, diags);
+                for arg in args {
+                    let _ = analyze_expr_inner(arg, ctx, diags);
+                }
+                Ty::Unknown
+            }
+        }
         ExprKind::Unary { op, expr } => {
             let inner_ty = analyze_expr_inner(expr, ctx, diags);
             match op.node {
@@ -113,7 +136,6 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
                         Ty::Unknown
                     }
                 }
-                Dot => Ty::Unknown,
             }
         }
         ExprKind::Ternary {

@@ -1,6 +1,6 @@
 use crate::completion::CompletionData;
 use crate::semantic::{ParamSig, Ty};
-use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
+use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, Symbol, ctx, t};
 
 #[test]
 fn completion_at_document_start() {
@@ -41,90 +41,34 @@ fn completion_at_document_start_without_properties_has_no_prop_variables() {
 }
 
 #[test]
-fn completion_after_identifier_shows_after_atom_operators() {
-    t("abc$0")
-        .no_ctx()
-        .expect_not_empty()
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_contains(&[Item::Builtin(Builtin::Not), Item::Builtin(Builtin::True)])
-        .expect_replace_contains_cursor();
-}
-
-#[test]
-fn completion_after_complete_atom_shows_after_atom_operators() {
-    t(r#"prop("Title")$0"#)
-        .no_ctx()
-        .expect_not_empty()
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_contains(&[Item::Builtin(Builtin::Not), Item::Builtin(Builtin::True)])
-        .expect_replace_contains_cursor();
-}
-
-#[test]
-fn completion_when_expecting_separator_in_call_shows_after_atom_operators() {
-    let c = ctx().func_if().build();
-
-    t("if(true$0)")
-        .ctx(c)
-        .expect_sig_active(0)
-        .expect_not_empty()
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
-        .expect_not_contains(&[
-            Item::Builtin(Builtin::Not),
-            Item::Builtin(Builtin::True),
-            Item::Builtin(Builtin::False),
-        ])
-        .expect_replace_contains_cursor();
-}
-
-#[test]
-fn completion_after_atom_in_call_arg_has_operator_completions() {
+fn completion_after_atom_shows_postfix_if_only() {
     let c = ctx().props_demo_basic().func_if().func_sum().build();
 
-    t("if(true$0")
-        .ctx(c)
-        .expect_sig_active(0)
+    t("(1+1)$0")
+        .ctx(c.clone())
         .expect_not_empty()
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
-        .expect_not_contains(&[
-            Item::Builtin(Builtin::Not),
-            Item::Builtin(Builtin::True),
-            Item::Builtin(Builtin::False),
-        ])
-        .expect_replace_contains_cursor();
-}
-
-#[test]
-fn completion_after_atom_in_call_arg_nested_expr_has_operator_completions() {
-    let c = ctx().props_demo_basic().func_if().func_sum().build();
-
-    t("if(sum(1,2)$0")
-        .ctx(c)
-        .expect_sig_active(0)
-        .expect_not_empty()
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_contains(&[Item::Func(Func::If), Item::Prop(Prop::Title)])
-        .expect_replace_contains_cursor();
-}
-
-#[test]
-fn completion_after_atom_at_toplevel_shows_only_operators() {
-    let c = ctx().props_demo_basic().func_if().func_sum().build();
-
-    t("1$0")
-        .ctx(c)
-        .expect_not_empty()
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
+        .expect_contains_items(&[Item::Symbol(Symbol::DotIf)])
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
             Item::Func(Func::If),
+            Item::Func(Func::Sum),
             Item::Builtin(Builtin::Not),
             Item::Builtin(Builtin::True),
             Item::Builtin(Builtin::False),
         ])
         .expect_replace_contains_cursor();
+
+    t("sum(1,2)$0")
+        .ctx(c.clone())
+        .expect_contains_items(&[Item::Symbol(Symbol::DotIf)]);
+
+    t("if(true,1,2)$0")
+        .ctx(c.clone())
+        .expect_contains_items(&[Item::Symbol(Symbol::DotIf)]);
+
+    t("true$0")
+        .ctx(c)
+        .expect_contains_items(&[Item::Symbol(Symbol::DotIf)]);
 }
 
 #[test]
@@ -450,6 +394,21 @@ fn completion_apply_function_before_call() {
         .ctx(c)
         .apply("if")
         .expect_text("if($0)sum(1,2)");
+}
+
+#[test]
+fn completion_apply_postfix_if_inserts_parens_and_moves_cursor_inside() {
+    let c = ctx().props_demo_basic().func_if().func_sum().build();
+
+    t("(1+1)$0")
+        .ctx(c.clone())
+        .apply(".if")
+        .expect_text("(1+1).if($0)");
+
+    t("sum(1,2)$0")
+        .ctx(c)
+        .apply(".if")
+        .expect_text("sum(1,2).if($0)");
 }
 
 #[test]

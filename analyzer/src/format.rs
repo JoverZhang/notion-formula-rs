@@ -123,6 +123,26 @@ fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
             s
         }
 
+        ExprKind::MemberCall {
+            receiver,
+            method,
+            args,
+        } => {
+            let mut s = String::new();
+            s.push_str(&format_expr_one_line_with_prec(receiver, 0));
+            s.push('.');
+            s.push_str(&method.text);
+            s.push('(');
+            for (i, a) in args.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                s.push_str(&format_expr_one_line_with_prec(a, 0));
+            }
+            s.push(')');
+            s
+        }
+
         ExprKind::Unary { op, expr: inner } => {
             let op_str = unop_str(op.node);
             let inner = format_expr_one_line_with_prec(inner, prefix_binding_power(op.node));
@@ -231,6 +251,11 @@ impl<'a> Formatter<'a> {
             ExprKind::Call { callee, args } => {
                 self.format_call(expr, indent, parent_prec, &callee.text, args)
             }
+            ExprKind::MemberCall {
+                receiver,
+                method,
+                args,
+            } => self.format_member_call(expr, indent, parent_prec, receiver, &method.text, args),
             ExprKind::Unary { op, expr: inner } => {
                 self.format_unary(expr, indent, parent_prec, op.node, inner)
             }
@@ -489,6 +514,67 @@ impl<'a> Formatter<'a> {
         out
     }
 
+    fn format_member_call(
+        &mut self,
+        expr: &Expr,
+        indent: usize,
+        _parent_prec: u8,
+        receiver: &Expr,
+        method: &str,
+        args: &[Expr],
+    ) -> Rendered {
+        let has_newline = self.expr_has_newline(expr);
+
+        if !has_newline {
+            let saved = self.used_comments.clone();
+
+            if let Some(receiver_inline) = self.format_expr_single_line(receiver, indent, 0) {
+                let mut parts = Vec::new();
+                let mut inline_ok = true;
+                for arg in args {
+                    if let Some(text) = self.format_expr_single_line(arg, indent, 0) {
+                        parts.push(text);
+                    } else {
+                        inline_ok = false;
+                        break;
+                    }
+                }
+
+                if inline_ok {
+                    let text = format!("{}.{}({})", receiver_inline, method, parts.join(", "));
+                    let inline_len = text.len();
+                    if self.fits_on_line(indent, inline_len) && inline_len <= MAX_WIDTH {
+                        return Rendered::single(indent, text);
+                    }
+                }
+            }
+
+            self.used_comments = saved;
+        }
+
+        let mut out = Rendered::default();
+        let receiver_r = self.format_expr_rendered(receiver, indent, 0);
+        out.append(receiver_r);
+        if let Some(last) = out.lines.last_mut() {
+            last.text.push_str(&format!(".{}(", method));
+        } else {
+            out.push_line(indent, format!(".{}(", method));
+        }
+
+        for (idx, arg) in args.iter().enumerate() {
+            let mut arg_r = self.format_expr_rendered(arg, indent + 1, 0);
+            let is_last = idx + 1 == args.len();
+            if !is_last {
+                if let Some(last) = arg_r.lines.last_mut() {
+                    last.text.push(',');
+                }
+            }
+            out.append(arg_r);
+        }
+        out.push_line(indent, ")");
+        out
+    }
+
     fn format_expr_single_line(
         &mut self,
         expr: &Expr,
@@ -518,6 +604,9 @@ impl<'a> Formatter<'a> {
         match &expr.kind {
             ExprKind::Group { inner } => self.expr_has_comments(inner),
             ExprKind::Call { args, .. } => args.iter().any(|a| self.expr_has_comments(a)),
+            ExprKind::MemberCall {
+                receiver, args, ..
+            } => self.expr_has_comments(receiver) || args.iter().any(|a| self.expr_has_comments(a)),
             ExprKind::Unary { expr, .. } => self.expr_has_comments(expr),
             ExprKind::Binary { left, right, .. } => {
                 self.expr_has_comments(left) || self.expr_has_comments(right)
@@ -547,6 +636,17 @@ impl<'a> Formatter<'a> {
             } => {
                 let start = self.expr_span_from_tokens(cond)?.start;
                 let end = self.expr_span_from_tokens(otherwise)?.end;
+                return Some(Span { start, end });
+            }
+            ExprKind::MemberCall {
+                receiver, args, ..
+            } => {
+                let start = self.expr_span_from_tokens(receiver)?.start;
+                let end = args
+                    .iter()
+                    .rev()
+                    .find_map(|a| self.expr_span_from_tokens(a).map(|s| s.end))
+                    .unwrap_or(expr.span.end);
                 return Some(Span { start, end });
             }
             ExprKind::Group { inner } => {
@@ -758,7 +858,6 @@ fn binop_str(op: BinOpKind) -> &'static str {
         Ne => "!=",
         Ge => ">=",
         Gt => ">",
-        Dot => ".",
         AndAnd => "&&",
         OrOr => "||",
         Plus => "+",

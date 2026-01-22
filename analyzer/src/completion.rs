@@ -41,6 +41,7 @@ pub enum CompletionKind {
 pub enum CompletionData {
     Function { name: String },
     PropExpr { property_name: String },
+    PostfixIf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -306,6 +307,11 @@ fn attach_primary_edits(
                         .saturating_add(item.insert_text.len() as u32),
                 )
             }
+            Some(CompletionData::PostfixIf) => item.insert_text.find('(').map(|idx| {
+                output_replace
+                    .start
+                    .saturating_add((idx as u32).saturating_add(1))
+            }),
             _ => None,
         };
     }
@@ -369,21 +375,18 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
 }
 
 fn after_atom_items() -> Vec<CompletionItem> {
-    const OPS: [&str; 10] = ["==", "!=", ">=", ">", "<=", "<", "+", "-", "*", "/"];
-    OPS.into_iter()
-        .map(|op| CompletionItem {
-            label: op.to_string(),
-            kind: CompletionKind::Operator,
-            insert_text: op.to_string(),
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: None,
-            is_disabled: false,
-            disabled_reason: None,
-            data: None,
-        })
-        .collect()
+    vec![CompletionItem {
+        label: ".if".to_string(),
+        kind: CompletionKind::Operator,
+        insert_text: ".if()".to_string(),
+        primary_edit: None,
+        cursor: None,
+        additional_edits: Vec::new(),
+        detail: None,
+        is_disabled: false,
+        disabled_reason: None,
+        data: Some(CompletionData::PostfixIf),
+    }]
 }
 
 fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
@@ -618,6 +621,7 @@ fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Opt
                 .find(|func| func.name == *name)
                 .map(|func| func.ret),
             CompletionData::PropExpr { property_name } => ctx.lookup(property_name),
+            CompletionData::PostfixIf => None,
         };
     }
 

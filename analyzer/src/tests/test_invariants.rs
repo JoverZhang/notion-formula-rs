@@ -40,6 +40,16 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
                 check_invariants(arg, tokens);
             }
         }
+        ExprKind::MemberCall {
+            receiver, args, ..
+        } => {
+            assert_child_range(receiver, expr);
+            check_invariants(receiver, tokens);
+            for arg in args {
+                assert_child_range(arg, expr);
+                check_invariants(arg, tokens);
+            }
+        }
         ExprKind::Unary { expr: inner, .. } => {
             assert_child_range(inner, expr);
             check_invariants(inner, tokens);

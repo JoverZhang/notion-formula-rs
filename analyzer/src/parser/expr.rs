@@ -172,7 +172,7 @@ impl<'a> Parser<'a> {
         // primary: literal / ident / (expr)
         let mut expr = self.parse_primary();
 
-        // postfix: call
+        // postfix: call / member-call
         loop {
             if matches!(self.cur_kind(), TokenKind::OpenParen) {
                 let lparen_idx = self.cur_idx();
@@ -213,6 +213,69 @@ impl<'a> Parser<'a> {
                 expr = self.mk_expr(span, tokens, ExprKind::Call { callee, args });
 
                 let _ = lparen_idx;
+                continue;
+            }
+
+            if matches!(self.cur_kind(), TokenKind::Dot) {
+                self.bump(); // '.'
+
+                let method_tok = match self.expect_ident() {
+                    Ok(tok) => tok,
+                    Err(()) => {
+                        let tokens = self.mk_token_range(expr.tokens.lo, self.cur_idx());
+                        let span = self.span_from_tokens(tokens);
+                        expr = self.mk_expr(span, tokens, ExprKind::Error);
+                        break;
+                    }
+                };
+
+                let method = match method_tok.kind {
+                    TokenKind::Ident(sym) => sym,
+                    _ => unreachable!(),
+                };
+
+                if !matches!(self.cur_kind(), TokenKind::OpenParen) {
+                    self.diagnostics.emit_error(
+                        method_tok.span,
+                        "expected '(' after member name (member access is not supported yet)",
+                    );
+                    let tokens = self.mk_token_range(expr.tokens.lo, self.cur_idx());
+                    let span = self.span_from_tokens(tokens);
+                    expr = self.mk_expr(span, tokens, ExprKind::Error);
+                    break;
+                }
+
+                self.bump(); // '('
+
+                let mut args = Vec::new();
+                if !matches!(self.cur_kind(), TokenKind::CloseParen) {
+                    args.push(self.parse_expr_bp(0));
+                    while matches!(self.cur_kind(), TokenKind::Comma) {
+                        self.bump(); // ','
+                        args.push(self.parse_expr_bp(0));
+                    }
+                }
+
+                if let Err(()) = self.expect_punct(TokenKind::CloseParen, "')'") {
+                    self.recover_to(&[TokenKind::CloseParen, TokenKind::Comma, TokenKind::Eof]);
+                    if matches!(self.cur_kind(), TokenKind::CloseParen) {
+                        self.bump();
+                    }
+                }
+
+                let receiver = expr;
+                let tokens = self.mk_token_range(receiver.tokens.lo, self.cur_idx());
+                let span = self.span_from_tokens(tokens);
+                expr = self.mk_expr(
+                    span,
+                    tokens,
+                    ExprKind::MemberCall {
+                        receiver: Box::new(receiver),
+                        method,
+                        args,
+                    },
+                );
+
                 continue;
             }
 

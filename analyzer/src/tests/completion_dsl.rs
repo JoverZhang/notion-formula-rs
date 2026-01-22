@@ -100,6 +100,35 @@ impl Builtin {
 }
 
 // ----------------------------
+// Symbols (postfix / special syntax)
+// ----------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum Symbol {
+    DotIf,
+}
+
+#[allow(dead_code)]
+impl Symbol {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Symbol::DotIf => ".if",
+        }
+    }
+
+    pub fn kind(&self) -> CompletionKind {
+        CompletionKind::Operator
+    }
+
+    pub fn data(&self) -> Option<CompletionData> {
+        match self {
+            Symbol::DotIf => Some(CompletionData::PostfixIf),
+        }
+    }
+}
+
+// ----------------------------
 // Demo Item (unified enum for all completion items)
 // ----------------------------
 
@@ -108,6 +137,7 @@ pub enum Item {
     Prop(Prop),
     Func(Func),
     Builtin(Builtin),
+    Symbol(Symbol),
 }
 
 impl Item {
@@ -116,6 +146,7 @@ impl Item {
             Item::Prop(p) => p.name().to_string(),
             Item::Func(f) => f.name().to_string(),
             Item::Builtin(b) => b.label().to_string(),
+            Item::Symbol(s) => s.label().to_string(),
         }
     }
 
@@ -133,6 +164,9 @@ impl Item {
             }
             Item::Builtin(b) => {
                 item.label == b.label() && item.kind == b.kind() && item.data.is_none()
+            }
+            Item::Symbol(s) => {
+                item.label == s.label() && item.kind == s.kind() && item.data == s.data()
             }
         }
     }
