@@ -475,10 +475,13 @@ impl<'a> Formatter<'a> {
 
         let mut out = Rendered::default();
         out.push_line(indent, format!("{}(", callee));
-        for arg in args {
+        for (idx, arg) in args.iter().enumerate() {
             let mut arg_r = self.format_expr_rendered(arg, indent + 1, 0);
-            if let Some(last) = arg_r.lines.last_mut() {
-                last.text.push(',');
+            let is_last = idx + 1 == args.len();
+            if !is_last {
+                if let Some(last) = arg_r.lines.last_mut() {
+                    last.text.push(',');
+                }
             }
             out.append(arg_r);
         }
