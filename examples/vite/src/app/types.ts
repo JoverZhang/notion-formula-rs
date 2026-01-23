@@ -1,5 +1,5 @@
-import type { Token } from "../editor_decorations";
 import type { DiagnosticView } from "../analyzer/generated/wasm_dto";
+import type { Token } from "../editor_decorations";
 
 export type FormulaId = "f1" | "f2" | "f3";
 

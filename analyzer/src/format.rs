@@ -604,9 +604,9 @@ impl<'a> Formatter<'a> {
         match &expr.kind {
             ExprKind::Group { inner } => self.expr_has_comments(inner),
             ExprKind::Call { args, .. } => args.iter().any(|a| self.expr_has_comments(a)),
-            ExprKind::MemberCall {
-                receiver, args, ..
-            } => self.expr_has_comments(receiver) || args.iter().any(|a| self.expr_has_comments(a)),
+            ExprKind::MemberCall { receiver, args, .. } => {
+                self.expr_has_comments(receiver) || args.iter().any(|a| self.expr_has_comments(a))
+            }
             ExprKind::Unary { expr, .. } => self.expr_has_comments(expr),
             ExprKind::Binary { left, right, .. } => {
                 self.expr_has_comments(left) || self.expr_has_comments(right)
@@ -638,9 +638,7 @@ impl<'a> Formatter<'a> {
                 let end = self.expr_span_from_tokens(otherwise)?.end;
                 return Some(Span { start, end });
             }
-            ExprKind::MemberCall {
-                receiver, args, ..
-            } => {
+            ExprKind::MemberCall { receiver, args, .. } => {
                 let start = self.expr_span_from_tokens(receiver)?.start;
                 let end = args
                     .iter()

@@ -1,6 +1,5 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-
 import type { TokenView } from "./analyzer/generated/wasm_dto";
 
 export type Token = TokenView;

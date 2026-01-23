@@ -1,4 +1,8 @@
-import type { CompletionItemView, SimpleSpanView, TextEditView } from "../analyzer/generated/wasm_dto";
+import type {
+  CompletionItemView,
+  SimpleSpanView,
+  TextEditView,
+} from "../analyzer/generated/wasm_dto";
 
 export type TextRange = SimpleSpanView;
 

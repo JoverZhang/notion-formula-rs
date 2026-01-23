@@ -40,9 +40,7 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
                 check_invariants(arg, tokens);
             }
         }
-        ExprKind::MemberCall {
-            receiver, args, ..
-        } => {
+        ExprKind::MemberCall { receiver, args, .. } => {
             assert_child_range(receiver, expr);
             check_invariants(receiver, tokens);
             for arg in args {

@@ -157,7 +157,9 @@ fn is_strictly_inside_ident(tokens: &[Token], cursor: u32) -> bool {
     let Some((_, token)) = token_containing_cursor(tokens, cursor) else {
         return false;
     };
-    matches!(token.kind, TokenKind::Ident(_)) && token.span.start < cursor && cursor < token.span.end
+    matches!(token.kind, TokenKind::Ident(_))
+        && token.span.start < cursor
+        && cursor < token.span.end
 }
 
 fn cursor_strictly_inside_string_literal(tokens: &[Token], cursor: u32) -> bool {
@@ -353,25 +355,21 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
 }
 
 fn builtin_expr_start_items() -> Vec<CompletionItem> {
-    [
-        ("not", "not"),
-        ("true", "true"),
-        ("false", "false"),
-    ]
-    .into_iter()
-    .map(|(label, insert_text)| CompletionItem {
-        label: label.to_string(),
-        kind: CompletionKind::Builtin,
-        insert_text: insert_text.to_string(),
-        primary_edit: None,
-        cursor: None,
-        additional_edits: Vec::new(),
-        detail: None,
-        is_disabled: false,
-        disabled_reason: None,
-        data: None,
-    })
-    .collect()
+    [("not", "not"), ("true", "true"), ("false", "false")]
+        .into_iter()
+        .map(|(label, insert_text)| CompletionItem {
+            label: label.to_string(),
+            kind: CompletionKind::Builtin,
+            insert_text: insert_text.to_string(),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
+            detail: None,
+            is_disabled: false,
+            disabled_reason: None,
+            data: None,
+        })
+        .collect()
 }
 
 fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
@@ -469,11 +467,7 @@ fn format_ty(ty: &semantic::Ty) -> String {
         semantic::Ty::Null => "null".into(),
         semantic::Ty::Unknown => "unknown".into(),
         semantic::Ty::List(inner) => format!("{}[]", format_ty(inner)),
-        semantic::Ty::Union(types) => types
-            .iter()
-            .map(format_ty)
-            .collect::<Vec<_>>()
-            .join(" | "),
+        semantic::Ty::Union(types) => types.iter().map(format_ty).collect::<Vec<_>>().join(" | "),
     }
 }
 
@@ -500,12 +494,7 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
         }
         label_params.push_str("...");
     }
-    let label = format!(
-        "{}({}) -> {}",
-        sig.name,
-        label_params,
-        format_ty(&sig.ret)
-    );
+    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
     (label, params)
 }
 

@@ -1,5 +1,4 @@
 import init, * as wasm from "../pkg/analyzer_wasm.js";
-
 import type {
   AnalyzeResult,
   CompletionItemView,
