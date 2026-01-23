@@ -172,7 +172,7 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
             args,
         } => {
             // Phase 8: minimal typing. For `.if(cond, otherwise)` we treat it like:
-            // `if(cond, receiver, otherwise)` for inference/diagnostics only.
+            // `condition.if(then, else)` is treated like `if(condition, then, else)` (receiver is the `condition`).
             if method.text == "if" && args.len() == 2 {
                 if lookup_function(ctx, "if").is_none() {
                     let _ = analyze_expr_inner(receiver, ctx, diags);
@@ -183,11 +183,11 @@ fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -
                     return Ty::Unknown;
                 }
 
-                let cond_ty = analyze_expr_inner(&args[0], ctx, diags);
-                let then_ty = analyze_expr_inner(receiver, ctx, diags);
+                let cond_ty = analyze_expr_inner(receiver, ctx, diags);
+                let then_ty = analyze_expr_inner(&args[0], ctx, diags);
                 let otherwise_ty = analyze_expr_inner(&args[1], ctx, diags);
                 if cond_ty != Ty::Unknown && cond_ty != Ty::Boolean {
-                    emit_error(diags, args[0].span, "if() condition must be boolean");
+                    emit_error(diags, receiver.span, "if() condition must be boolean");
                 }
                 join_types(then_ty, otherwise_ty)
             } else {
