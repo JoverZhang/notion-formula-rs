@@ -29,7 +29,15 @@ fn test_tokens_in_span() {
     // Span that reaches end-of-input does not include EOF for non-empty spans.
     let len = src.len() as u32;
     let r = tokens_in_span(&tokens, Span { start: 0, end: len });
-    assert!(matches!(tokens[r.hi as usize].kind, TokenKind::Eof));
+    let eof_idx = (tokens.len() - 1) as u32;
+    assert_eq!(
+        r.hi, eof_idx,
+        "expected non-empty span to exclude EOF (hi should point at EOF index)"
+    );
+    assert!(
+        matches!(tokens[eof_idx as usize].kind, TokenKind::Eof),
+        "expected EOF token at eof_idx"
+    );
 
     // Trivia inside the queried span is included (intersection-based).
     let src = "a/*c*/+b";

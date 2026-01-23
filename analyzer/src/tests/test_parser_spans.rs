@@ -139,6 +139,10 @@ fn test_parser_spans_error_recovery_in_call_arg_list() {
     assert_eq!(args.len(), 1);
     assert_span(expr, 0, 5);
     assert_span(&args[0], 2, 3);
+    assert!(
+        matches!(args[0].kind, ExprKind::Error),
+        "expected recovery to produce an error expression for the missing argument before ','"
+    );
 }
 
 #[test]
