@@ -6,6 +6,7 @@ mod diagnostics;
 mod format;
 mod lexer;
 mod parser;
+mod range;
 pub mod semantic;
 mod source_map;
 mod tests;

@@ -1,6 +1,9 @@
 pub type NodeId = u32;
 pub type TokenIdx = u32;
 
+#[allow(unused_imports)]
+pub use crate::range::{BytePos, ByteSpan};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
     pub text: String,
@@ -10,6 +13,12 @@ pub struct Symbol {
 pub struct Span {
     pub start: u32,
     pub end: u32,
+}
+
+impl From<Span> for ByteSpan {
+    fn from(span: Span) -> Self {
+        Self::from((span.start, span.end))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,20 +205,22 @@ impl TokenKind {
 /// Tokens:  0:'a' 1:'+' 2:'b'
 /// Span:    [0,1) covers only 'a' (it does NOT include '+')
 /// ```
-pub fn tokens_in_span(tokens: &[Token], span: Span) -> TokenRange {
+pub fn tokens_in_span(tokens: &[Token], span: ByteSpan) -> TokenRange {
     if tokens.is_empty() {
         return TokenRange::new(0, 0);
     }
 
     // Empty spans never intersect any half-open token span.
     // We still return a stable "insertion point" based on `span.start`.
-    if span.start >= span.end {
-        let idx = lower_bound_by_start(tokens, span.start);
+    let start = span.start_u32();
+    let end = span.end_u32();
+    if start >= end {
+        let idx = lower_bound_by_start(tokens, start);
         return TokenRange::new(idx, idx);
     }
 
-    let lo = lower_bound_by_end(tokens, span.start);
-    let hi = lower_bound_by_start(tokens, span.end);
+    let lo = lower_bound_by_end(tokens, start);
+    let hi = lower_bound_by_start(tokens, end);
     TokenRange::new(lo, hi)
 }
 

@@ -5,8 +5,8 @@ use crate::token::{Span, Token, tokens_in_span};
 use crate::tokenstream::TokenCursor;
 
 fn assert_child_range(child: &Expr, parent: &Expr, tokens: &[Token]) {
-    let child_range = tokens_in_span(tokens, child.span);
-    let parent_range = tokens_in_span(tokens, parent.span);
+    let child_range = tokens_in_span(tokens, child.span.into());
+    let parent_range = tokens_in_span(tokens, parent.span.into());
     assert!(
         child_range.lo >= parent_range.lo && child_range.hi <= parent_range.hi,
         "child range not within parent range"
@@ -14,7 +14,7 @@ fn assert_child_range(child: &Expr, parent: &Expr, tokens: &[Token]) {
 }
 
 fn check_invariants(expr: &Expr, tokens: &[Token]) {
-    let range = tokens_in_span(tokens, expr.span);
+    let range = tokens_in_span(tokens, expr.span.into());
     assert!(range.lo < range.hi, "empty token range");
 
     let hi = range.hi as usize;

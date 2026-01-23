@@ -602,7 +602,7 @@ impl<'a> Formatter<'a> {
     /// This is used by comment attachment logic. The range is intersection-based and therefore
     /// may include trivia tokens that lie within the expression span.
     fn expr_token_range(&self, expr: &Expr) -> TokenRange {
-        tokens_in_span(self.tokens, expr.span)
+        tokens_in_span(self.tokens, expr.span.into())
     }
 
     fn expr_has_comments(&self, expr: &Expr) -> bool {
