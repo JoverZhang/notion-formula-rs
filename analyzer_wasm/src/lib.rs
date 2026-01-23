@@ -3,76 +3,13 @@ use analyzer::{
     Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind,
     byte_offset_to_utf16,
 };
-use serde::Serialize;
+pub mod dto;
 use wasm_bindgen::prelude::*;
 
-#[derive(Serialize)]
-struct SpanView {
-    start: usize,
-    end: usize,
-    line: usize,
-    col: usize,
-}
-
-#[derive(Serialize)]
-struct DiagnosticView {
-    kind: String,
-    message: String,
-    span: SpanView,
-}
-
-#[derive(Serialize)]
-struct TokenView {
-    kind: String,
-    text: String,
-    span: SpanView,
-}
-
-#[derive(Serialize)]
-struct AnalyzeResult {
-    diagnostics: Vec<DiagnosticView>,
-    tokens: Vec<TokenView>,
-    formatted: String,
-}
-
-#[derive(Serialize)]
-struct SimpleSpanView {
-    start: usize,
-    end: usize,
-}
-
-#[derive(Serialize)]
-struct TextEditView {
-    range: SimpleSpanView,
-    new_text: String,
-}
-
-#[derive(Serialize)]
-struct SignatureHelpView {
-    label: String,
-    params: Vec<String>,
-    active_param: usize,
-}
-
-#[derive(Serialize)]
-struct CompletionItemView {
-    label: String,
-    kind: String,
-    insert_text: String,
-    primary_edit: Option<TextEditView>,
-    cursor: Option<usize>,
-    additional_edits: Vec<TextEditView>,
-    detail: Option<String>,
-    is_disabled: bool,
-    disabled_reason: Option<String>,
-}
-
-#[derive(Serialize)]
-struct CompletionOutputView {
-    items: Vec<CompletionItemView>,
-    replace: SimpleSpanView,
-    signature_help: Option<SignatureHelpView>,
-}
+use crate::dto::v1::{
+    AnalyzeResult, CompletionItemView, CompletionOutputView, DiagnosticView, SignatureHelpView,
+    SimpleSpanView, SpanView, TextEditView, TokenView,
+};
 
 #[wasm_bindgen]
 pub fn analyze(source: String, context_json: Option<String>) -> JsValue {

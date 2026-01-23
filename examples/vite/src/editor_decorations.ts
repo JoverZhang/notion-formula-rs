@@ -1,16 +1,9 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 
-export type Token = {
-  kind: string;
-  span: {
-    start: number;
-    end: number;
-    line: number;
-    col: number;
-  };
-  text: string;
-};
+import type { TokenView } from "./analyzer/generated/wasm_dto";
+
+export type Token = TokenView;
 
 export type Chip = {
   spanStart: number;

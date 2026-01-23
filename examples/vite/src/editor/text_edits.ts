@@ -1,21 +1,9 @@
-export type TextRange = { start: number; end: number };
+import type { CompletionItemView, SimpleSpanView, TextEditView } from "../analyzer/generated/wasm_dto";
 
-export type TextEdit = {
-  range: TextRange;
-  new_text: string;
-};
+export type TextRange = SimpleSpanView;
 
-export type CompletionItem = {
-  label: string;
-  kind: string;
-  insert_text: string;
-  primary_edit: TextEdit | null;
-  cursor: number | null;
-  additional_edits: TextEdit[];
-  detail: string | null;
-  is_disabled: boolean;
-  disabled_reason: string | null;
-};
+export type TextEdit = TextEditView;
+export type CompletionItem = CompletionItemView;
 
 function compareEditsDesc(a: TextEdit, b: TextEdit): number {
   return b.range.start - a.range.start || b.range.end - a.range.end;

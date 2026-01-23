@@ -1,43 +1,19 @@
-import type { AnalyzerDiagnostic } from "../app/types";
-import type { Token } from "../editor_decorations";
 import init, * as wasm from "../pkg/analyzer_wasm.js";
 
-export type AnalyzeResult = {
-  diagnostics: AnalyzerDiagnostic[];
-  tokens: Token[];
-  formatted: string;
-};
+import type {
+  AnalyzeResult,
+  CompletionItemView,
+  CompletionOutputView,
+  SignatureHelpView,
+  SimpleSpanView,
+  TextEditView,
+} from "./generated/wasm_dto";
 
-export type Span = { start: number; end: number };
-
-export type TextEdit = {
-  range: Span;
-  new_text: string;
-};
-
-export type CompletionItem = {
-  label: string;
-  kind: string;
-  insert_text: string;
-  primary_edit: TextEdit | null;
-  cursor: number | null;
-  additional_edits: TextEdit[];
-  detail: string | null;
-  is_disabled: boolean;
-  disabled_reason: string | null;
-};
-
-export type SignatureHelp = {
-  label: string;
-  params: string[];
-  active_param: number;
-};
-
-export type CompletionOutput = {
-  items: CompletionItem[];
-  replace: Span;
-  signature_help: SignatureHelp | null;
-};
+export type Span = SimpleSpanView;
+export type TextEdit = TextEditView;
+export type CompletionItem = CompletionItemView;
+export type SignatureHelp = SignatureHelpView;
+export type CompletionOutput = CompletionOutputView;
 
 export async function initWasm(): Promise<void> {
   await init();

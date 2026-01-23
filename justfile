@@ -6,6 +6,9 @@ fmt:
 check:
   cargo check && cd examples/vite && pnpm -s run check
 
+gen-ts:
+  cargo run -p analyzer_wasm --bin export_ts
+
 test: test-analyzer test-analyzer_wasm test-example-vite
 
 test-analyzer:
@@ -22,4 +25,3 @@ test-example-vite:
 
 run-example-vite:
   cd examples/vite && pnpm -s run wasm:build && npm run dev
-
