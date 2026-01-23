@@ -7,8 +7,8 @@ pub mod dto;
 use wasm_bindgen::prelude::*;
 
 use crate::dto::v1::{
-    AnalyzeResult, CompletionItemView, CompletionOutputView, DiagnosticView, SignatureHelpView,
-    SimpleSpanView, SpanView, TextEditView, TokenView,
+    AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView, DiagnosticKindView,
+    DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView, TokenView,
 };
 
 #[wasm_bindgen]
@@ -104,7 +104,7 @@ fn diag_to_view(source: &str, diag: &Diagnostic) -> DiagnosticView {
 
 fn diag_to_view_with_sm(source: &str, sm: &SourceMap, diag: &Diagnostic) -> DiagnosticView {
     DiagnosticView {
-        kind: diagnostic_kind_string(&diag.kind).to_string(),
+        kind: diagnostic_kind_view(&diag.kind),
         message: diag.message.clone(),
         span: span_view(source, sm, diag.span),
     }
@@ -174,13 +174,13 @@ fn simple_span_view(source: &str, span: Span) -> SimpleSpanView {
     }
 }
 
-fn completion_kind_string(kind: analyzer::CompletionKind) -> &'static str {
+fn completion_kind_view(kind: analyzer::CompletionKind) -> CompletionItemKind {
     use analyzer::CompletionKind::*;
     match kind {
-        Function => "Function",
-        Builtin => "Builtin",
-        Property => "Property",
-        Operator => "Operator",
+        Function => CompletionItemKind::Function,
+        Builtin => CompletionItemKind::Builtin,
+        Property => CompletionItemKind::Property,
+        Operator => CompletionItemKind::Operator,
     }
 }
 
@@ -273,7 +273,7 @@ fn completion_item_to_view(
 
     CompletionItemView {
         label: item.label.clone(),
-        kind: completion_kind_string(item.kind).to_string(),
+        kind: completion_kind_view(item.kind),
         insert_text: item.insert_text.clone(),
         primary_edit: primary_edit_view,
         cursor: cursor_utf16,
@@ -284,9 +284,9 @@ fn completion_item_to_view(
     }
 }
 
-fn diagnostic_kind_string(kind: &DiagnosticKind) -> &'static str {
+fn diagnostic_kind_view(kind: &DiagnosticKind) -> DiagnosticKindView {
     match kind {
-        DiagnosticKind::Error => "error",
+        DiagnosticKind::Error => DiagnosticKindView::Error,
     }
 }
 

@@ -23,7 +23,7 @@ describe("applyTextEdits", () => {
 describe("applyCompletion", () => {
   const baseItem: CompletionItem = {
     label: "x",
-    kind: "Keyword",
+    kind: "Function",
     insert_text: "x",
     primary_edit: { range: { start: 0, end: 0 }, new_text: "x" },
     cursor: null,

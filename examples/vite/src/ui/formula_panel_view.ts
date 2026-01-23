@@ -115,18 +115,10 @@ function applyDiagnosticsToChipRanges(
       const to = clamp(Math.max(toRaw, from + 1), 0, docLen);
       if (!chipIntersectsRange(range, from, to)) continue;
 
-      const kind = diag.kind ?? "error";
-      if (kind === "warning") {
-        hasWarning = true;
-        if (!message) message = diag.message;
-      } else if (kind === "info") {
-        if (!message) message = diag.message;
-      } else {
-        if (!hasError) {
-          message = diag.message;
-        }
-        hasError = true;
+      if (!hasError) {
+        message = diag.message;
       }
+      hasError = true;
     }
     return {
       ...range,

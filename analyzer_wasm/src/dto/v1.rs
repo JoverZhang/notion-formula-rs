@@ -1,6 +1,20 @@
 use serde::Serialize;
 use ts_rs::TS;
 
+#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompletionItemKind {
+    Function,
+    Builtin,
+    Property,
+    Operator,
+}
+
+#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticKindView {
+    #[serde(rename = "error")]
+    Error,
+}
+
 #[derive(Serialize, TS)]
 pub struct SpanView {
     pub start: usize,
@@ -11,7 +25,7 @@ pub struct SpanView {
 
 #[derive(Serialize, TS)]
 pub struct DiagnosticView {
-    pub kind: String,
+    pub kind: DiagnosticKindView,
     pub message: String,
     pub span: SpanView,
 }
@@ -52,7 +66,7 @@ pub struct SignatureHelpView {
 #[derive(Serialize, TS)]
 pub struct CompletionItemView {
     pub label: String,
-    pub kind: String,
+    pub kind: CompletionItemKind,
     pub insert_text: String,
     pub primary_edit: Option<TextEditView>,
     pub cursor: Option<usize>,

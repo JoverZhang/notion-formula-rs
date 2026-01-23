@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
-    AnalyzeResult, CompletionItemView, CompletionOutputView, DiagnosticView, SignatureHelpView,
-    SimpleSpanView, SpanView, TextEditView, TokenView,
+    AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView, DiagnosticKindView,
+    DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView, TokenView,
 };
 use ts_rs::TS;
 
@@ -21,12 +21,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for decl in [
         SpanView::decl(),
+        DiagnosticKindView::decl(),
         DiagnosticView::decl(),
         TokenView::decl(),
         AnalyzeResult::decl(),
         SimpleSpanView::decl(),
         TextEditView::decl(),
         SignatureHelpView::decl(),
+        CompletionItemKind::decl(),
         CompletionItemView::decl(),
         CompletionOutputView::decl(),
     ] {
