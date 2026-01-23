@@ -162,3 +162,73 @@ impl TokenKind {
         )
     }
 }
+
+/// Returns the index range of all tokens whose `Token::span` intersects `span`.
+///
+/// Spans are half-open byte ranges: `[start, end)`.
+///
+/// Intersection rule (also half-open):
+/// - `token.start < span.end && span.start < token.end`
+///
+/// The returned `TokenRange` uses the same half-open convention over indices:
+/// - `lo` is inclusive
+/// - `hi` is exclusive
+///
+/// If `span` is empty (`start >= end`), the result is always empty (`lo == hi`).
+///
+/// This assumes tokens are in source order (monotonic by `Token::span.start`).
+///
+/// ASCII example (byte offsets are illustrative):
+/// ```text
+/// Source:  ( a + b )
+/// Bytes:   0 1 2 3 4 5 6 7 8
+/// Tokens:  0:'(' 1:'a' 2:'+' 3:'b' 4:')'
+/// Span:        [2, 6) covers 'a' '+' 'b'
+/// Result:  lo=1, hi=4   (tokens[1..4])
+/// ```
+pub fn tokens_in_span(tokens: &[Token], span: Span) -> TokenRange {
+    if tokens.is_empty() {
+        return TokenRange::new(0, 0);
+    }
+
+    // Empty spans never intersect any half-open token span.
+    // We still return a stable "insertion point" based on `span.start`.
+    if span.start >= span.end {
+        let idx = lower_bound_by_start(tokens, span.start);
+        return TokenRange::new(idx, idx);
+    }
+
+    let lo = lower_bound_by_end(tokens, span.start);
+    let hi = lower_bound_by_start(tokens, span.end);
+    TokenRange::new(lo, hi)
+}
+
+fn lower_bound_by_end(tokens: &[Token], start: u32) -> u32 {
+    // First token with `token.span.end > start`.
+    let mut lo = 0usize;
+    let mut hi = tokens.len();
+    while lo < hi {
+        let mid = (lo + hi) / 2;
+        if tokens[mid].span.end <= start {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    lo as u32
+}
+
+fn lower_bound_by_start(tokens: &[Token], end: u32) -> u32 {
+    // First token with `token.span.start >= end`.
+    let mut lo = 0usize;
+    let mut hi = tokens.len();
+    while lo < hi {
+        let mid = (lo + hi) / 2;
+        if tokens[mid].span.start < end {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    lo as u32
+}

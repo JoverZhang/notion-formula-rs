@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::parser::{infix_binding_power, prefix_binding_power};
 use crate::source_map::SourceMap;
-use crate::token::{CommentKind, Lit, LitKind, Span, Token, TokenKind};
+use crate::token::{tokens_in_span, CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
 
 const INDENT: usize = 2;
 const MAX_WIDTH: usize = 80;
@@ -597,6 +597,10 @@ impl<'a> Formatter<'a> {
         self.expr_has_comments(expr)
     }
 
+    fn expr_token_range(&self, expr: &Expr) -> TokenRange {
+        tokens_in_span(self.tokens, expr.span)
+    }
+
     fn expr_has_comments(&self, expr: &Expr) -> bool {
         if self.has_attached_comments(expr) {
             return true;
@@ -662,8 +666,7 @@ impl<'a> Formatter<'a> {
                 });
             }
             ExprKind::Call { args, .. } if !args.is_empty() => {
-                let start_idx = expr.tokens.lo as usize;
-                let start = self.tokens.get(start_idx).map(|t| t.span.start)?;
+                let start = expr.span.start;
                 let end_span = self.expr_span_from_tokens(args.last().unwrap())?;
                 return Some(Span {
                     start,
@@ -673,8 +676,9 @@ impl<'a> Formatter<'a> {
             _ => {}
         }
 
-        let start_idx = expr.tokens.lo as usize;
-        let end_idx = expr.tokens.hi as usize;
+        let range = self.expr_token_range(expr);
+        let start_idx = range.lo as usize;
+        let end_idx = range.hi as usize;
         if start_idx >= self.tokens.len() || end_idx == 0 || end_idx > self.tokens.len() {
             return None;
         }
@@ -711,7 +715,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn available_leading_comments(&self, expr: &Expr) -> Vec<usize> {
-        let start = expr.tokens.lo as usize;
+        let start = (self.expr_token_range(expr).lo as usize).min(self.tokens.len());
         let lo = self.prev_nontrivia(start).map(|i| i + 1).unwrap_or(0);
         (lo..start)
             .filter(|&i| self.tokens[i].kind.is_comment())
@@ -744,11 +748,11 @@ impl<'a> Formatter<'a> {
     }
 
     fn available_trailing_comment(&self, expr: &Expr) -> Option<usize> {
-        let hi = expr.tokens.hi as usize;
+        let hi = (self.expr_token_range(expr).hi as usize).min(self.tokens.len());
         if hi == 0 || hi > self.tokens.len() {
             return None;
         }
-        let last_tok_idx = (expr.tokens.hi - 1) as usize;
+        let last_tok_idx = hi - 1;
         let last_line = self
             .sm
             .line_col(self.tokens[last_tok_idx].span.end.saturating_sub(1))

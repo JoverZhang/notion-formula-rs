@@ -1,60 +1,57 @@
 use crate::ast::{Expr, ExprKind};
 use crate::lexer::lex;
 use crate::parser::Parser;
-use crate::token::{Span, Token, TokenRange};
+use crate::token::{Span, Token, tokens_in_span};
 use crate::tokenstream::TokenCursor;
 
-fn span_from_tokens(tokens: &[Token], range: TokenRange) -> Span {
-    let lo = range.lo as usize;
-    let hi = range.hi as usize;
-    Span {
-        start: tokens[lo].span.start,
-        end: tokens[hi - 1].span.end,
-    }
-}
-
-fn assert_child_range(child: &Expr, parent: &Expr) {
+fn assert_child_range(child: &Expr, parent: &Expr, tokens: &[Token]) {
+    let child_range = tokens_in_span(tokens, child.span);
+    let parent_range = tokens_in_span(tokens, parent.span);
     assert!(
-        child.tokens.lo >= parent.tokens.lo && child.tokens.hi <= parent.tokens.hi,
+        child_range.lo >= parent_range.lo && child_range.hi <= parent_range.hi,
         "child range not within parent range"
     );
 }
 
 fn check_invariants(expr: &Expr, tokens: &[Token]) {
-    assert!(expr.tokens.lo < expr.tokens.hi, "empty token range");
+    let range = tokens_in_span(tokens, expr.span);
+    assert!(range.lo < range.hi, "empty token range");
 
-    let hi = expr.tokens.hi as usize;
+    let hi = range.hi as usize;
     assert!(hi <= tokens.len(), "token range out of bounds");
 
-    let expected_span = span_from_tokens(tokens, expr.tokens);
+    let expected_span = Span {
+        start: tokens[range.lo as usize].span.start,
+        end: tokens[hi - 1].span.end,
+    };
     assert_eq!(expr.span, expected_span);
 
     match &expr.kind {
         ExprKind::Group { inner } => {
-            assert_child_range(inner, expr);
+            assert_child_range(inner, expr, tokens);
             check_invariants(inner, tokens);
         }
         ExprKind::Call { args, .. } => {
             for arg in args {
-                assert_child_range(arg, expr);
+                assert_child_range(arg, expr, tokens);
                 check_invariants(arg, tokens);
             }
         }
         ExprKind::MemberCall { receiver, args, .. } => {
-            assert_child_range(receiver, expr);
+            assert_child_range(receiver, expr, tokens);
             check_invariants(receiver, tokens);
             for arg in args {
-                assert_child_range(arg, expr);
+                assert_child_range(arg, expr, tokens);
                 check_invariants(arg, tokens);
             }
         }
         ExprKind::Unary { expr: inner, .. } => {
-            assert_child_range(inner, expr);
+            assert_child_range(inner, expr, tokens);
             check_invariants(inner, tokens);
         }
         ExprKind::Binary { left, right, .. } => {
-            assert_child_range(left, expr);
-            assert_child_range(right, expr);
+            assert_child_range(left, expr, tokens);
+            assert_child_range(right, expr, tokens);
             check_invariants(left, tokens);
             check_invariants(right, tokens);
         }
@@ -64,9 +61,9 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
             then,
             otherwise,
         } => {
-            assert_child_range(cond, expr);
-            assert_child_range(then, expr);
-            assert_child_range(otherwise, expr);
+            assert_child_range(cond, expr, tokens);
+            assert_child_range(then, expr, tokens);
+            assert_child_range(otherwise, expr, tokens);
             check_invariants(cond, tokens);
             check_invariants(then, tokens);
             check_invariants(otherwise, tokens);

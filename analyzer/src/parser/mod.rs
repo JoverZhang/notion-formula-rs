@@ -1,6 +1,6 @@
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::diagnostics::{Diagnostic, Diagnostics};
-use crate::token::{LitKind, NodeId, Span, Token, TokenKind, TokenRange};
+use crate::token::{LitKind, NodeId, Span, Token, TokenKind};
 use crate::tokenstream::TokenCursor;
 
 mod expr;
@@ -62,6 +62,17 @@ impl<'a> Parser<'a> {
         let tok = self.token_cursor.tokens[self.token_cursor.pos].clone();
         self.token_cursor.pos += 1;
         tok
+    }
+
+    fn last_bumped(&self) -> Option<&Token> {
+        self.token_cursor
+            .pos
+            .checked_sub(1)
+            .and_then(|i| self.token_cursor.tokens.get(i))
+    }
+
+    fn last_bumped_end(&self) -> u32 {
+        self.last_bumped().map(|t| t.span.end).unwrap_or(self.cur().span.end)
     }
 
     fn lit_text(&self, span: Span) -> &'a str {
@@ -154,31 +165,10 @@ impl<'a> Parser<'a> {
         idx.min(self.token_cursor.tokens.len().saturating_sub(1))
     }
 
-    fn span_from_tokens(&self, range: TokenRange) -> Span {
-        let lo = range.lo as usize;
-        let hi = range.hi as usize;
-        if lo >= self.token_cursor.tokens.len()
-            || hi == 0
-            || hi > self.token_cursor.tokens.len()
-            || lo >= hi
-        {
-            // fallback: empty span
-            return self.cur().span;
-        }
-        let start = self.token_cursor.tokens[lo].span.start;
-        let end = self.token_cursor.tokens[hi - 1].span.end;
-        Span { start, end }
-    }
-
-    fn mk_token_range(&self, start: u32, end: u32) -> TokenRange {
-        TokenRange::new(start as u32, end as u32)
-    }
-
-    fn mk_expr(&mut self, span: Span, token_range: TokenRange, kind: ExprKind) -> Expr {
+    fn mk_expr(&mut self, span: Span, kind: ExprKind) -> Expr {
         Expr {
             id: self.alloc_id(),
             span: span,
-            tokens: token_range,
             kind,
         }
     }

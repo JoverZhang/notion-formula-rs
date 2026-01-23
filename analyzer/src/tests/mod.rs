@@ -20,4 +20,6 @@ mod test_parser;
 #[cfg(test)]
 mod test_semantic;
 #[cfg(test)]
+mod test_tokens_in_span;
+#[cfg(test)]
 mod test_utf16;

@@ -1,4 +1,4 @@
-use crate::token::{Lit, NodeId, Span, Spanned, Symbol, TokenRange};
+use crate::token::{Lit, NodeId, Span, Spanned, Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOpKind {
@@ -32,7 +32,6 @@ pub type UnOp = Spanned<UnOpKind>;
 pub struct Expr {
     pub id: NodeId,
     pub span: Span,
-    pub tokens: TokenRange,
     pub kind: ExprKind,
 }
 
