@@ -33,4 +33,3 @@ pub fn apply_text_edits_bytes(source: &str, edits: &[TextEdit]) -> String {
 
     updated
 }
-

@@ -9,6 +9,7 @@ export default tseslint.config(
       "node_modules/**",
       "dist/**",
       "src/pkg/**",
+      "src/analyzer/generated/**",
       "pkg/**",
       "**/*.min.js",
       "eslint.config.js",

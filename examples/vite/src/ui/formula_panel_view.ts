@@ -104,7 +104,7 @@ function applyDiagnosticsToChipRanges(
 
   return ranges.map((range) => {
     let hasError = false;
-    let hasWarning = false;
+    const hasWarning = false;
     let message: string | undefined;
     for (const diag of diagnostics) {
       const start = diag.span?.start;

@@ -1,11 +1,12 @@
-use analyzer::semantic::Context;
 use analyzer::{
-    Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind, byte_offset_to_utf16,
+    Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind,
+    byte_offset_to_utf16,
 };
 
 use crate::dto::v1::{
-    AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView, DiagnosticKindView,
-    DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView, TokenView,
+    AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
+    DiagnosticKindView, DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView,
+    TokenView,
 };
 use crate::text_edit::apply_text_edits_bytes;
 
@@ -60,11 +61,7 @@ impl<'a> ViewCtx<'a> {
         self.diag(&diag)
     }
 
-    pub fn completion_output(
-        &self,
-        output: &analyzer::CompletionOutput,
-        _ctx: Option<&Context>,
-    ) -> CompletionOutputView {
+    pub fn completion_output(&self, output: &analyzer::CompletionOutput) -> CompletionOutputView {
         let replace = self.simple_span(output.replace);
         let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelpView {
             label: sig.label.clone(),

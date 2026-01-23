@@ -2,8 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
-    AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView, DiagnosticKindView,
-    DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView, TokenView,
+    AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
+    DiagnosticKindView, DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView,
+    TokenView,
 };
 use ts_rs::TS;
 

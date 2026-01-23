@@ -53,9 +53,9 @@ pub fn complete(source: String, cursor_utf16: usize, context_json: Option<String
     let mut ctx = parse_context(context_json.as_deref());
     ctx.as_mut().unwrap().functions = builtins_functions();
 
-    let output = analyzer::complete_with_context(&source, cursor_byte, ctx.as_ref());
     let view = ViewCtx::new(&source);
-    let out = view.completion_output(&output, ctx.as_ref());
+    let output = analyzer::complete_with_context(&source, cursor_byte, ctx.as_ref());
+    let out = view.completion_output(&output);
     serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
 }
 

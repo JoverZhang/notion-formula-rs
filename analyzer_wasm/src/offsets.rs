@@ -15,4 +15,3 @@ pub fn utf16_offset_to_byte(source: &str, utf16: usize) -> usize {
 
     source.len()
 }
-
