@@ -178,6 +178,11 @@ impl TokenKind {
 ///
 /// This assumes tokens are in source order (monotonic by `Token::span.start`).
 ///
+/// EOF note:
+/// - The lexer emits an EOF token with an empty span at the end of the input.
+/// - Because EOF has an empty span, non-empty query spans will not intersect it, so it is naturally excluded.
+/// - For empty query spans, the returned insertion point may be the EOF token index (e.g. at end-of-input).
+///
 /// ASCII example (byte offsets are illustrative):
 /// ```text
 /// Source:  ( a + b )
@@ -185,6 +190,11 @@ impl TokenKind {
 /// Tokens:  0:'(' 1:'a' 2:'+' 3:'b' 4:')'
 /// Span:        [2, 6) covers 'a' '+' 'b'
 /// Result:  lo=1, hi=4   (tokens[1..4])
+///
+/// Boundary example (half-open end is excluded):
+/// Source:  a+b
+/// Tokens:  0:'a' 1:'+' 2:'b'
+/// Span:    [0,1) covers only 'a' (it does NOT include '+')
 /// ```
 pub fn tokens_in_span(tokens: &[Token], span: Span) -> TokenRange {
     if tokens.is_empty() {

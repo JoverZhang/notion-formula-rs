@@ -5,6 +5,17 @@ use crate::tokenstream::TokenCursor;
 
 mod expr;
 
+/// Parser span invariants.
+///
+/// - `Span` is a byte offset range into the original source, using half-open semantics: `[start, end)`.
+/// - The token stream (`TokenCursor.tokens`) includes trivia tokens (comments/newlines) and an EOF token.
+/// - Parsing *skips* trivia when looking at the current token and when consuming tokens (`cur()`/`bump()`).
+///   This means spans are anchored on non-trivia tokens.
+/// - For an expression that successfully parses, `Expr.span` starts at the first non-trivia token of the
+///   construct and ends at the last non-trivia token consumed for that construct.
+///   The span therefore also covers any trivia and whitespace *between* those two tokens.
+/// - Parent expression spans are expected to contain their child expression spans.
+/// - Error recovery may produce `ExprKind::Error` spans that are minimal (often just the unexpected token).
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -72,7 +83,9 @@ impl<'a> Parser<'a> {
     }
 
     fn last_bumped_end(&self) -> u32 {
-        self.last_bumped().map(|t| t.span.end).unwrap_or(self.cur().span.end)
+        self.last_bumped()
+            .map(|t| t.span.end)
+            .unwrap_or(self.cur().span.end)
     }
 
     fn lit_text(&self, span: Span) -> &'a str {

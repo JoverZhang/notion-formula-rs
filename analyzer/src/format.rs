@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::parser::{infix_binding_power, prefix_binding_power};
 use crate::source_map::SourceMap;
-use crate::token::{tokens_in_span, CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
+use crate::token::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange, tokens_in_span};
 
 const INDENT: usize = 2;
 const MAX_WIDTH: usize = 80;
@@ -597,6 +597,10 @@ impl<'a> Formatter<'a> {
         self.expr_has_comments(expr)
     }
 
+    /// Returns a token index range for an expression using its `Span`.
+    ///
+    /// This is used by comment attachment logic. The range is intersection-based and therefore
+    /// may include trivia tokens that lie within the expression span.
     fn expr_token_range(&self, expr: &Expr) -> TokenRange {
         tokens_in_span(self.tokens, expr.span)
     }

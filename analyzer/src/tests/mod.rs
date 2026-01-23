@@ -18,6 +18,8 @@ mod test_lexer;
 #[cfg(test)]
 mod test_parser;
 #[cfg(test)]
+mod test_parser_spans;
+#[cfg(test)]
 mod test_semantic;
 #[cfg(test)]
 mod test_tokens_in_span;
