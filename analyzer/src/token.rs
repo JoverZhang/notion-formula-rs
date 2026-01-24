@@ -192,12 +192,13 @@ impl TokenKind {
 /// - Because EOF has an empty span, non-empty query spans will not intersect it, so it is naturally excluded.
 /// - For empty query spans, the returned insertion point may be the EOF token index (e.g. at end-of-input).
 ///
-/// ASCII example (byte offsets are illustrative):
+/// ASCII example (byte offsets shown as *boundary indices*; ASCII-only illustration):
 /// ```text
 /// Source:  ( a + b )
-/// Bytes:   0 1 2 3 4 5 6 7 8
-/// Tokens:  0:'(' 1:'a' 2:'+' 3:'b' 4:')'
-/// Span:        [2, 6) covers 'a' '+' 'b'
+/// Char:    ( ␠ a ␠ + ␠ b ␠ )
+/// Index:   0 1 2 3 4 5 6 7 8
+/// Tokens:  0:'(' 1:'a' 2:'+' 3:'b' 4:')'   // trivia omitted from token list for brevity
+/// Span:        [2, 7) covers 'a' '+' 'b' (including any trivia between them)
 /// Result:  lo=1, hi=4   (tokens[1..4])
 ///
 /// Boundary example (half-open end is excluded):
