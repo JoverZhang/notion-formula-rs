@@ -1,0 +1,4 @@
+=== INPUT ===
+a+/*c*/b
+=== OUTPUT ===
+a + /*c*/ b

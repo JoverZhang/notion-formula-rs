@@ -22,6 +22,8 @@ mod test_parser_spans;
 #[cfg(test)]
 mod test_semantic;
 #[cfg(test)]
+mod test_token_query;
+#[cfg(test)]
 mod test_tokens_in_span;
 #[cfg(test)]
 mod test_utf16;

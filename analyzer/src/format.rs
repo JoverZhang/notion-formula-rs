@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::parser::{infix_binding_power, prefix_binding_power};
 use crate::source_map::SourceMap;
-use crate::token::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange, tokens_in_span};
+use crate::token::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
+use crate::tokenstream::TokenQuery;
 
 const INDENT: usize = 2;
 const MAX_WIDTH: usize = 80;
@@ -213,6 +214,10 @@ impl<'a> Formatter<'a> {
             used_comments: HashSet::new(),
             sm: SourceMap::new(source),
         }
+    }
+
+    fn token_query(&self) -> TokenQuery<'a> {
+        TokenQuery::new(self.tokens)
     }
 
     fn format_expr_rendered(&mut self, expr: &Expr, indent: usize, parent_prec: u8) -> Rendered {
@@ -602,7 +607,7 @@ impl<'a> Formatter<'a> {
     /// This is used by comment attachment logic. The range is intersection-based and therefore
     /// may include trivia tokens that lie within the expression span.
     fn expr_token_range(&self, expr: &Expr) -> TokenRange {
-        tokens_in_span(self.tokens, expr.span.into())
+        self.token_query().range_for_span(expr.span.into())
     }
 
     fn expr_has_comments(&self, expr: &Expr) -> bool {
@@ -681,17 +686,12 @@ impl<'a> Formatter<'a> {
         }
 
         let range = self.expr_token_range(expr);
-        let start_idx = range.lo as usize;
-        let end_idx = range.hi as usize;
-        if start_idx >= self.tokens.len() || end_idx == 0 || end_idx > self.tokens.len() {
-            return None;
-        }
-        if end_idx <= start_idx {
-            return None;
-        }
+        let q = self.token_query();
+        let start_idx = q.first_in_range(range)?;
+        let end_idx = q.last_in_range(range)?;
         Some(Span {
             start: self.tokens[start_idx].span.start,
-            end: self.tokens[end_idx - 1].span.end,
+            end: self.tokens[end_idx].span.end,
         })
     }
 
@@ -700,28 +700,11 @@ impl<'a> Formatter<'a> {
         source_has_newline(span, self.source)
     }
 
-    fn prev_nontrivia(&self, idx: usize) -> Option<usize> {
-        if idx == 0 {
-            return None;
-        }
-        let mut i = idx - 1;
-        loop {
-            let tok = &self.tokens[i];
-            if !tok.is_trivia() {
-                return Some(i);
-            }
-            if i == 0 {
-                break;
-            }
-            i -= 1;
-        }
-        None
-    }
-
     fn available_leading_comments(&self, expr: &Expr) -> Vec<usize> {
-        let start = (self.expr_token_range(expr).lo as usize).min(self.tokens.len());
-        let lo = self.prev_nontrivia(start).map(|i| i + 1).unwrap_or(0);
-        (lo..start)
+        let q = self.token_query();
+        let range = self.expr_token_range(expr);
+        let (start, _) = q.bounds_usize(range);
+        q.leading_trivia_before(start)
             .filter(|&i| self.tokens[i].kind.is_comment())
             .filter(|i| !self.used_comments.contains(i))
             .collect()
@@ -752,68 +735,49 @@ impl<'a> Formatter<'a> {
     }
 
     fn available_trailing_comment(&self, expr: &Expr) -> Option<usize> {
-        let hi = (self.expr_token_range(expr).hi as usize).min(self.tokens.len());
-        if hi == 0 || hi > self.tokens.len() {
-            return None;
-        }
-        let last_tok_idx = hi - 1;
+        let q = self.token_query();
+        let range = self.expr_token_range(expr);
+        let (_, hi) = q.bounds_usize(range);
+        let last_tok_idx = q.last_in_range(range)?;
         let last_line = self
             .sm
             .line_col(self.tokens[last_tok_idx].span.end.saturating_sub(1))
             .0;
 
-        let mut idx = hi;
-        while idx < self.tokens.len() {
+        for idx in q.trailing_trivia_until_newline_or_nontrivia(hi) {
             let tok = &self.tokens[idx];
-            if tok.is_trivia() {
-                match &tok.kind {
-                    TokenKind::Newline => break,
-                    TokenKind::LineComment(_) => {
-                        if self.used_comments.contains(&idx) {
-                            return None;
-                        }
-                        let line = self.sm.line_col(tok.span.start).0;
-                        if line == last_line {
-                            return Some(idx);
-                        } else {
-                            break;
-                        }
+            match &tok.kind {
+                TokenKind::LineComment(_) | TokenKind::DocComment(CommentKind::Line, _) => {
+                    if self.used_comments.contains(&idx) {
+                        return None;
                     }
-                    TokenKind::DocComment(CommentKind::Line, _) => {
-                        if self.used_comments.contains(&idx) {
-                            return None;
-                        }
-                        let line = self.sm.line_col(tok.span.start).0;
-                        if line == last_line {
-                            return Some(idx);
-                        } else {
-                            break;
-                        }
+                    let line = self.sm.line_col(tok.span.start).0;
+                    if line == last_line {
+                        return Some(idx);
+                    } else {
+                        break;
                     }
-                    TokenKind::BlockComment(_) => {
-                        if self.used_comments.contains(&idx) {
-                            return None;
-                        }
-                        let span_range = tok.span.start as usize..tok.span.end as usize;
-                        let has_newline = self
-                            .source
-                            .get(span_range)
-                            .map(|s| s.contains('\n'))
-                            .unwrap_or(true);
-                        if has_newline {
-                            break;
-                        }
-                        let line = self.sm.line_col(tok.span.start).0;
-                        if line == last_line {
-                            return Some(idx);
-                        }
-                    }
-                    _ => {}
                 }
-                idx += 1;
-                continue;
+                TokenKind::BlockComment(_) => {
+                    if self.used_comments.contains(&idx) {
+                        return None;
+                    }
+                    let span_range = tok.span.start as usize..tok.span.end as usize;
+                    let has_newline = self
+                        .source
+                        .get(span_range)
+                        .map(|s| s.contains('\n'))
+                        .unwrap_or(true);
+                    if has_newline {
+                        break;
+                    }
+                    let line = self.sm.line_col(tok.span.start).0;
+                    if line == last_line {
+                        return Some(idx);
+                    }
+                }
+                _ => {}
             }
-            break;
         }
         None
     }
