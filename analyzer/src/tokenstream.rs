@@ -1,5 +1,4 @@
-use crate::range::ByteSpan;
-use crate::token::{Token, TokenIdx, TokenKind, TokenRange, tokens_in_span};
+use crate::token::{Span, Token, TokenIdx, TokenKind, TokenRange, tokens_in_span};
 
 pub struct TokenCursor<'a> {
     pub source: &'a str,
@@ -41,7 +40,7 @@ impl<'a> TokenQuery<'a> {
     /// rule and empty-span behavior.
     ///
     /// The returned [`TokenRange`] is half-open over token indices: `[lo, hi)`.
-    pub fn range_for_span(&self, span: ByteSpan) -> TokenRange {
+    pub fn range_for_span(&self, span: Span) -> TokenRange {
         tokens_in_span(self.tokens, span)
     }
 

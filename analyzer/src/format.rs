@@ -32,6 +32,7 @@ fn source_has_newline(span: Span, source: &str) -> bool {
 pub struct Formatter<'a> {
     source: &'a str,
     tokens: &'a [Token],
+    token_query: TokenQuery<'a>,
     used_comments: HashSet<usize>,
     sm: SourceMap<'a>,
 }
@@ -211,13 +212,14 @@ impl<'a> Formatter<'a> {
         Self {
             source,
             tokens,
+            token_query: TokenQuery::new(tokens),
             used_comments: HashSet::new(),
             sm: SourceMap::new(source),
         }
     }
 
-    fn token_query(&self) -> TokenQuery<'a> {
-        TokenQuery::new(self.tokens)
+    fn token_query(&self) -> &TokenQuery<'a> {
+        &self.token_query
     }
 
     fn format_expr_rendered(&mut self, expr: &Expr, indent: usize, parent_prec: u8) -> Rendered {
@@ -607,7 +609,7 @@ impl<'a> Formatter<'a> {
     /// This is used by comment attachment logic. The range is intersection-based and therefore
     /// may include trivia tokens that lie within the expression span.
     fn expr_token_range(&self, expr: &Expr) -> TokenRange {
-        self.token_query().range_for_span(expr.span.into())
+        self.token_query().range_for_span(expr.span)
     }
 
     fn expr_has_comments(&self, expr: &Expr) -> bool {

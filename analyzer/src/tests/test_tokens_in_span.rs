@@ -1,34 +1,36 @@
 use crate::lexer::lex;
-use crate::token::{ByteSpan, Span, TokenKind, tokens_in_span};
+use crate::token::{Span, TokenKind, tokens_in_span};
 
 #[test]
 fn test_tokens_in_span() {
+    let span = |start: u32, end: u32| Span { start, end };
+
     // Exact boundary matches.
     let src = "(a+b)";
     let out = lex(src);
     assert!(out.diagnostics.is_empty());
     let tokens = out.tokens;
 
-    let r = tokens_in_span(&tokens, ByteSpan::from((1, 4))); // "a+b"
+    let r = tokens_in_span(&tokens, span(1, 4)); // "a+b"
     assert_eq!((r.lo, r.hi), (1, 4));
 
-    let r = tokens_in_span(&tokens, ByteSpan::from((1, 2))); // "a"
+    let r = tokens_in_span(&tokens, span(1, 2)); // "a"
     assert_eq!((r.lo, r.hi), (1, 2));
     assert!(matches!(tokens[r.lo as usize].kind, TokenKind::Ident(_)));
 
-    let r = tokens_in_span(&tokens, ByteSpan::from((2, 3))); // "+"
+    let r = tokens_in_span(&tokens, span(2, 3)); // "+"
     assert_eq!((r.lo, r.hi), (2, 3));
     assert!(matches!(tokens[r.lo as usize].kind, TokenKind::Plus));
 
     // Half-open end boundary is excluded.
-    let r = tokens_in_span(&tokens, ByteSpan::from((0, 2))); // "(a", does not include '+'
+    let r = tokens_in_span(&tokens, span(0, 2)); // "(a", does not include '+'
     assert_eq!((r.lo, r.hi), (0, 2));
     assert!(matches!(tokens[0].kind, TokenKind::OpenParen));
     assert!(matches!(tokens[1].kind, TokenKind::Ident(_)));
 
     // Span that reaches end-of-input does not include EOF for non-empty spans.
     let len = src.len() as u32;
-    let r = tokens_in_span(&tokens, ByteSpan::new(0, len));
+    let r = tokens_in_span(&tokens, span(0, len));
     let eof_idx = (tokens.len() - 1) as u32;
     assert_eq!(
         r.hi, eof_idx,
@@ -45,11 +47,11 @@ fn test_tokens_in_span() {
     assert!(out.diagnostics.is_empty());
     let tokens = out.tokens;
 
-    let r = tokens_in_span(&tokens, ByteSpan::from((0, 8))); // whole expression
+    let r = tokens_in_span(&tokens, span(0, 8)); // whole expression
     assert_eq!((r.lo, r.hi), (0, 4)); // excludes EOF
     assert!(matches!(tokens[1].kind, TokenKind::BlockComment(_)));
 
-    let r = tokens_in_span(&tokens, ByteSpan::from((1, 6))); // "/*c*/"
+    let r = tokens_in_span(&tokens, span(1, 6)); // "/*c*/"
     assert_eq!((r.lo, r.hi), (1, 2));
     assert!(matches!(
         tokens[r.lo as usize].kind,
@@ -61,7 +63,7 @@ fn test_tokens_in_span() {
     let out = lex(src);
     assert!(out.diagnostics.is_empty());
     let tokens = out.tokens;
-    let r = tokens_in_span(&tokens, ByteSpan::from((1, 6)));
+    let r = tokens_in_span(&tokens, span(1, 6));
     assert_eq!((r.lo, r.hi), (1, 2));
     assert!(matches!(
         tokens[r.lo as usize].kind,
@@ -73,7 +75,7 @@ fn test_tokens_in_span() {
     let out = lex(src);
     assert!(out.diagnostics.is_empty());
     let tokens = out.tokens;
-    let r = tokens_in_span(&tokens, ByteSpan::from((1, 8)));
+    let r = tokens_in_span(&tokens, span(1, 8));
     assert_eq!((r.lo, r.hi), (1, 4));
     assert!(matches!(tokens[1].kind, TokenKind::Newline));
     assert!(matches!(tokens[2].kind, TokenKind::BlockComment(_)));
@@ -85,31 +87,17 @@ fn test_tokens_in_span() {
     assert!(out.diagnostics.is_empty());
     let tokens = out.tokens;
 
-    let r = tokens_in_span(&tokens, ByteSpan::from((2, 2)));
+    let r = tokens_in_span(&tokens, span(2, 2));
     assert_eq!((r.lo, r.hi), (2, 2));
 
     // Empty span at EOF: insertion point may be the EOF token index.
     let eof_idx = (tokens.len() - 1) as u32;
     let len = src.len() as u32;
-    let r = tokens_in_span(
-        &tokens,
-        Span {
-            start: len,
-            end: len,
-        }
-        .into(),
-    );
+    let r = tokens_in_span(&tokens, span(len, len));
     assert_eq!((r.lo, r.hi), (eof_idx, eof_idx));
 
     // Out of bounds span: empty at the end (past EOF).
-    let r = tokens_in_span(
-        &tokens,
-        Span {
-            start: len + 100,
-            end: len + 101,
-        }
-        .into(),
-    );
+    let r = tokens_in_span(&tokens, span(len + 100, len + 101));
     let end = tokens.len() as u32;
     assert_eq!((r.lo, r.hi), (end, end));
 }
