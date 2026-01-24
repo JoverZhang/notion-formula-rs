@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView,
-    TokenView,
+    DiagnosticKindView, DiagnosticView, SignatureHelpView, SpanView, TextEditView, TokenView,
+    Utf16Span,
 };
 use ts_rs::TS;
 
@@ -21,12 +21,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     out.push_str("// AUTO-GENERATED: `cargo run -p analyzer_wasm --bin export_ts`\n\n");
 
     for decl in [
+        Utf16Span::decl(),
         SpanView::decl(),
         DiagnosticKindView::decl(),
         DiagnosticView::decl(),
         TokenView::decl(),
         AnalyzeResult::decl(),
-        SimpleSpanView::decl(),
         TextEditView::decl(),
         SignatureHelpView::decl(),
         CompletionItemKind::decl(),

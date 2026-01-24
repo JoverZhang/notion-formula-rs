@@ -4,11 +4,11 @@ import type {
   CompletionItemView,
   CompletionOutputView,
   SignatureHelpView,
-  SimpleSpanView,
   TextEditView,
+  Utf16Span,
 } from "./generated/wasm_dto";
 
-export type Span = SimpleSpanView;
+export type Span = Utf16Span;
 export type TextEdit = TextEditView;
 export type CompletionItem = CompletionItemView;
 export type SignatureHelp = SignatureHelpView;

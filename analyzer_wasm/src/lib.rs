@@ -1,5 +1,6 @@
 pub mod dto;
 mod offsets;
+mod span;
 mod text_edit;
 mod view;
 

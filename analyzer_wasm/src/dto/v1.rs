@@ -1,6 +1,15 @@
 use serde::Serialize;
 use ts_rs::TS;
 
+/// JS/editor-facing span in UTF-16 code units.
+///
+/// Ranges are half-open `[start, end)`; `end` is exclusive.
+#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Utf16Span {
+    pub start: u32,
+    pub end: u32,
+}
+
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionItemKind {
     Function,
@@ -17,10 +26,9 @@ pub enum DiagnosticKindView {
 
 #[derive(Serialize, TS)]
 pub struct SpanView {
-    pub start: usize,
-    pub end: usize,
-    pub line: usize,
-    pub col: usize,
+    pub range: Utf16Span,
+    pub line: u32,
+    pub col: u32,
 }
 
 #[derive(Serialize, TS)]
@@ -45,14 +53,8 @@ pub struct AnalyzeResult {
 }
 
 #[derive(Serialize, TS)]
-pub struct SimpleSpanView {
-    pub start: usize,
-    pub end: usize,
-}
-
-#[derive(Serialize, TS)]
 pub struct TextEditView {
-    pub range: SimpleSpanView,
+    pub range: Utf16Span,
     pub new_text: String,
 }
 
@@ -69,7 +71,7 @@ pub struct CompletionItemView {
     pub kind: CompletionItemKind,
     pub insert_text: String,
     pub primary_edit: Option<TextEditView>,
-    pub cursor: Option<usize>,
+    pub cursor: Option<u32>,
     pub additional_edits: Vec<TextEditView>,
     pub detail: Option<String>,
     pub is_disabled: bool,
@@ -79,6 +81,6 @@ pub struct CompletionItemView {
 #[derive(Serialize, TS)]
 pub struct CompletionOutputView {
     pub items: Vec<CompletionItemView>,
-    pub replace: SimpleSpanView,
+    pub replace: Utf16Span,
     pub signature_help: Option<SignatureHelpView>,
 }

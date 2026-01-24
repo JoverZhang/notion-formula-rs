@@ -107,9 +107,9 @@ function applyDiagnosticsToChipRanges(
     const hasWarning = false;
     let message: string | undefined;
     for (const diag of diagnostics) {
-      const start = diag.span?.start;
+      const start = diag.span?.range?.start;
       if (typeof start !== "number") continue;
-      const end = diag.span?.end;
+      const end = diag.span?.range?.end;
       const from = clamp(start, 0, docLen);
       const toRaw = typeof end === "number" ? end : start + 1;
       const to = clamp(Math.max(toRaw, from + 1), 0, docLen);
@@ -136,8 +136,8 @@ function analyzerToCmDiagnostics(
 ): CmDiagnostic[] {
   const out: CmDiagnostic[] = [];
   for (const d of diags) {
-    const start = d.span?.start;
-    const end = d.span?.end;
+    const start = d.span?.range?.start;
+    const end = d.span?.range?.end;
     if (typeof start !== "number") continue;
 
     let from = clamp(start, 0, docLen);
@@ -163,8 +163,8 @@ function formatChipPosLabel(
   chipSpans: ChipSpan[],
 ): string | null {
   if (!chipMap) return null;
-  const start = diag.span?.start;
-  const end = diag.span?.end;
+  const start = diag.span?.range?.start;
+  const end = diag.span?.range?.end;
   if (typeof start !== "number") return null;
   const rawEnd = typeof end === "number" ? end : start + 1;
   const normalizedEnd = Math.max(rawEnd, start + 1);

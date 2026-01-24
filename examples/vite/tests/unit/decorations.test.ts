@@ -10,11 +10,11 @@ describe("computePropChips", () => {
   it('detects prop("Title")', () => {
     const source = 'prop("Title")';
     const tokens: Token[] = [
-      { kind: "Ident", text: "prop", span: { start: 0, end: 4, line: 0, col: 0 } },
-      { kind: "OpenParen", text: "(", span: { start: 4, end: 5, line: 0, col: 4 } },
-      { kind: "String", text: '"Title"', span: { start: 5, end: 12, line: 0, col: 5 } },
-      { kind: "CloseParen", text: ")", span: { start: 12, end: 13, line: 0, col: 12 } },
-      { kind: "Eof", text: "", span: { start: 13, end: 13, line: 0, col: 13 } },
+      { kind: "Ident", text: "prop", span: { range: { start: 0, end: 4 }, line: 0, col: 0 } },
+      { kind: "OpenParen", text: "(", span: { range: { start: 4, end: 5 }, line: 0, col: 4 } },
+      { kind: "String", text: '"Title"', span: { range: { start: 5, end: 12 }, line: 0, col: 5 } },
+      { kind: "CloseParen", text: ")", span: { range: { start: 12, end: 13 }, line: 0, col: 12 } },
+      { kind: "Eof", text: "", span: { range: { start: 13, end: 13 }, line: 0, col: 13 } },
     ];
 
     const chips = computePropChips(source, tokens);
@@ -31,14 +31,14 @@ describe("computeTokenDecorationRanges", () => {
   it("covers all non-trivia tokens and skips Eof", () => {
     const source = 'prop("Title") + 1 +';
     const tokens: Token[] = [
-      { kind: "Ident", text: "prop", span: { start: 0, end: 4, line: 0, col: 0 } },
-      { kind: "OpenParen", text: "(", span: { start: 4, end: 5, line: 0, col: 4 } },
-      { kind: "String", text: '"Title"', span: { start: 5, end: 12, line: 0, col: 5 } },
-      { kind: "CloseParen", text: ")", span: { start: 12, end: 13, line: 0, col: 12 } },
-      { kind: "Plus", text: "+", span: { start: 14, end: 15, line: 0, col: 14 } },
-      { kind: "Number", text: "1", span: { start: 16, end: 17, line: 0, col: 16 } },
-      { kind: "Plus", text: "+", span: { start: 18, end: 19, line: 0, col: 18 } },
-      { kind: "Eof", text: "", span: { start: 19, end: 19, line: 0, col: 19 } },
+      { kind: "Ident", text: "prop", span: { range: { start: 0, end: 4 }, line: 0, col: 0 } },
+      { kind: "OpenParen", text: "(", span: { range: { start: 4, end: 5 }, line: 0, col: 4 } },
+      { kind: "String", text: '"Title"', span: { range: { start: 5, end: 12 }, line: 0, col: 5 } },
+      { kind: "CloseParen", text: ")", span: { range: { start: 12, end: 13 }, line: 0, col: 12 } },
+      { kind: "Plus", text: "+", span: { range: { start: 14, end: 15 }, line: 0, col: 14 } },
+      { kind: "Number", text: "1", span: { range: { start: 16, end: 17 }, line: 0, col: 16 } },
+      { kind: "Plus", text: "+", span: { range: { start: 18, end: 19 }, line: 0, col: 18 } },
+      { kind: "Eof", text: "", span: { range: { start: 19, end: 19 }, line: 0, col: 19 } },
     ];
 
     const ranges = computeTokenDecorationRanges(source.length, tokens);
@@ -60,7 +60,7 @@ describe("computeTokenDecorationRanges", () => {
 describe("getTokenSpanIssues", () => {
   it("flags out-of-bounds spans without overlap", () => {
     const tokens: Token[] = [
-      { kind: "Ident", text: "prop", span: { start: 0, end: 4, line: 0, col: 0 } },
+      { kind: "Ident", text: "prop", span: { range: { start: 0, end: 4 }, line: 0, col: 0 } },
     ];
 
     expect(getTokenSpanIssues(3, tokens)).toEqual({ outOfBounds: true, overlap: false });
@@ -68,8 +68,8 @@ describe("getTokenSpanIssues", () => {
 
   it("flags overlapping spans", () => {
     const tokens: Token[] = [
-      { kind: "Ident", text: "prop", span: { start: 0, end: 4, line: 0, col: 0 } },
-      { kind: "Plus", text: "+", span: { start: 3, end: 5, line: 0, col: 3 } },
+      { kind: "Ident", text: "prop", span: { range: { start: 0, end: 4 }, line: 0, col: 0 } },
+      { kind: "Plus", text: "+", span: { range: { start: 3, end: 5 }, line: 0, col: 3 } },
     ];
 
     expect(getTokenSpanIssues(10, tokens)).toEqual({ outOfBounds: false, overlap: true });
@@ -77,8 +77,8 @@ describe("getTokenSpanIssues", () => {
 
   it("reports clean spans", () => {
     const tokens: Token[] = [
-      { kind: "Ident", text: "prop", span: { start: 0, end: 4, line: 0, col: 0 } },
-      { kind: "Plus", text: "+", span: { start: 4, end: 5, line: 0, col: 4 } },
+      { kind: "Ident", text: "prop", span: { range: { start: 0, end: 4 }, line: 0, col: 0 } },
+      { kind: "Plus", text: "+", span: { range: { start: 4, end: 5 }, line: 0, col: 4 } },
     ];
 
     expect(getTokenSpanIssues(10, tokens)).toEqual({ outOfBounds: false, overlap: false });

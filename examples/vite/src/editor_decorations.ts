@@ -43,11 +43,11 @@ function isTriviaKind(kind: string): boolean {
 
 export function sortTokens(tokens: Token[]): Token[] {
   return [...tokens].sort((a, b) => {
-    const aStart = a.span?.start ?? Number.MAX_SAFE_INTEGER;
-    const bStart = b.span?.start ?? Number.MAX_SAFE_INTEGER;
+    const aStart = a.span?.range?.start ?? Number.MAX_SAFE_INTEGER;
+    const bStart = b.span?.range?.start ?? Number.MAX_SAFE_INTEGER;
     if (aStart !== bStart) return aStart - bStart;
-    const aEnd = a.span?.end ?? Number.MAX_SAFE_INTEGER;
-    const bEnd = b.span?.end ?? Number.MAX_SAFE_INTEGER;
+    const aEnd = a.span?.range?.end ?? Number.MAX_SAFE_INTEGER;
+    const bEnd = b.span?.range?.end ?? Number.MAX_SAFE_INTEGER;
     return aEnd - bEnd;
   });
 }
@@ -64,8 +64,8 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     if (!ident || ident.kind !== "Ident" || ident.text !== "prop") {
       continue;
     }
-    const identStart = ident.span?.start;
-    const identEnd = ident.span?.end;
+    const identStart = ident.span?.range?.start;
+    const identEnd = ident.span?.range?.end;
     if (typeof identStart !== "number" || typeof identEnd !== "number") {
       continue;
     }
@@ -97,9 +97,9 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
       continue;
     }
 
-    const stringStart = stringToken.span?.start;
-    const stringEnd = stringToken.span?.end;
-    const closeEnd = closeParen.span?.end;
+    const stringStart = stringToken.span?.range?.start;
+    const stringEnd = stringToken.span?.range?.end;
+    const closeEnd = closeParen.span?.range?.end;
     if (
       typeof stringStart !== "number" ||
       typeof stringEnd !== "number" ||
@@ -151,8 +151,8 @@ export function computeTokenDecorationRanges(
     if (!token || token.kind === "Eof") {
       continue;
     }
-    const start = token.span?.start;
-    const end = token.span?.end;
+    const start = token.span?.range?.start;
+    const end = token.span?.range?.end;
     if (typeof start !== "number" || typeof end !== "number") {
       continue;
     }
@@ -188,8 +188,8 @@ export function getTokenSpanIssues(docLen: number, tokens: Token[]): TokenSpanIs
     if (!token || token.kind === "Eof") {
       continue;
     }
-    const start = token.span?.start;
-    const end = token.span?.end;
+    const start = token.span?.range?.start;
+    const end = token.span?.range?.end;
     if (typeof start !== "number" || typeof end !== "number") {
       continue;
     }

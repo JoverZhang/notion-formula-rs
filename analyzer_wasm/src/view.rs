@@ -1,13 +1,12 @@
-use analyzer::{
-    Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind,
-    byte_offset_to_utf16,
-};
+use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind};
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, SignatureHelpView, SimpleSpanView, SpanView, TextEditView,
-    TokenView,
+    DiagnosticKindView, DiagnosticView, SignatureHelpView, SpanView, TextEditView, TokenView,
+    Utf16Span,
 };
+use crate::offsets::byte_offset_to_utf16_offset;
+use crate::span::byte_span_to_utf16_span;
 use crate::text_edit::apply_text_edits_bytes;
 
 pub struct ViewCtx<'a> {
@@ -114,7 +113,7 @@ impl<'a> ViewCtx<'a> {
                     .saturating_add(primary_edit.new_text.len() as u32)
             });
             let cursor_byte = usize::min(cursor_byte as usize, updated.len());
-            byte_offset_to_utf16(&updated, cursor_byte)
+            byte_offset_to_utf16_offset(&updated, cursor_byte)
         });
 
         CompletionItemView {
@@ -151,23 +150,18 @@ impl<'a> ViewCtx<'a> {
     }
 
     fn span(&self, span: Span) -> SpanView {
-        let start = byte_offset_to_utf16(self.source, span.start as usize);
-        let end = byte_offset_to_utf16(self.source, span.end as usize);
+        let range = byte_span_to_utf16_span(self.source, span);
         let (line, col) = self.sm.line_col(span.start);
 
         SpanView {
-            start,
-            end,
-            line,
-            col,
+            range,
+            line: line as u32,
+            col: col as u32,
         }
     }
 
-    fn simple_span(&self, span: Span) -> SimpleSpanView {
-        SimpleSpanView {
-            start: byte_offset_to_utf16(self.source, span.start as usize),
-            end: byte_offset_to_utf16(self.source, span.end as usize),
-        }
+    fn simple_span(&self, span: Span) -> Utf16Span {
+        byte_span_to_utf16_span(self.source, span)
     }
 }
 

@@ -1,10 +1,10 @@
 import type {
   CompletionItemView,
-  SimpleSpanView,
   TextEditView,
+  Utf16Span,
 } from "../analyzer/generated/wasm_dto";
 
-export type TextRange = SimpleSpanView;
+export type TextRange = Utf16Span;
 
 export type TextEdit = TextEditView;
 export type CompletionItem = CompletionItemView;

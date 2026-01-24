@@ -9,25 +9,30 @@ struct AnalyzeResult {
 }
 
 #[derive(Deserialize)]
-struct Span {
-    start: usize,
-    end: usize,
-    line: usize,
-    col: usize,
+struct Utf16Span {
+    start: u32,
+    end: u32,
+}
+
+#[derive(Deserialize)]
+struct SpanView {
+    range: Utf16Span,
+    line: u32,
+    col: u32,
 }
 
 #[derive(Deserialize)]
 struct Diagnostic {
     kind: String,
     _message: String,
-    span: Span,
+    span: SpanView,
 }
 
 #[derive(Deserialize)]
 struct TokenView {
     kind: String,
     text: String,
-    span: Span,
+    span: SpanView,
 }
 
 fn analyze_value(source: &str) -> AnalyzeResult {
@@ -75,14 +80,14 @@ fn analyze_ascii_spans_and_format() {
     assert_eq!(kinds, vec!["Number", "Plus", "Number", "Eof"]);
 
     let first = &result.tokens[0];
-    assert_eq!(first.span.start, 0);
-    assert_eq!(first.span.end, 1);
+    assert_eq!(first.span.range.start, 0);
+    assert_eq!(first.span.range.end, 1);
     assert_eq!(first.span.line, 1);
     assert_eq!(first.span.col, 1);
 
     let plus = &result.tokens[1];
-    assert_eq!(plus.span.start, 1);
-    assert_eq!(plus.span.end, 2);
+    assert_eq!(plus.span.range.start, 1);
+    assert_eq!(plus.span.range.end, 2);
     assert_eq!(plus.span.line, 1);
     assert_eq!(plus.span.col, 2);
 
@@ -90,7 +95,11 @@ fn analyze_ascii_spans_and_format() {
         if token.text.is_empty() {
             continue;
         }
-        let slice = utf16_slice(source, token.span.start, token.span.end);
+        let slice = utf16_slice(
+            source,
+            token.span.range.start as usize,
+            token.span.range.end as usize,
+        );
         assert_eq!(slice, token.text);
     }
 }
@@ -102,15 +111,15 @@ fn analyze_chinese_spans() {
 
     let ident = &result.tokens[0];
     assert_eq!(ident.kind, "Ident");
-    assert_eq!(ident.span.start, 0);
-    assert_eq!(ident.span.end, 2);
+    assert_eq!(ident.span.range.start, 0);
+    assert_eq!(ident.span.range.end, 2);
     assert_eq!(ident.span.line, 1);
     assert_eq!(ident.span.col, 1);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.kind, "Plus");
-    assert_eq!(plus.span.start, 2);
-    assert_eq!(plus.span.end, 3);
+    assert_eq!(plus.span.range.start, 2);
+    assert_eq!(plus.span.range.end, 3);
     assert_eq!(plus.span.line, 1);
     assert_eq!(plus.span.col, 3);
 
@@ -118,7 +127,11 @@ fn analyze_chinese_spans() {
         if token.text.is_empty() {
             continue;
         }
-        let slice = utf16_slice(source, token.span.start, token.span.end);
+        let slice = utf16_slice(
+            source,
+            token.span.range.start as usize,
+            token.span.range.end as usize,
+        );
         assert_eq!(slice, token.text);
     }
 }
@@ -130,15 +143,15 @@ fn analyze_emoji_spans_and_diagnostics() {
 
     let ident = &result.tokens[0];
     assert_eq!(ident.kind, "Ident");
-    assert_eq!(ident.span.start, 0);
-    assert_eq!(ident.span.end, 2);
+    assert_eq!(ident.span.range.start, 0);
+    assert_eq!(ident.span.range.end, 2);
     assert_eq!(ident.span.line, 1);
     assert_eq!(ident.span.col, 1);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.kind, "Plus");
-    assert_eq!(plus.span.start, 2);
-    assert_eq!(plus.span.end, 3);
+    assert_eq!(plus.span.range.start, 2);
+    assert_eq!(plus.span.range.end, 3);
     assert_eq!(plus.span.line, 1);
     assert_eq!(plus.span.col, 2);
 
@@ -148,8 +161,8 @@ fn analyze_emoji_spans_and_diagnostics() {
 
     let diag = &error_result.diagnostics[0];
     assert_eq!(diag.kind, "error");
-    assert_eq!(diag.span.start, 2);
-    assert_eq!(diag.span.end, 3);
+    assert_eq!(diag.span.range.start, 2);
+    assert_eq!(diag.span.range.end, 3);
     assert_eq!(diag.span.line, 1);
     assert_eq!(diag.span.col, 3);
 }
