@@ -15,11 +15,16 @@ Non-workspace directories:
 - `examples/vite/`: Vite + CodeMirror demo consuming `analyzer_wasm`
 - `docs/`: design notes / specs (this file lives here)
 
+---
+
 ## `analyzer` module map
 
 Entry points:
 
-- `analyzer/src/lib.rs`: `analyze(text)`, `analyze_with_context(text, ctx)`, `complete_with_context(text, cursor_byte, ctx)`
+- `analyzer/src/lib.rs`:
+  - `analyze(text)`
+  - `analyze_with_context(text, ctx)`
+  - `complete_with_context(text, cursor_byte, ctx)`
 
 Core modules:
 
@@ -27,81 +32,251 @@ Core modules:
 - `analyzer/src/parser/mod.rs`: Pratt parser plumbing + binding power tables; builds `ParseOutput { expr, diagnostics, tokens }`
 - `analyzer/src/parser/expr.rs`: expression grammar (primary/prefix/infix/ternary/call/member-call) + recovery
 - `analyzer/src/ast.rs`: AST node types (preserves explicit grouping via `ExprKind::Group`)
-- `analyzer/src/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules
+- `analyzer/src/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
 - `analyzer/src/semantic/mod.rs`: minimal type checking driven by `Context { properties, functions }`
 - `analyzer/src/completion.rs`: byte-offset completion + signature help for editor integrations
-- `analyzer/src/source_map.rs`: byte offset → (line,col) and byte offset → UTF-16 helpers
-- `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification
-- `analyzer/src/tokenstream.rs`: `TokenCursor` wrapper used by the parser
+- `analyzer/src/source_map.rs`: byte offset → `(line,col)` and byte offset ↔ UTF-16 helpers
+- `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification, `tokens_in_span(...)`
+- `analyzer/src/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
+
+---
+
+## Tokens, spans, and token ranges
+
+### Core span model (Rust)
+
+- `Span { start: u32, end: u32 }` in `analyzer/src/token.rs`
+- Represents **byte offsets**
+- Half-open semantics: `[start, end)`
+
+### Span → TokenRange
+
+- `tokens_in_span(tokens, span: Span) -> TokenRange`
+- Returns half-open token index range `[lo, hi)`
+- Handles:
+  - empty spans
+  - EOF insertion points
+  - trivia overlap
+  - out-of-bounds spans
+
+---
+
+## TokenQuery (canonical token neighbor API)
+
+Location:
+
+- `analyzer/src/tokenstream.rs`
+
+`TokenQuery<'a>` centralizes **span → token range → trivia scanning**, replacing ad-hoc loops in formatter and utilities.
+
+Key capabilities:
+
+- `range_for_span(span)` → TokenRange
+- `prev_nontrivia(idx)`
+- `next_nontrivia(idx)`
+- `first_in_range(range)`
+- `last_in_range(range)`
+- `leading_trivia_before(idx)`
+- `trailing_trivia_until_newline_or_nontrivia(idx)`
+- `bounds_usize(range)`
+
+Design intent:
+
+- Single authoritative place for trivia / neighbor scanning
+- Reduce duplicated index arithmetic in formatter and comment logic
+- Token index semantics are always half-open `[lo, hi)`
+
+---
 
 ## Implemented syntax (what the lexer/parser accept)
 
 Literals and identifiers:
 
 - numbers: integer digits only (`analyzer/src/lexer/mod.rs`)
-- strings: double-quoted, no escapes (“v1” behavior; `analyzer/src/lexer/mod.rs`)
-- identifiers: ASCII letters/`_` plus any non-ASCII codepoint (`analyzer/src/lexer/mod.rs`)
+- strings: double-quoted, no escapes (“v1” behavior)
+- identifiers: ASCII letters/`_` plus any non-ASCII codepoint
 
 Expression forms (AST):
 
-- unary: `!expr`, `-expr` (`analyzer/src/parser/expr.rs`, `analyzer/src/ast.rs`)
-- binary: `< <= == != >= > && || + - * / % ^` (precedence in `analyzer/src/parser/mod.rs`)
-- ternary: `cond ? then : otherwise` (`analyzer/src/parser/expr.rs`)
-- grouping: `(expr)` preserved as `ExprKind::Group` (`analyzer/src/parser/expr.rs`, `analyzer/src/ast.rs`)
-- calls: `ident(arg1, arg2, ...)` (callee must be an identifier; `analyzer/src/parser/expr.rs`)
-- member-call: `receiver.method(arg1, ...)` (member *access* without `(...)` is rejected; `analyzer/src/parser/expr.rs`)
+- unary: `!expr`, `-expr`
+- binary: `< <= == != >= > && || + - * / % ^`
+- ternary: `cond ? then : otherwise`
+- grouping: `(expr)` preserved as `ExprKind::Group`
+- calls: `ident(arg1, arg2, ...)`
+- member-call: `receiver.method(arg1, ...)`
+  (member access without `(...)` is rejected)
 
-Known gaps (explicit in code behavior):
+Known gaps:
 
-- lexer does not produce boolean literal tokens yet (`true` / `false` lex as identifiers; see note in `analyzer/src/parser/expr.rs`)
-- completion’s “after-atom operators” list does not include every parsed operator (`analyzer/src/completion.rs`)
+- boolean literals (`true` / `false`) lex as identifiers
+- completion operator list does not include every parsed operator
+
+---
 
 ## Builtins + sugar (where they live)
 
-Semantic builtins and checks:
+Semantic builtins:
 
-- builtin function list: `analyzer::semantic::builtins_functions()` currently returns `if` and `sum` (`analyzer/src/semantic/mod.rs`)
-- semantic types include `Boolean`, and `if()` checks its condition is boolean (`analyzer/src/semantic/mod.rs`)
-- property lookup: `prop("Name")` is a special-cased call that checks:
+- builtin function list: `builtins_functions()` → `if`, `sum`
+- `if()` checks condition is boolean
+- property lookup: `prop("Name")`
   - arity = 1
-  - argument is a string literal
-  - property exists in `Context.properties` (`analyzer/src/semantic/mod.rs`)
-- postfix sugar typing: `condition.if(then, else)` (2 args) is treated like `if(condition, then, else)` for typing/diagnostics only (no evaluator/runtime desugaring yet)
+  - argument must be string literal
+  - property must exist in `Context.properties`
+- postfix sugar typing:
+  - `cond.if(a, b)` treated like `if(cond, a, b)` for typing only
 
 Completion builtins and sugar:
 
-- start-of-expression “builtins” inserted as identifiers: `not`, `true`, `false` (`analyzer/src/completion.rs`)
-- postfix completion: `.if()` is offered after an atom when `if` exists in `Context.functions` (`analyzer/src/completion.rs`)
+- expression-start keywords: `not`, `true`, `false`
+- postfix completion: `.if()` offered when `if` exists in context
+
+---
 
 ## WASM boundary invariants (`analyzer_wasm`)
 
-- exported functions: `analyze(source: String, context_json?: String)` and `complete(source: String, cursor_utf16: usize, context_json?: String)` (`analyzer_wasm/src/lib.rs`)
-- internal spans are byte offsets (`analyzer/src/token.rs`), but JS-facing spans use UTF-16 offsets:
-  - `SpanView { start, end, line, col }` uses UTF-16 `start/end` (`analyzer_wasm/src/dto/v1.rs`, `analyzer_wasm/src/lib.rs`)
-  - `complete(...)` accepts a UTF-16 cursor and converts to a byte offset before calling Rust completion (`analyzer_wasm/src/lib.rs`)
-- span semantics: all ranges are half-open `[start, end)` (end is exclusive; token hi is exclusive; byte offsets in Rust; UTF-16 offsets in JS DTOs)
-- text edits are applied in descending `(start,end)` order to avoid offset shifting when multiple edits exist (`analyzer_wasm/src/lib.rs`)
+Exported functions (`analyzer_wasm/src/lib.rs`):
 
-## Tests (what exists and where)
+- `analyze(source: String, context_json?: String)`
+- `complete(source: String, cursor_utf16: usize, context_json?: String)`
+- `utf16_pos_to_line_col(source: String, pos_utf16: u32)`
 
-Rust unit tests:
+---
 
-- `analyzer/src/tests/`: unit tests for lexer/parser/formatter/semantic/utf16/completion (`analyzer/src/tests/mod.rs`)
-- completion DSL: `analyzer/src/tests/completion_dsl.rs` provides:
-  - a mini `Context` builder
-  - `$0` cursor markers in input strings
-  - assertion helpers used by `analyzer/src/tests/test_completion.rs`
+### Encoding boundary design
 
-Rust golden tests (fixtures):
+**Core analyzer (Rust):**
 
-- runners:
-  - `analyzer/tests/format_golden.rs` → `analyzer/tests/format/*.formula` → `*.snap`
-  - `analyzer/tests/diagnostics_golden.rs` → `analyzer/tests/diagnostics/*.formula` → `*.snap`
-- harness: `analyzer/tests/common/golden.rs`
-- update snapshots: run tests with `BLESS=1` (checked by `analyzer/tests/common/golden.rs`)
+- All spans and cursor positions are **byte offsets**
 
-Vite demo tests (TS):
+**JS / WASM boundary:**
 
-- unit: `examples/vite/tests/unit/` (Vitest)
-- e2e: `examples/vite/tests/e2e/` (Playwright; regression checks include token highlighting / diagnostics propagation)
+- All exposed spans use **UTF-16 code unit offsets**
+- Conversion occurs only in the WASM layer
+
+DTO types (`analyzer_wasm/src/dto/v1.rs`):
+
+```ts
+Utf16Span { start: u32, end: u32 } // half-open [start, end)
+SpanView { range: Utf16Span }
+LineColView { line: u32, col: u32 }
+TextEditView { range: Utf16Span, new_text: string }
+```
+
+Byte ↔ UTF-16 conversion lives in WASM
+
+Files:
+
+- `analyzer_wasm/src/offsets.rs`
+- `analyzer_wasm/src/span.rs`
+
+Helpers:
+
+- `utf16_offset_to_byte(source, utf16_pos)`
+- `byte_offset_to_utf16_offset(source, byte_pos)`
+- `byte_span_to_utf16_span(source, span)`
+
+JS never deals with byte offsets.
+Rust core never deals with UTF-16 offsets.
+
+---
+
+### Line / Column handling (now derived, not stored)
+
+- `DTO SpanView` no longer stores line or col
+- `Line/column` is computed lazily via: `utf16_pos_to_line_col(source, pos_utf16) -> LineColView`
+- Design intent:
+  - range is canonical
+  - line/col is derived only when needed
+  - Avoid storing redundant positional data
+
+- Design intent:
+  - range is canonical
+  - line/col is derived only when needed
+  - Avoid storing redundant positional data
+
+Text edits
+
+- Multiple edits applied in descending offset order
+- Prevents offset shifting bugs
+- All edit ranges are UTF-16 at JS boundary
+
+---
+
+Token stream utilities
+
+- TokenCursor — parser cursor over token stream
+- TokenQuery — span → range → trivia neighbor API
+
+Both live in:
+
+- `analyzer/src/tokenstream.rs`
+
+---
+
+Tests (what exists and where)
+
+Rust unit tests (analyzer/src/tests/)
+
+Coverage:
+
+- lexer
+- parser
+- span invariants
+- token-in-span
+- TokenQuery behavior
+- formatter
+- completion DSL
+- UTF-16 helpers
+- semantic checks
+
+---
+
+Rust golden tests
+
+Runners:
+
+- `analyzer/tests/format_golden.rs`
+- `analyzer/tests/diagnostics_golden.rs`
+
+Fixtures:
+
+- `analyzer/tests/format/*.formula → *.snap`
+- `analyzer/tests/diagnostics/*.formula → *.snap`
+
+Snapshots updated via:
+
+```bash
+BLESS=1 cargo test -p analyzer
+```
+
+WASM tests
+
+- analyzer_wasm/tests/analyze.rs
+- Validates:
+  - UTF-16 span correctness
+  - token span integrity
+  - diagnostics mapping
+
+Vite demo tests (TypeScript)
+
+- Unit tests: examples/vite/tests/unit/ (Vitest)
+- E2E tests: examples/vite/tests/e2e/ (Playwright)
+
+Regression coverage:
+
+- token highlighting
+- diagnostics propagation
+- chip spans
+- UI behavior
+
+Current architectural invariants
+
+- Analyzer core uses byte offsets only
+- JS/WASM boundary uses UTF-16 offsets only
+- Span semantics are half-open [start, end) everywhere
+- TokenQuery is the canonical trivia/token neighbor API
+- Token ranges derive from spans via tokens_in_span
+- Line/column is derived lazily, not stored
+- Encoding conversion lives only in WASM
