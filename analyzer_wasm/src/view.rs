@@ -2,8 +2,8 @@ use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, Span, Token, TokenKind};
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, SignatureHelpView, SpanView, TextEditView, TokenView,
-    Span as SpanDto,
+    DiagnosticKindView, DiagnosticView, SignatureHelpView, Span as SpanDto, SpanView, TextEditView,
+    TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::span::byte_span_to_utf16_span;
@@ -43,17 +43,6 @@ impl<'a> ViewCtx<'a> {
             tokens: Vec::new(),
             formatted: String::new(),
         }
-    }
-
-    pub fn invalid_context_diag(&self) -> DiagnosticView {
-        let diag = Diagnostic {
-            kind: DiagnosticKind::Error,
-            message: "Invalid context JSON".into(),
-            span: Span { start: 0, end: 0 },
-            labels: vec![],
-            notes: vec![],
-        };
-        self.diag(&diag)
     }
 
     pub fn completion_output(&self, output: &analyzer::CompletionOutput) -> CompletionOutputView {

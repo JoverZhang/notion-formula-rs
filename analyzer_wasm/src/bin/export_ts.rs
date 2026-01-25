@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, LineColView, SignatureHelpView, SpanView, TextEditView,
-    Span, TokenView,
+    DiagnosticKindView, DiagnosticView, LineColView, SignatureHelpView, Span, SpanView,
+    TextEditView, TokenView,
 };
 use ts_rs::TS;
 

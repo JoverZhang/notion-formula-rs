@@ -39,7 +39,8 @@ fn analyze_value(source: &str) -> AnalyzeResult {
     let value = analyzer_wasm::analyze(
         source.to_string(),
         r#"{"properties":[],"functions":[]}"#.to_string(),
-    );
+    )
+    .expect("expected analyze() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
 }
 
@@ -171,14 +172,25 @@ fn analyze_emoji_spans_and_diagnostics() {
 }
 
 #[wasm_bindgen_test]
-fn analyze_invalid_context_adds_diagnostic() {
+fn analyze_invalid_context_errors() {
     let source = "1+2";
-    let value = analyzer_wasm::analyze(source.to_string(), "{".to_string());
-    let result: AnalyzeResult = serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult");
+    let err = analyzer_wasm::analyze(source.to_string(), "{".to_string())
+        .expect_err("expected analyze() Err on invalid context JSON");
+    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+}
 
-    assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].kind, "error");
-    assert_eq!(result.diagnostics[0]._message, "Invalid context JSON");
-    assert_eq!(result.diagnostics[0].span.range.start, 0);
-    assert_eq!(result.diagnostics[0].span.range.end, 0);
+#[wasm_bindgen_test]
+fn analyze_empty_context_errors() {
+    let source = "1+2";
+    let err = analyzer_wasm::analyze(source.to_string(), "   ".to_string())
+        .expect_err("expected analyze() Err on empty context JSON");
+    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+}
+
+#[wasm_bindgen_test]
+fn complete_invalid_context_errors() {
+    let source = "1+2";
+    let err = analyzer_wasm::complete(source.to_string(), 0, "{".to_string())
+        .expect_err("expected complete() Err on invalid context JSON");
+    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
 }

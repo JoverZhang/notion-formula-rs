@@ -181,7 +181,7 @@ impl<'a> Parser<'a> {
     fn mk_expr(&mut self, span: Span, kind: ExprKind) -> Expr {
         Expr {
             id: self.alloc_id(),
-            span: span,
+            span,
             kind,
         }
     }

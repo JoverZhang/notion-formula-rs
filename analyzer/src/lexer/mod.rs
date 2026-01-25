@@ -162,15 +162,14 @@ pub fn lex(input: &str) -> LexOutput {
                     let mut end = start + 2;
                     let mut terminated = false;
                     while let Some((i, c2)) = iter.next() {
-                        if c2 == '*' {
-                            if matches!(iter.peek(), Some((_, '/'))) {
+                        if c2 == '*'
+                            && matches!(iter.peek(), Some((_, '/'))) {
                                 let (j, slash) = iter.next().unwrap();
                                 debug_assert_eq!(slash, '/');
                                 end = j + slash.len_utf8();
                                 terminated = true;
                                 break;
                             }
-                        }
                         end = i + c2.len_utf8();
                     }
 
@@ -212,7 +211,7 @@ pub fn lex(input: &str) -> LexOutput {
             '"' => {
                 // Read string until next quote (no escapes in v1).
                 let mut end: Option<usize> = None;
-                while let Some((i, c)) = iter.next() {
+                for (i, c) in iter.by_ref() {
                     if c == '"' {
                         end = Some(i + 1);
                         break;

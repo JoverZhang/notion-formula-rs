@@ -3,7 +3,7 @@ mod common;
 use std::path::Path;
 
 use analyzer::semantic::{Context, Property, Ty, builtins_functions};
-use analyzer::{analyze, analyze_with_context, format_diagnostics};
+use analyzer::{analyze, format_diagnostics};
 use common::golden::run_golden_dir;
 
 #[test]
@@ -28,8 +28,10 @@ fn diagnostics_golden() {
                     }],
                     functions: builtins_functions(),
                 };
-                analyze_with_context(source, ctx)
-                    .expect("analyze_with_context() should return ParseOutput")
+                let mut out = analyze(source).expect("analyze() should return ParseOutput");
+                let (_, diags) = analyzer::semantic::analyze_expr(&out.expr, &ctx);
+                out.diagnostics.extend(diags);
+                out
             } else {
                 analyze(source).expect("analyze() should return ParseOutput")
             };

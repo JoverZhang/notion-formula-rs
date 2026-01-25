@@ -63,12 +63,12 @@ pub fn format_diagnostics(source: &str, mut diags: Vec<Diagnostic>) -> String {
             (
                 a.span.start,
                 a.span.end,
-                a.message.as_ref().map(|s| s.as_str()).unwrap_or(""),
+                a.message.as_deref().unwrap_or(""),
             )
                 .cmp(&(
                     b.span.start,
                     b.span.end,
-                    b.message.as_ref().map(|s| s.as_str()).unwrap_or(""),
+                    b.message.as_deref().unwrap_or(""),
                 ))
         });
 

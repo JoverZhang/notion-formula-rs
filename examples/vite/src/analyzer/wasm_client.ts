@@ -15,6 +15,17 @@ export type SignatureHelp = SignatureHelpView;
 export type CompletionOutput = CompletionOutputView;
 
 export async function initWasm(): Promise<void> {
+  // wasm-pack's default init() uses `fetch(new URL(..., import.meta.url))`, which doesn't
+  // support `file://` in Node. For tests, pass the `.wasm` bytes explicitly.
+  if (typeof process !== "undefined" && Boolean(process.versions?.node)) {
+    const { readFile } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+    const wasmUrl = new URL("../pkg/analyzer_wasm_bg.wasm", import.meta.url);
+    const wasmBytes = await readFile(fileURLToPath(wasmUrl));
+    await init(wasmBytes);
+    return;
+  }
+
   await init();
 }
 

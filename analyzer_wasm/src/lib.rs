@@ -6,6 +6,7 @@ mod view;
 
 use analyzer::SourceMap;
 use analyzer::semantic::{Context, builtins_functions};
+use js_sys::Error as JsError;
 use wasm_bindgen::prelude::*;
 
 use crate::dto::v1::{AnalyzeResult, LineColView};
@@ -19,42 +20,34 @@ enum ContextParseError {
 }
 
 #[wasm_bindgen]
-pub fn analyze(source: String, context_json: String) -> JsValue {
+pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue> {
     let view = ViewCtx::new(&source);
-    let (ctx, invalid_context) = match parse_context(&context_json) {
-        Ok(ctx) => (ctx, false),
-        Err(_) => (
-            Context {
-                properties: vec![],
-                functions: builtins_functions(),
-            },
-            true,
-        ),
-    };
-    let mut result: AnalyzeResult = match analyzer::analyze_with_context(&source, ctx) {
-        Ok(output) => view.analyze_output(output),
+    let ctx = parse_context(&context_json)
+        .map_err(|_| JsValue::from(JsError::new("Invalid context JSON")))?;
+
+    let result: AnalyzeResult = match analyzer::analyze(&source) {
+        Ok(mut output) => {
+            let (_, diags) = analyzer::semantic::analyze_expr(&output.expr, &ctx);
+            output.diagnostics.extend(diags);
+            view.analyze_output(output)
+        }
         Err(diag) => view.analyze_error(&diag),
     };
 
-    if invalid_context {
-        result.diagnostics.push(view.invalid_context_diag());
-    }
-
-    serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
+    serde_wasm_bindgen::to_value(&result)
+        .map_err(|_| JsValue::from(JsError::new("Serialize error")))
 }
 
 #[wasm_bindgen]
-pub fn complete(source: String, cursor: usize, context_json: String) -> JsValue {
+pub fn complete(source: String, cursor: usize, context_json: String) -> Result<JsValue, JsValue> {
     let cursor_byte = utf16_offset_to_byte(&source, cursor);
-    let ctx = parse_context(&context_json).unwrap_or_else(|_| Context {
-        properties: vec![],
-        functions: builtins_functions(),
-    });
+    let ctx = parse_context(&context_json)
+        .map_err(|_| JsValue::from(JsError::new("Invalid context JSON")))?;
 
     let view = ViewCtx::new(&source);
-    let output = analyzer::complete_with_context(&source, cursor_byte, Some(&ctx));
+    let output = analyzer::complete(&source, cursor_byte, &ctx);
     let out = view.completion_output(&output);
-    serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
+    serde_wasm_bindgen::to_value(&out).map_err(|_| JsValue::from(JsError::new("Serialize error")))
 }
 
 #[wasm_bindgen]

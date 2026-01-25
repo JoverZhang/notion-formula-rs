@@ -15,6 +15,7 @@ name = "analyzer_wasm"
 version = "0.1.0"
 dependencies = [
  "analyzer",
+ "js-sys",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
