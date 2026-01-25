@@ -3,6 +3,7 @@ import type {
   AnalyzeResult,
   CompletionItemView,
   CompletionOutputView,
+  LineColView,
   SignatureHelpView,
   TextEditView,
   Utf16Span,
@@ -28,4 +29,8 @@ export function completeSource(
   contextJson?: string,
 ): CompletionOutput {
   return wasm.complete(source, cursorUtf16, contextJson) as CompletionOutput;
+}
+
+export function utf16PosToLineCol(source: string, posUtf16: number): LineColView {
+  return wasm.utf16_pos_to_line_col(source, posUtf16) as LineColView;
 }

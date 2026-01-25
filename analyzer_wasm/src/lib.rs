@@ -4,10 +4,11 @@ mod span;
 mod text_edit;
 mod view;
 
+use analyzer::SourceMap;
 use analyzer::semantic::{Context, builtins_functions};
 use wasm_bindgen::prelude::*;
 
-use crate::dto::v1::AnalyzeResult;
+use crate::dto::v1::{AnalyzeResult, LineColView};
 use crate::offsets::utf16_offset_to_byte;
 use crate::view::ViewCtx;
 
@@ -57,6 +58,17 @@ pub fn complete(source: String, cursor_utf16: usize, context_json: Option<String
     let view = ViewCtx::new(&source);
     let output = analyzer::complete_with_context(&source, cursor_byte, ctx.as_ref());
     let out = view.completion_output(&output);
+    serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn utf16_pos_to_line_col(source: String, pos_utf16: u32) -> JsValue {
+    let byte = utf16_offset_to_byte(&source, pos_utf16 as usize);
+    let (line, col) = SourceMap::new(&source).line_col(byte as u32);
+    let out = LineColView {
+        line: line as u32,
+        col: col as u32,
+    };
     serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
 }
 

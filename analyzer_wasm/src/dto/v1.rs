@@ -27,6 +27,10 @@ pub enum DiagnosticKindView {
 #[derive(Serialize, TS)]
 pub struct SpanView {
     pub range: Utf16Span,
+}
+
+#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LineColView {
     pub line: u32,
     pub col: u32,
 }

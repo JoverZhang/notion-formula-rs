@@ -1,4 +1,4 @@
-use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, SourceMap, Span, Token, TokenKind};
+use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, Span, Token, TokenKind};
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
@@ -11,15 +11,11 @@ use crate::text_edit::apply_text_edits_bytes;
 
 pub struct ViewCtx<'a> {
     source: &'a str,
-    sm: SourceMap<'a>,
 }
 
 impl<'a> ViewCtx<'a> {
     pub fn new(source: &'a str) -> Self {
-        Self {
-            source,
-            sm: SourceMap::new(source),
-        }
+        Self { source }
     }
 
     pub fn analyze_output(&self, output: ParseOutput) -> AnalyzeResult {
@@ -151,13 +147,8 @@ impl<'a> ViewCtx<'a> {
 
     fn span(&self, span: Span) -> SpanView {
         let range = byte_span_to_utf16_span(self.source, span);
-        let (line, col) = self.sm.line_col(span.start);
 
-        SpanView {
-            range,
-            line: line as u32,
-            col: col as u32,
-        }
+        SpanView { range }
     }
 
     fn simple_span(&self, span: Span) -> Utf16Span {

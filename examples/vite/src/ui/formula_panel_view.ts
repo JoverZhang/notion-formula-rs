@@ -3,7 +3,12 @@ import { linter } from "@codemirror/lint";
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, keymap } from "@codemirror/view";
-import { completeSource, type CompletionItem, type SignatureHelp } from "../analyzer/wasm_client";
+import {
+  completeSource,
+  type CompletionItem,
+  type SignatureHelp,
+  utf16PosToLineCol,
+} from "../analyzer/wasm_client";
 import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
 import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
@@ -183,6 +188,7 @@ function formatChipPosLabel(
 
 function renderDiagnostics(
   listEl: HTMLUListElement,
+  source: string,
   diagnostics: AnalyzerDiagnostic[],
   chipMap: ChipOffsetMap | null,
   chipSpans: ChipSpan[],
@@ -198,8 +204,19 @@ function renderDiagnostics(
   diagnostics.forEach((diag) => {
     const li = document.createElement("li");
     const kind = diag.kind || "error";
-    const line = diag.span?.line ?? 0;
-    const col = diag.span?.col ?? 0;
+    const start = diag.span?.range?.start;
+    let line = 0;
+    let col = 0;
+    if (typeof start === "number") {
+      try {
+        const lc = utf16PosToLineCol(source, start);
+        line = lc.line;
+        col = lc.col;
+      } catch {
+        line = 0;
+        col = 0;
+      }
+    }
     const chipLabel = formatChipPosLabel(diag, chipMap, chipSpans);
     const position = chipLabel ? `${chipLabel} line=${line} col=${col}` : `line=${line} col=${col}`;
     li.textContent = `${kind}: ${diag.message} ${position}`;
@@ -532,7 +549,7 @@ export function createFormulaPanelView(opts: {
   let lastStatus: FormulaState["status"] = "idle";
   let lastSource = opts.initialSource;
 
-  renderDiagnostics(diagnosticsEl, [], null, []);
+  renderDiagnostics(diagnosticsEl, lastSource, [], null, []);
   rerenderCompletions();
 
   formatBtn.addEventListener("click", () => {
@@ -633,7 +650,13 @@ export function createFormulaPanelView(opts: {
         lastChipMap = null;
       }
 
-      renderDiagnostics(diagnosticsEl, state.diagnostics, lastChipMap, lastValidChipSpans);
+      renderDiagnostics(
+        diagnosticsEl,
+        state.source,
+        state.diagnostics,
+        lastChipMap,
+        lastValidChipSpans,
+      );
       const cmDiags = analyzerToCmDiagnostics(
         state.diagnostics,
         state.source.length,

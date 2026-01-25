@@ -4,7 +4,9 @@
 
 export type Utf16Span = { start: number, end: number, };
 
-export type SpanView = { range: Utf16Span, line: number, col: number, };
+export type SpanView = { range: Utf16Span, };
+
+export type LineColView = { line: number, col: number, };
 
 export type DiagnosticKindView = "error";
 
