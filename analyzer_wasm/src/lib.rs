@@ -5,25 +5,26 @@ mod text_edit;
 mod view;
 
 use analyzer::SourceMap;
-use analyzer::semantic::{Context, builtins_functions};
+use analyzer::semantic::{Context, Property, builtins_functions};
 use js_sys::Error as JsError;
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 use crate::dto::v1::{AnalyzeResult, LineColView};
 use crate::offsets::utf16_offset_to_byte;
 use crate::view::ViewCtx;
 
-#[derive(Debug)]
-enum ContextParseError {
-    Empty,
-    InvalidJson,
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ContextInput {
+    #[serde(default)]
+    properties: Vec<Property>,
 }
 
 #[wasm_bindgen]
 pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue> {
     let view = ViewCtx::new(&source);
-    let ctx = parse_context(&context_json)
-        .map_err(|_| JsValue::from(JsError::new("Invalid context JSON")))?;
+    let ctx = parse_context(&context_json)?;
 
     let result: AnalyzeResult = match analyzer::analyze(&source) {
         Ok(mut output) => {
@@ -41,8 +42,7 @@ pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue>
 #[wasm_bindgen]
 pub fn complete(source: String, cursor: usize, context_json: String) -> Result<JsValue, JsValue> {
     let cursor_byte = utf16_offset_to_byte(&source, cursor);
-    let ctx = parse_context(&context_json)
-        .map_err(|_| JsValue::from(JsError::new("Invalid context JSON")))?;
+    let ctx = parse_context(&context_json)?;
 
     let view = ViewCtx::new(&source);
     let output = analyzer::complete(&source, cursor_byte, &ctx);
@@ -61,17 +61,20 @@ pub fn pos_to_line_col(source: String, pos: u32) -> JsValue {
     serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
 }
 
-fn parse_context(context_json: &str) -> Result<Context, ContextParseError> {
+fn invalid_context_json_error() -> JsValue {
+    JsValue::from(JsError::new("Invalid context JSON"))
+}
+
+fn parse_context(context_json: &str) -> Result<Context, JsValue> {
     let trimmed = context_json.trim();
     if trimmed.is_empty() {
-        return Err(ContextParseError::Empty);
+        return Err(invalid_context_json_error());
     }
 
-    match serde_json::from_str::<Context>(trimmed) {
-        Ok(mut ctx) => {
-            ctx.functions = builtins_functions();
-            Ok(ctx)
-        }
-        Err(_) => Err(ContextParseError::InvalidJson),
-    }
+    let input: ContextInput =
+        serde_json::from_str(trimmed).map_err(|_| invalid_context_json_error())?;
+    Ok(Context {
+        properties: input.properties,
+        functions: builtins_functions(),
+    })
 }

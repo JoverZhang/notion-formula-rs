@@ -9,5 +9,4 @@ export const PROPERTY_SCHEMA = [
 
 export const CONTEXT_JSON = JSON.stringify({
   properties: PROPERTY_SCHEMA,
-  functions: [],
 });

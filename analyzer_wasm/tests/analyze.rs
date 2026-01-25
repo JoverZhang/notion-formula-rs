@@ -38,7 +38,7 @@ struct TokenView {
 fn analyze_value(source: &str) -> AnalyzeResult {
     let value = analyzer_wasm::analyze(
         source.to_string(),
-        r#"{"properties":[],"functions":[]}"#.to_string(),
+        r#"{}"#.to_string(),
     )
     .expect("expected analyze() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
@@ -184,6 +184,22 @@ fn analyze_empty_context_errors() {
     let source = "1+2";
     let err = analyzer_wasm::analyze(source.to_string(), "   ".to_string())
         .expect_err("expected analyze() Err on empty context JSON");
+    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+}
+
+#[wasm_bindgen_test]
+fn analyze_rejects_functions_in_context_json() {
+    let source = "1+2";
+    let err = analyzer_wasm::analyze(source.to_string(), r#"{"functions":[]}"#.to_string())
+        .expect_err("expected analyze() Err on unknown context JSON fields");
+    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+}
+
+#[wasm_bindgen_test]
+fn analyze_rejects_invalid_properties_structure() {
+    let source = "1+2";
+    let err = analyzer_wasm::analyze(source.to_string(), r#"{"properties":{}}"#.to_string())
+        .expect_err("expected analyze() Err on invalid context JSON structure");
     assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
 }
 

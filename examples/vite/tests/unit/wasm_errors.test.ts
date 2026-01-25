@@ -25,4 +25,14 @@ describe("WASM host contract errors", () => {
       expect((e as Error).message).toContain("Invalid context JSON");
     }
   });
+
+  it("analyzeSource throws an Error when context JSON contains functions", () => {
+    try {
+      analyzeSource("1+2", JSON.stringify({ functions: [] }));
+      throw new Error("expected analyzeSource to throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toContain("Invalid context JSON");
+    }
+  });
 });
