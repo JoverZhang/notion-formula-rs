@@ -9,14 +9,14 @@ struct AnalyzeResult {
 }
 
 #[derive(Deserialize)]
-struct Utf16Span {
+struct Span {
     start: u32,
     end: u32,
 }
 
 #[derive(Deserialize)]
 struct SpanView {
-    range: Utf16Span,
+    range: Span,
     line: u32,
     col: u32,
 }
@@ -36,7 +36,10 @@ struct TokenView {
 }
 
 fn analyze_value(source: &str) -> AnalyzeResult {
-    let value = analyzer_wasm::analyze(source.to_string(), None);
+    let value = analyzer_wasm::analyze(
+        source.to_string(),
+        r#"{"properties":[],"functions":[]}"#.to_string(),
+    );
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
 }
 
@@ -165,4 +168,17 @@ fn analyze_emoji_spans_and_diagnostics() {
     assert_eq!(diag.span.range.end, 3);
     assert_eq!(diag.span.line, 1);
     assert_eq!(diag.span.col, 3);
+}
+
+#[wasm_bindgen_test]
+fn analyze_invalid_context_adds_diagnostic() {
+    let source = "1+2";
+    let value = analyzer_wasm::analyze(source.to_string(), "{".to_string());
+    let result: AnalyzeResult = serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult");
+
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].kind, "error");
+    assert_eq!(result.diagnostics[0]._message, "Invalid context JSON");
+    assert_eq!(result.diagnostics[0].span.range.start, 0);
+    assert_eq!(result.diagnostics[0].span.range.end, 0);
 }

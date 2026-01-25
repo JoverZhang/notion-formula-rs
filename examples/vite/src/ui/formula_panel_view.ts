@@ -7,7 +7,7 @@ import {
   completeSource,
   type CompletionItem,
   type SignatureHelp,
-  utf16PosToLineCol,
+  posToLineCol,
 } from "../analyzer/wasm_client";
 import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
 import type { FormulaId, FormulaState, AnalyzerDiagnostic } from "../app/types";
@@ -209,7 +209,7 @@ function renderDiagnostics(
     let col = 0;
     if (typeof start === "number") {
       try {
-        const lc = utf16PosToLineCol(source, start);
+        const lc = posToLineCol(source, start);
         line = lc.line;
         col = lc.col;
       } catch {

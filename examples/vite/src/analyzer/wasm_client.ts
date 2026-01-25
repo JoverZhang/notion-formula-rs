@@ -6,10 +6,9 @@ import type {
   LineColView,
   SignatureHelpView,
   TextEditView,
-  Utf16Span,
 } from "./generated/wasm_dto";
 
-export type Span = Utf16Span;
+export type { Span } from "./generated/wasm_dto";
 export type TextEdit = TextEditView;
 export type CompletionItem = CompletionItemView;
 export type SignatureHelp = SignatureHelpView;
@@ -19,18 +18,18 @@ export async function initWasm(): Promise<void> {
   await init();
 }
 
-export function analyzeSource(source: string, contextJson?: string): AnalyzeResult {
+export function analyzeSource(source: string, contextJson: string): AnalyzeResult {
   return wasm.analyze(source, contextJson) as AnalyzeResult;
 }
 
 export function completeSource(
   source: string,
-  cursorUtf16: number,
-  contextJson?: string,
+  cursor: number,
+  contextJson: string,
 ): CompletionOutput {
-  return wasm.complete(source, cursorUtf16, contextJson) as CompletionOutput;
+  return wasm.complete(source, cursor, contextJson) as CompletionOutput;
 }
 
-export function utf16PosToLineCol(source: string, posUtf16: number): LineColView {
-  return wasm.utf16_pos_to_line_col(source, posUtf16) as LineColView;
+export function posToLineCol(source: string, pos: number): LineColView {
+  return wasm.pos_to_line_col(source, pos) as LineColView;
 }

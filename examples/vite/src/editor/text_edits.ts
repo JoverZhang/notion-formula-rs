@@ -1,6 +1,6 @@
-import type { CompletionItemView, TextEditView, Utf16Span } from "../analyzer/generated/wasm_dto";
+import type { CompletionItemView, Span, TextEditView } from "../analyzer/generated/wasm_dto";
 
-export type TextRange = Utf16Span;
+export type TextRange = Span;
 
 export type TextEdit = TextEditView;
 export type CompletionItem = CompletionItemView;

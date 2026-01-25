@@ -5,7 +5,7 @@ use ts_rs::TS;
 ///
 /// Ranges are half-open `[start, end)`; `end` is exclusive.
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Utf16Span {
+pub struct Span {
     pub start: u32,
     pub end: u32,
 }
@@ -26,7 +26,7 @@ pub enum DiagnosticKindView {
 
 #[derive(Serialize, TS)]
 pub struct SpanView {
-    pub range: Utf16Span,
+    pub range: Span,
 }
 
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,7 +58,7 @@ pub struct AnalyzeResult {
 
 #[derive(Serialize, TS)]
 pub struct TextEditView {
-    pub range: Utf16Span,
+    pub range: Span,
     pub new_text: String,
 }
 
@@ -85,6 +85,6 @@ pub struct CompletionItemView {
 #[derive(Serialize, TS)]
 pub struct CompletionOutputView {
     pub items: Vec<CompletionItemView>,
-    pub replace: Utf16Span,
+    pub replace: Span,
     pub signature_help: Option<SignatureHelpView>,
 }

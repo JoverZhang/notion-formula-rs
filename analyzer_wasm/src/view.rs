@@ -3,7 +3,7 @@ use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, Span, Token, TokenKind};
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
     DiagnosticKindView, DiagnosticView, SignatureHelpView, SpanView, TextEditView, TokenView,
-    Utf16Span,
+    Span as SpanDto,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::span::byte_span_to_utf16_span;
@@ -151,7 +151,7 @@ impl<'a> ViewCtx<'a> {
         SpanView { range }
     }
 
-    fn simple_span(&self, span: Span) -> Utf16Span {
+    fn simple_span(&self, span: Span) -> SpanDto {
         byte_span_to_utf16_span(self.source, span)
     }
 }
