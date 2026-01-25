@@ -60,16 +60,11 @@ pub fn format_diagnostics(source: &str, mut diags: Vec<Diagnostic>) -> String {
     for d in diags {
         let mut labels = d.labels;
         labels.sort_by(|a, b| {
-            (
-                a.span.start,
-                a.span.end,
-                a.message.as_deref().unwrap_or(""),
-            )
-                .cmp(&(
-                    b.span.start,
-                    b.span.end,
-                    b.message.as_deref().unwrap_or(""),
-                ))
+            (a.span.start, a.span.end, a.message.as_deref().unwrap_or("")).cmp(&(
+                b.span.start,
+                b.span.end,
+                b.message.as_deref().unwrap_or(""),
+            ))
         });
 
         let (line, col) = sm.line_col(d.span.start);

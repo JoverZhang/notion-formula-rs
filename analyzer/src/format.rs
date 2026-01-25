@@ -189,10 +189,7 @@ pub fn format_expr(expr: &Expr, source: &str, tokens: &[Token]) -> String {
     let has_newline = fmt.expr_has_newline(expr);
     let force_multiline = fmt.forces_multiline(expr) || has_newline;
 
-    
-
-    if !force_multiline && !one_line.contains('\n') && fmt.fits_on_line(0, one_line.len())
-    {
+    if !force_multiline && !one_line.contains('\n') && fmt.fits_on_line(0, one_line.len()) {
         let mut s = one_line;
         if !s.ends_with('\n') {
             s.push('\n');
@@ -361,12 +358,13 @@ impl<'a> Formatter<'a> {
         if !has_newline || trailing_line_comment {
             let saved = self.used_comments.clone();
             if let Some(lhs) = self.format_expr_single_line(left, indent, l_bp)
-                && let Some(rhs) = self.format_expr_single_line(right, indent, r_bp) {
-                    let text = format!("{} {} {}", lhs, op_str, rhs);
-                    if self.fits_on_line(indent, text.len()) {
-                        return Rendered::single(indent, text);
-                    }
+                && let Some(rhs) = self.format_expr_single_line(right, indent, r_bp)
+            {
+                let text = format!("{} {} {}", lhs, op_str, rhs);
+                if self.fits_on_line(indent, text.len()) {
+                    return Rendered::single(indent, text);
                 }
+            }
             self.used_comments = saved;
         }
 
@@ -509,10 +507,9 @@ impl<'a> Formatter<'a> {
         for (idx, arg) in args.iter().enumerate() {
             let mut arg_r = self.format_expr_rendered(arg, indent + 1, 0);
             let is_last = idx + 1 == args.len();
-            if !is_last
-                && let Some(last) = arg_r.lines.last_mut() {
-                    last.text.push(',');
-                }
+            if !is_last && let Some(last) = arg_r.lines.last_mut() {
+                last.text.push(',');
+            }
             out.append(arg_r);
         }
         out.push_line(indent, ")");
@@ -569,10 +566,9 @@ impl<'a> Formatter<'a> {
         for (idx, arg) in args.iter().enumerate() {
             let mut arg_r = self.format_expr_rendered(arg, indent + 1, 0);
             let is_last = idx + 1 == args.len();
-            if !is_last
-                && let Some(last) = arg_r.lines.last_mut() {
-                    last.text.push(',');
-                }
+            if !is_last && let Some(last) = arg_r.lines.last_mut() {
+                last.text.push(',');
+            }
             out.append(arg_r);
         }
         out.push_line(indent, ")");

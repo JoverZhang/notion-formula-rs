@@ -7,7 +7,7 @@ use crate::dto::v1::{
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::span::byte_span_to_utf16_span;
-use crate::text_edit::apply_text_edits_bytes;
+use crate::text_edit::apply_text_edits_bytes_with_cursor;
 
 pub struct ViewCtx<'a> {
     source: &'a str,
@@ -89,14 +89,16 @@ impl<'a> ViewCtx<'a> {
             let mut edits = Vec::with_capacity(1 + item.additional_edits.len());
             edits.push(primary_edit.clone());
             edits.extend(item.additional_edits.iter().cloned());
-            let updated = apply_text_edits_bytes(self.source, &edits);
 
-            let cursor_byte = item.cursor.unwrap_or_else(|| {
+            let base_cursor_byte = item.cursor.unwrap_or_else(|| {
                 output
                     .replace
                     .start
                     .saturating_add(primary_edit.new_text.len() as u32)
             });
+
+            let (updated, cursor_byte) =
+                apply_text_edits_bytes_with_cursor(self.source, &edits, base_cursor_byte);
             let cursor_byte = usize::min(cursor_byte as usize, updated.len());
             byte_offset_to_utf16_offset(&updated, cursor_byte)
         });

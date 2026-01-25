@@ -162,14 +162,13 @@ pub fn lex(input: &str) -> LexOutput {
                     let mut end = start + 2;
                     let mut terminated = false;
                     while let Some((i, c2)) = iter.next() {
-                        if c2 == '*'
-                            && matches!(iter.peek(), Some((_, '/'))) {
-                                let (j, slash) = iter.next().unwrap();
-                                debug_assert_eq!(slash, '/');
-                                end = j + slash.len_utf8();
-                                terminated = true;
-                                break;
-                            }
+                        if c2 == '*' && matches!(iter.peek(), Some((_, '/'))) {
+                            let (j, slash) = iter.next().unwrap();
+                            debug_assert_eq!(slash, '/');
+                            end = j + slash.len_utf8();
+                            terminated = true;
+                            break;
+                        }
                         end = i + c2.len_utf8();
                     }
 

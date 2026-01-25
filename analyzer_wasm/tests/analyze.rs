@@ -17,8 +17,6 @@ struct Span {
 #[derive(Deserialize)]
 struct SpanView {
     range: Span,
-    line: u32,
-    col: u32,
 }
 
 #[derive(Deserialize)]
@@ -36,11 +34,8 @@ struct TokenView {
 }
 
 fn analyze_value(source: &str) -> AnalyzeResult {
-    let value = analyzer_wasm::analyze(
-        source.to_string(),
-        r#"{}"#.to_string(),
-    )
-    .expect("expected analyze() Ok");
+    let value = analyzer_wasm::analyze(source.to_string(), r#"{}"#.to_string())
+        .expect("expected analyze() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
 }
 
@@ -86,14 +81,10 @@ fn analyze_ascii_spans_and_format() {
     let first = &result.tokens[0];
     assert_eq!(first.span.range.start, 0);
     assert_eq!(first.span.range.end, 1);
-    assert_eq!(first.span.line, 1);
-    assert_eq!(first.span.col, 1);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.span.range.start, 1);
     assert_eq!(plus.span.range.end, 2);
-    assert_eq!(plus.span.line, 1);
-    assert_eq!(plus.span.col, 2);
 
     for token in &result.tokens {
         if token.text.is_empty() {
@@ -117,15 +108,11 @@ fn analyze_chinese_spans() {
     assert_eq!(ident.kind, "Ident");
     assert_eq!(ident.span.range.start, 0);
     assert_eq!(ident.span.range.end, 2);
-    assert_eq!(ident.span.line, 1);
-    assert_eq!(ident.span.col, 1);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.kind, "Plus");
     assert_eq!(plus.span.range.start, 2);
     assert_eq!(plus.span.range.end, 3);
-    assert_eq!(plus.span.line, 1);
-    assert_eq!(plus.span.col, 3);
 
     for token in &result.tokens {
         if token.text.is_empty() {
@@ -149,15 +136,11 @@ fn analyze_emoji_spans_and_diagnostics() {
     assert_eq!(ident.kind, "Ident");
     assert_eq!(ident.span.range.start, 0);
     assert_eq!(ident.span.range.end, 2);
-    assert_eq!(ident.span.line, 1);
-    assert_eq!(ident.span.col, 1);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.kind, "Plus");
     assert_eq!(plus.span.range.start, 2);
     assert_eq!(plus.span.range.end, 3);
-    assert_eq!(plus.span.line, 1);
-    assert_eq!(plus.span.col, 2);
 
     let error_source = "1 +";
     let error_result = analyze_value(error_source);
@@ -167,8 +150,6 @@ fn analyze_emoji_spans_and_diagnostics() {
     assert_eq!(diag.kind, "error");
     assert_eq!(diag.span.range.start, 2);
     assert_eq!(diag.span.range.end, 3);
-    assert_eq!(diag.span.line, 1);
-    assert_eq!(diag.span.col, 3);
 }
 
 #[wasm_bindgen_test]

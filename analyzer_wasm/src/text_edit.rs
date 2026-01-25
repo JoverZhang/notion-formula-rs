@@ -1,10 +1,16 @@
 use analyzer::TextEdit;
 
-/// Applies byte-offset text edits.
+/// Applies byte-offset text edits and rebases a byte cursor through them.
 ///
 /// - Offsets are half-open `[start, end)` (end is exclusive).
 /// - Edits are applied in descending order to avoid offset shifting.
-pub fn apply_text_edits_bytes(source: &str, edits: &[TextEdit]) -> String {
+/// - Cursor rebasing is computed only for edits that are actually applied (valid bounds and UTF-8
+///   char boundaries).
+pub fn apply_text_edits_bytes_with_cursor(
+    source: &str,
+    edits: &[TextEdit],
+    cursor: u32,
+) -> (String, u32) {
     let mut sorted = edits.to_vec();
     sorted.sort_by(|a, b| {
         b.range
@@ -14,14 +20,35 @@ pub fn apply_text_edits_bytes(source: &str, edits: &[TextEdit]) -> String {
     });
 
     let mut updated = source.to_string();
+    let mut cursor = cursor;
+
     for edit in sorted {
-        let start = edit.range.start as usize;
-        let end = edit.range.end as usize;
-        if start > end || end > updated.len() {
+        let start_u32 = edit.range.start;
+        let end_u32 = edit.range.end;
+        let start = start_u32 as usize;
+        let end = end_u32 as usize;
+
+        if start_u32 > end_u32 || end > updated.len() {
             continue;
         }
         if !updated.is_char_boundary(start) || !updated.is_char_boundary(end) {
             continue;
+        }
+
+        let replaced_len = end_u32.saturating_sub(start_u32);
+        let inserted_len = edit.new_text.len() as u32;
+        let delta = inserted_len as i64 - replaced_len as i64;
+
+        // Rebase cursor in original coordinates through this edit.
+        if end_u32 <= cursor {
+            cursor = if delta >= 0 {
+                cursor.saturating_add(delta as u32)
+            } else {
+                cursor.saturating_sub((-delta) as u32)
+            };
+        } else if start_u32 < cursor && cursor < end_u32 {
+            // Cursor was inside replaced range => snap to start boundary deterministically.
+            cursor = start_u32;
         }
 
         let mut next = String::with_capacity(updated.len() - (end - start) + edit.new_text.len());
@@ -31,5 +58,5 @@ pub fn apply_text_edits_bytes(source: &str, edits: &[TextEdit]) -> String {
         updated = next;
     }
 
-    updated
+    (updated, cursor)
 }

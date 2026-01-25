@@ -397,22 +397,23 @@ fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     }));
 
     if let Some(ctx) = ctx
-        && ctx.functions.iter().any(|f| f.name == "if") {
-            items.push(CompletionItem {
-                label: ".if".to_string(),
-                kind: CompletionKind::Operator,
-                insert_text: ".if()".to_string(),
-                primary_edit: None,
-                cursor: None,
-                additional_edits: Vec::new(),
-                detail: None,
-                is_disabled: false,
-                disabled_reason: None,
-                data: Some(CompletionData::PostfixMethod {
-                    name: "if".to_string(),
-                }),
-            });
-        }
+        && ctx.functions.iter().any(|f| f.name == "if")
+    {
+        items.push(CompletionItem {
+            label: ".if".to_string(),
+            kind: CompletionKind::Operator,
+            insert_text: ".if()".to_string(),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
+            detail: None,
+            is_disabled: false,
+            disabled_reason: None,
+            data: Some(CompletionData::PostfixMethod {
+                name: "if".to_string(),
+            }),
+        });
+    }
 
     items
 }
@@ -669,9 +670,11 @@ fn type_match_score(expected: semantic::Ty, actual: Option<semantic::Ty>) -> i32
 
 fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
-        && !token.is_trivia() && !matches!(token.kind, TokenKind::Eof) {
-            return Some((idx, token));
-        }
+        && !token.is_trivia()
+        && !matches!(token.kind, TokenKind::Eof)
+    {
+        return Some((idx, token));
+    }
 
     let mut prev = None;
     for (idx, token) in tokens.iter().enumerate() {
@@ -694,10 +697,12 @@ fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
 /// before a close-paren, while still treating a cursor strictly inside a token as "within" it.
 fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
-        && token.span.start < cursor && !token.is_trivia() && !matches!(token.kind, TokenKind::Eof)
-        {
-            return Some((idx, token));
-        }
+        && token.span.start < cursor
+        && !token.is_trivia()
+        && !matches!(token.kind, TokenKind::Eof)
+    {
+        return Some((idx, token));
+    }
 
     let mut prev = None;
     for (idx, token) in tokens.iter().enumerate() {
@@ -746,23 +751,26 @@ fn is_expr_start_position(prev_token: Option<&Token>) -> bool {
 
 fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
-        && matches!(token.kind, TokenKind::Ident(_)) {
-            // At an expr-start position, completing before an existing expression should insert
-            // instead of replacing tokens to the right.
-            if cursor == token.span.start {
-                return Span {
-                    start: cursor,
-                    end: cursor,
-                };
-            }
+        && matches!(token.kind, TokenKind::Ident(_))
+    {
+        // At an expr-start position, completing before an existing expression should insert
+        // instead of replacing tokens to the right.
+        if cursor == token.span.start {
+            return Span {
+                start: cursor,
+                end: cursor,
+            };
+        }
 
-            // If the cursor is actually inside the identifier token, treat it as prefix editing.
-            return tokens[idx].span;
-        }
+        // If the cursor is actually inside the identifier token, treat it as prefix editing.
+        return tokens[idx].span;
+    }
     if let Some((_, token)) = prev_non_trivia(tokens, cursor)
-        && matches!(token.kind, TokenKind::Ident(_)) && token.span.end == cursor {
-            return token.span;
-        }
+        && matches!(token.kind, TokenKind::Ident(_))
+        && token.span.end == cursor
+    {
+        return token.span;
+    }
     Span {
         start: cursor,
         end: cursor,
