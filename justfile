@@ -1,10 +1,13 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+check:
+  cargo check && cargo clippy && cd examples/vite && pnpm -s run check
+
+fix:
+  cargo clippy --fix --allow-dirty --allow-staged && cd examples/vite && pnpm -s run lint:fix
+
 fmt:
   cargo fmt --all && cd examples/vite && pnpm -s run format:fix
-
-check:
-  cargo check && cd examples/vite && pnpm -s run check
 
 gen-ts:
   cargo run -p analyzer_wasm --bin export_ts
