@@ -249,7 +249,7 @@ pub fn lex(input: &str) -> LexOutput {
             c if c.is_ascii_digit() => {
                 // integer number literal (v1)
                 let mut end = start + c.len_utf8();
-                while let Some(&(i, c2)) = iter.peek().map(|x| x) {
+                while let Some(&(i, c2)) = iter.peek() {
                     if c2.is_ascii_digit() {
                         iter.next();
                         end = i + c2.len_utf8();
@@ -278,7 +278,7 @@ pub fn lex(input: &str) -> LexOutput {
                 let mut ident = String::new();
                 ident.push(c);
 
-                while let Some(&(i, ch2)) = iter.peek().map(|x| x) {
+                while let Some(&(i, ch2)) = iter.peek() {
                     if is_ident_continue(ch2) {
                         ident.push(ch2);
                         iter.next();

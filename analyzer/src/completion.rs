@@ -661,7 +661,7 @@ fn type_match_score(expected: semantic::Ty, actual: Option<semantic::Ty>) -> i32
         return 1;
     }
     match actual {
-        Some(actual_ty) if matches!(actual_ty, semantic::Ty::Unknown) => 0,
+        Some(semantic::Ty::Unknown) => 0,
         Some(actual_ty) if semantic::ty_accepts(&expected, &actual_ty) => 2,
         Some(_) => -1,
         None => 0,

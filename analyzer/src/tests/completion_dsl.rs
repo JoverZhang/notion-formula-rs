@@ -838,7 +838,6 @@ fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
     let mut edits_with_idx = edits
         .iter()
         .enumerate()
-        .map(|(idx, edit)| (idx, edit))
         .collect::<Vec<_>>();
     edits_with_idx.sort_by(|(a_idx, a), (b_idx, b)| {
         let a_key = (

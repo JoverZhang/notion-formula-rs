@@ -247,7 +247,7 @@ fn test_comment_tokens() {
 fn test_unterminated_string_recovers_partial_tokens() {
     let input = r#"if(prop("Number") > 10, prop("Text"), "Needs review)"#;
     let output = lex(input);
-    assert!(output.tokens.len() > 0);
+    assert!(!output.tokens.is_empty());
     assert_eq!(output.diagnostics.len(), 1);
     assert!(
         output.diagnostics[0]
