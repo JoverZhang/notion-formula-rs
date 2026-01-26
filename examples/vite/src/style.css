@@ -81,39 +81,39 @@ body {
 
 #app {
   min-height: 100vh;
-  padding: 36px 24px 60px;
+  padding: 20px 20px 40px;
 }
 
 .page {
   max-width: 1040px;
   margin: 0 auto;
   display: grid;
-  gap: 28px;
+  gap: 18px;
 }
 
 .page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 12px;
 }
 
 .page-header-text {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .page-title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 32px;
+  font-size: 26px;
   letter-spacing: -0.02em;
 }
 
 .page-subtitle {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .page-header-actions {
@@ -146,33 +146,33 @@ body {
 .table-section {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 14px;
+  padding: 12px;
   box-shadow: var(--shadow);
 }
 
 .table-card {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .table-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .table-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .table-subtitle {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 11px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -192,10 +192,10 @@ body {
 
 .notion-table thead th {
   text-align: left;
-  padding: 10px 10px;
+  padding: 6px 8px;
   background: var(--table-head);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--border);
@@ -210,7 +210,7 @@ body {
 }
 
 .notion-table tbody td {
-  padding: 10px 10px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
@@ -224,12 +224,12 @@ body {
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 999px;
   background: var(--chip-bg);
   color: var(--chip-text);
   border: 1px solid var(--chip-border);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .formula-cell {
@@ -244,31 +244,31 @@ body {
 
 .formula-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
 }
 
 .formula-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 14px;
+  padding: 12px;
   box-shadow: var(--shadow);
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 12px;
   align-items: start;
 }
 
 .formula-left {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .formula-label {
-  font-size: 13px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: var(--muted);
 }
 
@@ -279,9 +279,9 @@ body {
 
 .editor {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--surface-muted);
-  min-height: 200px;
+  min-height: 160px;
   overflow: hidden;
 }
 
@@ -295,7 +295,7 @@ body {
 }
 
 .editor .cm-content {
-  padding: 12px;
+  padding: 8px;
 }
 
 .editor .cm-gutters {
@@ -359,15 +359,15 @@ body {
 
 .completion-panel {
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
   background: var(--surface-muted);
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .completion-header {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -375,12 +375,12 @@ body {
 
 .completion-signature {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 6px 8px;
 }
 
 .completion-signature-param {
@@ -405,12 +405,12 @@ body {
 }
 
 .completion-group-header {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  padding: 6px 10px 4px;
-  margin-top: 6px;
+  padding: 4px 8px 2px;
+  margin-top: 4px;
   user-select: none;
 }
 
@@ -419,11 +419,11 @@ body {
 }
 
 .completion-category-header {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 650;
   color: var(--text);
-  padding: 10px 10px 6px;
-  margin-top: 6px;
+  padding: 6px 8px 4px;
+  margin-top: 4px;
   border-top: 1px solid var(--border);
   user-select: none;
 }
@@ -431,8 +431,8 @@ body {
 .completion-item {
   display: grid;
   gap: 2px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
 }
@@ -468,12 +468,12 @@ body {
 
 .completion-item-label {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text);
 }
 
 .completion-item-meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
   text-align: right;
   overflow: hidden;
@@ -483,9 +483,9 @@ body {
 }
 
 .completion-empty {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--muted);
-  padding: 6px 2px;
+  padding: 4px 2px;
 }
 
 .cm-selectionBackground {
@@ -495,12 +495,12 @@ body {
 .nf-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 999px;
   background: var(--chip-bg);
   color: var(--chip-text);
   border: 1px solid var(--chip-border);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.4;
   font-family: inherit;
   white-space: nowrap;
@@ -602,7 +602,7 @@ body {
 
 @media (max-width: 980px) {
   #app {
-    padding: 24px 18px 48px;
+    padding: 16px 16px 32px;
   }
 
   .page-header {
