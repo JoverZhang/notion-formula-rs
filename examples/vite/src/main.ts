@@ -7,7 +7,9 @@ import { createFormulaTableView } from "./ui/table_view";
 import { initThemeToggle } from "./ui/theme";
 import { AppVM } from "./vm/app_vm";
 
-const FORMULA_DEMOS: Record<FormulaId, { label: string; sample: string; note?: string }> = {
+type DemoFormulaId = Exclude<FormulaId, "f3">;
+
+const FORMULA_DEMOS: Record<DemoFormulaId, { label: string; sample: string; note?: string }> = {
   f1: {
     label: "Formula 1",
     sample: `if(prop("Number") > 10, prop("Text"), "Needs review")`,
@@ -15,11 +17,6 @@ const FORMULA_DEMOS: Record<FormulaId, { label: string; sample: string; note?: s
   f2: {
     label: "Formula 2",
     sample: `formatDate(prop("Date"), "YYYY-MM-DD")`,
-  },
-  f3: {
-    label: "Formula 3",
-    sample: `prop("Select") + " • " + prop("Text")`,
-    note: "May reference Formula 1 & 2.",
   },
 };
 
@@ -33,7 +30,8 @@ function expectEl<T extends Element>(selector: string): T {
 
 async function start() {
   const appEl = expectEl<HTMLElement>("#app");
-  const panelViews: Partial<Record<FormulaId, ReturnType<typeof createFormulaPanelView>>> = {};
+  const panelViews: Partial<Record<DemoFormulaId, ReturnType<typeof createFormulaPanelView>>> = {};
+  const demoFormulaIds = Object.keys(FORMULA_DEMOS) as DemoFormulaId[];
 
   const layout = createRootLayoutView();
   layout.mount(appEl);
@@ -45,7 +43,7 @@ async function start() {
   const vm = new AppVM({
     contextJson: CONTEXT_JSON,
     onStateChange: (state) => {
-      for (const id of Object.keys(panelViews)) {
+      for (const id of demoFormulaIds) {
         const view = panelViews[id];
         if (view) {
           view.update(state.formulas[id]);
@@ -54,12 +52,11 @@ async function start() {
       tableView.updateFormulaStatus({
         f1: hasError(state.formulas.f1.diagnostics),
         f2: hasError(state.formulas.f2.diagnostics),
-        f3: hasError(state.formulas.f3.diagnostics),
       });
     },
   });
 
-  for (const id of Object.keys(FORMULA_DEMOS)) {
+  for (const id of demoFormulaIds) {
     const meta = FORMULA_DEMOS[id];
     const view = createFormulaPanelView({
       id,
@@ -73,7 +70,7 @@ async function start() {
   }
 
   await vm.start();
-  for (const id of Object.keys(FORMULA_DEMOS)) {
+  for (const id of demoFormulaIds) {
     vm.setSource(id, FORMULA_DEMOS[id].sample);
   }
 }

@@ -101,14 +101,14 @@ test("debug bridge is available and panels are registered", async ({ page }) => 
     const dbg = window.__nf_debug;
     return (dbg?.listPanels() ?? []).slice();
   });
-  expect(panels.sort()).toEqual(["f1", "f2", "f3"]);
+  expect(panels.sort()).toEqual(["f1", "f2"]);
 });
 
-test("page layout shows table above three formula editors", async ({ page }) => {
+test("page layout shows table above two formula editors", async ({ page }) => {
   const table = page.locator('[data-testid="table-section"]');
   const editors = page.locator('[data-testid="formula-panel"]');
   await expect(table).toBeVisible();
-  await expect(editors).toHaveCount(3);
+  await expect(editors).toHaveCount(2);
 
   const tableBox = await table.boundingBox();
   const panelBox = await editors.first().boundingBox();
@@ -119,7 +119,6 @@ test("page layout shows table above three formula editors", async ({ page }) => 
 
   await expect(page.locator(".formula-label", { hasText: "Formula 1" })).toBeVisible();
   await expect(page.locator(".formula-label", { hasText: "Formula 2" })).toBeVisible();
-  await expect(page.locator(".formula-label", { hasText: "Formula 3" })).toBeVisible();
 });
 
 test("formula table column shows error placeholder when parse error exists", async ({ page }) => {

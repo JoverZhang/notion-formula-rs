@@ -55,7 +55,7 @@ const BASE_ROWS: BaseRow[] = [
   },
 ];
 
-const FORMULA_IDS: FormulaId[] = ["f1", "f2", "f3"];
+const FORMULA_IDS: FormulaId[] = ["f1", "f2"];
 
 const COLUMN_LABELS = [
   "Text",
@@ -65,7 +65,6 @@ const COLUMN_LABELS = [
   "Relation",
   "Formula 1",
   "Formula 2",
-  "Formula 3",
 ];
 
 function createTableHeader(labels: string[]): HTMLTableSectionElement {
@@ -158,7 +157,7 @@ export function createFormulaTableView() {
   scroll.appendChild(table);
   root.appendChild(scroll);
 
-  function updateFormulaStatus(status: Record<FormulaId, boolean>) {
+  function updateFormulaStatus(status: Partial<Record<FormulaId, boolean>>) {
     FORMULA_IDS.forEach((id) => {
       const cells = formulaCells.get(id) ?? [];
       const isError = Boolean(status[id]);
