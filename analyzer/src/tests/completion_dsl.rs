@@ -835,10 +835,7 @@ impl ApplyResult {
 }
 
 fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
-    let mut edits_with_idx = edits
-        .iter()
-        .enumerate()
-        .collect::<Vec<_>>();
+    let mut edits_with_idx = edits.iter().enumerate().collect::<Vec<_>>();
     edits_with_idx.sort_by(|(a_idx, a), (b_idx, b)| {
         let a_key = (
             std::cmp::Reverse(a.range.start),

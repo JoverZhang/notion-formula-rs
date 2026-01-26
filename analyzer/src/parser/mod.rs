@@ -137,30 +137,50 @@ impl<'a> Parser<'a> {
 
     fn same_kind(&self, a: &TokenKind, b: &TokenKind) -> bool {
         use TokenKind::*;
-        match (a, b) {
-            (Ident(_), Ident(_)) => true,
-            (Literal(_), Literal(_)) => true,
-            (DocComment(..), DocComment(..)) => true,
-            (LineComment(_), LineComment(_)) => true,
-            (BlockComment(_), BlockComment(_)) => true,
-            (Newline, Newline) => true,
 
-            (Lt, Lt) | (Le, Le) | (EqEq, EqEq) | (Ne, Ne) | (Ge, Ge) | (Gt, Gt) => true,
-            (AndAnd, AndAnd) | (OrOr, OrOr) | (Bang, Bang) => true,
-            (Plus, Plus)
+        matches!(
+            (a, b),
+            // Exact matches for individual token kinds
+            (Ident(_), Ident(_))
+            | (Literal(_), Literal(_))
+            | (DocComment(..), DocComment(..))
+            | (LineComment(_), LineComment(_))
+            | (BlockComment(_), BlockComment(_))
+            | (Newline, Newline)
+
+            // Relational operators
+            | (Lt, Lt)
+            | (Le, Le)
+            | (EqEq, EqEq)
+            | (Ne, Ne)
+            | (Ge, Ge)
+            | (Gt, Gt)
+
+            // Logical operators
+            | (AndAnd, AndAnd)
+            | (OrOr, OrOr)
+            | (Bang, Bang)
+
+            // Arithmetic operators
+            | (Plus, Plus)
             | (Minus, Minus)
             | (Star, Star)
             | (Slash, Slash)
             | (Percent, Percent)
-            | (Caret, Caret) => true,
-            (Dot, Dot)
+            | (Caret, Caret)
+
+            // Punctuation
+            | (Dot, Dot)
             | (Comma, Comma)
             | (Colon, Colon)
             | (Pound, Pound)
-            | (Question, Question) => true,
-            (OpenParen, OpenParen) | (CloseParen, CloseParen) | (Eof, Eof) => true,
-            _ => false,
-        }
+            | (Question, Question)
+
+            // Parentheses and EOF
+            | (OpenParen, OpenParen)
+            | (CloseParen, CloseParen)
+            | (Eof, Eof)
+        )
     }
 
     fn is_trivia(kind: &TokenKind) -> bool {
