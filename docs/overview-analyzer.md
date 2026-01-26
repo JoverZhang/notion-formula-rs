@@ -271,6 +271,30 @@ Regression coverage:
 - chip spans
 - UI behavior
 
+### Vite demo completion UI
+
+The Vite demo renders completions returned by the WASM `complete(...)` export entirely on the TypeScript side.
+
+Primary files:
+
+- `examples/vite/src/analyzer/wasm_client.ts`: calls `wasm.complete(...)` via `completeSource(...)`
+- `examples/vite/src/ui/formula_panel_view.ts`: renders the completion panel and applies selected completions
+
+Rendering behavior:
+
+- Completions are displayed as a list under the “Suggestions” panel.
+- Items are grouped **purely in the UI** (no WASM changes) by inserting a header row whenever the
+  completion item’s `kind` changes (consecutive grouping).
+  - This relies on the incoming `items` array order being meaningful/stable.
+- Selection and navigation operate over a `completionRows` model (headers + items):
+  - Headers are not selectable.
+  - Arrow key navigation skips over header rows.
+  - Applying a completion maps the selected row back to the underlying `CompletionItem` index.
+
+Styling:
+
+- Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
+
 Current architectural invariants
 
 - Analyzer core uses byte offsets only

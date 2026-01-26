@@ -343,10 +343,79 @@ export function createFormulaPanelView(opts: {
 
   let completionItems: CompletionItem[] = [];
   let signatureHelp: SignatureHelp | null = null;
-  let selectedIndex = -1;
+  type CompletionRenderRow =
+    | { type: "header"; kind: CompletionItem["kind"]; label: string }
+    | { type: "item"; item: CompletionItem; itemIndex: number };
+
+  let completionRows: CompletionRenderRow[] = [];
+  let selectedRowIndex = -1;
   let completionTimer: ReturnType<typeof setTimeout> | null = null;
   let statusTimer: ReturnType<typeof setTimeout> | null = null;
   const COMPLETION_DEBOUNCE_MS = 120;
+
+  function completionGroupLabel(kind: CompletionItem["kind"]): string {
+    switch (kind) {
+      case "Function":
+        return "Functions";
+      case "Builtin":
+        return "Built-ins";
+      case "Property":
+        return "Properties";
+      case "Operator":
+        return "Operators";
+      default:
+        return String(kind);
+    }
+  }
+
+  function buildCompletionRows(items: CompletionItem[]): CompletionRenderRow[] {
+    const rows: CompletionRenderRow[] = [];
+    let prevKind: CompletionItem["kind"] | null = null;
+    items.forEach((item, itemIndex) => {
+      if (item.kind !== prevKind) {
+        rows.push({
+          type: "header",
+          kind: item.kind,
+          label: completionGroupLabel(item.kind),
+        });
+        prevKind = item.kind;
+      }
+      rows.push({ type: "item", item, itemIndex });
+    });
+    return rows;
+  }
+
+  function getSelectedItemIndex(): number | null {
+    if (selectedRowIndex < 0 || selectedRowIndex >= completionRows.length) return null;
+    const row = completionRows[selectedRowIndex];
+    if (!row || row.type !== "item") return null;
+    return row.itemIndex;
+  }
+
+  function normalizeSelectedRowIndex() {
+    if (completionRows.length === 0) {
+      selectedRowIndex = -1;
+      return;
+    }
+    if (selectedRowIndex < 0 || selectedRowIndex >= completionRows.length) {
+      selectedRowIndex = completionRows.findIndex((r) => r.type === "item");
+      return;
+    }
+    if (completionRows[selectedRowIndex]?.type === "header") {
+      const forward = completionRows.findIndex(
+        (r, idx) => idx > selectedRowIndex && r.type === "item",
+      );
+      if (forward !== -1) {
+        selectedRowIndex = forward;
+        return;
+      }
+      const backward = [...completionRows]
+        .map((r, idx) => ({ r, idx }))
+        .reverse()
+        .find(({ r, idx }) => idx < selectedRowIndex && r.type === "item")?.idx;
+      selectedRowIndex = typeof backward === "number" ? backward : -1;
+    }
+  }
 
   function setStatus(text: string, kind: "ok" | "warning" | "error" | "muted") {
     formatStatus.textContent = text;
@@ -372,18 +441,27 @@ export function createFormulaPanelView(opts: {
 
   function renderItems() {
     itemsEl.innerHTML = "";
-    if (!completionItems || completionItems.length === 0) {
+    if (!completionRows || completionRows.length === 0) {
       emptyEl.classList.remove("hidden");
       return;
     }
     emptyEl.classList.add("hidden");
 
-    completionItems.forEach((item, idx) => {
+    completionRows.forEach((row, rowIndex) => {
       const li = document.createElement("li");
+      if (row.type === "header") {
+        li.className = "completion-group-header";
+        li.textContent = row.label;
+        li.setAttribute("data-completion-group", row.kind);
+        itemsEl.appendChild(li);
+        return;
+      }
+
+      const item = row.item;
       li.className = "completion-item";
-      if (idx === selectedIndex) li.classList.add("is-selected");
+      if (rowIndex === selectedRowIndex) li.classList.add("is-selected");
       if (item.is_disabled) li.classList.add("is-disabled");
-      li.setAttribute("data-completion-index", String(idx));
+      li.setAttribute("data-completion-index", String(row.itemIndex));
 
       const main = document.createElement("div");
       main.className = "completion-item-main";
@@ -398,8 +476,8 @@ export function createFormulaPanelView(opts: {
       li.appendChild(main);
 
       li.addEventListener("mouseenter", () => {
-        if (!completionItems.length) return;
-        selectedIndex = idx;
+        if (!completionRows.length) return;
+        selectedRowIndex = rowIndex;
         renderItems();
       });
 
@@ -408,7 +486,7 @@ export function createFormulaPanelView(opts: {
       });
 
       li.addEventListener("click", () => {
-        applyCompletionItem(idx);
+        applyCompletionItem(row.itemIndex);
       });
 
       itemsEl.appendChild(li);
@@ -417,7 +495,8 @@ export function createFormulaPanelView(opts: {
 
   function rerenderCompletions() {
     renderSignature(signatureHelp);
-    if (selectedIndex >= completionItems.length) selectedIndex = completionItems.length - 1;
+    completionRows = buildCompletionRows(completionItems);
+    normalizeSelectedRowIndex();
     renderItems();
   }
 
@@ -435,19 +514,34 @@ export function createFormulaPanelView(opts: {
         completionItems = [];
         signatureHelp = null;
       }
-      if (completionItems.length === 0) selectedIndex = -1;
+      if (completionItems.length === 0) selectedRowIndex = -1;
       rerenderCompletions();
     }, COMPLETION_DEBOUNCE_MS);
   }
 
   function selectNext(delta: number) {
-    if (!completionItems.length) return;
-    if (selectedIndex < 0) {
-      selectedIndex = delta > 0 ? 0 : completionItems.length - 1;
-    } else {
-      selectedIndex = (selectedIndex + delta + completionItems.length) % completionItems.length;
+    if (!completionRows.length) return;
+    const itemRowIndices = completionRows
+      .map((r, idx) => (r.type === "item" ? idx : -1))
+      .filter((idx) => idx !== -1);
+    if (itemRowIndices.length === 0) return;
+
+    if (selectedRowIndex < 0) {
+      selectedRowIndex = delta > 0 ? itemRowIndices[0] : itemRowIndices[itemRowIndices.length - 1];
+      renderItems();
+      return;
     }
-    renderItems();
+
+    const dir = delta >= 0 ? 1 : -1;
+    let next = selectedRowIndex;
+    for (let i = 0; i < completionRows.length; i++) {
+      next = (next + dir + completionRows.length) % completionRows.length;
+      if (completionRows[next]?.type === "item") {
+        selectedRowIndex = next;
+        renderItems();
+        return;
+      }
+    }
   }
 
   function applyCompletionItem(index: number): boolean {
@@ -467,7 +561,7 @@ export function createFormulaPanelView(opts: {
     });
     editorView.focus();
 
-    selectedIndex = -1;
+    selectedRowIndex = -1;
     requestCompletions(editorView);
     return true;
   }
@@ -496,8 +590,8 @@ export function createFormulaPanelView(opts: {
           {
             key: "Escape",
             run: () => {
-              if (selectedIndex < 0) return false;
-              selectedIndex = -1;
+              if (selectedRowIndex < 0) return false;
+              selectedRowIndex = -1;
               renderItems();
               return true;
             },
@@ -505,15 +599,17 @@ export function createFormulaPanelView(opts: {
           {
             key: "Enter",
             run: () => {
-              if (selectedIndex < 0) return false;
-              return applyCompletionItem(selectedIndex);
+              const itemIndex = getSelectedItemIndex();
+              if (typeof itemIndex !== "number") return false;
+              return applyCompletionItem(itemIndex);
             },
           },
           {
             key: "Tab",
             run: () => {
-              if (selectedIndex < 0) return false;
-              return applyCompletionItem(selectedIndex);
+              const itemIndex = getSelectedItemIndex();
+              if (typeof itemIndex !== "number") return false;
+              return applyCompletionItem(itemIndex);
             },
           },
         ]),

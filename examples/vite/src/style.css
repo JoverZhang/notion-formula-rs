@@ -391,6 +391,20 @@ body {
   gap: 2px;
 }
 
+.completion-group-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 6px 10px 4px;
+  margin-top: 6px;
+  user-select: none;
+}
+
+.completion-group-header:first-child {
+  margin-top: 0;
+}
+
 .completion-item {
   display: grid;
   gap: 2px;
