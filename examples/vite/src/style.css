@@ -383,6 +383,19 @@ body {
   padding: 8px 10px;
 }
 
+.completion-signature-param {
+  display: inline-block;
+  padding: 1px 3px;
+  border-radius: 6px;
+}
+
+.completion-signature-param.is-active {
+  background: var(--selection);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+
 .completion-items {
   list-style: none;
   margin: 0;

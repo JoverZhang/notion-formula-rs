@@ -435,8 +435,30 @@ export function createFormulaPanelView(opts: {
       return;
     }
     signatureEl.classList.remove("hidden");
-    const params = sig.params.map((p, idx) => (idx === sig.active_param ? `[${p}]` : p));
-    signatureEl.textContent = `${sig.label} ${params.length ? "— " + params.join(", ") : ""}`;
+    signatureEl.replaceChildren();
+    if (sig.params.length === 0) {
+      signatureEl.append(document.createTextNode(sig.label));
+      return;
+    }
+
+    const openParen = sig.label.indexOf("(");
+    const closeParen = sig.label.lastIndexOf(")");
+
+    if (openParen === -1 || closeParen === -1 || closeParen <= openParen) {
+      signatureEl.append(document.createTextNode(sig.label));
+      return;
+    }
+
+    signatureEl.append(document.createTextNode(sig.label.slice(0, openParen + 1)));
+    sig.params.forEach((param, idx) => {
+      const paramEl = document.createElement("span");
+      paramEl.className = "completion-signature-param";
+      if (idx === sig.active_param) paramEl.classList.add("is-active");
+      paramEl.textContent = param;
+      signatureEl.append(paramEl);
+      if (idx !== sig.params.length - 1) signatureEl.append(document.createTextNode(", "));
+    });
+    signatureEl.append(document.createTextNode(sig.label.slice(closeParen)));
   }
 
   function renderItems() {
