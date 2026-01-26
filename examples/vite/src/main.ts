@@ -31,7 +31,7 @@ function expectEl<T extends Element>(selector: string): T {
 async function start() {
   const appEl = expectEl<HTMLElement>("#app");
   const panelViews: Partial<Record<DemoFormulaId, ReturnType<typeof createFormulaPanelView>>> = {};
-  const demoFormulaIds = Object.keys(FORMULA_DEMOS) as DemoFormulaId[];
+  const demoFormulaIds = Object.keys(FORMULA_DEMOS);
 
   const layout = createRootLayoutView();
   layout.mount(appEl);

@@ -1,4 +1,4 @@
-use crate::semantic::{self, Context, Property, Ty};
+use crate::semantic::{self, Context, FunctionCategory, Property, Ty};
 use crate::{Span, analyze};
 
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
@@ -48,6 +48,7 @@ fn ctx_with_builtins() -> Context {
         ret: Ty::Unknown,
         detail: None,
         min_args: 0,
+        category: FunctionCategory::General,
     });
     ctx.functions.push(crate::semantic::FunctionSig {
         name: "sum".into(),
@@ -60,6 +61,7 @@ fn ctx_with_builtins() -> Context {
         ret: Ty::Number,
         detail: None,
         min_args: 1,
+        category: FunctionCategory::Number,
     });
     ctx
 }

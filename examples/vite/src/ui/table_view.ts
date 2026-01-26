@@ -57,15 +57,7 @@ const BASE_ROWS: BaseRow[] = [
 
 const FORMULA_IDS: FormulaId[] = ["f1", "f2"];
 
-const COLUMN_LABELS = [
-  "Text",
-  "Number",
-  "Select",
-  "Date",
-  "Relation",
-  "Formula 1",
-  "Formula 2",
-];
+const COLUMN_LABELS = ["Text", "Number", "Select", "Date", "Relation", "Formula 1", "Formula 2"];
 
 function createTableHeader(labels: string[]): HTMLTableSectionElement {
   const thead = document.createElement("thead");

@@ -2,7 +2,7 @@ use crate::completion::{
     CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
     complete_with_context,
 };
-use crate::semantic::{Context, FunctionSig, ParamSig, Property, Ty};
+use crate::semantic::{Context, FunctionCategory, FunctionSig, ParamSig, Property, Ty};
 
 // ----------------------------
 // Demo Properties
@@ -259,6 +259,7 @@ impl ContextBuilder {
             ret: Ty::Unknown,
             detail: None,
             min_args: 0,
+            category: FunctionCategory::General,
         }
     }
 
@@ -298,6 +299,7 @@ impl ContextBuilder {
             })
             .ret(Ty::Number)
             .min_args(1)
+            .category(FunctionCategory::Number)
             .finish()
     }
 
@@ -316,6 +318,7 @@ pub struct FuncBuilder {
     ret: Ty,
     detail: Option<String>,
     min_args: usize,
+    category: FunctionCategory,
 }
 
 impl FuncBuilder {
@@ -339,6 +342,11 @@ impl FuncBuilder {
         self
     }
 
+    pub fn category(mut self, category: FunctionCategory) -> Self {
+        self.category = category;
+        self
+    }
+
     #[allow(dead_code)]
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
@@ -352,6 +360,7 @@ impl FuncBuilder {
             ret: self.ret,
             detail: self.detail.take(),
             min_args: self.min_args,
+            category: self.category,
         });
         self.parent
     }
