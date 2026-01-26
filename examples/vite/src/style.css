@@ -418,6 +418,16 @@ body {
   margin-top: 0;
 }
 
+.completion-category-header {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text);
+  padding: 10px 10px 6px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  user-select: none;
+}
+
 .completion-item {
   display: grid;
   gap: 2px;

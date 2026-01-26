@@ -19,6 +19,7 @@ pub struct TextEdit {
 pub struct CompletionItem {
     pub label: String,
     pub kind: CompletionKind,
+    pub category: Option<semantic::FunctionCategory>,
     pub insert_text: String,
     pub primary_edit: Option<TextEdit>,
     pub cursor: Option<u32>,
@@ -343,6 +344,7 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             CompletionItem {
                 label: func.name.clone(),
                 kind: CompletionKind::Function,
+                category: Some(func.category),
                 insert_text: format!("{}()", func.name),
                 primary_edit: None,
                 cursor: None,
@@ -367,6 +369,7 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
         .map(|(label, insert_text)| CompletionItem {
             label: label.to_string(),
             kind: CompletionKind::Builtin,
+            category: None,
             insert_text: insert_text.to_string(),
             primary_edit: None,
             cursor: None,
@@ -386,6 +389,7 @@ fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     items.extend(OPS.into_iter().map(|op| CompletionItem {
         label: op.to_string(),
         kind: CompletionKind::Operator,
+        category: None,
         insert_text: op.to_string(),
         primary_edit: None,
         cursor: None,
@@ -402,6 +406,7 @@ fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
         items.push(CompletionItem {
             label: ".if".to_string(),
             kind: CompletionKind::Operator,
+            category: None,
             insert_text: ".if()".to_string(),
             primary_edit: None,
             cursor: None,
@@ -430,6 +435,7 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
         let item = CompletionItem {
             label,
             kind: CompletionKind::Property,
+            category: None,
             insert_text,
             primary_edit: None,
             cursor: None,

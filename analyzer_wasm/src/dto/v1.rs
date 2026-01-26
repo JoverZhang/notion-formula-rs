@@ -19,6 +19,17 @@ pub enum CompletionItemKind {
 }
 
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FunctionCategoryView {
+    General,
+    Text,
+    Number,
+    Date,
+    People,
+    List,
+    Special,
+}
+
+#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiagnosticKindView {
     #[serde(rename = "error")]
     Error,
@@ -73,6 +84,7 @@ pub struct SignatureHelpView {
 pub struct CompletionItemView {
     pub label: String,
     pub kind: CompletionItemKind,
+    pub category: Option<FunctionCategoryView>,
     pub insert_text: String,
     pub primary_edit: Option<TextEditView>,
     pub cursor: Option<u32>,

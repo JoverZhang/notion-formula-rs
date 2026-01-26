@@ -22,7 +22,9 @@ export type SignatureHelpView = { label: string, params: Array<string>, active_p
 
 export type CompletionItemKind = "Function" | "Builtin" | "Property" | "Operator";
 
-export type CompletionItemView = { label: string, kind: CompletionItemKind, insert_text: string, primary_edit: TextEditView | null, cursor: number | null, additional_edits: Array<TextEditView>, detail: string | null, is_disabled: boolean, disabled_reason: string | null, };
+export type FunctionCategoryView = "General" | "Text" | "Number" | "Date" | "People" | "List" | "Special";
+
+export type CompletionItemView = { label: string, kind: CompletionItemKind, category: FunctionCategoryView | null, insert_text: string, primary_edit: TextEditView | null, cursor: number | null, additional_edits: Array<TextEditView>, detail: string | null, is_disabled: boolean, disabled_reason: string | null, };
 
 export type CompletionOutputView = { items: Array<CompletionItemView>, replace: Span, signature_help: SignatureHelpView | null, };
 

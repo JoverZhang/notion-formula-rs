@@ -345,6 +345,12 @@ export function createFormulaPanelView(opts: {
   let signatureHelp: SignatureHelp | null = null;
   type CompletionRenderRow =
     | { type: "header"; kind: CompletionItem["kind"]; label: string }
+    | {
+        type: "category";
+        kind: "Function";
+        category: NonNullable<CompletionItem["category"]>;
+        label: string;
+      }
     | { type: "item"; item: CompletionItem; itemIndex: number };
 
   let completionRows: CompletionRenderRow[] = [];
@@ -368,20 +374,65 @@ export function createFormulaPanelView(opts: {
     }
   }
 
+  function functionCategoryLabel(category: NonNullable<CompletionItem["category"]>): string {
+    return `${category} Functions`;
+  }
+
   function buildCompletionRows(items: CompletionItem[]): CompletionRenderRow[] {
     const rows: CompletionRenderRow[] = [];
-    let prevKind: CompletionItem["kind"] | null = null;
-    items.forEach((item, itemIndex) => {
-      if (item.kind !== prevKind) {
-        rows.push({
-          type: "header",
-          kind: item.kind,
-          label: completionGroupLabel(item.kind),
-        });
-        prevKind = item.kind;
+    const categoryOrder: Array<NonNullable<CompletionItem["category"]>> = [
+      "General",
+      "Text",
+      "Number",
+      "Date",
+      "People",
+      "List",
+      "Special",
+    ];
+
+    let idx = 0;
+    while (idx < items.length) {
+      const kind = items[idx].kind;
+      rows.push({ type: "header", kind, label: completionGroupLabel(kind) });
+
+      if (kind === "Function") {
+        const functionItems: Array<{ item: CompletionItem; itemIndex: number }> = [];
+        while (idx < items.length && items[idx].kind === "Function") {
+          functionItems.push({ item: items[idx], itemIndex: idx });
+          idx += 1;
+        }
+
+        const groups = new Map<NonNullable<CompletionItem["category"]>, typeof functionItems>();
+        for (const category of categoryOrder) groups.set(category, []);
+
+        for (const row of functionItems) {
+          const category = (row.item.category ?? "General") as NonNullable<
+            CompletionItem["category"]
+          >;
+          const group = groups.get(category);
+          if (group) group.push(row);
+        }
+
+        for (const category of categoryOrder) {
+          const group = groups.get(category);
+          if (!group || group.length === 0) continue;
+          rows.push({
+            type: "category",
+            kind: "Function",
+            category,
+            label: functionCategoryLabel(category),
+          });
+          group.forEach(({ item, itemIndex }) => rows.push({ type: "item", item, itemIndex }));
+        }
+
+        continue;
       }
-      rows.push({ type: "item", item, itemIndex });
-    });
+
+      while (idx < items.length && items[idx].kind === kind) {
+        rows.push({ type: "item", item: items[idx], itemIndex: idx });
+        idx += 1;
+      }
+    }
     return rows;
   }
 
@@ -401,7 +452,7 @@ export function createFormulaPanelView(opts: {
       selectedRowIndex = completionRows.findIndex((r) => r.type === "item");
       return;
     }
-    if (completionRows[selectedRowIndex]?.type === "header") {
+    if (completionRows[selectedRowIndex]?.type !== "item") {
       const forward = completionRows.findIndex(
         (r, idx) => idx > selectedRowIndex && r.type === "item",
       );
@@ -475,6 +526,13 @@ export function createFormulaPanelView(opts: {
         li.className = "completion-group-header";
         li.textContent = row.label;
         li.setAttribute("data-completion-group", row.kind);
+        itemsEl.appendChild(li);
+        return;
+      }
+      if (row.type === "category") {
+        li.className = "completion-category-header";
+        li.textContent = row.label;
+        li.setAttribute("data-completion-category", row.category);
         itemsEl.appendChild(li);
         return;
       }
