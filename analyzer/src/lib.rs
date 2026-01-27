@@ -40,5 +40,5 @@ pub use completion::{
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 pub use format::format_expr;
-pub use source_map::{SourceMap, byte_offset_to_utf16};
+pub use source_map::SourceMap;
 pub use token::{LitKind, Span, Token, TokenKind};

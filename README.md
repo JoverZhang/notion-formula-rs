@@ -89,7 +89,7 @@ cargo test
 
 This runs:
 
-- analyzer unit tests (lexer/parser/pretty/utf16/etc.)
+- analyzer unit tests (lexer/parser/pretty/etc.)
 - golden snapshot tests for diagnostics and formatting
 
 ## Updating golden snapshots
@@ -107,7 +107,7 @@ BLESS=1 cargo test
 - Internally, the analyzer uses byte offsets for spans (Rust-native).
 - The WASM layer converts spans to UTF-16 offsets for browser/editor interop.
 
-- Diagnostics and tokens returned to JS use UTF-16 offsets plus line/col.
+- Diagnostics and tokens returned to JS use UTF-16 offsets; line/col can be derived via `pos_to_line_col(...)`.
 
 ### Parentheses preservation
 

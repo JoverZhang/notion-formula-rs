@@ -35,8 +35,8 @@ Core modules:
 - `analyzer/src/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
 - `analyzer/src/semantic/mod.rs`: minimal type checking driven by `Context { properties, functions }`
-- `analyzer/src/completion.rs`: byte-offset completion + signature help for editor integrations (fuzzy ranking in `analyzer/src/completion/fuzzy.rs`)
-- `analyzer/src/source_map.rs`: byte offset → `(line,col)` plus `byte_offset_to_utf16(...)`
+- `analyzer/src/completion/mod.rs`: byte-offset completion + signature help for editor integrations (fuzzy ranking in `analyzer/src/completion/fuzzy.rs`)
+- `analyzer/src/source_map.rs`: byte offset → `(line,col)`
 - `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification, `tokens_in_span(...)`
 - `analyzer/src/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
 
@@ -131,7 +131,7 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
 - Postfix sugar typing:
   - `condition.if(then, else)` is treated like `if(condition, then, else)` **for typing only** when `if` exists in `Context.functions`.
 
-Completion (`analyzer/src/completion.rs`, fuzzy logic in `analyzer/src/completion/fuzzy.rs`):
+Completion (`analyzer/src/completion/mod.rs`, fuzzy logic in `analyzer/src/completion/fuzzy.rs`):
 
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
@@ -239,7 +239,6 @@ Coverage:
 - TokenQuery behavior
 - formatter
 - completion DSL
-- UTF-16 helpers
 - semantic checks
 
 ---

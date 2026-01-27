@@ -27,12 +27,6 @@ impl<'a> SourceMap<'a> {
     }
 }
 
-#[allow(dead_code)]
-pub fn byte_offset_to_utf16(source: &str, byte: usize) -> usize {
-    let clamped = clamp_to_char_boundary(source, byte);
-    source[..clamped].encode_utf16().count()
-}
-
 fn clamp_to_char_boundary(source: &str, mut byte: usize) -> usize {
     if byte > source.len() {
         byte = source.len();
