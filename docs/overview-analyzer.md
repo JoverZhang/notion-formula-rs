@@ -263,6 +263,9 @@ Vite demo tests (TypeScript)
 
 - Unit tests: examples/vite/tests/unit/ (Vitest)
 - E2E tests: examples/vite/tests/e2e/ (Playwright)
+- Note: some unit tests import the generated WASM glue from `examples/vite/src/pkg/`.
+  Ensure `pnpm -C examples/vite wasm:build` has been run at least once (or otherwise provide
+  `examples/vite/src/pkg/analyzer_wasm.js`) before running `pnpm -C examples/vite test`.
 
 Regression coverage:
 
@@ -270,6 +273,8 @@ Regression coverage:
 - diagnostics propagation
 - chip spans
 - UI behavior
+- editor undo/redo keybindings
+- editor height cap + internal scrolling
 - completion cursor placement (including UTF-16 text)
 - completion list scroll-into-view behavior
 
@@ -296,6 +301,13 @@ Rendering behavior:
 Styling:
 
 - Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
+- The formula editor height is constrained to ~4 visible lines via `.editor .cm-editor .cm-scroller`,
+  and the scroller uses `overflow-y: auto` so longer inputs scroll instead of growing the layout.
+
+Editor keybindings / history:
+
+- The CodeMirror editor enables history (undo/redo) with `history()` and `historyKeymap` from
+  `@codemirror/commands` (wired in `examples/vite/src/ui/formula_panel_view.ts`).
 
 Cursor placement invariants
 
