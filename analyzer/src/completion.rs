@@ -363,14 +363,24 @@ fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     items
 }
 
+fn needs_trailing_space(name: &str) -> bool {
+    matches!(name, "not" | "true" | "false" | "and" | "or")
+}
+
 fn builtin_expr_start_items() -> Vec<CompletionItem> {
     [("not", "not"), ("true", "true"), ("false", "false")]
         .into_iter()
-        .map(|(label, insert_text)| CompletionItem {
-            label: label.to_string(),
+        .map(|(label, insert_text)| {
+            let insert_text = if needs_trailing_space(label) {
+                format!("{insert_text} ")
+            } else {
+                insert_text.to_string()
+            };
+            CompletionItem {
+                label: label.to_string(),
             kind: CompletionKind::Builtin,
             category: None,
-            insert_text: insert_text.to_string(),
+            insert_text,
             primary_edit: None,
             cursor: None,
             additional_edits: Vec::new(),
@@ -378,6 +388,7 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
             is_disabled: false,
             disabled_reason: None,
             data: None,
+            }
         })
         .collect()
 }

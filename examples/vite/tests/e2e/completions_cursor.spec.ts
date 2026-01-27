@@ -147,3 +147,57 @@ test("cursor remains correct when formula contains UTF-16 characters", async ({ 
 
   await expectCursorAfter(page, FORMULA_ID, "if(");
 });
+
+test("builtin completion inserts trailing space: not", async ({ page }) => {
+  await setEditorContent(page, FORMULA_ID, 'prop("Title")');
+  await page.keyboard.press("Home");
+  await waitForAnyCompletionItems(page, FORMULA_ID);
+  await waitForCompletionDebounce(page);
+
+  await applyCompletionByDomClick(page, FORMULA_ID, "not");
+  await expectEditorText(page, FORMULA_ID, 'not prop("Title")');
+  await expectCursorAfter(page, FORMULA_ID, "not ");
+});
+
+test("builtin completion inserts trailing space: true", async ({ page }) => {
+  await setEditorContent(page, FORMULA_ID, 'prop("Title")');
+  await page.keyboard.press("Home");
+  await waitForAnyCompletionItems(page, FORMULA_ID);
+  await waitForCompletionDebounce(page);
+
+  await applyCompletionByDomClick(page, FORMULA_ID, "true");
+  await expectEditorText(page, FORMULA_ID, 'true prop("Title")');
+  await expectCursorAfter(page, FORMULA_ID, "true ");
+});
+
+test("builtin completion inserts trailing space: false", async ({ page }) => {
+  await setEditorContent(page, FORMULA_ID, 'prop("Title")');
+  await page.keyboard.press("Home");
+  await waitForAnyCompletionItems(page, FORMULA_ID);
+  await waitForCompletionDebounce(page);
+
+  await applyCompletionByDomClick(page, FORMULA_ID, "false");
+  await expectEditorText(page, FORMULA_ID, 'false prop("Title")');
+  await expectCursorAfter(page, FORMULA_ID, "false ");
+});
+
+test("builtin completion inserts trailing space with UTF-16 earlier in doc", async ({ page }) => {
+  await setEditorContent(page, FORMULA_ID, '"汉字" + prop("Title")');
+  await page.evaluate(
+    ({ formulaId, needle }) => {
+      const dbg = window.__nf_debug;
+      if (!dbg) throw new Error("Missing __nf_debug");
+      const source = dbg.getState(formulaId).source;
+      const idx = source.indexOf(needle);
+      if (idx === -1) throw new Error(`Missing needle: ${needle}`);
+      dbg.setSelectionHead(formulaId, idx);
+    },
+    { formulaId: FORMULA_ID, needle: 'prop("Title")' },
+  );
+  await waitForAnyCompletionItems(page, FORMULA_ID);
+  await waitForCompletionDebounce(page);
+
+  await applyCompletionByDomClick(page, FORMULA_ID, "not");
+  await expectEditorText(page, FORMULA_ID, '"汉字" + not prop("Title")');
+  await expectCursorAfter(page, FORMULA_ID, "not ");
+});
