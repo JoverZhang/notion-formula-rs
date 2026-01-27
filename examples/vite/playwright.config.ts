@@ -21,10 +21,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm run dev -- --host ${HOST} --port ${PORT} --strictPort`,
+    command: `pnpm build && pnpm vite preview --host ${HOST} --port ${PORT} --strictPort`,
     url: `${BASE_URL}/?debug=1`,
-    reuseExistingServer: true,
-    timeout: 5_000,
+    reuseExistingServer: !process.env.CI,
+    timeout: 30_000,
     stdout: "pipe",
     stderr: "pipe",
   },
