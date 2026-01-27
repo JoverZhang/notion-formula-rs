@@ -296,11 +296,43 @@ body {
 
 .editor .cm-content {
   padding: 8px;
+  caret-color: var(--text);
 }
 
 .editor .cm-gutters {
   background: transparent;
   border-right: none;
+}
+
+[data-theme="dark"] .editor .cm-cursor,
+[data-theme="dark"] .editor .cm-dropCursor {
+  border-left-color: var(--text) !important;
+}
+
+[data-theme="dark"] .editor .cm-tooltip {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+[data-theme="dark"] .editor .cm-tooltip-lint {
+  padding: 4px 0;
+}
+
+[data-theme="dark"] .editor .cm-diagnostic {
+  color: var(--text);
+}
+
+[data-theme="dark"] .editor .cm-diagnosticSource {
+  color: var(--muted);
+}
+
+[data-theme="dark"] .editor .cm-diagnosticAction {
+  background: var(--bg-accent);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .formula-actions {
@@ -402,6 +434,10 @@ body {
   padding: 0;
   display: grid;
   gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .completion-group-header {
