@@ -99,4 +99,5 @@ pub struct CompletionOutputView {
     pub items: Vec<CompletionItemView>,
     pub replace: Span,
     pub signature_help: Option<SignatureHelpView>,
+    pub preferred_indices: Vec<usize>,
 }

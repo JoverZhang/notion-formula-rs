@@ -138,6 +138,9 @@ Completion (`analyzer/src/completion.rs`):
 - Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
 - Postfix completion: `.if()` is offered after an atom when `if` exists in context.
 - Property completion items insert `prop("Name")` and can be disabled via `Property.disabled_reason` (disabled items have no `primary_edit`/cursor).
+- When `CompletionOutput.replace` is non-empty, the analyzer derives a “query” from the source substring covered by the replace span (lowercased; whitespace/underscores removed). If the normalized query is empty, no fuzzy ranking is applied and `preferred_indices` is `[]`.
+- With a non-empty query, completion items are fuzzy-ranked by **subsequence match** on `CompletionItem.label` (case-insensitive). Ranking prefers: prefix matches, fewer gaps / longer contiguous runs, earlier matches, and shorter labels; ties are deterministic and use kind priority (`Function` > `Builtin` > `Property` > `Operator`) then original index.
+- `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` matched+enabled items (high-score first, then lower-score matches). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
 
 ---
@@ -154,7 +157,7 @@ Exported functions (`analyzer_wasm/src/lib.rs`):
 
 - must be non-empty and valid JSON
 - unknown top-level fields are rejected (`deny_unknown_fields`)
-- schema today is **properties-only**: `{ "properties": Property[] }`
+- schema today is: `{ "properties": Property[], "completion"?: { "preferred_limit"?: number } }`
 - `Context.functions` is populated from Rust `builtins_functions()` (JS cannot supply functions today)
 
 ---
@@ -177,6 +180,7 @@ Span { start: u32, end: u32 } // UTF-16 code units, half-open [start, end)
 SpanView { range: Span }
 LineColView { line: u32, col: u32 }
 TextEditView { range: Span, new_text: string }
+CompletionOutputView { items: CompletionItemView[], replace: Span, signature_help: SignatureHelpView | null, preferred_indices: number[] }
 ```
 
 Byte ↔ UTF-16 conversion lives in WASM

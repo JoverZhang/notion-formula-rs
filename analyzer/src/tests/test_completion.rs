@@ -228,6 +228,61 @@ fn completion_inside_call_arg_empty_before_close_paren_shows_items_and_signature
 }
 
 #[test]
+fn completion_fuzzy_ranking_orders_matches_and_computes_preferred_indices() {
+    let c = ctx()
+        .func("toNumber")
+        .finish()
+        .func("median")
+        .finish()
+        .func("mean")
+        .finish()
+        .func("member")
+        .finish()
+        .build();
+
+    let input = "me$0";
+    let cursor = input.find("$0").expect("missing cursor marker");
+    let source = input.replace("$0", "");
+    let out = crate::completion::complete_with_context_config(
+        &source,
+        cursor,
+        Some(&c),
+        crate::completion::CompletionConfig { preferred_limit: 3 },
+    );
+
+    let idx_to_number = out.items.iter().position(|i| i.label == "toNumber").unwrap();
+    let idx_median = out.items.iter().position(|i| i.label == "median").unwrap();
+    let idx_mean = out.items.iter().position(|i| i.label == "mean").unwrap();
+    let idx_member = out.items.iter().position(|i| i.label == "member").unwrap();
+
+    assert!(idx_median < idx_to_number);
+    assert!(idx_mean < idx_to_number);
+    assert!(idx_member < idx_to_number);
+
+    assert_eq!(out.preferred_indices, vec![0, 1, 2]);
+    assert_eq!(out.items[out.preferred_indices[0]].label, "mean");
+    assert_eq!(out.items[out.preferred_indices[1]].label, "median");
+    assert_eq!(out.items[out.preferred_indices[2]].label, "member");
+}
+
+#[test]
+fn completion_preferred_limit_zero_disables_preferred_indices() {
+    let c = ctx().func("mean").finish().build();
+
+    let input = "me$0";
+    let cursor = input.find("$0").expect("missing cursor marker");
+    let source = input.replace("$0", "");
+    let out = crate::completion::complete_with_context_config(
+        &source,
+        cursor,
+        Some(&c),
+        crate::completion::CompletionConfig { preferred_limit: 0 },
+    );
+
+    assert!(out.preferred_indices.is_empty());
+}
+
+#[test]
 fn completion_inside_call_arg_without_close_paren_shows_items_and_signature_help() {
     let c = ctx().props_demo_basic().func_sum().build();
 

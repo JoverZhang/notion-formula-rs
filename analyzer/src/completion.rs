@@ -2,11 +2,27 @@ use crate::lexer::lex;
 use crate::semantic;
 use crate::token::{LitKind, Span, Token, TokenKind};
 
+pub const DEFAULT_PREFERRED_LIMIT: usize = 5;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompletionConfig {
+    pub preferred_limit: usize,
+}
+
+impl Default for CompletionConfig {
+    fn default() -> Self {
+        Self {
+            preferred_limit: DEFAULT_PREFERRED_LIMIT,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionOutput {
     pub items: Vec<CompletionItem>,
     pub replace: Span,
     pub signature_help: Option<SignatureHelp>,
+    pub preferred_indices: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +88,15 @@ pub fn complete_with_context(
     cursor: usize,
     ctx: Option<&semantic::Context>,
 ) -> CompletionOutput {
+    complete_with_context_config(text, cursor, ctx, CompletionConfig::default())
+}
+
+pub fn complete_with_context_config(
+    text: &str,
+    cursor: usize,
+    ctx: Option<&semantic::Context>,
+    config: CompletionConfig,
+) -> CompletionOutput {
     let cursor_u32 = u32::try_from(cursor).unwrap_or(u32::MAX);
     let lex_output = lex(text);
     let tokens = lex_output.tokens;
@@ -92,12 +117,15 @@ pub fn complete_with_context(
             Vec::new()
         };
         return finalize_output(
+            text,
             CompletionOutput {
                 items,
                 replace: default_replace,
                 signature_help: None,
+                preferred_indices: Vec::new(),
             },
             ctx,
+            config,
         );
     }
 
@@ -120,14 +148,23 @@ pub fn complete_with_context(
     );
     output.signature_help = signature_help;
 
-    finalize_output(output, ctx)
+    finalize_output(text, output, ctx, config)
 }
 
 /// Compute completions using byte offsets for the cursor and replace span.
 ///
 /// This is a small wrapper that enforces a non-optional `Context` at the call site.
 pub fn complete(text: &str, cursor: usize, ctx: &semantic::Context) -> CompletionOutput {
-    complete_with_context(text, cursor, Some(ctx))
+    complete_with_config(text, cursor, ctx, CompletionConfig::default())
+}
+
+pub fn complete_with_config(
+    text: &str,
+    cursor: usize,
+    ctx: &semantic::Context,
+    config: CompletionConfig,
+) -> CompletionOutput {
+    complete_with_context_config(text, cursor, Some(ctx), config)
 }
 
 fn detect_position_kind(
@@ -257,27 +294,232 @@ fn complete_for_position(
                 items,
                 replace: replace_span_for_expr_start(tokens, cursor),
                 signature_help: None,
+                preferred_indices: Vec::new(),
             }
         }
         PositionKind::AfterAtom => CompletionOutput {
             items: after_atom_items(ctx),
             replace: default_replace,
             signature_help: None,
+            preferred_indices: Vec::new(),
         },
         PositionKind::None => CompletionOutput {
             items: Vec::new(),
             replace: default_replace,
             signature_help: None,
+            preferred_indices: Vec::new(),
         },
     }
 }
 
 fn finalize_output(
+    text: &str,
     mut output: CompletionOutput,
     ctx: Option<&semantic::Context>,
+    config: CompletionConfig,
 ) -> CompletionOutput {
     attach_primary_edits(output.replace, &mut output.items, ctx);
+
+    let Some(query) = completion_query_for_replace(text, output.replace) else {
+        output.preferred_indices = Vec::new();
+        return output;
+    };
+
+    fuzzy_rank_items(&query, &mut output.items);
+    output.preferred_indices =
+        preferred_indices_for_items(&output.items, &query, config.preferred_limit);
     output
+}
+
+fn completion_query_for_replace(text: &str, replace: Span) -> Option<String> {
+    if replace.start == replace.end {
+        return None;
+    }
+
+    let start = usize::try_from(u32::min(replace.start, replace.end)).ok()?;
+    let end = usize::try_from(u32::max(replace.start, replace.end)).ok()?;
+    if end > text.len() {
+        return None;
+    }
+    if !text.is_char_boundary(start) || !text.is_char_boundary(end) {
+        return None;
+    }
+
+    let raw = text.get(start..end)?;
+    if raw.chars().all(|c| c.is_whitespace()) {
+        return None;
+    }
+
+    let query: String = raw
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '_')
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    if query.is_empty() {
+        return None;
+    }
+    Some(query)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FuzzyScore {
+    is_prefix: bool,
+    gap_sum: usize,
+    max_run: usize,
+    first_pos: usize,
+    label_len: usize,
+}
+
+fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
+    let query_chars: Vec<char> = query.chars().map(|c| c.to_ascii_lowercase()).collect();
+    if query_chars.is_empty() {
+        return None;
+    }
+
+    let label_chars: Vec<char> = label.chars().map(|c| c.to_ascii_lowercase()).collect();
+    if label_chars.is_empty() {
+        return None;
+    }
+
+    let mut positions = Vec::with_capacity(query_chars.len());
+    let mut j = 0usize;
+    for &qc in &query_chars {
+        while j < label_chars.len() && label_chars[j] != qc {
+            j += 1;
+        }
+        if j == label_chars.len() {
+            return None;
+        }
+        positions.push(j);
+        j += 1;
+    }
+
+    let first_pos = *positions.first().unwrap_or(&0);
+    let label_len = label_chars.len();
+
+    let mut gap_sum = 0usize;
+    let mut max_run = 1usize;
+    let mut current_run = 1usize;
+    for window in positions.windows(2) {
+        let prev = window[0];
+        let next = window[1];
+        if next == prev + 1 {
+            current_run += 1;
+            max_run = usize::max(max_run, current_run);
+        } else {
+            current_run = 1;
+            gap_sum = gap_sum.saturating_add(next.saturating_sub(prev).saturating_sub(1));
+        }
+    }
+
+    let label_lower: String = label_chars.iter().collect();
+    let query_lower: String = query_chars.iter().collect();
+    let is_prefix = label_lower.starts_with(&query_lower);
+
+    Some(FuzzyScore {
+        is_prefix,
+        gap_sum,
+        max_run,
+        first_pos,
+        label_len,
+    })
+}
+
+fn fuzzy_rank_items(query: &str, items: &mut Vec<CompletionItem>) {
+    #[derive(Debug)]
+    struct Ranked {
+        original_idx: usize,
+        score: Option<FuzzyScore>,
+        item: CompletionItem,
+    }
+
+    fn kind_priority(kind: CompletionKind) -> u8 {
+        match kind {
+            CompletionKind::Function => 0,
+            CompletionKind::Builtin => 1,
+            CompletionKind::Property => 2,
+            CompletionKind::Operator => 3,
+        }
+    }
+
+    let mut ranked: Vec<Ranked> = items
+        .drain(..)
+        .enumerate()
+        .map(|(idx, item)| Ranked {
+            original_idx: idx,
+            score: fuzzy_score(query, &item.label),
+            item,
+        })
+        .collect();
+
+    ranked.sort_by(|a, b| {
+        match (a.score, b.score) {
+            (Some(sa), Some(sb)) => {
+                // Match group: prefix > non-prefix, then tighter/earlier/shorter.
+                sb.is_prefix
+                    .cmp(&sa.is_prefix)
+                    .then_with(|| sa.gap_sum.cmp(&sb.gap_sum))
+                    .then_with(|| sb.max_run.cmp(&sa.max_run))
+                    .then_with(|| sa.first_pos.cmp(&sb.first_pos))
+                    .then_with(|| sa.label_len.cmp(&sb.label_len))
+                    .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
+                    .then_with(|| a.original_idx.cmp(&b.original_idx))
+            }
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.original_idx.cmp(&b.original_idx),
+        }
+    });
+
+    *items = ranked.into_iter().map(|r| r.item).collect();
+}
+
+pub(crate) fn preferred_indices_for_items(
+    items: &[CompletionItem],
+    query: &str,
+    preferred_limit: usize,
+) -> Vec<usize> {
+    if preferred_limit == 0 {
+        return Vec::new();
+    }
+
+    fn is_high_score(score: FuzzyScore) -> bool {
+        score.is_prefix || score.gap_sum == 0
+    }
+
+    let mut out = Vec::with_capacity(preferred_limit);
+
+    for (idx, item) in items.iter().enumerate() {
+        if out.len() >= preferred_limit {
+            break;
+        }
+        if item.is_disabled {
+            continue;
+        }
+        let Some(score) = fuzzy_score(query, &item.label) else {
+            continue;
+        };
+        if is_high_score(score) {
+            out.push(idx);
+        }
+    }
+
+    for (idx, item) in items.iter().enumerate() {
+        if out.len() >= preferred_limit {
+            break;
+        }
+        if item.is_disabled {
+            continue;
+        }
+        if out.contains(&idx) {
+            continue;
+        }
+        if fuzzy_score(query, &item.label).is_some() {
+            out.push(idx);
+        }
+    }
+
+    out
 }
 
 fn attach_primary_edits(

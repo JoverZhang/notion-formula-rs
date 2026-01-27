@@ -9,6 +9,7 @@
 //! the types expected by the frontend and WASM exports.
 
 use analyzer::SourceMap;
+use analyzer::completion::{CompletionConfig, DEFAULT_PREFERRED_LIMIT};
 use analyzer::semantic::{Context, FunctionCategory, Property, builtins_functions};
 use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, Span, Token, TokenKind};
 use js_sys::Error as JsError;
@@ -27,14 +28,40 @@ use crate::text_edit::apply_text_edits_bytes_with_cursor;
 
 pub struct Converter;
 
+pub struct ParsedContext {
+    pub ctx: Context,
+    pub completion: CompletionConfig,
+}
+
 impl Converter {
     /// Parse the JS-provided context JSON into an analyzer `Context`.
-    pub fn parse_context(context_json: &str) -> Result<Context, JsValue> {
+    pub fn parse_context(context_json: &str) -> Result<ParsedContext, JsValue> {
+        #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct CompletionInput {
+            #[serde(default = "default_preferred_limit")]
+            preferred_limit: usize,
+        }
+
+        impl Default for CompletionInput {
+            fn default() -> Self {
+                Self {
+                    preferred_limit: default_preferred_limit(),
+                }
+            }
+        }
+
+        fn default_preferred_limit() -> usize {
+            DEFAULT_PREFERRED_LIMIT
+        }
+
         #[derive(Debug, Deserialize)]
         #[serde(deny_unknown_fields)]
         struct ContextInput {
             #[serde(default)]
             properties: Vec<Property>,
+            #[serde(default)]
+            completion: CompletionInput,
         }
 
         fn invalid_context_json_error() -> JsValue {
@@ -48,9 +75,14 @@ impl Converter {
 
         let input: ContextInput =
             serde_json::from_str(trimmed).map_err(|_| invalid_context_json_error())?;
-        Ok(Context {
-            properties: input.properties,
-            functions: builtins_functions(),
+        Ok(ParsedContext {
+            ctx: Context {
+                properties: input.properties,
+                functions: builtins_functions(),
+            },
+            completion: CompletionConfig {
+                preferred_limit: input.completion.preferred_limit,
+            },
         })
     }
 
@@ -121,6 +153,7 @@ impl Converter {
             items,
             replace,
             signature_help,
+            preferred_indices: output.preferred_indices.clone(),
         }
     }
 

@@ -342,15 +342,22 @@ export function createFormulaPanelView(opts: {
 
   let completionItems: CompletionItem[] = [];
   let signatureHelp: SignatureHelp | null = null;
+  let preferredCompletionIndices: number[] = [];
   type CompletionRenderRow =
     | { type: "header"; kind: CompletionItem["kind"]; label: string }
+    | { type: "section"; section: "recommended"; label: string }
     | {
         type: "category";
         kind: "Function";
         category: NonNullable<CompletionItem["category"]>;
         label: string;
       }
-    | { type: "item"; item: CompletionItem; itemIndex: number };
+    | {
+        type: "item";
+        item: CompletionItem;
+        itemIndex: number;
+        isRecommended?: boolean;
+      };
 
   let completionRows: CompletionRenderRow[] = [];
   let selectedRowIndex = -1;
@@ -377,7 +384,10 @@ export function createFormulaPanelView(opts: {
     return `${category} Functions`;
   }
 
-  function buildCompletionRows(items: CompletionItem[]): CompletionRenderRow[] {
+  function buildCompletionRows(
+    items: CompletionItem[],
+    preferredIndices: number[],
+  ): CompletionRenderRow[] {
     const rows: CompletionRenderRow[] = [];
     const categoryOrder: Array<NonNullable<CompletionItem["category"]>> = [
       "General",
@@ -389,17 +399,45 @@ export function createFormulaPanelView(opts: {
       "Special",
     ];
 
-    let idx = 0;
-    while (idx < items.length) {
-      const kind = items[idx].kind;
-      rows.push({ type: "header", kind, label: completionGroupLabel(kind) });
+    const recommendedIndices: number[] = [];
+    const recommendedSet = new Set<number>();
+    for (const idx of preferredIndices) {
+      if (!Number.isInteger(idx)) continue;
+      if (idx < 0 || idx >= items.length) continue;
+      if (recommendedSet.has(idx)) continue;
+      const item = items[idx];
+      if (!item || item.is_disabled) continue;
+      recommendedSet.add(idx);
+      recommendedIndices.push(idx);
+    }
+
+    if (recommendedIndices.length > 0) {
+      rows.push({ type: "section", section: "recommended", label: "Recommended" });
+      for (const itemIndex of recommendedIndices) {
+        const item = items[itemIndex];
+        if (!item) continue;
+        rows.push({ type: "item", item, itemIndex, isRecommended: true });
+      }
+    }
+
+    let scanIdx = 0;
+    while (scanIdx < items.length) {
+      const kind = items[scanIdx].kind;
 
       if (kind === "Function") {
         const functionItems: Array<{ item: CompletionItem; itemIndex: number }> = [];
-        while (idx < items.length && items[idx].kind === "Function") {
-          functionItems.push({ item: items[idx], itemIndex: idx });
-          idx += 1;
+        while (scanIdx < items.length && items[scanIdx].kind === "Function") {
+          if (!recommendedSet.has(scanIdx)) {
+            functionItems.push({ item: items[scanIdx], itemIndex: scanIdx });
+          }
+          scanIdx += 1;
         }
+
+        if (functionItems.length === 0) {
+          continue;
+        }
+
+        rows.push({ type: "header", kind, label: completionGroupLabel(kind) });
 
         const groups = new Map<NonNullable<CompletionItem["category"]>, typeof functionItems>();
         for (const category of categoryOrder) groups.set(category, []);
@@ -427,10 +465,20 @@ export function createFormulaPanelView(opts: {
         continue;
       }
 
-      while (idx < items.length && items[idx].kind === kind) {
-        rows.push({ type: "item", item: items[idx], itemIndex: idx });
-        idx += 1;
+      const segmentItems: Array<{ item: CompletionItem; itemIndex: number }> = [];
+      while (scanIdx < items.length && items[scanIdx].kind === kind) {
+        if (!recommendedSet.has(scanIdx)) {
+          segmentItems.push({ item: items[scanIdx], itemIndex: scanIdx });
+        }
+        scanIdx += 1;
       }
+
+      if (segmentItems.length === 0) {
+        continue;
+      }
+
+      rows.push({ type: "header", kind, label: completionGroupLabel(kind) });
+      segmentItems.forEach(({ item, itemIndex }) => rows.push({ type: "item", item, itemIndex }));
     }
     return rows;
   }
@@ -528,6 +576,13 @@ export function createFormulaPanelView(opts: {
         itemsEl.appendChild(li);
         return;
       }
+      if (row.type === "section") {
+        li.className = "completion-recommended-header";
+        li.textContent = row.label;
+        li.setAttribute("data-completion-section", row.section);
+        itemsEl.appendChild(li);
+        return;
+      }
       if (row.type === "category") {
         li.className = "completion-category-header";
         li.textContent = row.label;
@@ -540,6 +595,10 @@ export function createFormulaPanelView(opts: {
       li.className = "completion-item";
       if (rowIndex === selectedRowIndex) li.classList.add("is-selected");
       if (item.is_disabled) li.classList.add("is-disabled");
+      if (row.isRecommended) {
+        li.classList.add("is-recommended");
+        li.setAttribute("data-completion-recommended", "true");
+      }
       li.setAttribute("data-completion-index", String(row.itemIndex));
 
       const main = document.createElement("div");
@@ -575,7 +634,14 @@ export function createFormulaPanelView(opts: {
 
   function rerenderCompletions() {
     renderSignature(signatureHelp);
-    completionRows = buildCompletionRows(completionItems);
+    completionRows = buildCompletionRows(completionItems, preferredCompletionIndices);
+    const preferredTop = preferredCompletionIndices[0];
+    if (typeof preferredTop === "number") {
+      const rowIndex = completionRows.findIndex(
+        (row) => row.type === "item" && row.itemIndex === preferredTop,
+      );
+      if (rowIndex !== -1) selectedRowIndex = rowIndex;
+    }
     normalizeSelectedRowIndex();
     renderItems();
     scrollSelectedIntoView();
@@ -591,9 +657,13 @@ export function createFormulaPanelView(opts: {
         const output = completeSource(source, cursor, CONTEXT_JSON);
         completionItems = output.items ?? [];
         signatureHelp = output.signature_help ?? null;
+        preferredCompletionIndices = Array.isArray(output.preferred_indices)
+          ? output.preferred_indices.filter((n) => typeof n === "number")
+          : [];
       } catch {
         completionItems = [];
         signatureHelp = null;
+        preferredCompletionIndices = [];
       }
       if (completionItems.length === 0) selectedRowIndex = -1;
       rerenderCompletions();

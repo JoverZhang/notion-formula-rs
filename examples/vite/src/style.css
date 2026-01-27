@@ -454,6 +454,20 @@ body {
   margin-top: 0;
 }
 
+.completion-recommended-header {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  padding: 4px 8px 2px;
+  margin-top: 4px;
+  user-select: none;
+}
+
+.completion-recommended-header:first-child {
+  margin-top: 0;
+}
+
 .completion-category-header {
   font-size: 11px;
   font-weight: 650;
@@ -471,6 +485,11 @@ body {
   border-radius: 8px;
   cursor: pointer;
   user-select: none;
+}
+
+.completion-item.is-recommended {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 5px;
 }
 
 .completion-item:hover {

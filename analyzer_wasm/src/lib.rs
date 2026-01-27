@@ -21,13 +21,13 @@ use crate::dto::v1::{AnalyzeResult, LineColView};
 #[wasm_bindgen]
 pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue> {
     // Parse the context from the provided JSON string.
-    let ctx = Converter::parse_context(&context_json)?;
+    let parsed = Converter::parse_context(&context_json)?;
 
     // Perform the analysis and collect the diagnostics.
     let result: AnalyzeResult = match analyzer::analyze(&source) {
         Ok(mut output) => {
             // Analyze the expression and append the diagnostics.
-            let (_, diags) = analyzer::semantic::analyze_expr(&output.expr, &ctx);
+            let (_, diags) = analyzer::semantic::analyze_expr(&output.expr, &parsed.ctx);
             output.diagnostics.extend(diags);
             // Convert the output to the desired DTO format.
             Converter::analyze_output(&source, output)
@@ -57,10 +57,11 @@ pub fn complete(source: String, cursor: usize, context_json: String) -> Result<J
     let cursor_byte = Converter::cursor_utf16_to_byte(&source, cursor);
 
     // Parse the context from the provided JSON string.
-    let ctx = Converter::parse_context(&context_json)?;
+    let parsed = Converter::parse_context(&context_json)?;
 
     // Perform the completion operation.
-    let output = analyzer::complete(&source, cursor_byte, &ctx);
+    let output =
+        analyzer::completion::complete_with_config(&source, cursor_byte, &parsed.ctx, parsed.completion);
 
     // Convert the completion output to the desired DTO format.
     let out = Converter::completion_output_view(&source, &output);
