@@ -67,11 +67,11 @@ pub fn complete(source: String, cursor: usize, context_json: String) -> Result<J
     serde_wasm_bindgen::to_value(&out).map_err(|_| JsValue::from(JsError::new("Serialize error")))
 }
 
-/// Convert a byte offset to a line and column, and return the result as a `JsValue`.
+/// Convert a UTF-16 offset (JS/editor position) to a line and column, and return the result as a `JsValue`.
 ///
 /// # Arguments:
 /// * `source` - The source string to calculate the line and column for.
-/// * `pos` - The byte position for which to calculate the line and column.
+/// * `pos` - The UTF-16 position (CodeMirror-style) for which to calculate the line and column.
 ///
 /// # Returns:
 /// A `JsValue` representing the line and column view at the given byte position.

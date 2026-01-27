@@ -1,13 +1,13 @@
 # Notion Formula Analyzer (Rust)
 
-This document is a code-backed overview of what is implemented today (parser/formatter/diagnostics/completion + a WASM bridge), with file paths for the source of truth.
+This document is a code-backed overview of what is implemented today (parser/formatter/diagnostics/completion + a WASM bridge), with file paths for the source of truth. When behavior changes, update this doc (rewrite/remove outdated parts; don’t append-only).
 
 ## Repository layout (workspace)
 
 Rust workspace members (from `Cargo.toml`):
 
 - `analyzer/`: frontend engine (lex → parse → diagnostics → format; plus completion + a small semantic pass)
-- `analyzer_wasm/`: `wasm-bindgen` bridge exporting `analyze(...)` and `complete(...)` to JS/TS
+- `analyzer_wasm/`: `wasm-bindgen` bridge exporting `analyze(...)`, `complete(...)`, and `pos_to_line_col(...)` to JS/TS (UTF-16 boundary)
 - `evaluator/`: currently a stub crate
 
 Non-workspace directories:
@@ -22,9 +22,9 @@ Non-workspace directories:
 Entry points:
 
 - `analyzer/src/lib.rs`:
-  - `analyze(text)`
-  - `analyze_with_context(text, ctx)`
-  - `complete_with_context(text, cursor_byte, ctx)`
+  - `analyze(text: &str) -> Result<ParseOutput, Diagnostic>`
+  - `analyze_with_context(text: &str, ctx: Context) -> Result<ParseOutput, Diagnostic>`
+  - re-exports: `complete(...)`, `complete_with_context(...)`, `format_expr(...)`, `format_diagnostics(...)`, core token/span types
 
 Core modules:
 
@@ -36,7 +36,7 @@ Core modules:
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
 - `analyzer/src/semantic/mod.rs`: minimal type checking driven by `Context { properties, functions }`
 - `analyzer/src/completion.rs`: byte-offset completion + signature help for editor integrations
-- `analyzer/src/source_map.rs`: byte offset → `(line,col)` and byte offset ↔ UTF-16 helpers
+- `analyzer/src/source_map.rs`: byte offset → `(line,col)` plus `byte_offset_to_utf16(...)`
 - `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification, `tokens_in_span(...)`
 - `analyzer/src/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
 
@@ -56,9 +56,8 @@ Core modules:
 - Returns half-open token index range `[lo, hi)`
 - Handles:
   - empty spans
-  - EOF insertion points
-  - trivia overlap
-  - out-of-bounds spans
+  - stable “insertion point” behavior for empty spans
+  - trivia tokens (comments/newlines) and EOF (which has an empty span)
 
 ---
 
@@ -109,28 +108,37 @@ Expression forms (AST):
 
 Known gaps:
 
-- boolean literals (`true` / `false`) lex as identifiers
+- boolean literals (`true` / `false`) lex as identifiers (the lexer does not emit `LitKind::Bool` today)
+- `not` is suggested by completion but is not a lexer/parser operator today
 - completion operator list does not include every parsed operator
 
 ---
 
 ## Builtins + sugar (where they live)
 
-Semantic builtins:
+Semantic analysis (`analyzer/src/semantic/mod.rs`):
 
-- builtin function list: `builtins_functions()` → `if`, `sum`
-- `if()` checks condition is boolean
-- property lookup: `prop("Name")`
-  - arity = 1
-  - argument must be string literal
-  - property must exist in `Context.properties`
-- postfix sugar typing:
-  - `cond.if(a, b)` treated like `if(cond, a, b)` for typing only
+- `Context` is `{ properties: Vec<Property>, functions: Vec<FunctionSig> }`.
+- Builtin function signatures are defined in `builtins_functions()` (this list is the source of truth and is larger than a couple of functions).
+- `prop("Name")` is **special-cased** in the semantic analyzer (it is not a `FunctionSig`):
+  - expects exactly 1 argument
+  - argument must be a string literal
+  - property name must exist in `Context.properties` (else a diagnostic is emitted)
+- `if(condition, then, else)` is special-cased for type checking:
+  - expects exactly 3 arguments
+  - `condition` must be boolean (if known)
+  - result type is a join of `then`/`else` (currently `Unknown` if they differ)
+- Postfix sugar typing:
+  - `condition.if(then, else)` is treated like `if(condition, then, else)` **for typing only** when `if` exists in `Context.functions`.
 
-Completion builtins and sugar:
+Completion (`analyzer/src/completion.rs`):
 
-- expression-start keywords: `not`, `true`, `false`
-- postfix completion: `.if()` offered when `if` exists in context
+- Cursor and `replace` spans are **byte offsets** in the core analyzer.
+- Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
+- Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
+- Postfix completion: `.if()` is offered after an atom when `if` exists in context.
+- Property completion items insert `prop("Name")` and can be disabled via `Property.disabled_reason` (disabled items have no `primary_edit`/cursor).
+- Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
 
 ---
 
@@ -138,9 +146,16 @@ Completion builtins and sugar:
 
 Exported functions (`analyzer_wasm/src/lib.rs`):
 
-- `analyze(source: String, context_json?: String)`
-- `complete(source: String, cursor_utf16: usize, context_json?: String)`
-- `utf16_pos_to_line_col(source: String, pos_utf16: u32)`
+- `analyze(source: String, context_json: String) -> Result<JsValue, JsValue>`
+- `complete(source: String, cursor_utf16: usize, context_json: String) -> Result<JsValue, JsValue>`
+- `pos_to_line_col(source: String, pos_utf16: u32) -> JsValue`
+
+`context_json` invariants (enforced by `Converter::parse_context(...)` and covered by WASM tests):
+
+- must be non-empty and valid JSON
+- unknown top-level fields are rejected (`deny_unknown_fields`)
+- schema today is **properties-only**: `{ "properties": Property[] }`
+- `Context.functions` is populated from Rust `builtins_functions()` (JS cannot supply functions today)
 
 ---
 
@@ -158,10 +173,10 @@ Exported functions (`analyzer_wasm/src/lib.rs`):
 DTO types (`analyzer_wasm/src/dto/v1.rs`):
 
 ```ts
-Utf16Span { start: u32, end: u32 } // half-open [start, end)
-SpanView { range: Utf16Span }
+Span { start: u32, end: u32 } // UTF-16 code units, half-open [start, end)
+SpanView { range: Span }
 LineColView { line: u32, col: u32 }
-TextEditView { range: Utf16Span, new_text: string }
+TextEditView { range: Span, new_text: string }
 ```
 
 Byte ↔ UTF-16 conversion lives in WASM
@@ -170,6 +185,8 @@ Files:
 
 - `analyzer_wasm/src/offsets.rs`
 - `analyzer_wasm/src/span.rs`
+- `analyzer_wasm/src/converter.rs`
+- `analyzer_wasm/src/text_edit.rs`
 
 Helpers:
 
@@ -185,33 +202,15 @@ Rust core never deals with UTF-16 offsets.
 ### Line / Column handling (now derived, not stored)
 
 - `DTO SpanView` no longer stores line or col
-- `Line/column` is computed lazily via: `utf16_pos_to_line_col(source, pos_utf16) -> LineColView`
-- Design intent:
-  - range is canonical
-  - line/col is derived only when needed
-  - Avoid storing redundant positional data
+- `Line/column` is computed lazily via: `pos_to_line_col(source, pos_utf16) -> LineColView` (1-based)
+- `pos_to_line_col` takes a **UTF-16** offset at the JS boundary and maps through byte offsets internally.
 
-- Design intent:
-  - range is canonical
-  - line/col is derived only when needed
-  - Avoid storing redundant positional data
+Text edits / cursor rebasing:
 
-Text edits
-
-- Multiple edits applied in descending offset order
-- Prevents offset shifting bugs
-- All edit ranges are UTF-16 at JS boundary
-
----
-
-Token stream utilities
-
-- TokenCursor — parser cursor over token stream
-- TokenQuery — span → range → trivia neighbor API
-
-Both live in:
-
-- `analyzer/src/tokenstream.rs`
+- Analyzer `TextEdit` ranges are **byte offsets**.
+- WASM DTO `TextEditView` ranges are **UTF-16**.
+- `analyzer_wasm/src/text_edit.rs` applies byte edits in **descending start offset order** and can rebase a byte cursor through edits.
+- The completion DTO’s optional `cursor` is expressed in **UTF-16 in the updated document**.
 
 ---
 
@@ -258,6 +257,7 @@ WASM tests
   - UTF-16 span correctness
   - token span integrity
   - diagnostics mapping
+  - `context_json` validation rules (non-empty JSON; unknown fields rejected)
 
 Vite demo tests (TypeScript)
 
@@ -285,9 +285,8 @@ Primary files:
 Rendering behavior:
 
 - Completions are displayed as a list under the “Suggestions” panel.
-- Items are grouped **purely in the UI** (no WASM changes) by inserting a header row whenever the
-  completion item’s `kind` changes (consecutive grouping).
-  - This relies on the incoming `items` array order being meaningful/stable.
+- Function completions are grouped by `category` (UI-owned grouping; no WASM changes).
+- Non-function completions are grouped by consecutive `kind` changes (UI-owned grouping).
 - Selection and navigation operate over a `completionRows` model (headers + items):
   - Headers are not selectable.
   - Arrow key navigation skips over header rows.
@@ -303,9 +302,9 @@ Cursor placement invariants
 - The analyzer’s optional `CompletionItem.cursor` is intended to represent the desired cursor position
   **in the updated document after applying the primary edit** (e.g., `if()` => inside the `(`).
 - The WASM bridge (`analyzer_wasm/`) converts completion edit ranges and cursor values to **UTF-16**
-  for JS/editor usage, and must account for any `additional_edits` that occur before the primary edit.
-  - Cursor shifting must only account for edits that are actually applied (invalid ranges or non-UTF-8
-    boundaries are skipped by the edit applier).
+  for JS/editor usage, and accounts for shifts from `additional_edits` that occur before the primary edit.
+- The Vite demo uses `item.cursor` when present; otherwise it falls back to `primary_edit` end plus any
+  shifts from additional edits before the primary edit (`examples/vite/src/ui/formula_panel_view.ts`).
 
 Playwright host configuration
 
