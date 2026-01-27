@@ -270,6 +270,8 @@ Regression coverage:
 - diagnostics propagation
 - chip spans
 - UI behavior
+- completion cursor placement (including UTF-16 text)
+- completion list scroll-into-view behavior
 
 ### Vite demo completion UI
 
@@ -289,11 +291,29 @@ Rendering behavior:
 - Selection and navigation operate over a `completionRows` model (headers + items):
   - Headers are not selectable.
   - Arrow key navigation skips over header rows.
-  - Applying a completion maps the selected row back to the underlying `CompletionItem` index.
+- Applying a completion maps the selected row back to the underlying `CompletionItem` index.
 
 Styling:
 
 - Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
+
+Cursor placement invariants
+
+- Analyzer core (`analyzer/`) computes completion cursors as **byte offsets**.
+- The analyzer’s optional `CompletionItem.cursor` is intended to represent the desired cursor position
+  **in the updated document after applying the primary edit** (e.g., `if()` => inside the `(`).
+- The WASM bridge (`analyzer_wasm/`) converts completion edit ranges and cursor values to **UTF-16**
+  for JS/editor usage, and must account for any `additional_edits` that occur before the primary edit.
+  - Cursor shifting must only account for edits that are actually applied (invalid ranges or non-UTF-8
+    boundaries are skipped by the edit applier).
+
+Playwright host configuration
+
+- The Playwright suite in `examples/vite/` boots Vite via the `webServer` setting in
+  `examples/vite/playwright.config.ts`.
+- Host/port can be overridden with:
+  - `PW_HOST` (defaults to `127.0.0.1`)
+  - `PW_PORT` (defaults to `5173`)
 
 Current architectural invariants
 

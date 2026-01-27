@@ -162,9 +162,24 @@ impl Converter {
             let primary_start = primary_edit.range.start;
             for edit in &item.additional_edits {
                 if edit.range.end <= primary_start {
-                    let replaced_len = edit.range.end.saturating_sub(edit.range.start) as i64;
+                    let start_u32 = edit.range.start;
+                    let end_u32 = edit.range.end;
+                    let start = start_u32 as usize;
+                    let end = end_u32 as usize;
+
+                    // Match the edit application validity checks: if an edit would be skipped due to
+                    // invalid bounds or non-UTF8-boundary ranges, it must not shift the cursor.
+                    if start_u32 > end_u32 || end > source.len() {
+                        continue;
+                    }
+                    if !source.is_char_boundary(start) || !source.is_char_boundary(end) {
+                        continue;
+                    }
+
+                    let replaced_len = end_u32.saturating_sub(start_u32) as i64;
                     let inserted_len = edit.new_text.len() as i64;
-                    cursor_byte = cursor_byte.saturating_add(inserted_len.saturating_sub(replaced_len));
+                    cursor_byte =
+                        cursor_byte.saturating_add(inserted_len.saturating_sub(replaced_len));
                 }
             }
 

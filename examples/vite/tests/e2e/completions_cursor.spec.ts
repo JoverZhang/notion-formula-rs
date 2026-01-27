@@ -3,7 +3,6 @@ import type { FormulaId } from "../../src/app/types";
 import {
   applyCompletionByDomClick,
   completionItemsLocator,
-  editorContentLocator,
   expectEditorText,
   expectCursorAfter,
   gotoDebug,
