@@ -55,20 +55,24 @@ test("dark mode: CodeMirror caret has sufficient contrast", async ({ page }) => 
   );
   await expect(cmEditor).toHaveClass(/cm-focused/, { timeout: 5_000 });
 
-  const colors = await page.evaluate(({ formulaId }) => {
-    const scope = document.querySelector<HTMLElement>(
-      `[data-testid="formula-editor"][data-formula-id="${formulaId}"]`,
-    );
-    if (!scope) return null;
-    const content = scope.querySelector<HTMLElement>(".cm-content");
-    const editor = scope.closest<HTMLElement>(".editor") ?? scope.querySelector<HTMLElement>(".editor");
-    const editorEl = editor ?? scope;
-    if (!content || !editorEl) return null;
-    return {
-      caretColor: getComputedStyle(content).caretColor,
-      editorBg: getComputedStyle(editorEl).backgroundColor,
-    };
-  }, { formulaId: FORMULA_ID });
+  const colors = await page.evaluate(
+    ({ formulaId }) => {
+      const scope = document.querySelector<HTMLElement>(
+        `[data-testid="formula-editor"][data-formula-id="${formulaId}"]`,
+      );
+      if (!scope) return null;
+      const content = scope.querySelector<HTMLElement>(".cm-content");
+      const editor =
+        scope.closest<HTMLElement>(".editor") ?? scope.querySelector<HTMLElement>(".editor");
+      const editorEl = editor ?? scope;
+      if (!content || !editorEl) return null;
+      return {
+        caretColor: getComputedStyle(content).caretColor,
+        editorBg: getComputedStyle(editorEl).backgroundColor,
+      };
+    },
+    { formulaId: FORMULA_ID },
+  );
 
   expect(colors).not.toBeNull();
   if (!colors) return;

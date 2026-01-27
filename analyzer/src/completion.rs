@@ -378,16 +378,16 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
             };
             CompletionItem {
                 label: label.to_string(),
-            kind: CompletionKind::Builtin,
-            category: None,
-            insert_text,
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: None,
-            is_disabled: false,
-            disabled_reason: None,
-            data: None,
+                kind: CompletionKind::Builtin,
+                category: None,
+                insert_text,
+                primary_edit: None,
+                cursor: None,
+                additional_edits: Vec::new(),
+                detail: None,
+                is_disabled: false,
+                disabled_reason: None,
+                data: None,
             }
         })
         .collect()
