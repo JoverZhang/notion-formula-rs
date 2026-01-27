@@ -148,16 +148,28 @@ impl Converter {
             edits.push(primary_edit.clone());
             edits.extend(item.additional_edits.iter().cloned());
 
-            let base_cursor_byte = item.cursor.unwrap_or_else(|| {
+            // The analyzer's `cursor` is intended to be a position in the *updated* document after
+            // applying the primary edit (e.g., `if()` => inside `(`), but the additional edits may
+            // shift that position. We account for shifts from additional edits that occur strictly
+            // before the primary edit, without rebasing the cursor through the primary edit itself.
+            let mut cursor_byte: i64 = i64::from(item.cursor.unwrap_or_else(|| {
                 output
                     .replace
                     .start
                     .saturating_add(primary_edit.new_text.len() as u32)
-            });
+            }));
 
-            let (updated, cursor_byte) =
-                apply_text_edits_bytes_with_cursor(source, &edits, base_cursor_byte);
-            let cursor_byte = usize::min(cursor_byte as usize, updated.len());
+            let primary_start = primary_edit.range.start;
+            for edit in &item.additional_edits {
+                if edit.range.end <= primary_start {
+                    let replaced_len = edit.range.end.saturating_sub(edit.range.start) as i64;
+                    let inserted_len = edit.new_text.len() as i64;
+                    cursor_byte = cursor_byte.saturating_add(inserted_len.saturating_sub(replaced_len));
+                }
+            }
+
+            let (updated, _) = apply_text_edits_bytes_with_cursor(source, &edits, 0);
+            let cursor_byte = usize::min(usize::try_from(cursor_byte).unwrap_or(0), updated.len());
             byte_offset_to_utf16_offset(&updated, cursor_byte)
         });
 

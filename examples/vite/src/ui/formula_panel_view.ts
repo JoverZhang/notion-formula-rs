@@ -21,7 +21,6 @@ import {
   setChipDecoListEffect,
   type ChipDecorationRange,
 } from "../editor/chip_decorations";
-import { applyCompletion } from "../editor/text_edits";
 import {
   computePropChips,
   computeTokenDecorationRanges,
@@ -559,6 +558,7 @@ export function createFormulaPanelView(opts: {
         if (!completionRows.length) return;
         selectedRowIndex = rowIndex;
         renderItems();
+        scrollSelectedIntoView();
       });
 
       li.addEventListener("mousedown", (e) => {
@@ -578,6 +578,7 @@ export function createFormulaPanelView(opts: {
     completionRows = buildCompletionRows(completionItems);
     normalizeSelectedRowIndex();
     renderItems();
+    scrollSelectedIntoView();
   }
 
   function requestCompletions(view: EditorView) {
@@ -609,6 +610,7 @@ export function createFormulaPanelView(opts: {
     if (selectedRowIndex < 0) {
       selectedRowIndex = delta > 0 ? itemRowIndices[0] : itemRowIndices[itemRowIndices.length - 1];
       renderItems();
+      scrollSelectedIntoView();
       return;
     }
 
@@ -619,8 +621,16 @@ export function createFormulaPanelView(opts: {
       if (completionRows[next]?.type === "item") {
         selectedRowIndex = next;
         renderItems();
+        scrollSelectedIntoView();
         return;
       }
+    }
+  }
+
+  function scrollSelectedIntoView() {
+    const selectedItem = itemsEl.querySelector(".completion-item.is-selected");
+    if (selectedItem instanceof HTMLElement) {
+      selectedItem.scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -628,18 +638,31 @@ export function createFormulaPanelView(opts: {
     const item = completionItems[index];
     if (!item || item.is_disabled || !item.primary_edit) return false;
 
-    const source = editorView.state.doc.toString();
-    const { newText, newCursor } = applyCompletion(source, item);
     const edits = [item.primary_edit, ...(item.additional_edits ?? [])];
     const changes = edits
       .map((e) => ({ from: e.range.start, to: e.range.end, insert: e.new_text }))
       .sort((a, b) => a.from - b.from || a.to - b.to);
 
+    // Calculate the offset from additional edits before the primary edit
+    let offset = 0;
+    const primaryStart = item.primary_edit.range.start;
+    for (const edit of item.additional_edits ?? []) {
+      if (edit.range.end <= primaryStart) {
+        offset += edit.new_text.length - (edit.range.end - edit.range.start);
+      }
+    }
+
+    // Calculate the final cursor position considering the offset
+    const fallbackCursor = primaryStart + item.primary_edit.new_text.length + offset;
+    const newCursor = Math.max(0, item.cursor ?? fallbackCursor);
+
     editorView.dispatch({
       changes,
-      selection: { anchor: Math.max(0, Math.min(newCursor, newText.length)) },
+      selection: { anchor: newCursor },
     });
-    editorView.focus();
+    requestAnimationFrame(() => {
+      editorView.focus();
+    });
 
     selectedRowIndex = -1;
     requestCompletions(editorView);
