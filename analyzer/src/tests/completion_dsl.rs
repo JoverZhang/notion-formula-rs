@@ -2,7 +2,8 @@ use crate::completion::{
     CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
     complete_with_context,
 };
-use crate::semantic::{Context, FunctionCategory, FunctionSig, ParamSig, Property, Ty};
+use crate::semantic::{Context, FunctionSig, Property, Ty, builtins_functions};
+use std::collections::HashSet;
 
 // ----------------------------
 // Demo Properties
@@ -202,7 +203,7 @@ impl Prop {
 // Context Builder Extensions
 // ----------------------------
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ContextBuilder {
     properties: Vec<Property>,
     functions: Vec<FunctionSig>,
@@ -210,6 +211,15 @@ pub struct ContextBuilder {
 
 pub fn ctx() -> ContextBuilder {
     ContextBuilder::default()
+}
+
+impl Default for ContextBuilder {
+    fn default() -> Self {
+        Self {
+            properties: Vec::new(),
+            functions: builtins_functions(),
+        }
+    }
 }
 
 impl ContextBuilder {
@@ -237,6 +247,27 @@ impl ContextBuilder {
         self
     }
 
+    pub fn only_funcs(mut self, names: &[&str]) -> Self {
+        let mut remaining: HashSet<&str> = names.iter().copied().collect();
+        let funcs = builtins_functions()
+            .into_iter()
+            .filter(|f| remaining.remove(f.name.as_str()))
+            .collect::<Vec<_>>();
+        assert!(
+            remaining.is_empty(),
+            "unknown builtin function(s): {:?}",
+            remaining
+        );
+        self.functions = funcs;
+        self
+    }
+
+    pub fn without_funcs(mut self, names: &[&str]) -> Self {
+        let remove: HashSet<&str> = names.iter().copied().collect();
+        self.functions.retain(|f| !remove.contains(f.name.as_str()));
+        self
+    }
+
     pub fn disabled_prop(
         mut self,
         name: impl Into<String>,
@@ -251,118 +282,11 @@ impl ContextBuilder {
         self
     }
 
-    pub fn func(self, name: impl Into<String>) -> FuncBuilder {
-        FuncBuilder {
-            parent: self,
-            name: name.into(),
-            params: Vec::new(),
-            ret: Ty::Unknown,
-            detail: None,
-            min_args: 0,
-            category: FunctionCategory::General,
-        }
-    }
-
-    pub fn func_if(self) -> ContextBuilder {
-        self.func("if")
-            .params([
-                ParamSig {
-                    name: Some("condition".into()),
-                    ty: Ty::Boolean,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: Some("then".into()),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: Some("else".into()),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ])
-            .ret(Ty::Unknown)
-            .finish()
-    }
-
-    pub fn func_sum(self) -> ContextBuilder {
-        self.func("sum")
-            .param(ParamSig {
-                name: Some("values".into()),
-                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-                optional: false,
-                variadic: true,
-            })
-            .ret(Ty::Number)
-            .min_args(1)
-            .category(FunctionCategory::Number)
-            .finish()
-    }
-
     pub fn build(self) -> Context {
         Context {
             properties: self.properties,
             functions: self.functions,
         }
-    }
-}
-
-pub struct FuncBuilder {
-    parent: ContextBuilder,
-    name: String,
-    params: Vec<ParamSig>,
-    ret: Ty,
-    detail: Option<String>,
-    min_args: usize,
-    category: FunctionCategory,
-}
-
-impl FuncBuilder {
-    pub fn params<const N: usize>(mut self, params: [ParamSig; N]) -> Self {
-        self.params.extend(params);
-        self
-    }
-
-    pub fn param(mut self, p: ParamSig) -> Self {
-        self.params.push(p);
-        self
-    }
-
-    pub fn ret(mut self, ty: Ty) -> Self {
-        self.ret = ty;
-        self
-    }
-
-    pub fn min_args(mut self, min_args: usize) -> Self {
-        self.min_args = min_args;
-        self
-    }
-
-    pub fn category(mut self, category: FunctionCategory) -> Self {
-        self.category = category;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = Some(detail.into());
-        self
-    }
-
-    pub fn finish(mut self) -> ContextBuilder {
-        self.parent.functions.push(FunctionSig {
-            name: self.name,
-            params: self.params,
-            ret: self.ret,
-            detail: self.detail.take(),
-            min_args: self.min_args,
-            category: self.category,
-        });
-        self.parent
     }
 }
 

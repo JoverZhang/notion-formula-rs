@@ -2,6 +2,8 @@ use crate::lexer::lex;
 use crate::semantic;
 use crate::token::{LitKind, Span, Token, TokenKind};
 
+mod fuzzy;
+
 pub const DEFAULT_PREFERRED_LIMIT: usize = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -239,13 +241,15 @@ fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>
         return false;
     }
 
-    if "true".starts_with(prefix) && prefix != "true" {
+    let prefix_lower = prefix.to_ascii_lowercase();
+
+    if "true".starts_with(&prefix_lower) && prefix_lower != "true" {
         return true;
     }
-    if "false".starts_with(prefix) && prefix != "false" {
+    if "false".starts_with(&prefix_lower) && prefix_lower != "false" {
         return true;
     }
-    if "not".starts_with(prefix) && prefix != "not" {
+    if "not".starts_with(&prefix_lower) && prefix_lower != "not" {
         return true;
     }
 
@@ -253,19 +257,15 @@ fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>
         return false;
     };
 
-    if ctx
-        .functions
-        .iter()
-        .any(|func| func.name.starts_with(prefix) && func.name != prefix)
-    {
+    if ctx.functions.iter().any(|func| {
+        func.name.to_ascii_lowercase().starts_with(&prefix_lower) && func.name != prefix_lower
+    }) {
         return true;
     }
 
-    if ctx
-        .properties
-        .iter()
-        .any(|prop| prop.name.starts_with(prefix) && prop.name != prefix)
-    {
+    if ctx.properties.iter().any(|prop| {
+        prop.name.to_ascii_lowercase().starts_with(&prefix_lower) && prop.name != prefix_lower
+    }) {
         return true;
     }
 
@@ -325,9 +325,9 @@ fn finalize_output(
         return output;
     };
 
-    fuzzy_rank_items(&query, &mut output.items);
+    fuzzy::fuzzy_rank_items(&query, &mut output.items);
     output.preferred_indices =
-        preferred_indices_for_items(&output.items, &query, config.preferred_limit);
+        fuzzy::preferred_indices_for_items(&output.items, &query, config.preferred_limit);
     output
 }
 
@@ -349,6 +349,12 @@ fn completion_query_for_replace(text: &str, replace: Span) -> Option<String> {
     if raw.chars().all(|c| c.is_whitespace()) {
         return None;
     }
+    if !raw
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c.is_whitespace())
+    {
+        return None;
+    }
 
     let query: String = raw
         .chars()
@@ -359,167 +365,6 @@ fn completion_query_for_replace(text: &str, replace: Span) -> Option<String> {
         return None;
     }
     Some(query)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FuzzyScore {
-    is_prefix: bool,
-    gap_sum: usize,
-    max_run: usize,
-    first_pos: usize,
-    label_len: usize,
-}
-
-fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
-    let query_chars: Vec<char> = query.chars().map(|c| c.to_ascii_lowercase()).collect();
-    if query_chars.is_empty() {
-        return None;
-    }
-
-    let label_chars: Vec<char> = label.chars().map(|c| c.to_ascii_lowercase()).collect();
-    if label_chars.is_empty() {
-        return None;
-    }
-
-    let mut positions = Vec::with_capacity(query_chars.len());
-    let mut j = 0usize;
-    for &qc in &query_chars {
-        while j < label_chars.len() && label_chars[j] != qc {
-            j += 1;
-        }
-        if j == label_chars.len() {
-            return None;
-        }
-        positions.push(j);
-        j += 1;
-    }
-
-    let first_pos = *positions.first().unwrap_or(&0);
-    let label_len = label_chars.len();
-
-    let mut gap_sum = 0usize;
-    let mut max_run = 1usize;
-    let mut current_run = 1usize;
-    for window in positions.windows(2) {
-        let prev = window[0];
-        let next = window[1];
-        if next == prev + 1 {
-            current_run += 1;
-            max_run = usize::max(max_run, current_run);
-        } else {
-            current_run = 1;
-            gap_sum = gap_sum.saturating_add(next.saturating_sub(prev).saturating_sub(1));
-        }
-    }
-
-    let label_lower: String = label_chars.iter().collect();
-    let query_lower: String = query_chars.iter().collect();
-    let is_prefix = label_lower.starts_with(&query_lower);
-
-    Some(FuzzyScore {
-        is_prefix,
-        gap_sum,
-        max_run,
-        first_pos,
-        label_len,
-    })
-}
-
-fn fuzzy_rank_items(query: &str, items: &mut Vec<CompletionItem>) {
-    #[derive(Debug)]
-    struct Ranked {
-        original_idx: usize,
-        score: Option<FuzzyScore>,
-        item: CompletionItem,
-    }
-
-    fn kind_priority(kind: CompletionKind) -> u8 {
-        match kind {
-            CompletionKind::Function => 0,
-            CompletionKind::Builtin => 1,
-            CompletionKind::Property => 2,
-            CompletionKind::Operator => 3,
-        }
-    }
-
-    let mut ranked: Vec<Ranked> = items
-        .drain(..)
-        .enumerate()
-        .map(|(idx, item)| Ranked {
-            original_idx: idx,
-            score: fuzzy_score(query, &item.label),
-            item,
-        })
-        .collect();
-
-    ranked.sort_by(|a, b| {
-        match (a.score, b.score) {
-            (Some(sa), Some(sb)) => {
-                // Match group: prefix > non-prefix, then tighter/earlier/shorter.
-                sb.is_prefix
-                    .cmp(&sa.is_prefix)
-                    .then_with(|| sa.gap_sum.cmp(&sb.gap_sum))
-                    .then_with(|| sb.max_run.cmp(&sa.max_run))
-                    .then_with(|| sa.first_pos.cmp(&sb.first_pos))
-                    .then_with(|| sa.label_len.cmp(&sb.label_len))
-                    .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
-                    .then_with(|| a.original_idx.cmp(&b.original_idx))
-            }
-            (Some(_), None) => std::cmp::Ordering::Less,
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-            (None, None) => a.original_idx.cmp(&b.original_idx),
-        }
-    });
-
-    *items = ranked.into_iter().map(|r| r.item).collect();
-}
-
-pub(crate) fn preferred_indices_for_items(
-    items: &[CompletionItem],
-    query: &str,
-    preferred_limit: usize,
-) -> Vec<usize> {
-    if preferred_limit == 0 {
-        return Vec::new();
-    }
-
-    fn is_high_score(score: FuzzyScore) -> bool {
-        score.is_prefix || score.gap_sum == 0
-    }
-
-    let mut out = Vec::with_capacity(preferred_limit);
-
-    for (idx, item) in items.iter().enumerate() {
-        if out.len() >= preferred_limit {
-            break;
-        }
-        if item.is_disabled {
-            continue;
-        }
-        let Some(score) = fuzzy_score(query, &item.label) else {
-            continue;
-        };
-        if is_high_score(score) {
-            out.push(idx);
-        }
-    }
-
-    for (idx, item) in items.iter().enumerate() {
-        if out.len() >= preferred_limit {
-            break;
-        }
-        if item.is_disabled {
-            continue;
-        }
-        if out.contains(&idx) {
-            continue;
-        }
-        if fuzzy_score(query, &item.label).is_some() {
-            out.push(idx);
-        }
-    }
-
-    out
 }
 
 fn attach_primary_edits(
@@ -875,21 +720,70 @@ fn apply_type_ranking(
         Some(expected_ty) => expected_ty,
         None => return,
     };
-    let mut scored = items
-        .drain(..)
-        .enumerate()
-        .map(|(idx, item)| {
-            let actual = item_result_ty(&item, ctx);
-            let score = type_match_score(expected_ty.clone(), actual);
-            (idx, item, score)
+    if matches!(expected_ty, semantic::Ty::Unknown) {
+        return;
+    }
+
+    fn kind_index(kind: CompletionKind) -> usize {
+        match kind {
+            CompletionKind::Builtin => 0,
+            CompletionKind::Property => 1,
+            CompletionKind::Function => 2,
+            CompletionKind::Operator => 3,
+        }
+    }
+
+    fn kind_section_priority(kind: CompletionKind) -> u8 {
+        match kind {
+            CompletionKind::Builtin => 0,
+            CompletionKind::Property => 1,
+            CompletionKind::Function => 2,
+            CompletionKind::Operator => 3,
+        }
+    }
+
+    #[derive(Debug)]
+    struct ScoredItem {
+        original_idx: usize,
+        score: i32,
+        item: CompletionItem,
+    }
+
+    let mut buckets: [Vec<ScoredItem>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut best_score: [i32; 4] = [i32::MIN, i32::MIN, i32::MIN, i32::MIN];
+
+    for (idx, item) in items.drain(..).enumerate() {
+        let actual = item_result_ty(&item, ctx);
+        let score = type_match_score(expected_ty.clone(), actual);
+        let bucket = kind_index(item.kind);
+        best_score[bucket] = best_score[bucket].max(score);
+        buckets[bucket].push(ScoredItem {
+            original_idx: idx,
+            score,
+            item,
+        });
+    }
+
+    for bucket in buckets.iter_mut() {
+        bucket.sort_by(|a, b| {
+            let a_key = (a.item.is_disabled, -a.score, a.original_idx as i32);
+            let b_key = (b.item.is_disabled, -b.score, b.original_idx as i32);
+            a_key.cmp(&b_key)
+        });
+    }
+
+    let mut order: Vec<usize> = (0..4).filter(|&i| !buckets[i].is_empty()).collect();
+    order.sort_by(|&a, &b| {
+        (-best_score[a]).cmp(&(-best_score[b])).then_with(|| {
+            let a_kind = buckets[a][0].item.kind;
+            let b_kind = buckets[b][0].item.kind;
+            kind_section_priority(a_kind).cmp(&kind_section_priority(b_kind))
         })
-        .collect::<Vec<_>>();
-    scored.sort_by(|(a_idx, a_item, a_score), (b_idx, b_item, b_score)| {
-        let a_key = (a_item.is_disabled, -a_score, *a_idx as i32);
-        let b_key = (b_item.is_disabled, -b_score, *b_idx as i32);
-        a_key.cmp(&b_key)
     });
-    items.extend(scored.into_iter().map(|(_, item, _)| item));
+
+    for idx in order {
+        items.extend(buckets[idx].drain(..).map(|s| s.item));
+    }
 }
 
 fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Option<semantic::Ty> {

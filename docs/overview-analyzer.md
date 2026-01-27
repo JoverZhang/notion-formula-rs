@@ -35,7 +35,7 @@ Core modules:
 - `analyzer/src/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
 - `analyzer/src/semantic/mod.rs`: minimal type checking driven by `Context { properties, functions }`
-- `analyzer/src/completion.rs`: byte-offset completion + signature help for editor integrations
+- `analyzer/src/completion.rs`: byte-offset completion + signature help for editor integrations (fuzzy ranking in `analyzer/src/completion/fuzzy.rs`)
 - `analyzer/src/source_map.rs`: byte offset → `(line,col)` plus `byte_offset_to_utf16(...)`
 - `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification, `tokens_in_span(...)`
 - `analyzer/src/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
@@ -131,16 +131,24 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
 - Postfix sugar typing:
   - `condition.if(then, else)` is treated like `if(condition, then, else)` **for typing only** when `if` exists in `Context.functions`.
 
-Completion (`analyzer/src/completion.rs`):
+Completion (`analyzer/src/completion.rs`, fuzzy logic in `analyzer/src/completion/fuzzy.rs`):
 
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
 - Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
 - Postfix completion: `.if()` is offered after an atom when `if` exists in context.
 - Property completion items insert `prop("Name")` and can be disabled via `Property.disabled_reason` (disabled items have no `primary_edit`/cursor).
-- When `CompletionOutput.replace` is non-empty, the analyzer derives a “query” from the source substring covered by the replace span (lowercased; whitespace/underscores removed). If the normalized query is empty, no fuzzy ranking is applied and `preferred_indices` is `[]`.
-- With a non-empty query, completion items are fuzzy-ranked by **subsequence match** on `CompletionItem.label` (case-insensitive). Ranking prefers: prefix matches, fewer gaps / longer contiguous runs, earlier matches, and shorter labels; ties are deterministic and use kind priority (`Function` > `Builtin` > `Property` > `Operator`) then original index.
-- `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` matched+enabled items (high-score first, then lower-score matches). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
+- At an identifier boundary (cursor at the end of an identifier token), the analyzer treats completion as “prefix editing” only if the prefix can be extended by something in-scope:
+  - builtins `true`/`false`/`not` via case-insensitive prefix match
+  - context functions/properties via case-insensitive prefix match (excluding exact matches)
+- When `CompletionOutput.replace` is non-empty, the analyzer derives a “query” from the source substring covered by the replace span. If the substring contains any non-identifier characters (identifier-like = ASCII alnum + `_` + whitespace), no fuzzy ranking is applied and `preferred_indices` is `[]`. Otherwise the query is normalized (lowercased; whitespace/underscores removed); if the normalized query is empty, fuzzy ranking is also skipped.
+- With a non-empty query, completion ranking applies only to `CompletionKind::Function` and `CompletionKind::Property` labels (the identifiers users type). Query and label are normalized by lowercasing and removing `_`. Items are ranked by:
+  1) exact match (`label_norm == query_norm`)
+  2) substring contains (`label_norm` contains `query_norm`)
+  3) fuzzy subsequence match (existing subsequence scoring)
+  Within exact/contains, shorter normalized labels rank first (and for contains, earlier substring occurrence breaks ties); fuzzy ties use the subsequence score; all remaining ties are deterministic by original index. Other completion kinds are left in original relative order after matched items.
+- When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
+- `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
 
 ---
