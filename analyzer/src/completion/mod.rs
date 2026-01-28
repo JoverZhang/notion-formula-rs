@@ -65,6 +65,7 @@ pub enum CompletionData {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureHelp {
+    pub receiver: Option<String>,
     pub label: String,
     pub params: Vec<String>,
     pub active_param: usize,
@@ -81,6 +82,7 @@ struct CallContext {
 enum PositionKind {
     NeedExpr,
     AfterAtom,
+    AfterDot,
     None,
 }
 
@@ -175,6 +177,10 @@ fn detect_position_kind(
     ctx: Option<&semantic::Context>,
     call_ctx: Option<&CallContext>,
 ) -> PositionKind {
+    if is_postfix_member_access_position(tokens, cursor) {
+        return PositionKind::AfterDot;
+    }
+
     if is_strictly_inside_ident(tokens, cursor) {
         return PositionKind::NeedExpr;
     }
@@ -197,6 +203,43 @@ fn detect_position_kind(
             PositionKind::AfterAtom
         }
         _ => PositionKind::None,
+    }
+}
+
+fn is_postfix_member_access_position(tokens: &[Token], cursor: u32) -> bool {
+    fn dot_has_receiver_atom(tokens: &[Token], dot_idx: usize) -> bool {
+        prev_non_trivia_before(tokens, dot_idx).is_some_and(|(_, token)| {
+            matches!(
+                token.kind,
+                TokenKind::Ident(_) | TokenKind::Literal(_) | TokenKind::CloseParen
+            )
+        })
+    }
+
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
+        && matches!(token.kind, TokenKind::Ident(_))
+        && let Some((dot_idx, dot_token)) = prev_non_trivia_before(tokens, idx)
+        && matches!(dot_token.kind, TokenKind::Dot)
+    {
+        return dot_has_receiver_atom(tokens, dot_idx);
+    }
+
+    let Some((prev_idx, prev_token)) = prev_non_trivia_insertion(tokens, cursor) else {
+        return false;
+    };
+
+    match prev_token.kind {
+        TokenKind::Dot => dot_has_receiver_atom(tokens, prev_idx),
+        TokenKind::Ident(_) => {
+            if let Some((dot_idx, dot_token)) = prev_non_trivia_before(tokens, prev_idx)
+                && matches!(dot_token.kind, TokenKind::Dot)
+            {
+                dot_has_receiver_atom(tokens, dot_idx)
+            } else {
+                false
+            }
+        }
+        _ => false,
     }
 }
 
@@ -300,6 +343,12 @@ fn complete_for_position(
         PositionKind::AfterAtom => CompletionOutput {
             items: after_atom_items(ctx),
             replace: default_replace,
+            signature_help: None,
+            preferred_indices: Vec::new(),
+        },
+        PositionKind::AfterDot => CompletionOutput {
+            items: after_dot_items(ctx),
+            replace: replace_span_for_expr_start(tokens, cursor),
             signature_help: None,
             preferred_indices: Vec::new(),
         },
@@ -498,14 +547,33 @@ fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
         data: None,
     }));
 
-    if let Some(ctx) = ctx
-        && ctx.functions.iter().any(|f| f.name == "if")
-    {
+    items.extend(postfix_method_items(ctx, true));
+
+    items
+}
+
+fn postfix_method_items(ctx: Option<&semantic::Context>, insert_dot: bool) -> Vec<CompletionItem> {
+    let mut items = Vec::new();
+
+    let Some(ctx) = ctx else {
+        return items;
+    };
+    let postfix_capable = semantic::postfix_capable_builtin_names();
+    for func in &ctx.functions {
+        if !postfix_capable.contains(func.name.as_str()) {
+            continue;
+        }
+        let label = format!(".{}", func.name);
+        let insert_text = if insert_dot {
+            format!(".{}()", func.name)
+        } else {
+            format!("{}()", func.name)
+        };
         items.push(CompletionItem {
-            label: ".if".to_string(),
+            label,
             kind: CompletionKind::Operator,
             category: None,
-            insert_text: ".if()".to_string(),
+            insert_text,
             primary_edit: None,
             cursor: None,
             additional_edits: Vec::new(),
@@ -513,12 +581,17 @@ fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
             is_disabled: false,
             disabled_reason: None,
             data: Some(CompletionData::PostfixMethod {
-                name: "if".to_string(),
+                name: func.name.clone(),
             }),
         });
     }
 
     items
+}
+
+fn after_dot_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
+    // In a member-access context, the `.` already exists in the source.
+    postfix_method_items(ctx, false)
 }
 
 fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
@@ -582,22 +655,20 @@ fn format_ty(ty: &semantic::Ty) -> String {
     }
 }
 
+fn format_param_sig(param: &semantic::ParamSig) -> String {
+    let mut ty = format_ty(&param.ty);
+    if param.optional {
+        ty.push('?');
+    }
+    if let Some(name) = &param.name {
+        format!("{name}: {ty}")
+    } else {
+        ty
+    }
+}
+
 fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
-    let params = sig
-        .params
-        .iter()
-        .map(|param| {
-            let mut ty = format_ty(&param.ty);
-            if param.optional {
-                ty.push('?');
-            }
-            if let Some(name) = &param.name {
-                format!("{name}: {ty}")
-            } else {
-                ty
-            }
-        })
-        .collect::<Vec<_>>();
+    let params = sig.params.iter().map(format_param_sig).collect::<Vec<_>>();
     let mut label_params = params.join(", ");
     if sig.is_variadic() {
         if !label_params.is_empty() {
@@ -631,6 +702,51 @@ fn compute_signature_help_if_in_call(
         .iter()
         .find(|func| func.name == call_ctx.callee)?;
 
+    let is_postfix_call = || {
+        let (callee_idx, callee_token) = prev_non_trivia_before(tokens, call_ctx.lparen_idx)?;
+        let TokenKind::Ident(_) = callee_token.kind else {
+            return None;
+        };
+        let (dot_idx, dot_token) = prev_non_trivia_before(tokens, callee_idx)?;
+        if !matches!(dot_token.kind, TokenKind::Dot) {
+            return None;
+        }
+        let (_, receiver_token) = prev_non_trivia_before(tokens, dot_idx)?;
+        matches!(
+            receiver_token.kind,
+            TokenKind::Ident(_) | TokenKind::Literal(_) | TokenKind::CloseParen
+        )
+        .then_some(())
+    };
+
+    let is_postfix_call = is_postfix_call().is_some();
+    if is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str()) {
+        let receiver = func.params.first().map(format_param_sig);
+        let params = func.params.iter().skip(1).map(format_param_sig).collect::<Vec<_>>();
+
+        let mut label_params = params.join(", ");
+        if func.is_variadic() {
+            if !label_params.is_empty() {
+                label_params.push_str(", ");
+            }
+            label_params.push_str("...");
+        }
+        let label = format!("{}({}) -> {}", func.name, label_params, format_ty(&func.ret));
+
+        let active_param = if params.is_empty() {
+            0
+        } else {
+            call_ctx.arg_index.min(params.len() - 1)
+        };
+
+        return Some(SignatureHelp {
+            receiver,
+            label,
+            params,
+            active_param,
+        });
+    }
+
     let (label, params) = format_signature(func);
     let active_param = if params.is_empty() {
         0
@@ -639,6 +755,7 @@ fn compute_signature_help_if_in_call(
     };
 
     Some(SignatureHelp {
+        receiver: None,
         label,
         params,
         active_param,

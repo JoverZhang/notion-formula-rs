@@ -1,7 +1,7 @@
 use crate::completion::{CompletionData, CompletionKind, complete_with_context};
 use crate::semantic::Ty;
 use crate::semantic::{Context, builtins_functions};
-use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, Symbol, ctx, t};
+use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 use std::collections::HashSet;
 
 fn fixture_source_and_cursor(fixture: &str) -> (String, usize) {
@@ -55,8 +55,8 @@ fn completion_after_atom_shows_operators_and_postfix_methods() {
         .expect_contains_items(&[
             Item::Builtin(Builtin::EqEq),
             Item::Builtin(Builtin::Plus),
-            Item::Symbol(Symbol::DotIf),
         ])
+        .expect_postfix_if()
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
             Item::Func(Func::If),
@@ -69,15 +69,18 @@ fn completion_after_atom_shows_operators_and_postfix_methods() {
 
     t("sum(1,2,3)$0")
         .ctx(c.clone())
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Symbol(Symbol::DotIf)]);
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq)])
+        .expect_postfix_if();
 
     t("if(true,1,2)$0")
         .ctx(c.clone())
-        .expect_contains_items(&[Item::Builtin(Builtin::Plus), Item::Symbol(Symbol::DotIf)]);
+        .expect_contains_items(&[Item::Builtin(Builtin::Plus)])
+        .expect_postfix_if();
 
     t("true$0")
         .ctx(c)
-        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Symbol(Symbol::DotIf)]);
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq)])
+        .expect_postfix_if();
 }
 
 #[test]
@@ -87,7 +90,47 @@ fn completion_after_atom_postfix_if_requires_if_in_context() {
     t("(1+1)$0")
         .ctx(c)
         .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_contains(&[Item::Symbol(Symbol::DotIf)]);
+        .expect_not_postfix_if();
+}
+
+#[test]
+fn completion_after_dot_shows_postfix_methods() {
+    let c = ctx().props_demo_basic().build();
+
+    t("sum(1,2,3).$0")
+        .ctx(c)
+        .expect_not_empty()
+        .expect_item_data(
+            ".if",
+            CompletionData::PostfixMethod {
+                name: "if".to_string(),
+            },
+        )
+        .expect_not_contains(&[
+            Item::Prop(Prop::Title),
+            Item::Func(Func::If),
+            Item::Func(Func::Sum),
+            Item::Builtin(Builtin::Not),
+            Item::Builtin(Builtin::True),
+            Item::Builtin(Builtin::False),
+            Item::Builtin(Builtin::EqEq),
+            Item::Builtin(Builtin::Plus),
+        ])
+        .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_after_dot_offers_postfix_if_and_insert_text_is_if_parens() {
+    let c = ctx().build();
+    let (source, cursor) = fixture_source_and_cursor("true.$0");
+    let out = complete_with_context(&source, cursor, Some(&c));
+
+    let item = out
+        .items
+        .iter()
+        .find(|i| i.label == ".if")
+        .expect("missing completion item .if");
+    assert_eq!(item.insert_text, "if()");
 }
 
 #[test]
@@ -605,6 +648,11 @@ fn completion_apply_postfix_if_inserts_parens_and_moves_cursor_inside() {
         .expect_text("(1+1).if($0)");
 
     t("sum(1,2,3)$0")
+        .ctx(c.clone())
+        .apply(".if")
+        .expect_text("sum(1,2,3).if($0)");
+
+    t("sum(1,2,3).$0")
         .ctx(c)
         .apply(".if")
         .expect_text("sum(1,2,3).if($0)");
@@ -672,6 +720,95 @@ fn signature_help_label_sum_union_variadic() {
     t("sum($0")
         .ctx(c)
         .expect_sig_label("sum(values: number | number[], ...) -> number");
+}
+
+#[test]
+fn signature_help_postfix_if_label_format() {
+    let c = ctx().build();
+    let (source, cursor) = fixture_source_and_cursor("true.if($0, 1)");
+    let out = complete_with_context(&source, cursor, Some(&c));
+    let sig = out
+        .signature_help
+        .as_ref()
+        .expect("expected signature help");
+
+    assert_eq!(sig.receiver.as_deref(), Some("condition: boolean"));
+    assert_eq!(
+        sig.params,
+        vec!["then: unknown".to_string(), "else: unknown".to_string()]
+    );
+    assert_eq!(sig.active_param, 0);
+
+    assert!(
+        sig.label.starts_with("if("),
+        "expected function signature label, got: {}",
+        sig.label
+    );
+    assert_eq!(sig.label, "if(then: unknown, else: unknown) -> unknown");
+}
+
+#[test]
+fn signature_help_postfix_if_active_param_then_else() {
+    let c = ctx().build();
+
+    t("true.if($0, 1)").ctx(c.clone()).expect_sig_active(0);
+    t("true.if(1, $0)").ctx(c).expect_sig_active(1);
+}
+
+#[test]
+fn signature_help_normal_if_has_no_receiver_and_includes_all_params() {
+    let c = ctx().build();
+    let (source, cursor) = fixture_source_and_cursor("if($0");
+    let out = complete_with_context(&source, cursor, Some(&c));
+    let sig = out
+        .signature_help
+        .as_ref()
+        .expect("expected signature help");
+
+    assert_eq!(sig.receiver, None);
+    assert_eq!(
+        sig.params,
+        vec![
+            "condition: boolean".to_string(),
+            "then: unknown".to_string(),
+            "else: unknown".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn completion_after_dot_only_offers_postfix_capable_functions() {
+    let c = ctx().build();
+    let (source, cursor) = fixture_source_and_cursor("true.$0");
+    let out = complete_with_context(&source, cursor, Some(&c));
+
+    assert!(
+        out.items.iter().any(|i| i.label == ".if"),
+        "expected postfix .if completion"
+    );
+    assert!(
+        out.items.iter().all(|i| i.label != ".sum"),
+        "did not expect .sum to be offered as a postfix method"
+    );
+}
+
+#[test]
+fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
+    let c = ctx().build();
+    let (source, cursor) = fixture_source_and_cursor("true.sum($0");
+    let out = complete_with_context(&source, cursor, Some(&c));
+    let sig = out
+        .signature_help
+        .as_ref()
+        .expect("expected signature help");
+
+    assert_eq!(sig.receiver, None);
+    assert_eq!(sig.label, "sum(values: number | number[], ...) -> number");
+    assert!(
+        !sig.label.contains(").sum("),
+        "did not expect method-style signature label, got: {}",
+        sig.label
+    );
 }
 
 #[test]

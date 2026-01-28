@@ -136,7 +136,9 @@ Completion (`analyzer/src/completion/mod.rs`, fuzzy logic in `analyzer/src/compl
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
 - Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
-- Postfix completion: `.if()` is offered after an atom when `if` exists in context.
+- Postfix completion is driven by a single builtin-derived allowlist (`postfix_capable_builtin_names()` in `analyzer/src/semantic/mod.rs`), defined as builtins with **more than one parameter** (so there is at least one non-receiver argument):
+  - after an atom: `.if()` is offered (inserts the leading `.`)
+  - after `.` with a receiver atom: `.if` is offered and inserts `if()` (the `.` is already in the source)
 - Property completion items insert `prop("Name")` and can be disabled via `Property.disabled_reason` (disabled items have no `primary_edit`/cursor).
 - At an identifier boundary (cursor at the end of an identifier token), the analyzer treats completion as “prefix editing” only if the prefix can be extended by something in-scope:
   - builtins `true`/`false`/`not` via case-insensitive prefix match
@@ -150,6 +152,11 @@ Completion (`analyzer/src/completion/mod.rs`, fuzzy logic in `analyzer/src/compl
 - When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
 - `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
+  - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin, signature help models the receiver separately:
+    - `receiver`: formatted first parameter (`<receiver_param>`)
+    - `label`: `<callee>(<remaining_params>[, ...]) -> <ret>`
+    - `params`: the remaining parameters only (`sig.params[1..]`)
+    - `active_param` indexes into `params` only (excluding receiver).
 
 ---
 

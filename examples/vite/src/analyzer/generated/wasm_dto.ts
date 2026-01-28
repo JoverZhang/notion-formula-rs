@@ -18,7 +18,7 @@ export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<
 
 export type TextEditView = { range: Span, new_text: string, };
 
-export type SignatureHelpView = { label: string, params: Array<string>, active_param: number, };
+export type SignatureHelpView = { receiver: string | null, label: string, params: Array<string>, active_param: number, };
 
 export type CompletionItemKind = "Function" | "Builtin" | "Property" | "Operator";
 

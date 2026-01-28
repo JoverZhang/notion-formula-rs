@@ -75,6 +75,7 @@ pub struct TextEditView {
 
 #[derive(Serialize, TS)]
 pub struct SignatureHelpView {
+    pub receiver: Option<String>,
     pub label: String,
     pub params: Vec<String>,
     pub active_param: usize,

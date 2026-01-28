@@ -534,8 +534,9 @@ export function createFormulaPanelView(opts: {
     }
     signatureEl.classList.remove("hidden");
     signatureEl.replaceChildren();
+    const receiverPrefix = sig.receiver ? `(${sig.receiver}).` : "";
     if (sig.params.length === 0) {
-      signatureEl.append(document.createTextNode(sig.label));
+      signatureEl.append(document.createTextNode(receiverPrefix + sig.label));
       return;
     }
 
@@ -543,11 +544,11 @@ export function createFormulaPanelView(opts: {
     const closeParen = sig.label.lastIndexOf(")");
 
     if (openParen === -1 || closeParen === -1 || closeParen <= openParen) {
-      signatureEl.append(document.createTextNode(sig.label));
+      signatureEl.append(document.createTextNode(receiverPrefix + sig.label));
       return;
     }
 
-    signatureEl.append(document.createTextNode(sig.label.slice(0, openParen + 1)));
+    signatureEl.append(document.createTextNode(receiverPrefix + sig.label.slice(0, openParen + 1)));
     sig.params.forEach((param, idx) => {
       const paramEl = document.createElement("span");
       paramEl.className = "completion-signature-param";

@@ -138,6 +138,7 @@ impl Converter {
     ) -> CompletionOutputView {
         let replace = Self::span_dto(source, output.replace);
         let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelpView {
+            receiver: sig.receiver.clone(),
             label: sig.label.clone(),
             params: sig.params.clone(),
             active_param: sig.active_param,

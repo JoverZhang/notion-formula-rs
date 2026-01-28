@@ -2,9 +2,25 @@ use crate::ast::{Expr, ExprKind};
 use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::token::{LitKind, Span};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::sync::LazyLock;
 
 mod functions;
 pub use functions::builtins_functions;
+
+static POSTFIX_CAPABLE_BUILTIN_NAMES: LazyLock<HashSet<String>> = LazyLock::new(|| {
+    builtins_functions()
+        .into_iter()
+        // A builtin is postfix-capable if it has at least one non-receiver parameter.
+        // Postfix form: `receiver.fn(arg1, ...)` corresponds to `fn(receiver, arg1, ...)`.
+        .filter(|sig| sig.params.len() > 1)
+        .map(|sig| sig.name)
+        .collect()
+});
+
+pub fn postfix_capable_builtin_names() -> &'static HashSet<String> {
+    &POSTFIX_CAPABLE_BUILTIN_NAMES
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
