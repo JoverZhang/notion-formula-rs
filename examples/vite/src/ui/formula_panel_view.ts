@@ -741,13 +741,13 @@ export function createFormulaPanelView(opts: {
 
   const editorView = new EditorView({
     state: EditorState.create({
-	      doc: opts.initialSource,
-	      extensions: [
-	        history(),
-	        keymap.of([
-	          {
-	            key: "ArrowDown",
-	            run: () => {
+      doc: opts.initialSource,
+      extensions: [
+        history(),
+        keymap.of([
+          {
+            key: "ArrowDown",
+            run: () => {
               if (!completionItems.length) return false;
               selectNext(1);
               return true;
@@ -785,12 +785,12 @@ export function createFormulaPanelView(opts: {
               if (typeof itemIndex !== "number") return false;
               return applyCompletionItem(itemIndex);
             },
-	          },
-	        ]),
-	        keymap.of(historyKeymap),
-	        keymap.of(defaultKeymap),
-	        EditorView.lineWrapping,
-	        formulaIdFacet.of(opts.id),
+          },
+        ]),
+        keymap.of(historyKeymap),
+        keymap.of(defaultKeymap),
+        EditorView.lineWrapping,
+        formulaIdFacet.of(opts.id),
         tokenDecoStateField,
         chipDecoStateField,
         chipRangesField,

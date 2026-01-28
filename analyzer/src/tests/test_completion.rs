@@ -1,13 +1,11 @@
 use crate::completion::{CompletionData, CompletionKind, complete_with_context};
-use crate::semantic::{Context, builtins_functions};
 use crate::semantic::Ty;
+use crate::semantic::{Context, builtins_functions};
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, Symbol, ctx, t};
 use std::collections::HashSet;
 
 fn fixture_source_and_cursor(fixture: &str) -> (String, usize) {
-    let cursor = fixture
-        .find("$0")
-        .expect("fixture must contain $0 marker");
+    let cursor = fixture.find("$0").expect("fixture must contain $0 marker");
     assert_eq!(
         fixture.matches("$0").count(),
         1,
@@ -274,10 +272,15 @@ fn completion_fuzzy_ranking_orders_matches_and_computes_preferred_indices() {
         crate::completion::CompletionConfig { preferred_limit: 3 },
     );
 
-    let idx_to_number = out.items.iter().position(|i| i.label == "toNumber").unwrap();
+    let idx_to_number = out
+        .items
+        .iter()
+        .position(|i| i.label == "toNumber")
+        .unwrap();
     let idx_repeat = out.items.iter().position(|i| i.label == "repeat").unwrap();
     let idx_replace = out.items.iter().position(|i| i.label == "replace").unwrap();
-    let idx_replace_all = out.items
+    let idx_replace_all = out
+        .items
         .iter()
         .position(|i| i.label == "replaceAll")
         .unwrap();
@@ -324,7 +327,11 @@ fn completion_ranking_contains_beats_fuzzy() {
     let idx_median = out.items.iter().position(|i| i.label == "median").unwrap();
     let idx_name = out.items.iter().position(|i| i.label == "name").unwrap();
     let idx_some = out.items.iter().position(|i| i.label == "some").unwrap();
-    let idx_to_number = out.items.iter().position(|i| i.label == "toNumber").unwrap();
+    let idx_to_number = out
+        .items
+        .iter()
+        .position(|i| i.label == "toNumber")
+        .unwrap();
 
     let max_contains = *[idx_mean, idx_median, idx_name, idx_some]
         .iter()

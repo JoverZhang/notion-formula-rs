@@ -60,8 +60,12 @@ pub fn complete(source: String, cursor: usize, context_json: String) -> Result<J
     let parsed = Converter::parse_context(&context_json)?;
 
     // Perform the completion operation.
-    let output =
-        analyzer::completion::complete_with_config(&source, cursor_byte, &parsed.ctx, parsed.completion);
+    let output = analyzer::completion::complete_with_config(
+        &source,
+        cursor_byte,
+        &parsed.ctx,
+        parsed.completion,
+    );
 
     // Convert the completion output to the desired DTO format.
     let out = Converter::completion_output_view(&source, &output);

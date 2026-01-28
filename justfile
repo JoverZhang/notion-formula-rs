@@ -28,3 +28,7 @@ test-example-vite:
 
 run-example-vite:
   cd examples/vite && pnpm -s run wasm:build && npm run dev
+
+clean:
+  cargo clean
+  cd examples/vite && rm -rf node_modules dist src/pkg test-results

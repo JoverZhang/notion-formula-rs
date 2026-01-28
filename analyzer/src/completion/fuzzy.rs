@@ -101,7 +101,10 @@ pub(super) fn fuzzy_rank_items(query: &str, items: &mut Vec<CompletionItem>) {
     }
 
     fn match_class_for_item(query_norm: &str, item: &CompletionItem) -> MatchClass {
-        if !matches!(item.kind, CompletionKind::Function | CompletionKind::Property) {
+        if !matches!(
+            item.kind,
+            CompletionKind::Function | CompletionKind::Property
+        ) {
             return MatchClass::None;
         }
 
@@ -187,7 +190,10 @@ pub(super) fn preferred_indices_for_items(
     let query_norm = normalize_for_match(query);
 
     fn matches_query(query_norm: &str, item: &CompletionItem) -> bool {
-        if !matches!(item.kind, CompletionKind::Function | CompletionKind::Property) {
+        if !matches!(
+            item.kind,
+            CompletionKind::Function | CompletionKind::Property
+        ) {
             return false;
         }
         let label_norm = normalize_for_match(&item.label);

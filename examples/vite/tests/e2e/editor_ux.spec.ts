@@ -1,7 +1,27 @@
 import { expect, test } from "@playwright/test";
 import { editorContentLocator, expectEditorText, gotoDebug, setEditorContent } from "./helpers";
+type EditorId = "f1" | "f2";
+type Page = Parameters<typeof editorContentLocator>[0];
 
-async function readEditorText(page: Parameters<typeof editorContentLocator>[0], id: "f1" | "f2") {
+async function clearEditor(page: Page, id: EditorId) {
+  const editor = editorContentLocator(page, id);
+  await editor.click({ timeout: 10_000 });
+
+  // Clear using user-like actions to avoid programmatic history pollution.
+  await page.keyboard.press("Control+A");
+  await page.keyboard.press("Backspace");
+  // If running on mac in local, you can attempt Meta+A as fallback.
+  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("Backspace");
+}
+
+async function typeInEditor(page: Page, id: EditorId, text: string) {
+  const editor = editorContentLocator(page, id);
+  await editor.click({ timeout: 10_000 });
+  await page.keyboard.type(text);
+}
+
+async function readEditorText(page: Page, id: EditorId) {
   return page.evaluate((formulaId) => {
     const el = document.querySelector<HTMLElement>(
       `[data-testid="formula-editor"][data-formula-id="${formulaId}"] .cm-content`,
@@ -10,12 +30,7 @@ async function readEditorText(page: Parameters<typeof editorContentLocator>[0], 
   }, id);
 }
 
-async function waitForEditorTextChange(
-  page: Parameters<typeof editorContentLocator>[0],
-  id: "f1" | "f2",
-  before: string,
-  timeoutMs = 250,
-) {
+async function waitForEditorTextChange(page: Page, id: EditorId, before: string, timeoutMs = 250) {
   try {
     await page.waitForFunction(
       ({ formulaId, prev }) => {
@@ -33,26 +48,66 @@ async function waitForEditorTextChange(
   return readEditorText(page, id);
 }
 
-async function pressUndo(page: Parameters<typeof editorContentLocator>[0], id: "f1" | "f2") {
+async function pressRedo(page: Page, id: EditorId, expected?: string): Promise<string> {
+  const editor = editorContentLocator(page, id);
   const before = await readEditorText(page, id);
-  await page.keyboard.press("Meta+Z");
-  let after = await waitForEditorTextChange(page, id, before);
-  if (after === before) {
-    await page.keyboard.press("Control+Z");
-    after = await waitForEditorTextChange(page, id, before);
+
+  // CM6 historyKeymap typically supports Mod-Shift-z (redo) and Mod-y.
+  // We'll try a few variations for Linux/macOS.
+  const attempts = ["Meta+Shift+Z", "Control+Shift+Z", "Control+Y", "Meta+Y"] as const;
+
+  for (const combo of attempts) {
+    // Ensure focus is on the correct editor instance (CI/headless can lose focus).
+    await editor.click({ timeout: 10_000 });
+
+    try {
+      await page.keyboard.press(combo);
+
+      const after = await waitForEditorTextChange(page, id, before, 3_000);
+
+      if (expected !== undefined) {
+        if (after === expected) return after;
+        continue;
+      }
+
+      // No expected target provided: any change is considered success.
+      if (after !== before) return after;
+    } catch {
+      // Shortcut didn't work or timed out waiting for change — try next combo.
+      continue;
+    }
   }
-  return after;
+
+  // Final read (either unchanged, or changed in a way that didn't match expected).
+  return await readEditorText(page, id);
 }
 
-async function pressRedo(page: Parameters<typeof editorContentLocator>[0], id: "f1" | "f2") {
+async function pressUndo(page: Page, id: EditorId, expected?: string): Promise<string> {
+  const editor = editorContentLocator(page, id);
   const before = await readEditorText(page, id);
-  const attempts = ["Meta+Shift+Z", "Control+Shift+Z", "Control+Y", "Meta+Y"];
+
+  const attempts = ["Meta+Z", "Control+Z"] as const;
+
   for (const combo of attempts) {
-    await page.keyboard.press(combo);
-    const after = await waitForEditorTextChange(page, id, before);
-    if (after !== before) return after;
+    await editor.click({ timeout: 10_000 });
+
+    try {
+      await page.keyboard.press(combo);
+      const after = await waitForEditorTextChange(page, id, before, 3_000);
+
+      // If expected is provided, keep trying until the editor text equals expected.
+      if (expected !== undefined) {
+        if (after === expected) return after;
+        continue;
+      }
+
+      if (after !== before) return after;
+    } catch {
+      continue;
+    }
   }
-  return readEditorText(page, id);
+
+  return await readEditorText(page, id);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -60,17 +115,22 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("undo reverts recent editor input", async ({ page }) => {
-  await setEditorContent(page, "f1", "");
-  const editor = editorContentLocator(page, "f1");
-  await editor.click();
-  await page.keyboard.type("1+2");
+  await clearEditor(page, "f1");
+
+  await expectEditorText(page, "f1", "");
+  // CodeMirror history groups adjacent edits that happen within `newGroupDelay` (default 500ms).
+  // Without a pause here, the "clear" and subsequent "type" can become a single undo group,
+  // causing undo to restore the pre-clear content instead of the expected empty state.
+  await page.waitForTimeout(600);
+
+  await typeInEditor(page, "f1", "1+2");
   await expectEditorText(page, "f1", "1+2");
 
-  const afterUndo = await pressUndo(page, "f1");
-  expect(afterUndo).not.toBe("1+2");
+  await pressUndo(page, "f1");
+  await expectEditorText(page, "f1", "");
 
-  const afterRedo = await pressRedo(page, "f1");
-  expect(afterRedo).toBe("1+2");
+  await pressRedo(page, "f1");
+  await expectEditorText(page, "f1", "1+2");
 });
 
 test("editor height is capped and content scrolls", async ({ page }) => {
