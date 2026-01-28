@@ -60,10 +60,10 @@ pub fn complete(source: String, cursor: usize, context_json: String) -> Result<J
     let parsed = Converter::parse_context(&context_json)?;
 
     // Perform the completion operation.
-    let output = analyzer::completion::complete_with_config(
+    let output = analyzer::completion::complete(
         &source,
         cursor_byte,
-        &parsed.ctx,
+        Some(&parsed.ctx),
         parsed.completion,
     );
 

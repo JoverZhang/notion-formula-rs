@@ -23,19 +23,9 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
     Ok(output)
 }
 
-pub fn analyze_with_context(
-    text: &str,
-    ctx: semantic::Context,
-) -> Result<ParseOutput, diagnostics::Diagnostic> {
-    let mut output = analyze(text)?;
-    let (_, diags) = semantic::analyze_expr(&output.expr, &ctx);
-    output.diagnostics.extend(diags);
-    Ok(output)
-}
-
 pub use completion::{
     CompletionData, CompletionItem, CompletionKind, CompletionOutput, SignatureHelp, TextEdit,
-    complete, complete_with_context,
+    complete, CompletionConfig,
 };
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};

@@ -23,8 +23,7 @@ Entry points:
 
 - `analyzer/src/lib.rs`:
   - `analyze(text: &str) -> Result<ParseOutput, Diagnostic>`
-  - `analyze_with_context(text: &str, ctx: Context) -> Result<ParseOutput, Diagnostic>`
-  - re-exports: `complete(...)`, `complete_with_context(...)`, `format_expr(...)`, `format_diagnostics(...)`, core token/span types
+  - re-exports: `complete(text, cursor, ctx, config)`, `CompletionConfig`, `format_expr(...)`, `format_diagnostics(...)`, core token/span types
 
 Core modules:
 
@@ -35,7 +34,7 @@ Core modules:
 - `analyzer/src/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
 - `analyzer/src/semantic/mod.rs`: minimal type checking driven by `Context { properties, functions }`
-- `analyzer/src/completion/mod.rs`: byte-offset completion + signature help for editor integrations (fuzzy ranking in `analyzer/src/completion/fuzzy.rs`)
+- `analyzer/src/completion/mod.rs`: byte-offset completion + signature help for editor integrations (pipeline/position/items/signature + ranking/matchers)
 - `analyzer/src/source_map.rs`: byte offset → `(line,col)`
 - `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification, `tokens_in_span(...)`
 - `analyzer/src/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
@@ -131,8 +130,9 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
 - Postfix sugar typing:
   - `condition.if(then, else)` is treated like `if(condition, then, else)` **for typing only** when `if` exists in `Context.functions`.
 
-Completion (`analyzer/src/completion/mod.rs`, fuzzy logic in `analyzer/src/completion/fuzzy.rs`):
+Completion (`analyzer/src/completion/mod.rs`, ranking/matching in `analyzer/src/completion/rank.rs` + `analyzer/src/completion/matchers.rs`):
 
+- Public entrypoint: `completion::complete(text: &str, cursor: usize, ctx: Option<&semantic::Context>, config: CompletionConfig) -> CompletionOutput`.
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
 - Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).

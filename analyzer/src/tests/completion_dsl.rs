@@ -1,6 +1,6 @@
 use crate::completion::{
     CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
-    complete_with_context, complete_with_context_config,
+    complete,
 };
 use crate::semantic::{Context, FunctionSig, Property, Ty, builtins_functions};
 use std::collections::HashSet;
@@ -343,16 +343,13 @@ impl CompletionTestBuilder {
 
     fn ensure_run(&mut self) -> &CompletionOutput {
         if self.output.is_none() {
-            let out = if let Some(config) = self.config {
-                complete_with_context_config(
-                    &self.replaced,
-                    self.cursor as usize,
-                    self.ctx.as_ref(),
-                    config,
-                )
-            } else {
-                complete_with_context(&self.replaced, self.cursor as usize, self.ctx.as_ref())
-            };
+            let config = self.config.unwrap_or_default();
+            let out = complete(
+                &self.replaced,
+                self.cursor as usize,
+                self.ctx.as_ref(),
+                config,
+            );
             self.output = Some(out);
         }
         self.output.as_ref().unwrap()
@@ -450,7 +447,7 @@ impl CompletionTestBuilder {
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         for label in expected {
             assert!(
-                labels.iter().any(|l| *l == *label),
+                labels.contains(label),
                 "expected to contain label {label}\nactual labels: {labels:?}"
             );
         }
@@ -462,7 +459,7 @@ impl CompletionTestBuilder {
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         for label in expected {
             assert!(
-                labels.iter().all(|l| *l != *label),
+                !labels.contains(label),
                 "expected NOT to contain label {label}\nactual labels: {labels:?}"
             );
         }

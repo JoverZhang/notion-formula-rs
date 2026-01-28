@@ -120,6 +120,14 @@ fn completion_member_access_prefix_filters_to_query_matches() {
 }
 
 #[test]
+fn completion_member_access_filters_postfix_items_strictly() {
+    let c = ctx().build();
+
+    t("true.rep$0").ctx(c.clone()).expect_not_postfix(Func::If);
+    t("true.i$0").ctx(c).expect_postfix(Func::If);
+}
+
+#[test]
 fn completion_after_identifier_shows_after_atom_operators() {
     t("abc$0")
         .no_ctx()

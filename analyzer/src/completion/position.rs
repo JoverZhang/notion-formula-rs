@@ -1,0 +1,264 @@
+use super::signature::CallContext;
+use crate::semantic;
+use crate::token::{LitKind, Span, Token, TokenKind};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PositionKind {
+    NeedExpr,
+    AfterAtom,
+    AfterDot,
+    None,
+}
+
+pub(super) fn detect_position_kind(
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+    call_ctx: Option<&CallContext>,
+) -> PositionKind {
+    if is_postfix_member_access_position(tokens, cursor) {
+        return PositionKind::AfterDot;
+    }
+
+    if is_strictly_inside_ident(tokens, cursor) {
+        return PositionKind::NeedExpr;
+    }
+
+    if has_extending_ident_prefix(tokens, cursor, ctx) {
+        return PositionKind::NeedExpr;
+    }
+
+    let prev = prev_non_trivia_insertion(tokens, cursor).map(|(_, token)| token);
+    if is_expr_start_position(prev) {
+        return PositionKind::NeedExpr;
+    }
+
+    // AfterAtom only makes sense if we're in an expression (either top-level or inside a call).
+    // Call context is computed separately; we treat both cases the same for completion contents.
+    let _ = call_ctx;
+
+    match prev.map(|token| &token.kind) {
+        Some(TokenKind::Ident(_)) | Some(TokenKind::Literal(_)) | Some(TokenKind::CloseParen) => {
+            PositionKind::AfterAtom
+        }
+        _ => PositionKind::None,
+    }
+}
+
+fn is_postfix_member_access_position(tokens: &[Token], cursor: u32) -> bool {
+    fn dot_has_receiver_atom(tokens: &[Token], dot_idx: usize) -> bool {
+        prev_non_trivia_before(tokens, dot_idx).is_some_and(|(_, token)| {
+            matches!(
+                token.kind,
+                TokenKind::Ident(_) | TokenKind::Literal(_) | TokenKind::CloseParen
+            )
+        })
+    }
+
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
+        && matches!(token.kind, TokenKind::Ident(_))
+        && let Some((dot_idx, dot_token)) = prev_non_trivia_before(tokens, idx)
+        && matches!(dot_token.kind, TokenKind::Dot)
+    {
+        return dot_has_receiver_atom(tokens, dot_idx);
+    }
+
+    let Some((prev_idx, prev_token)) = prev_non_trivia_insertion(tokens, cursor) else {
+        return false;
+    };
+
+    match prev_token.kind {
+        TokenKind::Dot => dot_has_receiver_atom(tokens, prev_idx),
+        TokenKind::Ident(_) => {
+            if let Some((dot_idx, dot_token)) = prev_non_trivia_before(tokens, prev_idx)
+                && matches!(dot_token.kind, TokenKind::Dot)
+            {
+                dot_has_receiver_atom(tokens, dot_idx)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+fn is_strictly_inside_ident(tokens: &[Token], cursor: u32) -> bool {
+    let Some((_, token)) = token_containing_cursor(tokens, cursor) else {
+        return false;
+    };
+    matches!(token.kind, TokenKind::Ident(_))
+        && token.span.start < cursor
+        && cursor < token.span.end
+}
+
+pub(super) fn cursor_strictly_inside_string_literal(tokens: &[Token], cursor: u32) -> bool {
+    let Some((_, token)) = token_containing_cursor(tokens, cursor) else {
+        return false;
+    };
+    let TokenKind::Literal(ref lit) = token.kind else {
+        return false;
+    };
+    lit.kind == LitKind::String && token.span.start < cursor && cursor < token.span.end
+}
+
+fn has_extending_ident_prefix(
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+) -> bool {
+    let Some((_, token)) = prev_non_trivia(tokens, cursor) else {
+        return false;
+    };
+    if token.span.end != cursor {
+        return false;
+    }
+    let TokenKind::Ident(ref symbol) = token.kind else {
+        return false;
+    };
+    has_extending_completion_prefix(&symbol.text, ctx)
+}
+
+fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>) -> bool {
+    if prefix.is_empty() {
+        return false;
+    }
+
+    let prefix_lower = prefix.to_ascii_lowercase();
+
+    if "true".starts_with(&prefix_lower) && prefix_lower != "true" {
+        return true;
+    }
+    if "false".starts_with(&prefix_lower) && prefix_lower != "false" {
+        return true;
+    }
+    if "not".starts_with(&prefix_lower) && prefix_lower != "not" {
+        return true;
+    }
+
+    let Some(ctx) = ctx else {
+        return false;
+    };
+
+    if ctx.functions.iter().any(|func| {
+        func.name.to_ascii_lowercase().starts_with(&prefix_lower) && func.name != prefix_lower
+    }) {
+        return true;
+    }
+
+    if ctx.properties.iter().any(|prop| {
+        prop.name.to_ascii_lowercase().starts_with(&prefix_lower) && prop.name != prefix_lower
+    }) {
+        return true;
+    }
+
+    false
+}
+
+pub(super) fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
+        && !token.is_trivia()
+        && !matches!(token.kind, TokenKind::Eof)
+    {
+        return Some((idx, token));
+    }
+
+    let mut prev = None;
+    for (idx, token) in tokens.iter().enumerate() {
+        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+            continue;
+        }
+        if token.span.end <= cursor {
+            prev = Some((idx, token));
+        } else {
+            break;
+        }
+    }
+    prev
+}
+
+/// Like `prev_non_trivia`, but treats a cursor at a token boundary (`cursor == token.span.start`)
+/// as an insertion point *before* that token.
+///
+/// This prevents `)` from being treated as the "previous" token when completing immediately
+/// before a close-paren, while still treating a cursor strictly inside a token as "within" it.
+pub(super) fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
+        && token.span.start < cursor
+        && !token.is_trivia()
+        && !matches!(token.kind, TokenKind::Eof)
+    {
+        return Some((idx, token));
+    }
+
+    let mut prev = None;
+    for (idx, token) in tokens.iter().enumerate() {
+        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+            continue;
+        }
+        if token.span.end <= cursor {
+            prev = Some((idx, token));
+        } else {
+            break;
+        }
+    }
+    prev
+}
+
+pub(super) fn prev_non_trivia_before(tokens: &[Token], idx: usize) -> Option<(usize, &Token)> {
+    let mut i = idx;
+    while i > 0 {
+        i -= 1;
+        let token = &tokens[i];
+        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+            continue;
+        }
+        return Some((i, token));
+    }
+    None
+}
+
+fn token_containing_cursor(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
+    tokens.iter().enumerate().find(|(_, token)| {
+        token.span.start <= cursor
+            && cursor < token.span.end
+            && !matches!(token.kind, TokenKind::Eof)
+    })
+}
+
+fn is_expr_start_position(prev_token: Option<&Token>) -> bool {
+    match prev_token.map(|token| &token.kind) {
+        None => true,
+        Some(TokenKind::Ident(_)) => false,
+        Some(TokenKind::Literal(_)) => false,
+        Some(TokenKind::CloseParen) => false,
+        _ => true,
+    }
+}
+
+pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span {
+    if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
+        && matches!(token.kind, TokenKind::Ident(_))
+    {
+        // At an expr-start position, completing before an existing expression should insert
+        // instead of replacing tokens to the right.
+        if cursor == token.span.start {
+            return Span {
+                start: cursor,
+                end: cursor,
+            };
+        }
+
+        // If the cursor is actually inside the identifier token, treat it as prefix editing.
+        return tokens[idx].span;
+    }
+    if let Some((_, token)) = prev_non_trivia(tokens, cursor)
+        && matches!(token.kind, TokenKind::Ident(_))
+        && token.span.end == cursor
+    {
+        return token.span;
+    }
+    Span {
+        start: cursor,
+        end: cursor,
+    }
+}
