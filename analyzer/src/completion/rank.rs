@@ -74,10 +74,7 @@ fn completion_query_for_replace(text: &str, replace: Span) -> Option<String> {
     Some(query)
 }
 
-fn attach_primary_edits(
-    output_replace: Span,
-    items: &mut [CompletionItem],
-) {
+fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
     for item in items {
         if item.is_disabled {
             item.primary_edit = None;

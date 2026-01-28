@@ -24,8 +24,8 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
 }
 
 pub use completion::{
-    CompletionData, CompletionItem, CompletionKind, CompletionOutput, SignatureHelp, TextEdit,
-    complete, CompletionConfig,
+    CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput,
+    SignatureHelp, TextEdit, complete,
 };
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};

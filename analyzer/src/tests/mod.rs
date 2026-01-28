@@ -6,7 +6,13 @@ mod completion_dsl;
 #[cfg(test)]
 mod test_ast_regression;
 #[cfg(test)]
-mod test_completion;
+mod test_completion_position;
+#[cfg(test)]
+mod test_completion_ranking;
+#[cfg(test)]
+mod test_completion_signature_help;
+#[cfg(test)]
+mod test_completion_smoke;
 #[cfg(test)]
 mod test_errors;
 #[cfg(test)]
