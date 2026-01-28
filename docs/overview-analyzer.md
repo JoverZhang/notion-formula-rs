@@ -144,7 +144,7 @@ Completion (`analyzer/src/completion/mod.rs`, fuzzy logic in `analyzer/src/compl
   - builtins `true`/`false`/`not` via case-insensitive prefix match
   - context functions/properties via case-insensitive prefix match (excluding exact matches)
 - When `CompletionOutput.replace` is non-empty, the analyzer derives a “query” from the source substring covered by the replace span. If the substring contains any non-identifier characters (identifier-like = ASCII alnum + `_` + whitespace), no fuzzy ranking is applied and `preferred_indices` is `[]`. Otherwise the query is normalized (lowercased; whitespace/underscores removed); if the normalized query is empty, fuzzy ranking is also skipped.
-- With a non-empty query, completion ranking applies only to `CompletionKind::Function` and `CompletionKind::Property` labels (the identifiers users type). Query and label are normalized by lowercasing and removing `_`. Items are ranked by:
+- With a non-empty query, completion ranking applies to `CompletionKind::Function` and `CompletionKind::Property` labels (the identifiers users type). In member-access (after-dot) prefix completion, postfix-method items are **filtered** to only those matching the query and then ranked using the same normalization/matching (matching is computed on the label **without** the leading `.`). Query and label are normalized by lowercasing and removing `_`. Items are ranked by:
   1) exact match (`label_norm == query_norm`)
   2) substring contains (`label_norm` contains `query_norm`)
   3) fuzzy subsequence match (existing subsequence scoring)

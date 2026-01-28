@@ -1,18 +1,7 @@
-use crate::completion::{CompletionData, CompletionKind, complete_with_context};
+use crate::completion::CompletionData;
 use crate::semantic::Ty;
 use crate::semantic::{Context, builtins_functions};
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
-use std::collections::HashSet;
-
-fn fixture_source_and_cursor(fixture: &str) -> (String, usize) {
-    let cursor = fixture.find("$0").expect("fixture must contain $0 marker");
-    assert_eq!(
-        fixture.matches("$0").count(),
-        1,
-        "fixture must contain exactly one $0 marker"
-    );
-    (fixture.replace("$0", ""), cursor)
-}
 
 #[test]
 fn completion_at_document_start() {
@@ -52,11 +41,8 @@ fn completion_after_atom_shows_operators_and_postfix_methods() {
     t("(1+1)$0")
         .ctx(c.clone())
         .expect_not_empty()
-        .expect_contains_items(&[
-            Item::Builtin(Builtin::EqEq),
-            Item::Builtin(Builtin::Plus),
-        ])
-        .expect_postfix_if()
+        .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
+        .expect_postfix(Func::If)
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
             Item::Func(Func::If),
@@ -70,17 +56,17 @@ fn completion_after_atom_shows_operators_and_postfix_methods() {
     t("sum(1,2,3)$0")
         .ctx(c.clone())
         .expect_contains_items(&[Item::Builtin(Builtin::EqEq)])
-        .expect_postfix_if();
+        .expect_postfix(Func::If);
 
     t("if(true,1,2)$0")
         .ctx(c.clone())
         .expect_contains_items(&[Item::Builtin(Builtin::Plus)])
-        .expect_postfix_if();
+        .expect_postfix(Func::If);
 
     t("true$0")
         .ctx(c)
         .expect_contains_items(&[Item::Builtin(Builtin::EqEq)])
-        .expect_postfix_if();
+        .expect_postfix(Func::If);
 }
 
 #[test]
@@ -90,7 +76,7 @@ fn completion_after_atom_postfix_if_requires_if_in_context() {
     t("(1+1)$0")
         .ctx(c)
         .expect_contains_items(&[Item::Builtin(Builtin::EqEq), Item::Builtin(Builtin::Plus)])
-        .expect_not_postfix_if();
+        .expect_not_postfix(Func::If);
 }
 
 #[test]
@@ -100,12 +86,7 @@ fn completion_after_dot_shows_postfix_methods() {
     t("sum(1,2,3).$0")
         .ctx(c)
         .expect_not_empty()
-        .expect_item_data(
-            ".if",
-            CompletionData::PostfixMethod {
-                name: "if".to_string(),
-            },
-        )
+        .expect_postfix(Func::If)
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
             Item::Func(Func::If),
@@ -122,15 +103,20 @@ fn completion_after_dot_shows_postfix_methods() {
 #[test]
 fn completion_after_dot_offers_postfix_if_and_insert_text_is_if_parens() {
     let c = ctx().build();
-    let (source, cursor) = fixture_source_and_cursor("true.$0");
-    let out = complete_with_context(&source, cursor, Some(&c));
+    t("true.$0")
+        .ctx(c)
+        .expect_postfix(Func::If)
+        .expect_item_insert_text(".if", "if()");
+}
 
-    let item = out
-        .items
-        .iter()
-        .find(|i| i.label == ".if")
-        .expect("missing completion item .if");
-    assert_eq!(item.insert_text, "if()");
+#[test]
+fn completion_member_access_prefix_filters_to_query_matches() {
+    let c = ctx().build();
+
+    t("true.rep$0")
+        .ctx(c)
+        .expect_contains_labels(&[".repeat", ".replace", ".replaceAll"])
+        .expect_not_contains_labels(&[".if", ".test", ".match"]);
 }
 
 #[test]
@@ -279,80 +265,35 @@ fn completion_inside_call_arg_empty_before_close_paren_shows_items_and_signature
 fn completion_inside_call_arg_empty_does_not_apply_fuzzy_ranking() {
     let c = ctx().props_demo_basic().build();
 
-    let out_start = crate::completion::complete_with_context("", 0, Some(&c));
-
-    let input = "empty($0)";
-    let cursor = input.find("$0").expect("missing cursor marker");
-    let source = input.replace("$0", "");
-    let out_call = crate::completion::complete_with_context(&source, cursor, Some(&c));
-
-    assert!(out_call.preferred_indices.is_empty());
-
-    let start_labels: Vec<(crate::completion::CompletionKind, String)> = out_start
-        .items
-        .iter()
-        .map(|i| (i.kind, i.label.clone()))
-        .collect();
-    let call_labels: Vec<(crate::completion::CompletionKind, String)> = out_call
-        .items
-        .iter()
-        .map(|i| (i.kind, i.label.clone()))
-        .collect();
-    assert_eq!(call_labels, start_labels);
+    let start = t("$0").ctx(c.clone()).items_kinds_labels();
+    t("empty($0)")
+        .ctx(c)
+        .expect_preferred_indices_empty()
+        .expect_items_kinds_labels(&start);
 }
 
 #[test]
 fn completion_fuzzy_ranking_orders_matches_and_computes_preferred_indices() {
     let c = ctx().build();
 
-    let input = "rep$0";
-    let cursor = input.find("$0").expect("missing cursor marker");
-    let source = input.replace("$0", "");
-    let out = crate::completion::complete_with_context_config(
-        &source,
-        cursor,
-        Some(&c),
-        crate::completion::CompletionConfig { preferred_limit: 3 },
-    );
-
-    let idx_to_number = out
-        .items
-        .iter()
-        .position(|i| i.label == "toNumber")
-        .unwrap();
-    let idx_repeat = out.items.iter().position(|i| i.label == "repeat").unwrap();
-    let idx_replace = out.items.iter().position(|i| i.label == "replace").unwrap();
-    let idx_replace_all = out
-        .items
-        .iter()
-        .position(|i| i.label == "replaceAll")
-        .unwrap();
-
-    assert!(idx_repeat < idx_to_number);
-    assert!(idx_replace < idx_to_number);
-    assert!(idx_replace_all < idx_to_number);
-
-    assert_eq!(out.preferred_indices, vec![0, 1, 2]);
-    assert_eq!(out.items[out.preferred_indices[0]].label, "repeat");
-    assert_eq!(out.items[out.preferred_indices[1]].label, "replace");
-    assert_eq!(out.items[out.preferred_indices[2]].label, "replaceAll");
+    t("rep$0")
+        .ctx(c)
+        .preferred_limit(3)
+        .expect_order("repeat", "toNumber")
+        .expect_order("replace", "toNumber")
+        .expect_order("replaceAll", "toNumber")
+        .expect_top_labels(&["repeat", "replace", "replaceAll"])
+        .expect_preferred_indices(&[0, 1, 2]);
 }
 
 #[test]
 fn completion_preferred_limit_zero_disables_preferred_indices() {
     let c = ctx().build();
 
-    let input = "rep$0";
-    let cursor = input.find("$0").expect("missing cursor marker");
-    let source = input.replace("$0", "");
-    let out = crate::completion::complete_with_context_config(
-        &source,
-        cursor,
-        Some(&c),
-        crate::completion::CompletionConfig { preferred_limit: 0 },
-    );
-
-    assert!(out.preferred_indices.is_empty());
+    t("rep$0")
+        .ctx(c)
+        .preferred_limit(0)
+        .expect_preferred_indices_empty();
 }
 
 #[test]
@@ -361,26 +302,12 @@ fn completion_ranking_contains_beats_fuzzy() {
         .only_funcs(&["mean", "median", "toNumber", "name", "some"])
         .build();
 
-    let input = "me$0";
-    let cursor = input.find("$0").expect("missing cursor marker");
-    let source = input.replace("$0", "");
-    let out = crate::completion::complete_with_context(&source, cursor, Some(&c));
-
-    let idx_mean = out.items.iter().position(|i| i.label == "mean").unwrap();
-    let idx_median = out.items.iter().position(|i| i.label == "median").unwrap();
-    let idx_name = out.items.iter().position(|i| i.label == "name").unwrap();
-    let idx_some = out.items.iter().position(|i| i.label == "some").unwrap();
-    let idx_to_number = out
-        .items
-        .iter()
-        .position(|i| i.label == "toNumber")
-        .unwrap();
-
-    let max_contains = *[idx_mean, idx_median, idx_name, idx_some]
-        .iter()
-        .max()
-        .unwrap();
-    assert!(max_contains < idx_to_number);
+    t("me$0")
+        .ctx(c)
+        .expect_order("mean", "toNumber")
+        .expect_order("median", "toNumber")
+        .expect_order("name", "toNumber")
+        .expect_order("some", "toNumber");
 }
 
 #[test]
@@ -399,19 +326,7 @@ fn completion_ranking_exact_beats_contains() {
         functions: vec![replace_all.unwrap(), replace.unwrap()],
     };
 
-    let input = "replace$0";
-    let cursor = input.find("$0").expect("missing cursor marker");
-    let source = input.replace("$0", "");
-    let out = crate::completion::complete_with_context(&source, cursor, Some(&c));
-
-    let idx_replace = out.items.iter().position(|i| i.label == "replace").unwrap();
-    let idx_replace_all = out
-        .items
-        .iter()
-        .position(|i| i.label == "replaceAll")
-        .unwrap();
-
-    assert!(idx_replace < idx_replace_all);
+    t("replace$0").ctx(c).expect_order("replace", "replaceAll");
 }
 
 #[test]
@@ -725,26 +640,12 @@ fn signature_help_label_sum_union_variadic() {
 #[test]
 fn signature_help_postfix_if_label_format() {
     let c = ctx().build();
-    let (source, cursor) = fixture_source_and_cursor("true.if($0, 1)");
-    let out = complete_with_context(&source, cursor, Some(&c));
-    let sig = out
-        .signature_help
-        .as_ref()
-        .expect("expected signature help");
-
-    assert_eq!(sig.receiver.as_deref(), Some("condition: boolean"));
-    assert_eq!(
-        sig.params,
-        vec!["then: unknown".to_string(), "else: unknown".to_string()]
-    );
-    assert_eq!(sig.active_param, 0);
-
-    assert!(
-        sig.label.starts_with("if("),
-        "expected function signature label, got: {}",
-        sig.label
-    );
-    assert_eq!(sig.label, "if(then: unknown, else: unknown) -> unknown");
+    t("true.if($0, 1)")
+        .ctx(c)
+        .expect_sig_receiver(Some("condition: boolean"))
+        .expect_sig_params(&["then: unknown", "else: unknown"])
+        .expect_sig_active(0)
+        .expect_sig_label("if(then: unknown, else: unknown) -> unknown");
 }
 
 #[test]
@@ -758,88 +659,37 @@ fn signature_help_postfix_if_active_param_then_else() {
 #[test]
 fn signature_help_normal_if_has_no_receiver_and_includes_all_params() {
     let c = ctx().build();
-    let (source, cursor) = fixture_source_and_cursor("if($0");
-    let out = complete_with_context(&source, cursor, Some(&c));
-    let sig = out
-        .signature_help
-        .as_ref()
-        .expect("expected signature help");
-
-    assert_eq!(sig.receiver, None);
-    assert_eq!(
-        sig.params,
-        vec![
-            "condition: boolean".to_string(),
-            "then: unknown".to_string(),
-            "else: unknown".to_string(),
-        ]
-    );
+    t("if($0")
+        .ctx(c)
+        .expect_sig_receiver(None)
+        .expect_sig_params(&["condition: boolean", "then: unknown", "else: unknown"]);
 }
 
 #[test]
 fn completion_after_dot_only_offers_postfix_capable_functions() {
     let c = ctx().build();
-    let (source, cursor) = fixture_source_and_cursor("true.$0");
-    let out = complete_with_context(&source, cursor, Some(&c));
-
-    assert!(
-        out.items.iter().any(|i| i.label == ".if"),
-        "expected postfix .if completion"
-    );
-    assert!(
-        out.items.iter().all(|i| i.label != ".sum"),
-        "did not expect .sum to be offered as a postfix method"
-    );
+    t("true.$0")
+        .ctx(c)
+        .expect_postfix(Func::If)
+        .expect_not_postfix(Func::Sum);
 }
 
 #[test]
 fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
     let c = ctx().build();
-    let (source, cursor) = fixture_source_and_cursor("true.sum($0");
-    let out = complete_with_context(&source, cursor, Some(&c));
-    let sig = out
-        .signature_help
-        .as_ref()
-        .expect("expected signature help");
-
-    assert_eq!(sig.receiver, None);
-    assert_eq!(sig.label, "sum(values: number | number[], ...) -> number");
-    assert!(
-        !sig.label.contains(").sum("),
-        "did not expect method-style signature label, got: {}",
-        sig.label
-    );
+    t("true.sum($0")
+        .ctx(c)
+        .expect_sig_receiver(None)
+        .expect_sig_label("sum(values: number | number[], ...) -> number")
+        .expect_sig_label_not_contains(").sum(");
 }
 
 #[test]
 fn completion_day_arg_kinds_are_single_run_each_for_ui_grouping() {
     let c = ctx().props_demo_basic().build();
 
-    let (source, cursor) = fixture_source_and_cursor("day($0)");
-    let out = complete_with_context(&source, cursor, Some(&c));
-
-    assert!(
-        out.preferred_indices.is_empty(),
-        "expected preferred_indices to be empty (no fuzzy) inside `day(...)`\nactual preferred_indices: {:?}",
-        out.preferred_indices
-    );
-
-    let mut runs = Vec::<CompletionKind>::new();
-    let mut last = None;
-    for item in &out.items {
-        if last != Some(item.kind) {
-            runs.push(item.kind);
-            last = Some(item.kind);
-        }
-    }
-
-    let mut seen = HashSet::<std::mem::Discriminant<CompletionKind>>::new();
-    for kind in runs {
-        let disc = std::mem::discriminant(&kind);
-        assert!(
-            seen.insert(disc),
-            "completion kind run is fragmented; kind {:?} re-appeared after a different kind",
-            kind
-        );
-    }
+    t("day($0)")
+        .ctx(c)
+        .expect_preferred_indices_empty()
+        .expect_kind_runs_not_fragmented();
 }

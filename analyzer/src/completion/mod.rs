@@ -130,6 +130,7 @@ pub fn complete_with_context_config(
             },
             ctx,
             config,
+            PositionKind::NeedExpr,
         );
     }
 
@@ -152,7 +153,7 @@ pub fn complete_with_context_config(
     );
     output.signature_help = signature_help;
 
-    finalize_output(text, output, ctx, config)
+    finalize_output(text, output, ctx, config, position_kind)
 }
 
 /// Compute completions using byte offsets for the cursor and replace span.
@@ -366,6 +367,7 @@ fn finalize_output(
     mut output: CompletionOutput,
     ctx: Option<&semantic::Context>,
     config: CompletionConfig,
+    position_kind: PositionKind,
 ) -> CompletionOutput {
     attach_primary_edits(output.replace, &mut output.items, ctx);
 
@@ -374,7 +376,11 @@ fn finalize_output(
         return output;
     };
 
-    fuzzy::fuzzy_rank_items(&query, &mut output.items);
+    if matches!(position_kind, PositionKind::AfterDot) {
+        fuzzy::fuzzy_filter_and_rank_postfix_items(&query, &mut output.items);
+    } else {
+        fuzzy::fuzzy_rank_items(&query, &mut output.items);
+    }
     output.preferred_indices =
         fuzzy::preferred_indices_for_items(&output.items, &query, config.preferred_limit);
     output
@@ -722,7 +728,12 @@ fn compute_signature_help_if_in_call(
     let is_postfix_call = is_postfix_call().is_some();
     if is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str()) {
         let receiver = func.params.first().map(format_param_sig);
-        let params = func.params.iter().skip(1).map(format_param_sig).collect::<Vec<_>>();
+        let params = func
+            .params
+            .iter()
+            .skip(1)
+            .map(format_param_sig)
+            .collect::<Vec<_>>();
 
         let mut label_params = params.join(", ");
         if func.is_variadic() {
@@ -731,7 +742,12 @@ fn compute_signature_help_if_in_call(
             }
             label_params.push_str("...");
         }
-        let label = format!("{}({}) -> {}", func.name, label_params, format_ty(&func.ret));
+        let label = format!(
+            "{}({}) -> {}",
+            func.name,
+            label_params,
+            format_ty(&func.ret)
+        );
 
         let active_param = if params.is_empty() {
             0

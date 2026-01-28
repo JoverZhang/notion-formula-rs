@@ -1,6 +1,6 @@
 use crate::completion::{
-    CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
-    complete_with_context,
+    CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
+    complete_with_context, complete_with_context_config,
 };
 use crate::semantic::{Context, FunctionSig, Property, Ty, builtins_functions};
 use std::collections::HashSet;
@@ -268,6 +268,7 @@ pub struct CompletionTestBuilder {
     replaced: String,
     cursor: u32,
     ctx: Option<Context>,
+    config: Option<CompletionConfig>,
     output: Option<CompletionOutput>,
     ignore_props: bool,
 }
@@ -289,6 +290,7 @@ impl CompletionTestBuilder {
             replaced,
             cursor: cursor as u32,
             ctx: None,
+            config: None,
             output: None,
             ignore_props: false,
         }
@@ -301,6 +303,11 @@ impl CompletionTestBuilder {
 
     pub fn no_ctx(mut self) -> Self {
         self.ctx = None;
+        self
+    }
+
+    pub fn preferred_limit(mut self, preferred_limit: usize) -> Self {
+        self.config = Some(CompletionConfig { preferred_limit });
         self
     }
 
@@ -336,8 +343,16 @@ impl CompletionTestBuilder {
 
     fn ensure_run(&mut self) -> &CompletionOutput {
         if self.output.is_none() {
-            let out =
-                complete_with_context(&self.replaced, self.cursor as usize, self.ctx.as_ref());
+            let out = if let Some(config) = self.config {
+                complete_with_context_config(
+                    &self.replaced,
+                    self.cursor as usize,
+                    self.ctx.as_ref(),
+                    config,
+                )
+            } else {
+                complete_with_context(&self.replaced, self.cursor as usize, self.ctx.as_ref())
+            };
             self.output = Some(out);
         }
         self.output.as_ref().unwrap()
@@ -421,6 +436,39 @@ impl CompletionTestBuilder {
         self
     }
 
+    pub fn expect_item_insert_text(mut self, label: &str, expected: &str) -> Self {
+        let item = { self.item(label).clone() };
+        assert_eq!(
+            item.insert_text, expected,
+            "unexpected insert_text for item {label}"
+        );
+        self
+    }
+
+    pub fn expect_contains_labels(mut self, expected: &[&str]) -> Self {
+        let items = self.visible_items();
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        for label in expected {
+            assert!(
+                labels.iter().any(|l| *l == *label),
+                "expected to contain label {label}\nactual labels: {labels:?}"
+            );
+        }
+        self
+    }
+
+    pub fn expect_not_contains_labels(mut self, expected: &[&str]) -> Self {
+        let items = self.visible_items();
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        for label in expected {
+            assert!(
+                labels.iter().all(|l| *l != *label),
+                "expected NOT to contain label {label}\nactual labels: {labels:?}"
+            );
+        }
+        self
+    }
+
     pub fn expect_item_disabled(mut self, label: &str, reason: Option<&str>) -> Self {
         let item = { self.item(label).clone() };
         assert!(item.is_disabled, "expected item {label} to be disabled");
@@ -461,35 +509,39 @@ impl CompletionTestBuilder {
         self
     }
 
-    pub fn expect_postfix_if(mut self) -> Self {
-        let item = { self.item(".if").clone() };
+    pub fn expect_postfix(mut self, func: Func) -> Self {
+        let name = func.name();
+        let label = format!(".{name}");
+        let item = { self.item(&label).clone() };
         assert_eq!(
             item.kind,
             CompletionKind::Operator,
-            "unexpected kind for postfix .if"
+            "unexpected kind for postfix {label}"
         );
         assert_eq!(
             item.data,
             Some(CompletionData::PostfixMethod {
-                name: "if".to_string(),
+                name: name.to_string(),
             }),
-            "unexpected data for postfix .if"
+            "unexpected data for postfix {label}"
         );
         self
     }
 
-    pub fn expect_not_postfix_if(mut self) -> Self {
+    pub fn expect_not_postfix(mut self, func: Func) -> Self {
+        let name = func.name();
+        let label = format!(".{name}");
         let out = self.ensure_run();
         assert!(
             !out.items.iter().any(|item| {
-                item.label == ".if"
+                item.label == label
                     && item.kind == CompletionKind::Operator
                     && item.data
                         == Some(CompletionData::PostfixMethod {
-                            name: "if".to_string(),
+                            name: name.to_string(),
                         })
             }),
-            "expected NOT to contain postfix .if"
+            "expected NOT to contain postfix {label}"
         );
         self
     }
@@ -583,6 +635,41 @@ impl CompletionTestBuilder {
         self
     }
 
+    pub fn expect_sig_label_not_contains(mut self, substr: &str) -> Self {
+        let out = self.ensure_run();
+        let sig = out
+            .signature_help
+            .as_ref()
+            .expect("expected signature help");
+        assert!(
+            !sig.label.contains(substr),
+            "did not expect signature label to contain {substr:?}, got: {}",
+            sig.label
+        );
+        self
+    }
+
+    pub fn expect_sig_receiver(mut self, expected: Option<&str>) -> Self {
+        let out = self.ensure_run();
+        let sig = out
+            .signature_help
+            .as_ref()
+            .expect("expected signature help");
+        assert_eq!(sig.receiver.as_deref(), expected);
+        self
+    }
+
+    pub fn expect_sig_params(mut self, expected: &[&str]) -> Self {
+        let out = self.ensure_run();
+        let sig = out
+            .signature_help
+            .as_ref()
+            .expect("expected signature help");
+        let expected = expected.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(sig.params, expected);
+        self
+    }
+
     pub fn expect_no_signature_help(mut self) -> Self {
         let out = self.ensure_run();
         assert!(
@@ -590,6 +677,59 @@ impl CompletionTestBuilder {
             "expected no signature help, got: {:?}",
             out.signature_help
         );
+        self
+    }
+
+    pub fn expect_preferred_indices(mut self, expected: &[usize]) -> Self {
+        let out = self.ensure_run();
+        assert_eq!(out.preferred_indices, expected);
+        self
+    }
+
+    pub fn expect_preferred_indices_empty(self) -> Self {
+        self.expect_preferred_indices(&[])
+    }
+
+    pub fn items_kinds_labels(mut self) -> Vec<(CompletionKind, String)> {
+        let out = self.ensure_run();
+        out.items
+            .iter()
+            .map(|i| (i.kind, i.label.clone()))
+            .collect()
+    }
+
+    pub fn expect_items_kinds_labels(mut self, expected: &[(CompletionKind, String)]) -> Self {
+        let out = self.ensure_run();
+        let actual = out
+            .items
+            .iter()
+            .map(|i| (i.kind, i.label.clone()))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+        self
+    }
+
+    pub fn expect_kind_runs_not_fragmented(mut self) -> Self {
+        let out = self.ensure_run();
+
+        let mut runs = Vec::<CompletionKind>::new();
+        let mut last = None;
+        for item in &out.items {
+            if last != Some(item.kind) {
+                runs.push(item.kind);
+                last = Some(item.kind);
+            }
+        }
+
+        let mut seen = HashSet::<std::mem::Discriminant<CompletionKind>>::new();
+        for kind in runs {
+            let disc = std::mem::discriminant(&kind);
+            assert!(
+                seen.insert(disc),
+                "completion kind run is fragmented; kind {:?} re-appeared after a different kind",
+                kind
+            );
+        }
         self
     }
 
@@ -796,9 +936,4 @@ fn apply_text_edits(original: &str, edits: &[TextEdit]) -> String {
         updated = next;
     }
     updated
-}
-
-#[allow(dead_code)]
-pub fn prop_label(name: &str) -> String {
-    format!(r#"prop("{name}")"#)
 }
