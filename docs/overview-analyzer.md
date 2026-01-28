@@ -318,6 +318,7 @@ Rendering behavior:
 Styling:
 
 - Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
+- Signature help for postfix calls de-emphasizes the receiver prefix (the `(receiver)` portion) in the completion panel UI.
 - The formula editor height is constrained to ~4 visible lines via `.editor .cm-editor .cm-scroller`,
   and the scroller uses `overflow-y: auto` so longer inputs scroll instead of growing the layout.
 

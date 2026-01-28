@@ -292,8 +292,7 @@ body {
   font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.4;
-  /* 4 visible lines by default; scroll (don't grow) past that. */
-  height: 6.8em !important;
+  /* ~4 visible lines by default; scroll (don't grow) past that. */
   min-height: 6.8em !important;
   max-height: 6.8em !important;
   overflow-y: auto !important;
@@ -418,6 +417,11 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 8px;
+}
+
+.completion-signature-receiver {
+  color: var(--muted);
+  opacity: 0.9;
 }
 
 .completion-signature-param {
