@@ -292,7 +292,7 @@ Regression coverage:
 - chip spans
 - UI behavior
 - editor undo/redo keybindings
-- editor height cap + internal scrolling
+- editor auto height growth
 - completion cursor placement (including UTF-16 text)
 - completion list scroll-into-view behavior
 
@@ -319,8 +319,8 @@ Styling:
 
 - Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
 - Signature help for postfix calls de-emphasizes the receiver prefix (the `(receiver)` portion) in the completion panel UI.
-- The formula editor height is constrained to ~4 visible lines via `.editor .cm-editor .cm-scroller`,
-  and the scroller uses `overflow-y: auto` so longer inputs scroll instead of growing the layout.
+- The formula editor auto-grows with content (no fixed max-height cap) and keeps a small minimum height via
+  `.editor .cm-editor .cm-scroller`.
 
 Editor keybindings / history:
 

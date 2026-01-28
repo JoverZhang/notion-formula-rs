@@ -133,8 +133,17 @@ test("undo reverts recent editor input", async ({ page }) => {
   await expectEditorText(page, "f1", "1+2");
 });
 
-test("editor height is capped and content scrolls", async ({ page }) => {
-  await setEditorContent(page, "f1", "a\nb\nc\nd\ne\nf\n");
+test("editor height grows with content", async ({ page }) => {
+  await setEditorContent(page, "f1", "a\nb\nc\nd\ne\nf\ng\nh");
+
+  await page.waitForFunction(() => {
+    const scroller = document.querySelector<HTMLElement>(
+      `[data-testid="formula-editor"][data-formula-id="f1"] .cm-scroller`,
+    );
+    if (!scroller) return false;
+    // With auto-growth, the scroller should not need internal vertical scrolling.
+    return scroller.scrollHeight <= scroller.clientHeight + 1;
+  });
 
   const metrics = await page.evaluate(() => {
     const scroller = document.querySelector<HTMLElement>(
@@ -146,19 +155,17 @@ test("editor height is capped and content scrolls", async ({ page }) => {
       clientHeight: scroller.clientHeight,
       scrollHeight: scroller.scrollHeight,
       lineHeight: cs.lineHeight,
-      overflowY: cs.overflowY,
     };
   });
 
   expect(metrics).not.toBeNull();
   if (!metrics) return;
-  expect(metrics.overflowY).toMatch(/auto|scroll/i);
 
   const lineHeightPx = Number.parseFloat(metrics.lineHeight);
   expect(Number.isFinite(lineHeightPx)).toBe(true);
   expect(lineHeightPx).toBeGreaterThan(0);
 
-  // Loose bound: should not visually grow to 6+ lines.
-  expect(metrics.clientHeight).toBeLessThanOrEqual(lineHeightPx * 6);
-  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  // Loose bound: should visually grow to fit ~8 lines.
+  expect(metrics.clientHeight).toBeGreaterThanOrEqual(lineHeightPx * 8);
+  expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.clientHeight + 1);
 });
