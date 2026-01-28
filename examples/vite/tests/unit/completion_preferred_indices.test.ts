@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorView } from "@codemirror/view";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createFormulaPanelView } from "../../src/ui/formula_panel_view";
 
 const { completeSourceMock } = vi.hoisted(() => ({
   completeSourceMock: vi.fn(),
@@ -10,8 +11,6 @@ vi.mock("../../src/analyzer/wasm_client", () => ({
   completeSource: completeSourceMock,
   posToLineCol: () => ({ line: 1, col: 1 }),
 }));
-
-import { createFormulaPanelView } from "../../src/ui/formula_panel_view";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -38,12 +37,12 @@ function mountAndGetEditorView(initialSource: string): EditorView {
 
   const editorHost = document.querySelector(
     '[data-testid="formula-editor"][data-formula-id="f1"]',
-  ) as HTMLElement | null;
-  expect(editorHost).toBeTruthy();
+  ) as HTMLElement;
+  expect(editorHost).not.toBeNull();
 
   const cmNode =
-    (editorHost?.querySelector(".cm-editor") as HTMLElement | null) ??
-    (editorHost?.querySelector(".cm-content") as HTMLElement | null) ??
+    (editorHost.querySelector(".cm-editor") as HTMLElement) ??
+    (editorHost.querySelector(".cm-content") as HTMLElement) ??
     editorHost;
   const editorView = cmNode ? EditorView.findFromDOM(cmNode) : null;
   expect(editorView).toBeTruthy();
@@ -114,9 +113,7 @@ describe("recommended completions", () => {
       document.querySelector('[data-formula-id="f1"] .completion-recommended-header'),
     ).toBeTruthy();
 
-    const firstItem = document.querySelector(
-      '[data-formula-id="f1"] .completion-item',
-    ) as HTMLElement | null;
+    const firstItem = document.querySelector('[data-formula-id="f1"] .completion-item');
     expect(firstItem?.getAttribute("data-completion-index")).toBe("0");
     expect(firstItem?.getAttribute("data-completion-recommended")).toBe("true");
     expect(firstItem?.classList.contains("is-recommended")).toBe(true);
@@ -141,7 +138,7 @@ describe("recommended completions", () => {
 
     const allItems = Array.from(
       document.querySelectorAll('[data-formula-id="f1"] .completion-item'),
-    ) as HTMLElement[];
+    );
     expect(allItems.length).toBeGreaterThanOrEqual(2);
     expect(allItems[0]?.getAttribute("data-completion-index")).toBe("1");
     expect(allItems[1]?.getAttribute("data-completion-index")).toBe("0");
