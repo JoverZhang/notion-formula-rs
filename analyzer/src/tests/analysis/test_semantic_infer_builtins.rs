@@ -38,7 +38,7 @@ fn builtins_ctx() -> Context {
 }
 
 #[test]
-fn semantic_if_inferrs_union_on_plain_generic_conflict() {
+fn semantic_if_variant_generic_inferrs_union_on_conflict() {
     let ctx = builtins_ctx();
     let ty = infer_ok("if(true, 1, \"x\")", &ctx);
     assert_eq!(ty, Ty::Union(vec![Ty::Number, Ty::String]));
@@ -52,17 +52,24 @@ fn semantic_if_inferrs_union_through_nested_if() {
 }
 
 #[test]
-fn semantic_ifs_inferrs_union_across_repeat_groups() {
+fn semantic_if_variant_generic_propagates_unknown() {
     let ctx = builtins_ctx();
-    let ty = infer_ok("ifs(true, 1, false, \"x\", 2)", &ctx);
+    let ty = infer_ok("if(true, x, 1)", &ctx);
+    assert_eq!(ty, Ty::Unknown);
+}
+
+#[test]
+fn semantic_ifs_variant_generic_inferrs_union_across_repeat_groups() {
+    let ctx = builtins_ctx();
+    let ty = infer_ok("ifs(true, 1, false, 2, \"a\")", &ctx);
     assert_eq!(ty, Ty::Union(vec![Ty::Number, Ty::String]));
 }
 
 #[test]
-fn semantic_ifs_variant_generic_skips_unknown_when_accumulating_union() {
+fn semantic_ifs_variant_generic_propagates_unknown() {
     let ctx = builtins_ctx();
-    let ty = infer_ok("ifs(true, 1, false, x, \"a\")", &ctx);
-    assert_eq!(ty, Ty::Union(vec![Ty::Number, Ty::String]));
+    let ty = infer_ok("ifs(true, x, false, 1, 2)", &ctx);
+    assert_eq!(ty, Ty::Unknown);
 }
 
 #[test]

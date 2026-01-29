@@ -96,7 +96,33 @@ fn generic_list_unifies_inner_type() {
 }
 
 #[test]
-fn variant_generic_skips_unknown_when_accumulating_union() {
+fn variant_generic_accumulates_union_when_no_unknown() {
+    let t = GenericId(0);
+    let ctx = Context {
+        properties: vec![],
+        functions: vec![FunctionSig::new(
+            FunctionCategory::General,
+            "ifs(condition, value, ..., default)",
+            "ifs",
+            ParamShape::new(
+                vec![],
+                vec![p("condition", Ty::Unknown), p("value", Ty::Generic(t))],
+                vec![p("default", Ty::Generic(t))],
+            ),
+            Ty::Generic(t),
+            vec![GenericParam {
+                id: t,
+                kind: GenericParamKind::Variant,
+            }],
+        )],
+    };
+
+    let (ty, _, _) = infer("ifs(true, 1, false, 2, \"a\")", &ctx);
+    assert_eq!(ty, Ty::Union(vec![Ty::Number, Ty::String]));
+}
+
+#[test]
+fn variant_generic_propagates_unknown() {
     let t = GenericId(0);
     let ctx = Context {
         properties: vec![],
@@ -118,5 +144,5 @@ fn variant_generic_skips_unknown_when_accumulating_union() {
     };
 
     let (ty, _, _) = infer("ifs(true, 1, false, x, \"a\")", &ctx);
-    assert_eq!(ty, Ty::Union(vec![Ty::Number, Ty::String]));
+    assert_eq!(ty, Ty::Unknown);
 }

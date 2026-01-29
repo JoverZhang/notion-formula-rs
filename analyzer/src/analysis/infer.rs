@@ -34,39 +34,65 @@ fn bind_generic(subst: &mut Subst, registry: &GenericRegistry, id: GenericId, ac
         .copied()
         .unwrap_or(GenericParamKind::Plain);
 
-    let mut to_add: Vec<Ty> = Vec::new();
-    match (kind, actual) {
-        (_, Ty::Unknown) => return,
-        (GenericParamKind::Variant, Ty::Union(members)) => {
-            to_add.extend(
-                members
-                    .iter()
-                    .filter(|t| !matches!(t, Ty::Unknown))
-                    .cloned(),
-            );
+    fn contains_unknown(ty: &Ty) -> bool {
+        match ty {
+            Ty::Unknown => true,
+            Ty::Union(members) => members.iter().any(contains_unknown),
+            _ => false,
         }
-        (GenericParamKind::Variant, other) => {
-            if !matches!(other, Ty::Unknown) {
-                to_add.push(other.clone());
+    }
+
+    match kind {
+        GenericParamKind::Plain => {
+            if matches!(actual, Ty::Unknown) {
+                return;
+            }
+
+            let to_add = vec![actual.clone()];
+            match subst.get(&id).cloned() {
+                None => {
+                    subst.insert(id, normalize_union(to_add));
+                }
+                Some(prev) => {
+                    // Plain generics: permissive accumulation on conflicts.
+                    subst.insert(id, normalize_union(std::iter::once(prev).chain(to_add)));
+                }
             }
         }
-        (GenericParamKind::Plain, other) => {
-            to_add.push(other.clone());
-        }
-    }
+        GenericParamKind::Variant => {
+            if contains_unknown(actual) {
+                subst.insert(id, Ty::Unknown);
+                return;
+            }
 
-    if to_add.is_empty() {
-        return;
-    }
+            // Once a variant generic sees an Unknown, the result stays Unknown.
+            if subst.get(&id).is_some_and(|t| matches!(t, Ty::Unknown)) {
+                return;
+            }
 
-    match subst.get(&id).cloned() {
-        None => {
-            subst.insert(id, normalize_union(to_add));
-        }
-        Some(prev) => {
-            // Plain generics: permissive accumulation on conflicts.
-            // Variant generics: union-accumulate on every binding (Unknowns filtered above).
-            subst.insert(id, normalize_union(std::iter::once(prev).chain(to_add)));
+            let mut to_add: Vec<Ty> = Vec::new();
+            match actual {
+                Ty::Union(members) => {
+                    to_add.extend(members.iter().cloned());
+                }
+                other => {
+                    to_add.push(other.clone());
+                }
+            }
+
+            if to_add.is_empty() {
+                return;
+            }
+
+            match subst.get(&id).cloned() {
+                None => {
+                    subst.insert(id, normalize_union(to_add));
+                }
+                Some(prev) => {
+                    // Variant generics: union-accumulate across all bindings.
+                    subst.insert(id, normalize_union(std::iter::once(prev).chain(to_add)));
+                }
+            }
         }
     }
 }
@@ -95,6 +121,51 @@ pub(crate) fn apply(subst: &Subst, ty_template: &Ty) -> Ty {
         Ty::Union(members) => normalize_union(members.iter().map(|m| apply(subst, m))),
         other => other.clone(),
     }
+}
+
+fn unify_call_args(sig: &FunctionSig, arg_tys: &[Ty], subst: &mut Subst) {
+    let registry = registry_for(sig);
+
+    if sig.params.repeat.is_empty() {
+        let params = sig.params.head.iter().chain(sig.params.tail.iter());
+        for (param, actual) in params.zip(arg_tys.iter()) {
+            unify(subst, &registry, &param.ty, actual);
+        }
+        return;
+    }
+
+    let head_len = sig.params.head.len();
+    let tail_used =
+        super::resolve_repeat_tail_used(&sig.params, arg_tys.len()).unwrap_or(sig.params.tail.len());
+    let tail_start = arg_tys.len().saturating_sub(tail_used);
+
+    for (idx, actual) in arg_tys.iter().enumerate() {
+        let expected = if idx < head_len {
+            sig.params.head.get(idx)
+        } else if idx >= tail_start {
+            sig.params.tail.get(idx - tail_start)
+        } else {
+            let r_idx = (idx - head_len) % sig.params.repeat.len();
+            sig.params.repeat.get(r_idx)
+        };
+
+        if let Some(param) = expected {
+            unify(subst, &registry, &param.ty, actual);
+        }
+    }
+}
+
+pub(crate) fn instantiate_sig(sig: &FunctionSig, arg_tys: &[Ty]) -> (Vec<Ty>, Ty) {
+    let mut subst = Subst::new();
+    unify_call_args(sig, arg_tys, &mut subst);
+
+    let params = sig
+        .display_params()
+        .into_iter()
+        .map(|p| apply(&subst, &p.ty))
+        .collect::<Vec<_>>();
+    let ret = apply(&subst, &sig.ret);
+    (params, ret)
 }
 
 pub fn infer_expr_with_map(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
@@ -244,68 +315,10 @@ fn infer_call(
         arg_tys.push(infer_expr_with_map(arg, ctx, map));
     }
 
-    let registry = registry_for(sig);
     let mut subst = Subst::new();
-
-    if sig.params.repeat.is_empty() {
-        let params = sig.params.head.iter().chain(sig.params.tail.iter());
-        for (param, actual) in params.zip(arg_tys.iter()) {
-            unify(&mut subst, &registry, &param.ty, actual);
-        }
-    } else {
-        let head_len = sig.params.head.len();
-        let tail_used =
-            resolve_repeat_tail_used(sig, arg_tys.len()).unwrap_or(sig.params.tail.len());
-        let tail_start = arg_tys.len().saturating_sub(tail_used);
-
-        for (idx, actual) in arg_tys.iter().enumerate() {
-            let expected = if idx < head_len {
-                sig.params.head.get(idx)
-            } else if idx >= tail_start {
-                sig.params.tail.get(idx - tail_start)
-            } else {
-                let r_idx = (idx - head_len) % sig.params.repeat.len();
-                sig.params.repeat.get(r_idx)
-            };
-
-            if let Some(param) = expected {
-                unify(&mut subst, &registry, &param.ty, actual);
-            }
-        }
-    }
+    unify_call_args(sig, arg_tys.as_slice(), &mut subst);
 
     apply(&subst, &sig.ret)
-}
-
-fn resolve_repeat_tail_used(sig: &FunctionSig, total: usize) -> Option<usize> {
-    if sig.params.repeat.is_empty() {
-        return Some(sig.params.tail.len());
-    }
-
-    let head_len = sig.params.head.len();
-    if total < head_len {
-        return None;
-    }
-
-    let repeat_len = sig.params.repeat.len();
-    let mut tail_min = 0usize;
-    for (idx, p) in sig.params.tail.iter().enumerate() {
-        if !p.optional {
-            tail_min = idx + 1;
-        }
-    }
-
-    for tail_used in (tail_min..=sig.params.tail.len()).rev() {
-        if total < head_len + tail_used {
-            continue;
-        }
-        let middle = total - head_len - tail_used;
-        if middle >= repeat_len && middle.is_multiple_of(repeat_len) {
-            return Some(tail_used);
-        }
-    }
-
-    None
 }
 
 fn join_types(a: Ty, b: Ty) -> Ty {

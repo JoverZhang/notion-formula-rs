@@ -142,10 +142,13 @@ Semantic analysis (`analyzer/src/analysis/mod.rs`):
   - argument must be a string literal
   - property name must exist in `Context.properties` (else a diagnostic is emitted)
 - Generic inference is driven by `FunctionSig.generics` + `Ty::Generic` (see `analyzer/src/analysis/infer.rs`):
-  - `if<T: Plain>(condition: boolean, then: T, else: T) -> T`
-    - `Plain` generics accumulate permissively (conflicts form a union).
+  - `Plain` generics accumulate permissively (conflicts form a union); `Unknown` does not bind.
+  - `if<T: Variant>(condition: boolean, then: T, else: T) -> T`
+    - `Variant` generics:
+      - if **any** participating actual type is `Unknown`, the instantiated generic becomes `Unknown` (Unknown propagates)
+      - otherwise, all participating concrete types are accumulated into a deterministic union
   - `ifs<T: Variant>([condition: boolean, value: T]..., default: T) -> T`
-    - `Variant` generics union-accumulate across every binding and **skip** `Unknown`.
+    - same `Variant` rules as `if`
 - Postfix sugar typing/inference:
   - For postfix-capable builtins, `receiver.fn(arg1, ...)` is treated like `fn(receiver, arg1, ...)` (fixed-arity signatures only).
 
@@ -171,7 +174,11 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
 - When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
 - `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
-  - Signature help is display-only: it shows the `FunctionSig` shape as-is (generics remain `T0`, `T1`, etc).
+  - Signature help is **call-site instantiated**:
+    - it best-effort infers argument expression types from the source
+    - it instantiates the `FunctionSig` using the same unification/substitution logic as semantic inference (`instantiate_sig` in `analyzer/src/analysis/infer.rs`)
+    - instantiated `Unknown` is rendered as `unknown` (including unconstrained generics)
+    - parameter labels prefer the per-argument inferred (actual) types when available; they fall back to instantiated expected types
   - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin, signature help models the receiver separately:
     - `receiver`: formatted first parameter (`<receiver_param>`)
     - `label`: `<callee>(<remaining_params>[, ...]) -> <ret>`

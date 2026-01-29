@@ -13,6 +13,7 @@ mod signature;
 pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig};
 mod infer;
 pub use infer::{ExprId, TypeMap, infer_expr_with_map};
+pub(crate) use infer::instantiate_sig;
 mod type_hints;
 pub use type_hints::normalize_union;
 
@@ -351,7 +352,7 @@ fn param_for_arg_index_with_total(
     sig.params.repeat.get(idx % sig.params.repeat.len())
 }
 
-fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
+pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
     if params.repeat.is_empty() {
         return Some(params.tail.len());
     }

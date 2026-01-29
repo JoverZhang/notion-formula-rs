@@ -48,7 +48,7 @@ fn signature_help_only_inside_call() {
 fn signature_help_label_sum_union_variadic() {
     let c = ctx().build();
     t("sum($0").ctx(c).expect_sig_label(
-        "sum(values1: number | number[], values2: number | number[], ...) -> number",
+        "sum(values1: unknown, values2: number | number[], ...) -> number",
     );
 }
 
@@ -58,9 +58,9 @@ fn signature_help_postfix_if_label_format() {
     t("true.if($0, 1)")
         .ctx(c)
         .expect_sig_receiver(Some("condition: boolean"))
-        .expect_sig_params(&["then: T0", "else: T0"])
+        .expect_sig_params(&["then: unknown", "else: number"])
         .expect_sig_active(0)
-        .expect_sig_label("if(then: T0, else: T0) -> T0");
+        .expect_sig_label("if(then: unknown, else: number) -> unknown");
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn signature_help_normal_if_has_no_receiver_and_includes_all_params() {
     t("if($0")
         .ctx(c)
         .expect_sig_receiver(None)
-        .expect_sig_params(&["condition: boolean", "then: T0", "else: T0"]);
+        .expect_sig_params(&["condition: unknown", "then: unknown", "else: unknown"]);
 }
 
 #[test]
@@ -86,8 +86,64 @@ fn signature_help_ifs_repeat_group_label_format() {
     t("ifs(true, 1, false, 2, 3$0)")
         .ctx(c)
         .expect_sig_label(
-            "ifs(condition1: boolean, value1: T0, condition2: boolean, value2: T0, ..., default: T0) -> T0",
+            "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: number) -> number",
         );
+}
+
+#[test]
+fn signature_help_if_shows_instantiated_union_return_type() {
+    let c = ctx().build();
+    t("if(true, 1, \"x\"$0)")
+        .ctx(c)
+        .expect_sig_active(2)
+        .expect_sig_label(
+            "if(condition: boolean, then: number, else: string) -> number | string",
+        );
+}
+
+#[test]
+fn signature_help_if_propagates_unknown() {
+    let c = ctx().build();
+    t("if(true, x, 1$0)")
+        .ctx(c)
+        .expect_sig_active(2)
+        .expect_sig_label("if(condition: boolean, then: unknown, else: number) -> unknown");
+}
+
+#[test]
+fn signature_help_ifs_shows_instantiated_union_return_type() {
+    let c = ctx().build();
+    t("ifs(true, 1, false, 2, \"a\"$0)")
+        .ctx(c)
+        .expect_sig_label(
+            "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: string) -> number | string",
+        );
+}
+
+#[test]
+fn signature_help_ifs_propagates_unknown() {
+    let c = ctx().build();
+    t("ifs(true, x, false, 1, 2$0)")
+        .ctx(c)
+        .expect_sig_label(
+            "ifs(condition1: boolean, value1: unknown, condition2: boolean, value2: number, ..., default: number) -> unknown",
+        );
+}
+
+#[test]
+fn signature_help_ifs_active_param_empty_default_highlights_tail() {
+    let c = ctx().build();
+    t("ifs(true, \"123\", true, \"123\", $0)")
+        .ctx(c)
+        .expect_sig_active(5);
+}
+
+#[test]
+fn signature_help_ifs_active_param_repeat_value_highlights_value() {
+    let c = ctx().build();
+    t("ifs(true, \"123\", true, \"123\", true, $0)")
+        .ctx(c)
+        .expect_sig_active(3);
 }
 
 #[test]
@@ -97,7 +153,7 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
         .ctx(c)
         .expect_sig_receiver(None)
         .expect_sig_label(
-            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+            "sum(values1: unknown, values2: number | number[], ...) -> number",
         )
         .expect_sig_label_not_contains(").sum(");
 }

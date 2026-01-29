@@ -9,7 +9,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
         func_g!(
             FunctionCategory::General,
             "if(condition, then, else)",
-            generics!(g!(0, Plain)),
+            generics!(g!(0, Variant)),
             "if",
             params!(
                 p!("condition", Ty::Boolean),

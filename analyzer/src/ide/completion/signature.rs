@@ -1,5 +1,6 @@
 use super::SignatureHelp;
 use super::position::prev_non_trivia_before;
+use crate::ast::{Expr, ExprKind};
 use crate::lexer::{Token, TokenKind};
 use crate::semantic;
 
@@ -24,50 +25,324 @@ pub(super) fn format_ty(ty: &semantic::Ty) -> String {
     }
 }
 
-fn format_param_sig(name: &str, param: &semantic::ParamSig) -> String {
-    let mut ty = format_ty(&param.ty);
-    if param.optional {
+fn format_param_sig(name: &str, ty: &semantic::Ty, optional: bool) -> String {
+    let mut ty = format_ty(ty);
+    if optional {
         ty.push('?');
     }
     format!("{name}: {ty}")
 }
 
-fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
+fn format_signature_display(
+    sig: &semantic::FunctionSig,
+    arg_tys: &[semantic::Ty],
+    inst_param_tys: &[semantic::Ty],
+    inst_ret: &semantic::Ty,
+) -> (String, Vec<String>) {
     if sig.params.repeat.is_empty() {
+        let mut idx = 0usize;
         let params = sig
             .params
             .head
             .iter()
             .chain(sig.params.tail.iter())
-            .map(|p| format_param_sig(&p.name, p))
+            .map(|p| {
+                let ty = arg_tys
+                    .get(idx)
+                    .or_else(|| inst_param_tys.get(idx))
+                    .unwrap_or(&p.ty);
+                idx += 1;
+                format_param_sig(&p.name, ty, p.optional)
+            })
             .collect::<Vec<_>>();
 
         let label_params = params.join(", ");
-        let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
+        let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(inst_ret));
         return (label, params);
     }
 
     let mut params = Vec::<String>::new();
-    params.extend(sig.params.head.iter().map(|p| format_param_sig(&p.name, p)));
+    for (idx, p) in sig.params.head.iter().enumerate() {
+        let ty = inst_param_tys.get(idx).unwrap_or(&p.ty);
+        params.push(format_param_sig(&p.name, ty, p.optional));
+    }
 
     // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
+    let repeat_start = sig.params.head.len();
+
+    // For mapping call-site arg types to tail params, mirror analysis shape matching but allow
+    // incomplete calls: if the total arg count doesn't satisfy the full shape, treat the tail
+    // group as not present yet.
+    let total_args = arg_tys.len();
+    let tail_used = semantic::resolve_repeat_tail_used(&sig.params, total_args).unwrap_or(0);
+    let actual_tail_start = total_args.saturating_sub(tail_used);
+    let repeat_len = sig.params.repeat.len();
+
     for n in 1..=2 {
-        for p in &sig.params.repeat {
+        for (r_idx, p) in sig.params.repeat.iter().enumerate() {
             let name = format!("{}{}", p.name, n);
-            params.push(format_param_sig(&name, p));
+            let cycle = n - 1;
+            let actual_idx = repeat_start + cycle * repeat_len + r_idx;
+            let ty = arg_tys
+                .get(actual_idx)
+                .or_else(|| inst_param_tys.get(repeat_start + r_idx))
+                .unwrap_or(&p.ty);
+            params.push(format_param_sig(&name, ty, p.optional));
         }
     }
     params.push("...".into());
-    params.extend(sig.params.tail.iter().map(|p| format_param_sig(&p.name, p)));
+    for (t_idx, p) in sig.params.tail.iter().enumerate() {
+        let actual_idx = actual_tail_start + t_idx;
+        let inst_idx = repeat_start + repeat_len + t_idx;
+        let ty = arg_tys
+            .get(actual_idx)
+            .or_else(|| inst_param_tys.get(inst_idx))
+            .unwrap_or(&p.ty);
+        params.push(format_param_sig(&p.name, ty, p.optional));
+    }
 
     let label_params = params.join(", ");
-    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
+    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(inst_ret));
     (label, params)
+}
+
+fn find_call_expr_by_lparen<'a>(
+    root: &'a Expr,
+    callee: &str,
+    lparen_start: u32,
+) -> Option<&'a Expr> {
+    fn visit<'a>(
+        expr: &'a Expr,
+        callee: &str,
+        lparen_start: u32,
+        best: &mut Option<&'a Expr>,
+    ) {
+        let mut visit_child = |child: &'a Expr| visit(child, callee, lparen_start, best);
+
+        match &expr.kind {
+            ExprKind::Group { inner } => visit_child(inner),
+            ExprKind::Unary { expr: inner, .. } => visit_child(inner),
+            ExprKind::Binary { left, right, .. } => {
+                visit_child(left);
+                visit_child(right);
+            }
+            ExprKind::Ternary {
+                cond,
+                then,
+                otherwise,
+            } => {
+                visit_child(cond);
+                visit_child(then);
+                visit_child(otherwise);
+            }
+            ExprKind::Call { args, .. } => {
+                for a in args {
+                    visit_child(a);
+                }
+            }
+            ExprKind::MemberCall { receiver, args, .. } => {
+                visit_child(receiver);
+                for a in args {
+                    visit_child(a);
+                }
+            }
+            ExprKind::Ident(_) | ExprKind::Lit(_) | ExprKind::Error => {}
+        }
+
+        let matches_call = match &expr.kind {
+            ExprKind::Call { callee: c, .. } => c.text == callee,
+            ExprKind::MemberCall { method, .. } => method.text == callee,
+            _ => false,
+        };
+
+        if matches_call && expr.span.start <= lparen_start && lparen_start < expr.span.end {
+            match best {
+                None => *best = Some(expr),
+                Some(prev) => {
+                    let prev_len = prev.span.end.saturating_sub(prev.span.start);
+                    let cur_len = expr.span.end.saturating_sub(expr.span.start);
+                    if cur_len <= prev_len {
+                        *best = Some(expr);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut best = None;
+    visit(root, callee, lparen_start, &mut best);
+    best
+}
+
+fn infer_call_arg_tys_best_effort(
+    source: &str,
+    tokens: &[Token],
+    ctx: &semantic::Context,
+    call_ctx: &CallContext,
+    include_receiver_as_arg: bool,
+) -> Vec<semantic::Ty> {
+    let Some(lparen_token) = tokens.get(call_ctx.lparen_idx) else {
+        return Vec::new();
+    };
+
+    fn infer_one_arg(expr_source: &str, ctx: &semantic::Context) -> Option<semantic::Ty> {
+        let trimmed = expr_source.trim();
+        if trimmed.is_empty() {
+            return Some(semantic::Ty::Unknown);
+        }
+
+        match trimmed {
+            "true" | "false" => {
+                return Some(semantic::Ty::Boolean);
+            }
+            _ => {}
+        }
+
+        let Ok(parsed) = crate::analyze(trimmed) else {
+            return Some(semantic::Ty::Unknown);
+        };
+
+        let mut map = semantic::TypeMap::default();
+        Some(semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map))
+    }
+
+    fn arg_spans(tokens: &[Token], lparen_idx: usize, source_len: u32) -> Vec<crate::Span> {
+        let mut spans = Vec::<crate::Span>::new();
+        let Some(lparen) = tokens.get(lparen_idx) else {
+            return spans;
+        };
+
+        let mut depth = 0i32;
+        let mut start = lparen.span.end;
+
+        for token in tokens.iter().skip(lparen_idx + 1) {
+            if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
+                continue;
+            }
+
+            match token.kind {
+                TokenKind::OpenParen => depth += 1,
+                TokenKind::CloseParen => {
+                    if depth == 0 {
+                        spans.push(crate::Span {
+                            start,
+                            end: token.span.start,
+                        });
+                        return spans;
+                    }
+                    depth -= 1;
+                }
+                TokenKind::Comma if depth == 0 => {
+                    spans.push(crate::Span {
+                        start,
+                        end: token.span.start,
+                    });
+                    start = token.span.end;
+                }
+                _ => {}
+            }
+        }
+
+        spans.push(crate::Span {
+            start,
+            end: source_len,
+        });
+        spans
+    }
+
+    let source_len = u32::try_from(source.len()).unwrap_or(u32::MAX);
+    let spans = arg_spans(tokens, call_ctx.lparen_idx, source_len);
+
+    let mut arg_tys: Vec<semantic::Ty> = Vec::new();
+
+    // If this is a member call, try to include the receiver type as the leading argument.
+    if include_receiver_as_arg {
+        if let Ok(parsed) = crate::analyze(source) {
+            if let Some(call_expr) =
+                find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
+            {
+                if let ExprKind::MemberCall { receiver, .. } = &call_expr.kind {
+                    let mut map = semantic::TypeMap::default();
+                    let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
+                    let mut ty = map.get(receiver.id).cloned().unwrap_or(semantic::Ty::Unknown);
+                    if matches!(ty, semantic::Ty::Unknown)
+                        && matches!(
+                            &receiver.kind,
+                            ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
+                        )
+                    {
+                        ty = semantic::Ty::Boolean;
+                    }
+                    arg_tys.push(ty);
+                }
+            }
+        }
+    }
+
+    for span in spans {
+        let start = span.start as usize;
+        let end = span.end as usize;
+        if start > source.len() || end > source.len() || start > end {
+            continue;
+        }
+        let frag = &source[start..end];
+        if let Some(ty) = infer_one_arg(frag, ctx) {
+            arg_tys.push(ty);
+        }
+    }
+
+    arg_tys
+}
+
+fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext) -> usize {
+    if sig.params.repeat.is_empty() {
+        let total_params = sig.params.head.len() + sig.params.tail.len();
+        if total_params == 0 {
+            return 0;
+        }
+        return call_ctx.arg_index.min(total_params - 1);
+    }
+
+    let head_len = sig.params.head.len();
+    let repeat_len = sig.params.repeat.len();
+    let tail_len = sig.params.tail.len();
+
+    if repeat_len == 0 {
+        return 0;
+    }
+
+    // Treat the current cursor argument as present even if it's empty.
+    let total_args = call_ctx.arg_index + 1;
+    let tail_used = semantic::resolve_repeat_tail_used(&sig.params, total_args).unwrap_or(0);
+    let tail_start = total_args.saturating_sub(tail_used);
+
+    // Display shape: head, repeat x2, "...", tail
+    let ellipsis_idx = head_len + repeat_len * 2;
+    let tail_display_start = ellipsis_idx + 1;
+
+    if call_ctx.arg_index < head_len {
+        return call_ctx.arg_index;
+    }
+
+    if call_ctx.arg_index >= tail_start {
+        let tail_idx = call_ctx.arg_index.saturating_sub(tail_start);
+        let max_tail = tail_len.saturating_sub(1);
+        return tail_display_start + tail_idx.min(max_tail);
+    }
+
+    let idx_in_repeat = call_ctx.arg_index.saturating_sub(head_len);
+    let repeat_pos = idx_in_repeat % repeat_len;
+
+    // Map all cycles >= 2 to the second displayed cycle so we can still highlight
+    // condition vs value within the repeat pair.
+    let cycle = (idx_in_repeat / repeat_len).min(1);
+    head_len + cycle * repeat_len + repeat_pos
 }
 
 /// Only compute signature help if the cursor is inside a function call argument context
 /// (i.e., after the opening parenthesis).
 pub(super) fn compute_signature_help_if_in_call(
+    source: &str,
     tokens: &[Token],
     cursor: u32,
     ctx: Option<&semantic::Context>,
@@ -105,14 +380,33 @@ pub(super) fn compute_signature_help_if_in_call(
     };
 
     let is_postfix_call = is_postfix_call().is_some();
+    let can_use_postfix_help =
+        is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str());
 
-    if is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str()) {
+    let arg_tys =
+        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, can_use_postfix_help);
+    let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
+
+    if can_use_postfix_help {
         let params_all = func.flat_params()?;
-        let receiver = params_all.first().map(|p| format_param_sig(&p.name, p));
+        let receiver = params_all.first().map(|p| {
+            let ty = arg_tys
+                .first()
+                .or_else(|| inst_param_tys.first())
+                .unwrap_or(&p.ty);
+            format_param_sig(&p.name, ty, p.optional)
+        });
         let params = params_all
             .iter()
             .skip(1)
-            .map(|p| format_param_sig(&p.name, p))
+            .enumerate()
+            .map(|(idx, p)| {
+                let ty = arg_tys
+                    .get(idx + 1)
+                    .or_else(|| inst_param_tys.get(idx + 1))
+                    .unwrap_or(&p.ty);
+                format_param_sig(&p.name, ty, p.optional)
+            })
             .collect::<Vec<_>>();
 
         let label_params = params.join(", ");
@@ -120,7 +414,7 @@ pub(super) fn compute_signature_help_if_in_call(
             "{}({}) -> {}",
             func.name,
             label_params,
-            format_ty(&func.ret)
+            format_ty(&inst_ret)
         );
 
         let active_param = if params.is_empty() {
@@ -137,11 +431,11 @@ pub(super) fn compute_signature_help_if_in_call(
         });
     }
 
-    let (label, params) = format_signature(func);
+    let (label, params) = format_signature_display(func, arg_tys.as_slice(), inst_param_tys.as_slice(), &inst_ret);
     let active_param = if params.is_empty() {
         0
     } else {
-        call_ctx.arg_index.min(params.len() - 1)
+        active_param_index(func, call_ctx).min(params.len() - 1)
     };
 
     Some(SignatureHelp {

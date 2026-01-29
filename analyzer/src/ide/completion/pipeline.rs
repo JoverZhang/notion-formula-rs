@@ -46,6 +46,7 @@ pub(super) fn complete(
 
     let compute = |tokens: &[Token]| {
         let signature_help = super::signature::compute_signature_help_if_in_call(
+            text,
             tokens,
             cursor_u32,
             ctx,
