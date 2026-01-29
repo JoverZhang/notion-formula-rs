@@ -177,6 +177,17 @@ fn signature_help_ifs_invalid_total_4_guides_to_value2() {
 }
 
 #[test]
+fn signature_help_ifs_does_not_override_hard_constrained_condition_types() {
+    let c = ctx().build();
+    t("ifs(true, \"42\", 42, $0)")
+        .ctx(c)
+        .expect_sig_active(3)
+        .expect_sig_label(
+            "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., default: string) -> string",
+        );
+}
+
+#[test]
 fn signature_help_ifs_total_5_highlights_default() {
     let c = ctx().build();
     t("ifs(true, \"42\", false, 7, $0)")

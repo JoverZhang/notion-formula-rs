@@ -25,12 +25,32 @@ pub(super) fn format_ty(ty: &semantic::Ty) -> String {
     }
 }
 
+fn ty_contains_generic(ty: &semantic::Ty) -> bool {
+    match ty {
+        semantic::Ty::Generic(_) => true,
+        semantic::Ty::List(inner) => ty_contains_generic(inner),
+        semantic::Ty::Union(members) => members.iter().any(ty_contains_generic),
+        _ => false,
+    }
+}
+
 fn format_param_sig(name: &str, ty: &semantic::Ty, optional: bool) -> String {
     let mut ty = format_ty(ty);
     if optional {
         ty.push('?');
     }
     format!("{name}: {ty}")
+}
+
+fn choose_display_ty<'a>(
+    actual: Option<&'a semantic::Ty>,
+    declared_template: &'a semantic::Ty,
+    instantiated_expected: &'a semantic::Ty,
+) -> &'a semantic::Ty {
+    if !ty_contains_generic(declared_template) {
+        return instantiated_expected;
+    }
+    actual.unwrap_or(instantiated_expected)
 }
 
 fn format_signature_display(
@@ -48,11 +68,9 @@ fn format_signature_display(
             .iter()
             .chain(sig.params.tail.iter())
             .map(|p| {
-                let ty = arg_tys
-                    .get(idx)
-                    .and_then(|t| t.as_ref())
-                    .or_else(|| inst_param_tys.get(idx))
-                    .unwrap_or(&p.ty);
+                let instantiated_expected = inst_param_tys.get(idx).unwrap_or(&p.ty);
+                let actual = arg_tys.get(idx).and_then(|t| t.as_ref());
+                let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
                 idx += 1;
                 format_param_sig(&p.name, ty, p.optional)
             })
@@ -83,11 +101,10 @@ fn format_signature_display(
             let name = format!("{}{}", p.name, n);
             let cycle = n - 1;
             let actual_idx = repeat_start + cycle * repeat_len + r_idx;
-            let ty = arg_tys
-                .get(actual_idx)
-                .and_then(|t| t.as_ref())
-                .or_else(|| inst_param_tys.get(repeat_start + r_idx))
-                .unwrap_or(&p.ty);
+            let inst_idx = repeat_start + r_idx;
+            let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
+            let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
+            let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
             params.push(format_param_sig(&name, ty, p.optional));
         }
     }
@@ -95,11 +112,9 @@ fn format_signature_display(
     for (t_idx, p) in sig.params.tail.iter().enumerate() {
         let actual_idx = tail_start.saturating_add(t_idx);
         let inst_idx = repeat_start + repeat_len + t_idx;
-        let ty = arg_tys
-            .get(actual_idx)
-            .and_then(|t| t.as_ref())
-            .or_else(|| inst_param_tys.get(inst_idx))
-            .unwrap_or(&p.ty);
+        let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
+        let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
+        let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
         params.push(format_param_sig(&p.name, ty, p.optional));
     }
 
