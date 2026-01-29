@@ -26,6 +26,31 @@ beforeAll(async () => {
 });
 
 describe("WASM signature help (instantiated types)", () => {
+  // TODO: restore `number[]` support for `sum` once list literals or an equivalent array expression exists.
+  it("sum() shows variadic number signature and highlights first arg", () => {
+    const sig = sigAtCloseParen("sum()");
+    expect(sig.label).toBe("sum(values1: number, ...) -> number");
+    expect(sig.active_param).toBe(0);
+  });
+
+  it("sum(42) highlights first arg", () => {
+    const sig = sigAtCloseParen("sum(42)");
+    expect(sig.label).toBe("sum(values1: number, ...) -> number");
+    expect(sig.active_param).toBe(0);
+  });
+
+  it("sum(42, <empty>) highlights second arg", () => {
+    const sig = sigAtCloseParen("sum(42, )");
+    expect(sig.label).toBe("sum(values1: number, values2: number, ...) -> number");
+    expect(sig.active_param).toBe(1);
+  });
+
+  it("sum(42, 42) highlights second arg", () => {
+    const sig = sigAtCloseParen("sum(42, 42)");
+    expect(sig.label).toBe("sum(values1: number, values2: number, ...) -> number");
+    expect(sig.active_param).toBe(1);
+  });
+
   it("if(true, unknown, 1) -> unknown", () => {
     expect(sigLabelAtCloseParen("if(true, x, 1)")).toBe(
       "if(condition: boolean, then: unknown, else: number) -> unknown",
@@ -53,7 +78,7 @@ describe("WASM signature help (instantiated types)", () => {
   it("ifs(..., <empty>) highlights default (tail)", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", )');
     expect(sig.label).toBe(
-      "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., default: unknown) -> unknown",
+      "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., default: string) -> string",
     );
     expect(sig.active_param).toBe(5);
   });

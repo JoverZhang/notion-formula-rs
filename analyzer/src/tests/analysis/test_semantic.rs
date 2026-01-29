@@ -59,14 +59,12 @@ fn ctx_with_builtins() -> Context {
     ));
     ctx.functions.push(FunctionSig::new(
         FunctionCategory::Number,
-        "sum(number|number[], ...)",
+        "sum(number, ...)",
         "sum",
         ParamShape::new(
             vec![],
-            vec![p(
-                "values",
-                Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-            )],
+            // TODO: restore `number[]` once list literals or an equivalent array expression exists.
+            vec![p("values", Ty::Number)],
             vec![],
         ),
         Ty::Number,
@@ -202,7 +200,7 @@ fn test_sum_type_mismatch_emits_error() {
 }
 
 #[test]
-fn test_sum_accepts_number_list_property() {
+fn test_sum_rejects_number_list_property() {
     let mut ctx = ctx_with_builtins();
     ctx.properties.push(Property {
         name: "Nums".into(),
@@ -210,7 +208,11 @@ fn test_sum_accepts_number_list_property() {
         disabled_reason: None,
     });
     let diags = run_semantic("sum(prop(\"Nums\"))", ctx);
-    assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
+    assert_single_diag(
+        diags,
+        "sum() expects number arguments",
+        Span { start: 4, end: 16 },
+    );
 }
 
 #[test]
@@ -263,7 +265,7 @@ fn required_min_args_repeat_group_counts_all_non_optional_in_head_and_tail() {
         params: ParamShape::new(
             vec![opt("h_opt", Ty::Number), p("h_req", Ty::Number)],
             vec![p("r", Ty::Number)],
-            vec![p("t_req", Ty::Number), opt("t_opt", Ty::Number)],
+            vec![p("t_req", Ty::Number)],
         ),
         ret: Ty::Number,
         category: FunctionCategory::General,

@@ -35,7 +35,8 @@ fn format_param_sig(name: &str, ty: &semantic::Ty, optional: bool) -> String {
 
 fn format_signature_display(
     sig: &semantic::FunctionSig,
-    arg_tys: &[semantic::Ty],
+    arg_tys: &[Option<semantic::Ty>],
+    total_args_for_shape: usize,
     inst_param_tys: &[semantic::Ty],
     inst_ret: &semantic::Ty,
 ) -> (String, Vec<String>) {
@@ -49,6 +50,7 @@ fn format_signature_display(
             .map(|p| {
                 let ty = arg_tys
                     .get(idx)
+                    .and_then(|t| t.as_ref())
                     .or_else(|| inst_param_tys.get(idx))
                     .unwrap_or(&p.ty);
                 idx += 1;
@@ -69,22 +71,21 @@ fn format_signature_display(
 
     // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
     let repeat_start = sig.params.head.len();
-
-    // For mapping call-site arg types to tail params, mirror analysis shape matching but allow
-    // incomplete calls: if the total arg count doesn't satisfy the full shape, treat the tail
-    // group as not present yet.
-    let total_args = arg_tys.len();
-    let tail_used = semantic::resolve_repeat_tail_used(&sig.params, total_args).unwrap_or(0);
-    let actual_tail_start = total_args.saturating_sub(tail_used);
     let repeat_len = sig.params.repeat.len();
 
-    for n in 1..=2 {
+    let shape = semantic::complete_repeat_shape(&sig.params, total_args_for_shape);
+    let repeat_groups = shape.map(|s| s.repeat_groups).unwrap_or(1).max(1);
+    let repeat_groups_displayed = repeat_groups.min(2);
+    let tail_start = shape.map(|s| s.tail_start).unwrap_or(usize::MAX);
+
+    for n in 1..=repeat_groups_displayed {
         for (r_idx, p) in sig.params.repeat.iter().enumerate() {
             let name = format!("{}{}", p.name, n);
             let cycle = n - 1;
             let actual_idx = repeat_start + cycle * repeat_len + r_idx;
             let ty = arg_tys
                 .get(actual_idx)
+                .and_then(|t| t.as_ref())
                 .or_else(|| inst_param_tys.get(repeat_start + r_idx))
                 .unwrap_or(&p.ty);
             params.push(format_param_sig(&name, ty, p.optional));
@@ -92,10 +93,11 @@ fn format_signature_display(
     }
     params.push("...".into());
     for (t_idx, p) in sig.params.tail.iter().enumerate() {
-        let actual_idx = actual_tail_start + t_idx;
+        let actual_idx = tail_start.saturating_add(t_idx);
         let inst_idx = repeat_start + repeat_len + t_idx;
         let ty = arg_tys
             .get(actual_idx)
+            .and_then(|t| t.as_ref())
             .or_else(|| inst_param_tys.get(inst_idx))
             .unwrap_or(&p.ty);
         params.push(format_param_sig(&p.name, ty, p.optional));
@@ -180,7 +182,7 @@ fn infer_call_arg_tys_best_effort(
     ctx: &semantic::Context,
     call_ctx: &CallContext,
     include_receiver_as_arg: bool,
-) -> Vec<semantic::Ty> {
+) -> Vec<Option<semantic::Ty>> {
     let Some(lparen_token) = tokens.get(call_ctx.lparen_idx) else {
         return Vec::new();
     };
@@ -188,7 +190,7 @@ fn infer_call_arg_tys_best_effort(
     fn infer_one_arg(expr_source: &str, ctx: &semantic::Context) -> Option<semantic::Ty> {
         let trimmed = expr_source.trim();
         if trimmed.is_empty() {
-            return Some(semantic::Ty::Unknown);
+            return None;
         }
 
         match trimmed {
@@ -253,7 +255,7 @@ fn infer_call_arg_tys_best_effort(
     let source_len = u32::try_from(source.len()).unwrap_or(u32::MAX);
     let spans = arg_spans(tokens, call_ctx.lparen_idx, source_len);
 
-    let mut arg_tys: Vec<semantic::Ty> = Vec::new();
+    let mut arg_tys: Vec<Option<semantic::Ty>> = Vec::new();
 
     // If this is a member call, try to include the receiver type as the leading argument.
     if include_receiver_as_arg {
@@ -273,7 +275,7 @@ fn infer_call_arg_tys_best_effort(
                     {
                         ty = semantic::Ty::Boolean;
                     }
-                    arg_tys.push(ty);
+                    arg_tys.push(Some(ty));
                 }
             }
         }
@@ -286,15 +288,13 @@ fn infer_call_arg_tys_best_effort(
             continue;
         }
         let frag = &source[start..end];
-        if let Some(ty) = infer_one_arg(frag, ctx) {
-            arg_tys.push(ty);
-        }
+        arg_tys.push(infer_one_arg(frag, ctx));
     }
 
     arg_tys
 }
 
-fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext) -> usize {
+fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext, total_args_for_shape: usize) -> usize {
     if sig.params.repeat.is_empty() {
         let total_params = sig.params.head.len() + sig.params.tail.len();
         if total_params == 0 {
@@ -311,13 +311,14 @@ fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext) -> us
         return 0;
     }
 
-    // Treat the current cursor argument as present even if it's empty.
-    let total_args = call_ctx.arg_index + 1;
-    let tail_used = semantic::resolve_repeat_tail_used(&sig.params, total_args).unwrap_or(0);
-    let tail_start = total_args.saturating_sub(tail_used);
+    let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape) else {
+        return 0;
+    };
+    let tail_start = shape.tail_start;
+    let repeat_groups_displayed = shape.repeat_groups.max(1).min(2);
 
-    // Display shape: head, repeat x2, "...", tail
-    let ellipsis_idx = head_len + repeat_len * 2;
+    // Display shape: head, repeat x{1..2}, "...", tail
+    let ellipsis_idx = head_len + repeat_len * repeat_groups_displayed;
     let tail_display_start = ellipsis_idx + 1;
 
     if call_ctx.arg_index < head_len {
@@ -335,7 +336,7 @@ fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext) -> us
 
     // Map all cycles >= 2 to the second displayed cycle so we can still highlight
     // condition vs value within the repeat pair.
-    let cycle = (idx_in_repeat / repeat_len).min(1);
+    let cycle = (idx_in_repeat / repeat_len).min(repeat_groups_displayed.saturating_sub(1));
     head_len + cycle * repeat_len + repeat_pos
 }
 
@@ -392,6 +393,7 @@ pub(super) fn compute_signature_help_if_in_call(
         let receiver = params_all.first().map(|p| {
             let ty = arg_tys
                 .first()
+                .and_then(|t| t.as_ref())
                 .or_else(|| inst_param_tys.first())
                 .unwrap_or(&p.ty);
             format_param_sig(&p.name, ty, p.optional)
@@ -403,6 +405,7 @@ pub(super) fn compute_signature_help_if_in_call(
             .map(|(idx, p)| {
                 let ty = arg_tys
                     .get(idx + 1)
+                    .and_then(|t| t.as_ref())
                     .or_else(|| inst_param_tys.get(idx + 1))
                     .unwrap_or(&p.ty);
                 format_param_sig(&p.name, ty, p.optional)
@@ -431,11 +434,18 @@ pub(super) fn compute_signature_help_if_in_call(
         });
     }
 
-    let (label, params) = format_signature_display(func, arg_tys.as_slice(), inst_param_tys.as_slice(), &inst_ret);
+    let total_args_for_shape = arg_tys.len().max(call_ctx.arg_index + 1);
+    let (label, params) = format_signature_display(
+        func,
+        arg_tys.as_slice(),
+        total_args_for_shape,
+        inst_param_tys.as_slice(),
+        &inst_ret,
+    );
     let active_param = if params.is_empty() {
         0
     } else {
-        active_param_index(func, call_ctx).min(params.len() - 1)
+        active_param_index(func, call_ctx, total_args_for_shape).min(params.len() - 1)
     };
 
     Some(SignatureHelp {

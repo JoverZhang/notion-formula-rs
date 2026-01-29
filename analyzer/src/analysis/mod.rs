@@ -11,6 +11,8 @@ mod functions;
 pub use functions::builtins_functions;
 mod signature;
 pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig};
+mod param_shape;
+pub(crate) use param_shape::complete_repeat_shape;
 mod infer;
 pub use infer::{ExprId, TypeMap, infer_expr_with_map};
 pub(crate) use infer::instantiate_sig;
@@ -353,39 +355,7 @@ fn param_for_arg_index_with_total(
 }
 
 pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
-    if params.repeat.is_empty() {
-        return Some(params.tail.len());
-    }
-
-    let head_len = params.head.len();
-    if total < head_len {
-        return None;
-    }
-
-    let repeat_len = params.repeat.len();
-    let tail_min = required_tail_prefix_len(&params.tail);
-
-    for tail_used in (tail_min..=params.tail.len()).rev() {
-        if total < head_len + tail_used {
-            continue;
-        }
-        let middle = total - head_len - tail_used;
-        if middle >= repeat_len && middle.is_multiple_of(repeat_len) {
-            return Some(tail_used);
-        }
-    }
-
-    None
-}
-
-fn required_tail_prefix_len(tail: &[ParamSig]) -> usize {
-    let mut required = 0usize;
-    for (idx, p) in tail.iter().enumerate() {
-        if !p.optional {
-            required = idx + 1;
-        }
-    }
-    required
+    param_shape::resolve_repeat_tail_used(params, total)
 }
 
 fn emit_error(diags: &mut Vec<Diagnostic>, span: Span, message: impl Into<String>) {

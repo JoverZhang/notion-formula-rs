@@ -244,13 +244,11 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "sum(number|number[], ...)",
+            "sum(number, ...)",
             "sum",
             repeat_params_with_tail!(
-                repeat!(p!(
-                    "values",
-                    Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))])
-                )),
+                // TODO: restore `number[]` once list literals or an equivalent array expression exists.
+                repeat!(p!("values", Ty::Number)),
                 tail!(),
             ),
             Ty::Number,

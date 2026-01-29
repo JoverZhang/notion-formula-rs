@@ -155,9 +155,58 @@ fn unify_call_args(sig: &FunctionSig, arg_tys: &[Ty], subst: &mut Subst) {
     }
 }
 
-pub(crate) fn instantiate_sig(sig: &FunctionSig, arg_tys: &[Ty]) -> (Vec<Ty>, Ty) {
+fn unify_call_args_present(sig: &FunctionSig, arg_tys: &[Option<Ty>], subst: &mut Subst) {
+    let registry = registry_for(sig);
+
+    if sig.params.repeat.is_empty() {
+        let total_params = sig.params.head.len() + sig.params.tail.len();
+        for (idx, actual) in arg_tys.iter().enumerate() {
+            if idx >= total_params {
+                break;
+            }
+            let Some(actual) = actual else {
+                continue;
+            };
+            let expected = if idx < sig.params.head.len() {
+                sig.params.head.get(idx)
+            } else {
+                sig.params.tail.get(idx - sig.params.head.len())
+            };
+            if let Some(param) = expected {
+                unify(subst, &registry, &param.ty, actual);
+            }
+        }
+        return;
+    }
+
+    let head_len = sig.params.head.len();
+    let Some(shape) = super::complete_repeat_shape(&sig.params, arg_tys.len()) else {
+        return;
+    };
+
+    for (idx, actual) in arg_tys.iter().enumerate() {
+        let Some(actual) = actual else {
+            continue;
+        };
+
+        let expected = if idx < head_len {
+            sig.params.head.get(idx)
+        } else if idx >= shape.tail_start {
+            sig.params.tail.get(idx - shape.tail_start)
+        } else {
+            let r_idx = (idx - head_len) % sig.params.repeat.len();
+            sig.params.repeat.get(r_idx)
+        };
+
+        if let Some(param) = expected {
+            unify(subst, &registry, &param.ty, actual);
+        }
+    }
+}
+
+pub(crate) fn instantiate_sig(sig: &FunctionSig, arg_tys: &[Option<Ty>]) -> (Vec<Ty>, Ty) {
     let mut subst = Subst::new();
-    unify_call_args(sig, arg_tys, &mut subst);
+    unify_call_args_present(sig, arg_tys, &mut subst);
 
     let params = sig
         .display_params()

@@ -178,15 +178,15 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
     - it best-effort infers argument expression types from the source
     - it instantiates the `FunctionSig` using the same unification/substitution logic as semantic inference (`instantiate_sig` in `analyzer/src/analysis/infer.rs`)
     - instantiated `Unknown` is rendered as `unknown` (including unconstrained generics)
-    - parameter labels prefer the per-argument inferred (actual) types when available; they fall back to instantiated expected types
+    - parameter labels prefer the per-argument inferred (actual) types when the argument expression is non-empty; empty argument slots fall back to instantiated expected types
   - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin, signature help models the receiver separately:
     - `receiver`: formatted first parameter (`<receiver_param>`)
     - `label`: `<callee>(<remaining_params>[, ...]) -> <ret>`
     - `params`: the remaining parameters only (for fixed-arity signatures, this is the parameter list excluding the first “receiver” param)
     - `active_param` indexes into `params` only (excluding receiver).
-  - Repeat-group shapes (a `ParamShape` with non-empty `repeat`) are pretty-printed as a pattern:
+  - Repeat-group shapes (a `ParamShape` with non-empty `repeat`) are pretty-printed as a pattern (see `docs/signature-help.md` for the spec):
     - head params once
-    - repeat params twice (numbered: `condition1/value1`, `condition2/value2`)
+    - repeat params **up to twice** (numbered: `condition1/value1`, `condition2/value2`), but the second repeat group is only shown once the call has entered it (or when the call is completed to the next valid shape for guidance)
     - `...`
     - tail params once
     - Example: `ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: number) -> number`
