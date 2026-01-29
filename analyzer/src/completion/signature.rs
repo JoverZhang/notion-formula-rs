@@ -65,20 +65,12 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
                 label_params.push_str("...");
             }
 
-            let label = format!(
-                "{}({}) -> {}",
-                sig.name,
-                label_params,
-                format_ty(&sig.ret)
-            );
+            let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
             (label, params)
         }
         semantic::ParamLayout::RepeatGroup { head, repeat, tail } => {
             let mut params = Vec::<String>::new();
-            params.extend(
-                head.iter()
-                    .map(|p| format_param_sig(&p.name, p)),
-            );
+            params.extend(head.iter().map(|p| format_param_sig(&p.name, p)));
 
             // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
             for n in 1..=2 {
@@ -88,18 +80,10 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
                 }
             }
             params.push("...".into());
-            params.extend(
-                tail.iter()
-                    .map(|p| format_param_sig(&p.name, p)),
-            );
+            params.extend(tail.iter().map(|p| format_param_sig(&p.name, p)));
 
             let label_params = params.join(", ");
-            let label = format!(
-                "{}({}) -> {}",
-                sig.name,
-                label_params,
-                format_ty(&sig.ret)
-            );
+            let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
             (label, params)
         }
     }

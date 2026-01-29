@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
+#[macro_use]
+mod builtins;
 mod functions;
 pub use functions::builtins_functions;
 mod signature;
-pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamLayout, ParamSig};
+pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig};
 mod infer;
 pub use infer::{ExprId, TypeMap, infer_expr_with_map};
 mod type_hints;

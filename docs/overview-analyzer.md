@@ -119,10 +119,17 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
 
 - `Context` is `{ properties: Vec<Property>, functions: Vec<FunctionSig> }`.
 - Builtin function signatures are defined in `builtins_functions()`.
-- `FunctionSig` now models parameters via `layout: ParamLayout`:
-  - `ParamLayout::Flat(Vec<ParamSig>)` for simple parameter lists (including legacy “last param is variadic” shapes)
-- `ParamLayout::RepeatGroup { head, repeat, tail }` for repeating bindings like `(a, b, a, b, ..., tail)`
-- `ParamSig.name` is required (`String`) and `FunctionSig` can declare `generics: Vec<GenericParam>`.
+- Builtin signatures are declared via a small macro DSL in `analyzer/src/semantic/builtins/macros.rs` and used from `analyzer/src/semantic/functions.rs`.
+- `FunctionSig` includes required `category: FunctionCategory` and required `detail: String` (used by completion/signature help).
+- `FunctionSig` models parameters via `params: ParamShape { head, repeat, tail }`:
+  - `head`: fixed prefix params (appear once)
+  - `repeat`: repeating group params (appear 1+ times when non-empty)
+  - `tail`: fixed suffix params (appear once after the repeat group)
+- `ParamSig` is `{ name: String, ty: Ty, optional: bool }`.
+- `ParamShape::new(...)` enforces invariants for builtin declarations:
+  - repeat params must not be optional
+  - tail params may be optional but must be suffix-only (once an optional tail param appears, no required tail params may follow)
+- `FunctionSig` can declare `generics: Vec<GenericParam>`; a `GenericParam` is `{ id: GenericId, kind: GenericParamKind }` (no display name; UI renders `T0`, `T1`, ...).
 - Semantic analysis is inference-first:
   - `infer_expr_with_map(expr, ctx, &mut TypeMap)` computes a `TypeMap` of `ExprId`/`NodeId -> Ty`.
   - `analyze_expr` returns the inferred root type and emits diagnostics by comparing inferred argument types to builtin signatures (arity + expected types).
@@ -140,7 +147,7 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
   - `ifs<T: Variant>([condition: boolean, value: T]..., default: T) -> T`
     - `Variant` generics union-accumulate across every binding and **skip** `Unknown`.
 - Postfix sugar typing/inference:
-  - For postfix-capable builtins, `receiver.fn(arg1, ...)` is treated like `fn(receiver, arg1, ...)` (flat layouts only).
+  - For postfix-capable builtins, `receiver.fn(arg1, ...)` is treated like `fn(receiver, arg1, ...)` (fixed-arity signatures only).
 
 Completion (`analyzer/src/completion/mod.rs`, ranking/matching in `analyzer/src/completion/rank.rs` + `analyzer/src/completion/matchers.rs`):
 
@@ -168,9 +175,9 @@ Completion (`analyzer/src/completion/mod.rs`, ranking/matching in `analyzer/src/
   - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin, signature help models the receiver separately:
     - `receiver`: formatted first parameter (`<receiver_param>`)
     - `label`: `<callee>(<remaining_params>[, ...]) -> <ret>`
-    - `params`: the remaining parameters only (for flat layouts, this is the parameter list excluding the first “receiver” param)
+    - `params`: the remaining parameters only (for fixed-arity signatures, this is the parameter list excluding the first “receiver” param)
     - `active_param` indexes into `params` only (excluding receiver).
-  - Repeat-group layouts (`ParamLayout::RepeatGroup`) are pretty-printed as a pattern:
+  - Repeat-group shapes (a `ParamShape` with non-empty `repeat`) are pretty-printed as a pattern:
     - head params once
     - repeat params twice (numbered: `condition1/value1`, `condition2/value2`)
     - `...`

@@ -1,1542 +1,772 @@
-use super::{
-    FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamLayout,
-    ParamSig, Ty,
-};
+use super::{FunctionCategory, FunctionSig, GenericId, Ty};
 
 pub fn builtins_functions() -> Vec<FunctionSig> {
     let t0 = GenericId(0);
-    let builtins = vec![
+    vec![
         // =========================
         // General / Logic
         // =========================
-        FunctionSig {
-            name: "if".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "condition".into(),
-                    ty: Ty::Boolean,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "then".into(),
-                    ty: Ty::Generic(t0),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "else".into(),
-                    ty: Ty::Generic(t0),
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Generic(t0),
-            detail: Some("if(condition, then, else)".into()),
-            category: FunctionCategory::General,
-            generics: vec![GenericParam {
-                id: t0,
-                name: "T".into(),
-                kind: GenericParamKind::Plain,
-            }],
-        },
-        FunctionSig {
-            name: "ifs".into(),
-            layout: ParamLayout::RepeatGroup {
-                head: vec![],
-                repeat: vec![
-                    ParamSig {
-                        name: "condition".into(),
-                        ty: Ty::Boolean,
-                        optional: false,
-                        variadic: false,
-                    },
-                    ParamSig {
-                        name: "value".into(),
-                        ty: Ty::Generic(t0),
-                        optional: false,
-                        variadic: false,
-                    },
-                ],
-                tail: vec![ParamSig {
-                    name: "default".into(),
-                    ty: Ty::Generic(t0),
-                    optional: false,
-                    variadic: false,
-                }],
-            },
-            ret: Ty::Generic(t0),
-            detail: Some("ifs(condition, value, ..., default)".into()),
-            category: FunctionCategory::General,
-            generics: vec![GenericParam {
-                id: t0,
-                name: "T".into(),
-                kind: GenericParamKind::Variant,
-            }],
-        },
-        FunctionSig {
-            name: "empty".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Boolean,
-            detail: Some("empty(value)".into()),
-            category: FunctionCategory::General,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "format".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("format(value)".into()),
-            category: FunctionCategory::General,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "toNumber".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("toNumber(value)".into()),
-            category: FunctionCategory::General,
-            generics: vec![],
-        },
+        func_g!(
+            FunctionCategory::General,
+            "if(condition, then, else)",
+            generics!(g!(0, Plain)),
+            "if",
+            params!(
+                p!("condition", Ty::Boolean),
+                p!("then", Ty::Generic(t0)),
+                p!("else", Ty::Generic(t0))
+            ),
+            Ty::Generic(t0),
+        ),
+        func_g!(
+            FunctionCategory::General,
+            "ifs(condition, value, ..., default)",
+            generics!(g!(0, Variant)),
+            "ifs",
+            repeat_params!(
+                head!(),
+                repeat!(p!("condition", Ty::Boolean), p!("value", Ty::Generic(t0))),
+                tail!(p!("default", Ty::Generic(t0))),
+            ),
+            Ty::Generic(t0),
+        ),
+        func!(
+            FunctionCategory::General,
+            "empty(value)",
+            "empty",
+            params!(p!("value", Ty::Unknown)),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::General,
+            "format(value)",
+            "format",
+            params!(p!("value", Ty::Unknown)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::General,
+            "toNumber(value)",
+            "toNumber",
+            params!(p!("value", Ty::Unknown)),
+            Ty::Number,
+        ),
         // =========================
         // Text
         // =========================
-        FunctionSig {
-            name: "length".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Union(vec![Ty::String, Ty::List(Box::new(Ty::Unknown))]),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("length(text|any[])".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "substring".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "start".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "end".into(),
-                    ty: Ty::Number,
-                    optional: true,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("substring(text, start, end?)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "contains".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "search".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("contains(text, search)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "test".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "regex".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("test(text, regex)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "match".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "regex".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::List(Box::new(Ty::String)),
-            detail: Some("match(text, regex)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "replace".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "regex".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "replacement".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("replace(text, regex, replacement)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "replaceAll".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "regex".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "replacement".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("replaceAll(text, regex, replacement)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "lower".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "text".into(),
-                ty: Ty::String,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("lower(text)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "upper".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "text".into(),
-                ty: Ty::String,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("upper(text)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "repeat".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "times".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("repeat(text, times)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "link".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "label".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "url".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("link(label, url)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "style".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "styles".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: true,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("style(text, styleOrColor, ...)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "unstyle".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "styles".into(),
-                    ty: Ty::String,
-                    optional: true,
-                    variadic: true,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("unstyle(text, style?)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "trim".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "text".into(),
-                ty: Ty::String,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("trim(text)".into()),
-            category: FunctionCategory::Text,
-            generics: vec![],
-        },
+        func!(
+            FunctionCategory::Text,
+            "length(text|any[])",
+            "length",
+            params!(p!(
+                "value",
+                Ty::Union(vec![Ty::String, Ty::List(Box::new(Ty::Unknown))])
+            )),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "substring(text, start, end?)",
+            "substring",
+            params!(
+                p!("text", Ty::String),
+                p!("start", Ty::Number),
+                opt!("end", Ty::Number)
+            ),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "contains(text, search)",
+            "contains",
+            params!(p!("text", Ty::String), p!("search", Ty::String)),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "test(text, regex)",
+            "test",
+            params!(p!("text", Ty::String), p!("regex", Ty::String)),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "match(text, regex)",
+            "match",
+            params!(p!("text", Ty::String), p!("regex", Ty::String)),
+            Ty::List(Box::new(Ty::String)),
+        ),
+        func!(
+            FunctionCategory::Text,
+            "replace(text, regex, replacement)",
+            "replace",
+            params!(
+                p!("text", Ty::String),
+                p!("regex", Ty::String),
+                p!("replacement", Ty::String)
+            ),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "replaceAll(text, regex, replacement)",
+            "replaceAll",
+            params!(
+                p!("text", Ty::String),
+                p!("regex", Ty::String),
+                p!("replacement", Ty::String)
+            ),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "lower(text)",
+            "lower",
+            params!(p!("text", Ty::String)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "upper(text)",
+            "upper",
+            params!(p!("text", Ty::String)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "repeat(text, times)",
+            "repeat",
+            params!(p!("text", Ty::String), p!("times", Ty::Number)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "link(label, url)",
+            "link",
+            params!(p!("label", Ty::String), p!("url", Ty::String)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "style(text, styleOrColor, ...)",
+            "style",
+            repeat_params!(
+                head!(p!("text", Ty::String)),
+                repeat!(p!("styles", Ty::String)),
+                tail!(),
+            ),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "unstyle(text, style?)",
+            "unstyle",
+            params!(p!("text", Ty::String), opt!("styles", Ty::String)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "trim(text)",
+            "trim",
+            params!(p!("text", Ty::String)),
+            Ty::String,
+        ),
         // =========================
         // Number
         // =========================
-        FunctionSig {
-            name: "add".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("add(a, b)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "subtract".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("subtract(a, b)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "multiply".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("multiply(a, b)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "divide".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("divide(a, b)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "mod".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("mod(a, b)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "pow".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "base".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "exp".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("pow(base, exp)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "min".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "values".into(),
-                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-                optional: false,
-                variadic: true,
-            }]),
-            ret: Ty::Number,
-            detail: Some("min(number|number[], ...)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "max".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "values".into(),
-                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-                optional: false,
-                variadic: true,
-            }]),
-            ret: Ty::Number,
-            detail: Some("max(number|number[], ...)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "sum".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "values".into(),
-                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-                optional: false,
-                variadic: true,
-            }]),
-            ret: Ty::Number,
-            detail: Some("sum(number|number[], ...)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "median".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "values".into(),
-                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-                optional: false,
-                variadic: true,
-            }]),
-            ret: Ty::Number,
-            detail: Some("median(number|number[], ...)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "mean".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "values".into(),
-                ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-                optional: false,
-                variadic: true,
-            }]),
-            ret: Ty::Number,
-            detail: Some("mean(number|number[], ...)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "abs".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("abs(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "round".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "value".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "places".into(),
-                    ty: Ty::Number,
-                    optional: true,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("round(number, places?)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "ceil".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("ceil(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "floor".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("floor(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "sqrt".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("sqrt(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "cbrt".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("cbrt(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "exp".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("exp(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "ln".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("ln(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "log10".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("log10(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "log2".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("log2(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "sign".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "value".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("sign(number)".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "pi".into(),
-            layout: ParamLayout::Flat(vec![]),
-            ret: Ty::Number,
-            detail: Some("pi()".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "e".into(),
-            layout: ParamLayout::Flat(vec![]),
-            ret: Ty::Number,
-            detail: Some("e()".into()),
-            category: FunctionCategory::Number,
-            generics: vec![],
-        },
+        func!(
+            FunctionCategory::Number,
+            "add(a, b)",
+            "add",
+            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "subtract(a, b)",
+            "subtract",
+            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "multiply(a, b)",
+            "multiply",
+            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "divide(a, b)",
+            "divide",
+            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "mod(a, b)",
+            "mod",
+            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "pow(base, exp)",
+            "pow",
+            params!(p!("base", Ty::Number), p!("exp", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "min(number|number[], ...)",
+            "min",
+            repeat_params_with_tail!(
+                repeat!(p!(
+                    "values",
+                    Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))])
+                )),
+                tail!(),
+            ),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "max(number|number[], ...)",
+            "max",
+            repeat_params_with_tail!(
+                repeat!(p!(
+                    "values",
+                    Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))])
+                )),
+                tail!(),
+            ),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "sum(number|number[], ...)",
+            "sum",
+            repeat_params_with_tail!(
+                repeat!(p!(
+                    "values",
+                    Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))])
+                )),
+                tail!(),
+            ),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "median(number|number[], ...)",
+            "median",
+            repeat_params_with_tail!(
+                repeat!(p!(
+                    "values",
+                    Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))])
+                )),
+                tail!(),
+            ),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "mean(number|number[], ...)",
+            "mean",
+            repeat_params_with_tail!(
+                repeat!(p!(
+                    "values",
+                    Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))])
+                )),
+                tail!(),
+            ),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "abs(number)",
+            "abs",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "round(number, places?)",
+            "round",
+            params!(p!("value", Ty::Number), opt!("places", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "ceil(number)",
+            "ceil",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "floor(number)",
+            "floor",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "sqrt(number)",
+            "sqrt",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "cbrt(number)",
+            "cbrt",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "exp(number)",
+            "exp",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "ln(number)",
+            "ln",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "log10(number)",
+            "log10",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "log2(number)",
+            "log2",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "sign(number)",
+            "sign",
+            params!(p!("value", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "pi()",
+            "pi",
+            params!(),
+            Ty::Number,
+        ),
+        func!(FunctionCategory::Number, "e()", "e", params!(), Ty::Number,),
         // =========================
         // Date
         // =========================
-        FunctionSig {
-            name: "now".into(),
-            layout: ParamLayout::Flat(vec![]),
-            ret: Ty::Date,
-            detail: Some("now()".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "today".into(),
-            layout: ParamLayout::Flat(vec![]),
-            ret: Ty::Date,
-            detail: Some("today()".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "minute".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("minute(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "hour".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("hour(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "day".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("day(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "date".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("date(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "week".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("week(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "month".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("month(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "year".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("year(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "dateAdd".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "date".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "amount".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "unit".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Date,
-            detail: Some("dateAdd(date, amount, unit)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "dateSubtract".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "date".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "amount".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "unit".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Date,
-            detail: Some("dateSubtract(date, amount, unit)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "dateBetween".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "unit".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("dateBetween(a, b, unit)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "dateRange".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "start".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "end".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
+        func!(FunctionCategory::Date, "now()", "now", params!(), Ty::Date,),
+        func!(
+            FunctionCategory::Date,
+            "today()",
+            "today",
+            params!(),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "minute(date)",
+            "minute",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "hour(date)",
+            "hour",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "day(date)",
+            "day",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "date(date)",
+            "date",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "week(date)",
+            "week",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "month(date)",
+            "month",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "year(date)",
+            "year",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "dateAdd(date, amount, unit)",
+            "dateAdd",
+            params!(
+                p!("date", Ty::Date),
+                p!("amount", Ty::Number),
+                p!("unit", Ty::String)
+            ),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "dateSubtract(date, amount, unit)",
+            "dateSubtract",
+            params!(
+                p!("date", Ty::Date),
+                p!("amount", Ty::Number),
+                p!("unit", Ty::String)
+            ),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "dateBetween(a, b, unit)",
+            "dateBetween",
+            params!(p!("a", Ty::Date), p!("b", Ty::Date), p!("unit", Ty::String)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "dateRange(start, end)",
+            "dateRange",
+            params!(p!("start", Ty::Date), p!("end", Ty::Date)),
             // Note: if you have Ty::DateRange, use it instead of Ty::Date here.
-            ret: Ty::Date,
-            detail: Some("dateRange(start, end)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "dateStart".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "range".into(),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "dateStart(range)",
+            "dateStart",
+            params!(p!(
+                "range",
                 // Note: if you have Ty::DateRange, use it here instead of Ty::Date.
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Date,
-            detail: Some("dateStart(range)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "dateEnd".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "range".into(),
+                Ty::Date
+            )),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "dateEnd(range)",
+            "dateEnd",
+            params!(p!(
+                "range",
                 // Note: if you have Ty::DateRange, use it here instead of Ty::Date.
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Date,
-            detail: Some("dateEnd(range)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "timestamp".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "date".into(),
-                ty: Ty::Date,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Number,
-            detail: Some("timestamp(date)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "fromTimestamp".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "timestamp".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Date,
-            detail: Some("fromTimestamp(timestampMs)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "formatDate".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "date".into(),
-                    ty: Ty::Date,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "format".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("formatDate(date, format)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "parseDate".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "text".into(),
-                ty: Ty::String,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Date,
-            detail: Some("parseDate(text)".into()),
-            category: FunctionCategory::Date,
-            generics: vec![],
-        },
+                Ty::Date
+            )),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "timestamp(date)",
+            "timestamp",
+            params!(p!("date", Ty::Date)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "fromTimestamp(timestampMs)",
+            "fromTimestamp",
+            params!(p!("timestamp", Ty::Number)),
+            Ty::Date,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "formatDate(date, format)",
+            "formatDate",
+            params!(p!("date", Ty::Date), p!("format", Ty::String)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Date,
+            "parseDate(text)",
+            "parseDate",
+            params!(p!("text", Ty::String)),
+            Ty::Date,
+        ),
         // =========================
         // People
         // =========================
-        FunctionSig {
-            name: "name".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "person".into(),
+        func!(
+            FunctionCategory::People,
+            "name(person)",
+            "name",
+            params!(p!(
+                "person",
                 // TODO: Notion's person type is more complex than this.
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("name(person)".into()),
-            category: FunctionCategory::People,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "email".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "person".into(),
+                Ty::Unknown
+            )),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::People,
+            "email(person)",
+            "email",
+            params!(p!(
+                "person",
                 // TODO: Notion's person type is more complex than this.
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("email(person)".into()),
-            category: FunctionCategory::People,
-            generics: vec![],
-        },
+                Ty::Unknown
+            )),
+            Ty::String,
+        ),
         // =========================
         // List
         // =========================
-        FunctionSig {
-            name: "at".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "index".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Unknown,
-            detail: Some("at(list, index)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "first".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "list".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Unknown,
-            detail: Some("first(list)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "last".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "list".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::Unknown,
-            detail: Some("last(list)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "slice".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "start".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "end".into(),
-                    ty: Ty::Number,
-                    optional: true,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("slice(list, start, end?)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "concat".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "lists".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: true,
-            }]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("concat(list, ...)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "sort".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "list".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("sort(list)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "reverse".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "list".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("reverse(list)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "join".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "separator".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::String,
-            detail: Some("join(list, separator)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "split".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "text".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "separator".into(),
-                    ty: Ty::String,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::List(Box::new(Ty::String)),
-            detail: Some("split(text, separator)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "unique".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "list".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("unique(list)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "includes".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "value".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("includes(list, value)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "find".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "predicate".into(),
-                    ty: Ty::Unknown, // lambda expr (current/index) in Notion DSL
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Unknown,
-            detail: Some("find(list, predicate)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "findIndex".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "predicate".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Number,
-            detail: Some("findIndex(list, predicate)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "filter".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "predicate".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("filter(list, predicate)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "some".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "predicate".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("some(list, predicate)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "every".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "predicate".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("every(list, predicate)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "map".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Unknown)),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "mapper".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("map(list, mapper)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "flat".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "list".into(),
-                ty: Ty::List(Box::new(Ty::Unknown)),
-                optional: false,
-                variadic: false,
-            }]),
-            ret: Ty::List(Box::new(Ty::Unknown)),
-            detail: Some("flat(list)".into()),
-            category: FunctionCategory::List,
-            generics: vec![],
-        },
+        func!(
+            FunctionCategory::List,
+            "at(list, index)",
+            "at",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("index", Ty::Number)
+            ),
+            Ty::Unknown,
+        ),
+        func!(
+            FunctionCategory::List,
+            "first(list)",
+            "first",
+            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            Ty::Unknown,
+        ),
+        func!(
+            FunctionCategory::List,
+            "last(list)",
+            "last",
+            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            Ty::Unknown,
+        ),
+        func!(
+            FunctionCategory::List,
+            "slice(list, start, end?)",
+            "slice",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("start", Ty::Number),
+                opt!("end", Ty::Number)
+            ),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "concat(list, ...)",
+            "concat",
+            repeat_params_with_tail!(
+                repeat!(p!("lists", Ty::List(Box::new(Ty::Unknown)))),
+                tail!(),
+            ),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "sort(list)",
+            "sort",
+            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "reverse(list)",
+            "reverse",
+            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "join(list, separator)",
+            "join",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("separator", Ty::String)
+            ),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::List,
+            "split(text, separator)",
+            "split",
+            params!(p!("text", Ty::String), p!("separator", Ty::String)),
+            Ty::List(Box::new(Ty::String)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "unique(list)",
+            "unique",
+            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "includes(list, value)",
+            "includes",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("value", Ty::Unknown)
+            ),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::List,
+            "find(list, predicate)",
+            "find",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!(
+                    "predicate",
+                    // lambda expr (current/index) in Notion DSL
+                    Ty::Unknown
+                )
+            ),
+            Ty::Unknown,
+        ),
+        func!(
+            FunctionCategory::List,
+            "findIndex(list, predicate)",
+            "findIndex",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("predicate", Ty::Unknown)
+            ),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::List,
+            "filter(list, predicate)",
+            "filter",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("predicate", Ty::Unknown)
+            ),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "some(list, predicate)",
+            "some",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("predicate", Ty::Unknown)
+            ),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::List,
+            "every(list, predicate)",
+            "every",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("predicate", Ty::Unknown)
+            ),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::List,
+            "map(list, mapper)",
+            "map",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("mapper", Ty::Unknown)
+            ),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
+        func!(
+            FunctionCategory::List,
+            "flat(list)",
+            "flat",
+            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            Ty::List(Box::new(Ty::Unknown)),
+        ),
         // =========================
         // Special / Utility
         // =========================
-        FunctionSig {
-            name: "id".into(),
-            layout: ParamLayout::Flat(vec![ParamSig {
-                name: "page".into(),
-                ty: Ty::Unknown, // if you have Ty::Page, use it here
-                optional: true,
-                variadic: false,
-            }]),
-            ret: Ty::String,
-            detail: Some("id(page?)".into()),
-            category: FunctionCategory::Special,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "equal".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("equal(a, b)".into()),
-            category: FunctionCategory::Special,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "unequal".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "a".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "b".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Boolean,
-            detail: Some("unequal(a, b)".into()),
-            category: FunctionCategory::Special,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "let".into(),
+        func!(
+            FunctionCategory::Special,
+            "id(page?)",
+            "id",
+            params!(opt!(
+                "page",
+                // if you have Ty::Page, use it here
+                Ty::Unknown
+            )),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Special,
+            "equal(a, b)",
+            "equal",
+            params!(p!("a", Ty::Unknown), p!("b", Ty::Unknown)),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::Special,
+            "unequal(a, b)",
+            "unequal",
+            params!(p!("a", Ty::Unknown), p!("b", Ty::Unknown)),
+            Ty::Boolean,
+        ),
+        func!(
+            FunctionCategory::Special,
+            "let(var, value, expr)",
+            "let",
             // let(var, value, expr)
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "var".into(),
-                    ty: Ty::Unknown, // identifier slot
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "value".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "expr".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Unknown,
-            detail: Some("let(var, value, expr)".into()),
-            category: FunctionCategory::Special,
-            generics: vec![],
-        },
-        FunctionSig {
-            name: "lets".into(),
+            params!(
+                p!(
+                    "var",
+                    // identifier slot
+                    Ty::Unknown
+                ),
+                p!("value", Ty::Unknown),
+                p!("expr", Ty::Unknown)
+            ),
+            Ty::Unknown,
+        ),
+        func!(
+            FunctionCategory::Special,
+            "lets(var1, value1, ..., expr)",
+            "lets",
             // lets(a, v1, b, v2, ..., expr)
-            layout: ParamLayout::RepeatGroup {
-                head: vec![],
-                repeat: vec![
-                    ParamSig {
-                        name: "var".into(),
-                        ty: Ty::Unknown, // identifier slot
-                        optional: false,
-                        variadic: false,
-                    },
-                    ParamSig {
-                        name: "value".into(),
-                        ty: Ty::Unknown,
-                        optional: false,
-                        variadic: false,
-                    },
-                ],
-                tail: vec![ParamSig {
-                    name: "expr".into(),
-                    ty: Ty::Unknown,
-                    optional: false,
-                    variadic: false,
-                }],
-            },
-            ret: Ty::Unknown,
-            detail: Some("lets(var1, value1, ..., expr)".into()),
-            category: FunctionCategory::Special,
-            generics: vec![],
-        },
-    ];
-    builtins
+            repeat_params!(
+                head!(),
+                repeat!(
+                    p!(
+                        "var",
+                        // identifier slot
+                        Ty::Unknown
+                    ),
+                    p!("value", Ty::Unknown)
+                ),
+                tail!(p!("expr", Ty::Unknown)),
+            ),
+            Ty::Unknown,
+        ),
+    ]
 }
