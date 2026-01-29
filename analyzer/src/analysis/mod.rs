@@ -22,15 +22,36 @@ pub use type_hints::normalize_union;
 static POSTFIX_CAPABLE_BUILTIN_NAMES: LazyLock<HashSet<String>> = LazyLock::new(|| {
     builtins_functions()
         .into_iter()
-        // A builtin is postfix-capable if it has at least one non-receiver parameter.
-        // Postfix form: `receiver.fn(arg1, ...)` corresponds to `fn(receiver, arg1, ...)`.
-        .filter(|sig| sig.flat_params().is_some_and(|params| params.len() > 1))
+        .filter(is_postfix_capable)
         .map(|sig| sig.name)
         .collect()
 });
 
 pub fn postfix_capable_builtin_names() -> &'static HashSet<String> {
     &POSTFIX_CAPABLE_BUILTIN_NAMES
+}
+
+/// Returns true if `receiver.<name>(...)` can be treated as `<name>(receiver, ...)` deterministically.
+///
+/// This gate is used by:
+/// - the postfix-capable builtin allowlist
+/// - semantic inference for member calls
+/// - signature help postfix rendering
+pub fn is_postfix_capable(sig: &FunctionSig) -> bool {
+    // Postfix calls must have a deterministic "first parameter slot" and at least one additional
+    // parameter to be supplied inside `( ... )`.
+    //
+    // Deterministic first slot:
+    // - `head[0]` if head is non-empty
+    // - else `repeat[0]` if repeat is non-empty (repeat_min_groups is 1 in this repo)
+    // - else not postfix-capable (tail-only signatures are excluded by design)
+    if !sig.params.head.is_empty() {
+        return sig.display_params_len() >= 2;
+    }
+    if !sig.params.repeat.is_empty() {
+        return sig.display_params_len() >= 2;
+    }
+    false
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

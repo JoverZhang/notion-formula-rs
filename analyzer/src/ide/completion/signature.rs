@@ -396,71 +396,61 @@ pub(super) fn compute_signature_help_if_in_call(
     };
 
     let is_postfix_call = is_postfix_call().is_some();
-    let can_use_postfix_help =
-        is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str());
+    let can_use_postfix_help = is_postfix_call
+        && semantic::postfix_capable_builtin_names().contains(func.name.as_str())
+        && semantic::is_postfix_capable(func);
 
     let arg_tys =
         infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, can_use_postfix_help);
     let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
 
+    let mut full_call_ctx = call_ctx.clone();
     if can_use_postfix_help {
-        let params_all = func.flat_params()?;
-        let receiver = params_all.first().map(|p| {
-            let instantiated_expected = inst_param_tys.first().unwrap_or(&p.ty);
-            let actual = arg_tys.first().and_then(|t| t.as_ref());
-            let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-            format_param_sig(&p.name, ty, p.optional)
-        });
-        let params = params_all
-            .iter()
-            .skip(1)
-            .enumerate()
-            .map(|(idx, p)| {
-                let instantiated_expected = inst_param_tys.get(idx + 1).unwrap_or(&p.ty);
-                let actual = arg_tys.get(idx + 1).and_then(|t| t.as_ref());
-                let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-                format_param_sig(&p.name, ty, p.optional)
-            })
-            .collect::<Vec<_>>();
-
-        let label_params = params.join(", ");
-        let label = format!(
-            "{}({}) -> {}",
-            func.name,
-            label_params,
-            format_ty(&inst_ret)
-        );
-
-        let active_param = if params.is_empty() {
-            0
-        } else {
-            call_ctx.arg_index.min(params.len() - 1)
-        };
-
-        return Some(SignatureHelp {
-            receiver,
-            label,
-            params,
-            active_param,
-        });
+        // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
+        full_call_ctx.arg_index = full_call_ctx.arg_index.saturating_add(1);
     }
 
-    let total_args_for_shape = arg_tys.len().max(call_ctx.arg_index + 1);
-    let (label, params) = format_signature_display(
+    let total_args_for_shape = arg_tys.len().max(full_call_ctx.arg_index + 1);
+    let (full_label, full_params) = format_signature_display(
         func,
         arg_tys.as_slice(),
         total_args_for_shape,
         inst_param_tys.as_slice(),
         &inst_ret,
     );
+    let full_active_param = if full_params.is_empty() {
+        0
+    } else {
+        active_param_index(func, &full_call_ctx, total_args_for_shape).min(full_params.len() - 1)
+    };
+
+    if !can_use_postfix_help {
+        return Some(SignatureHelp {
+            receiver: None,
+            label: full_label,
+            params: full_params,
+            active_param: full_active_param,
+        });
+    }
+
+    // Postfix rendering is a presentation-only transformation: split off the receiver slot.
+    let receiver = full_params.first().cloned();
+    let params = full_params.into_iter().skip(1).collect::<Vec<_>>();
+    let label = format!("{}({}) -> {}", func.name, params.join(", "), format_ty(&inst_ret));
+
     let active_param = if params.is_empty() {
         0
     } else {
-        active_param_index(func, call_ctx, total_args_for_shape).min(params.len() - 1)
+        let shifted = if full_active_param == 0 {
+            0
+        } else {
+            full_active_param - 1
+        };
+        shifted.min(params.len() - 1)
     };
 
     Some(SignatureHelp {
-        receiver: None,
+        receiver,
         label,
         params,
         active_param,

@@ -106,6 +106,22 @@ fn signature_help_postfix_if_receiver_is_not_overridden_by_ill_typed_receiver() 
 }
 
 #[test]
+fn signature_help_postfix_ifs_uses_method_style_and_boolean_receiver() {
+    let c = ctx().build();
+
+    t("(1 == 1).ifs(42, \"42\"$0)")
+        .ctx(c.clone())
+        .expect_sig_receiver(Some("condition1: boolean"))
+        .expect_sig_label("ifs(value1: number, ..., default: string) -> number | string");
+
+    // Ill-typed receiver should not override the hard-constrained boolean receiver slot.
+    t("(1).ifs(42, \"42\"$0)")
+        .ctx(c)
+        .expect_sig_receiver(Some("condition1: boolean"))
+        .expect_sig_label("ifs(value1: number, ..., default: string) -> number | string");
+}
+
+#[test]
 fn signature_help_postfix_if_active_param_then_else() {
     let c = ctx().build();
 

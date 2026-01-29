@@ -131,3 +131,19 @@ TODO: restore `number[]` support once arrays exist.
 
 - `ifs(true, "42", false, 7, $0)` (total=5)
   - `activeParam`: `5` (default)
+
+## Postfix form (presentation-only)
+
+Member-call syntax is treated as a normal call internally:
+
+- `receiver.fn(arg1, ...)` is analyzed as `fn(receiver, arg1, ...)` for:
+  - semantic inference (types + diagnostics)
+  - signature help instantiation
+  - active parameter mapping
+
+Signature help output is then transformed only for rendering:
+
+- `signature_help.receiver` is the first formatted parameter slot
+- `signature_help.params` is the remaining slots
+- `signature_help.label` prints only `params` (return type unchanged)
+- `signature_help.active_param` is the “full call” active index shifted by `-1` (clamped), and never highlights `...`

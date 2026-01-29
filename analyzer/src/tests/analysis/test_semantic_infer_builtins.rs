@@ -73,6 +73,14 @@ fn semantic_ifs_variant_generic_propagates_unknown() {
 }
 
 #[test]
+fn semantic_member_call_ifs_is_equivalent_to_prefix_call() {
+    let ctx = builtins_ctx();
+    let a = infer_ok("(true).ifs(1, 2)", &ctx);
+    let b = infer_ok("ifs(true, 1, 2)", &ctx);
+    assert_eq!(a, b);
+}
+
+#[test]
 fn diagnostics_if_arity_error() {
     let ctx = builtins_ctx();
     assert_single_diag(

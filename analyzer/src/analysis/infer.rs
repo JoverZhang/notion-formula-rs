@@ -310,8 +310,7 @@ fn infer_expr_inner(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
                 Ty::Unknown
             } else {
                 let sig = ctx.functions.iter().find(|f| f.name == method.text);
-                let sig =
-                    sig.filter(|sig| sig.flat_params().is_some_and(|params| params.len() > 1));
+                let sig = sig.filter(|sig| super::is_postfix_capable(sig));
                 if sig.is_none() {
                     Ty::Unknown
                 } else {
