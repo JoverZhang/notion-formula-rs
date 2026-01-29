@@ -1,4 +1,4 @@
-use crate::semantic::{self, Context, FunctionCategory, Property, Ty};
+use crate::semantic::{self, Context, FunctionCategory, ParamLayout, Property, Ty};
 use crate::{Span, analyze};
 
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
@@ -25,43 +25,43 @@ fn ctx_with_builtins() -> Context {
     };
     ctx.functions.push(crate::semantic::FunctionSig {
         name: "if".into(),
-        params: vec![
+        layout: ParamLayout::Flat(vec![
             crate::semantic::ParamSig {
-                name: Some("condition".into()),
+                name: "condition".into(),
                 ty: Ty::Boolean,
                 optional: false,
                 variadic: false,
             },
             crate::semantic::ParamSig {
-                name: Some("then".into()),
+                name: "then".into(),
                 ty: Ty::Unknown,
                 optional: false,
                 variadic: false,
             },
             crate::semantic::ParamSig {
-                name: Some("else".into()),
+                name: "else".into(),
                 ty: Ty::Unknown,
                 optional: false,
                 variadic: false,
             },
-        ],
+        ]),
         ret: Ty::Unknown,
         detail: None,
-        min_args: 0,
         category: FunctionCategory::General,
+        generics: vec![],
     });
     ctx.functions.push(crate::semantic::FunctionSig {
         name: "sum".into(),
-        params: vec![crate::semantic::ParamSig {
-            name: Some("values".into()),
+        layout: ParamLayout::Flat(vec![crate::semantic::ParamSig {
+            name: "values".into(),
             ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
             optional: false,
             variadic: true,
-        }],
+        }]),
         ret: Ty::Number,
         detail: None,
-        min_args: 1,
         category: FunctionCategory::Number,
+        generics: vec![],
     });
     ctx
 }
@@ -129,7 +129,7 @@ fn test_if_cond_not_bool() {
     let diags = run_semantic("if(1, 1, 2)", ctx);
     assert_single_diag(
         diags,
-        "if() condition must be boolean",
+        "argument type mismatch: expected Boolean, got Number",
         Span { start: 3, end: 4 },
     );
 }

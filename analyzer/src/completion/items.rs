@@ -11,7 +11,7 @@ pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<Completio
                 Some(format!(
                     "{}({}) -> {}",
                     func.name,
-                    super::signature::format_param_list(&func.params),
+                    super::signature::format_param_list(func.display_params()),
                     super::signature::format_ty(&func.ret)
                 ))
             });

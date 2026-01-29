@@ -7,13 +7,19 @@ use std::sync::LazyLock;
 
 mod functions;
 pub use functions::builtins_functions;
+mod signature;
+pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamLayout, ParamSig};
+mod infer;
+pub use infer::{ExprId, TypeMap, infer_expr_with_map};
+mod type_hints;
+pub use type_hints::normalize_union;
 
 static POSTFIX_CAPABLE_BUILTIN_NAMES: LazyLock<HashSet<String>> = LazyLock::new(|| {
     builtins_functions()
         .into_iter()
         // A builtin is postfix-capable if it has at least one non-receiver parameter.
         // Postfix form: `receiver.fn(arg1, ...)` corresponds to `fn(receiver, arg1, ...)`.
-        .filter(|sig| sig.params.len() > 1)
+        .filter(|sig| sig.flat_params().is_some_and(|params| params.len() > 1))
         .map(|sig| sig.name)
         .collect()
 });
@@ -21,6 +27,12 @@ static POSTFIX_CAPABLE_BUILTIN_NAMES: LazyLock<HashSet<String>> = LazyLock::new(
 pub fn postfix_capable_builtin_names() -> &'static HashSet<String> {
     &POSTFIX_CAPABLE_BUILTIN_NAMES
 }
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(transparent)]
+pub struct GenericId(pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -31,6 +43,7 @@ pub enum Ty {
     Date,
     Null,
     Unknown,
+    Generic(GenericId),
     List(Box<Ty>),
     Union(Vec<Ty>),
 }
@@ -51,29 +64,14 @@ pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
     if matches!(expected, Ty::Unknown) || matches!(actual, Ty::Unknown) {
         return true;
     }
+    if matches!(expected, Ty::Generic(_)) || matches!(actual, Ty::Generic(_)) {
+        return true;
+    }
     match (expected, actual) {
         (Ty::Union(branches), actual) => branches.iter().any(|t| ty_accepts(t, actual)),
         (Ty::List(e), Ty::List(a)) => ty_accepts(e, a),
         _ => expected == actual,
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FunctionSig {
-    pub name: String,
-    pub params: Vec<ParamSig>,
-    pub ret: Ty,
-    pub detail: Option<String>,
-    pub min_args: usize,
-    pub category: FunctionCategory,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParamSig {
-    pub name: Option<String>,
-    pub ty: Ty,
-    pub optional: bool,
-    pub variadic: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,41 +88,6 @@ pub struct Context {
     pub functions: Vec<FunctionSig>,
 }
 
-impl FunctionSig {
-    pub fn is_variadic(&self) -> bool {
-        self.params.last().is_some_and(|p| p.variadic)
-    }
-
-    pub fn fixed_params_len(&self) -> usize {
-        if self.is_variadic() {
-            self.params.len().saturating_sub(1)
-        } else {
-            self.params.len()
-        }
-    }
-
-    pub fn effective_min_args(&self) -> usize {
-        if self.min_args > 0 {
-            return self.min_args;
-        }
-        if self.is_variadic() {
-            self.fixed_params_len()
-        } else {
-            self.params.len()
-        }
-    }
-
-    pub fn param_for_arg_index(&self, idx: usize) -> Option<&ParamSig> {
-        if idx < self.params.len() {
-            return self.params.get(idx);
-        }
-        if self.is_variadic() {
-            return self.params.last();
-        }
-        None
-    }
-}
-
 impl Context {
     pub fn lookup(&self, name: &str) -> Option<Ty> {
         self.properties
@@ -135,8 +98,12 @@ impl Context {
 }
 
 pub fn analyze_expr(expr: &Expr, ctx: &Context) -> (Ty, Vec<Diagnostic>) {
+    let mut map = TypeMap::default();
+    let ty = infer_expr_with_map(expr, ctx, &mut map);
+
     let mut diags = Vec::new();
-    let ty = analyze_expr_inner(expr, ctx, &mut diags);
+    validate_expr(expr, ctx, &map, &mut diags);
+
     (ty, diags)
 }
 
@@ -144,203 +111,77 @@ fn lookup_function<'a>(ctx: &'a Context, name: &str) -> Option<&'a FunctionSig> 
     ctx.functions.iter().find(|f| f.name == name)
 }
 
-fn analyze_expr_inner(expr: &Expr, ctx: &Context, diags: &mut Vec<Diagnostic>) -> Ty {
+fn validate_expr(expr: &Expr, ctx: &Context, map: &TypeMap, diags: &mut Vec<Diagnostic>) {
     match &expr.kind {
-        ExprKind::Lit(lit) => match lit.kind {
-            LitKind::Number => Ty::Number,
-            LitKind::String => Ty::String,
-            LitKind::Bool => Ty::Boolean,
-        },
-        ExprKind::Ident(_) => Ty::Unknown,
-        ExprKind::Group { inner } => analyze_expr_inner(inner, ctx, diags),
-        ExprKind::MemberCall {
-            receiver,
-            method,
-            args,
-        } => {
-            // Phase 8: minimal typing. For `.if(cond, otherwise)` we treat it like:
-            // `condition.if(then, else)` is treated like `if(condition, then, else)` (receiver is the `condition`).
-            if method.text == "if" && args.len() == 2 {
-                if lookup_function(ctx, "if").is_none() {
-                    let _ = analyze_expr_inner(receiver, ctx, diags);
-                    for arg in args {
-                        let _ = analyze_expr_inner(arg, ctx, diags);
-                    }
-                    emit_error(diags, expr.span, "unknown function: if");
-                    return Ty::Unknown;
-                }
-
-                let cond_ty = analyze_expr_inner(receiver, ctx, diags);
-                let then_ty = analyze_expr_inner(&args[0], ctx, diags);
-                let otherwise_ty = analyze_expr_inner(&args[1], ctx, diags);
-                if cond_ty != Ty::Unknown && cond_ty != Ty::Boolean {
-                    emit_error(diags, receiver.span, "if() condition must be boolean");
-                }
-                join_types(then_ty, otherwise_ty)
-            } else {
-                let _ = analyze_expr_inner(receiver, ctx, diags);
-                for arg in args {
-                    let _ = analyze_expr_inner(arg, ctx, diags);
-                }
-                Ty::Unknown
-            }
-        }
-        ExprKind::Unary { op, expr } => {
-            let inner_ty = analyze_expr_inner(expr, ctx, diags);
-            match op.node {
-                crate::ast::UnOpKind::Not => match inner_ty {
-                    Ty::Boolean => Ty::Boolean,
-                    _ => Ty::Unknown,
-                },
-                crate::ast::UnOpKind::Neg => match inner_ty {
-                    Ty::Number => Ty::Number,
-                    _ => Ty::Unknown,
-                },
-            }
-        }
-        ExprKind::Binary { op, left, right } => {
-            let left_ty = analyze_expr_inner(left, ctx, diags);
-            let right_ty = analyze_expr_inner(right, ctx, diags);
-            use crate::ast::BinOpKind::*;
-            match op.node {
-                Plus | Minus | Star | Slash | Percent | Caret => {
-                    if left_ty == Ty::Number && right_ty == Ty::Number {
-                        Ty::Number
-                    } else {
-                        Ty::Unknown
-                    }
-                }
-                AndAnd | OrOr => {
-                    if left_ty == Ty::Boolean && right_ty == Ty::Boolean {
-                        Ty::Boolean
-                    } else {
-                        Ty::Unknown
-                    }
-                }
-                Lt | Le | Ge | Gt => {
-                    if left_ty != Ty::Unknown && right_ty != Ty::Unknown {
-                        Ty::Boolean
-                    } else {
-                        Ty::Unknown
-                    }
-                }
-                EqEq | Ne => {
-                    if left_ty == right_ty && left_ty != Ty::Unknown {
-                        Ty::Boolean
-                    } else {
-                        Ty::Unknown
-                    }
-                }
-            }
+        ExprKind::Lit(_) | ExprKind::Ident(_) | ExprKind::Error => {}
+        ExprKind::Group { inner } => validate_expr(inner, ctx, map, diags),
+        ExprKind::Unary { expr, .. } => validate_expr(expr, ctx, map, diags),
+        ExprKind::Binary { left, right, .. } => {
+            validate_expr(left, ctx, map, diags);
+            validate_expr(right, ctx, map, diags);
         }
         ExprKind::Ternary {
             cond,
             then,
             otherwise,
         } => {
-            let _ = analyze_expr_inner(cond, ctx, diags);
-            let then_ty = analyze_expr_inner(then, ctx, diags);
-            let otherwise_ty = analyze_expr_inner(otherwise, ctx, diags);
-            join_types(then_ty, otherwise_ty)
+            validate_expr(cond, ctx, map, diags);
+            validate_expr(then, ctx, map, diags);
+            validate_expr(otherwise, ctx, map, diags);
         }
-        ExprKind::Call { callee, args } => match callee.text.as_str() {
-            "prop" => analyze_prop(expr, args, ctx, diags),
-            name => {
-                let Some(sig) = lookup_function(ctx, name) else {
-                    for arg in args {
-                        let _ = analyze_expr_inner(arg, ctx, diags);
-                    }
-                    emit_error(diags, expr.span, format!("unknown function: {}", name));
-                    return Ty::Unknown;
-                };
+        ExprKind::Call { callee, args } => {
+            for arg in args {
+                validate_expr(arg, ctx, map, diags);
+            }
 
-                match name {
-                    "if" => analyze_if(expr, args, ctx, diags),
-                    _ => analyze_call(expr, sig, args, ctx, diags),
+            match callee.text.as_str() {
+                "prop" => validate_prop_call(expr, args, ctx, diags),
+                name => {
+                    let Some(sig) = lookup_function(ctx, name) else {
+                        emit_error(diags, expr.span, format!("unknown function: {}", name));
+                        return;
+                    };
+                    validate_call(expr.span, name, sig, args, ctx, map, diags);
                 }
             }
-        },
-        ExprKind::Error => Ty::Unknown,
-    }
-}
-
-fn analyze_call(
-    expr: &Expr,
-    sig: &FunctionSig,
-    args: &[Expr],
-    ctx: &Context,
-    diags: &mut Vec<Diagnostic>,
-) -> Ty {
-    debug_assert!(
-        sig.params
-            .iter()
-            .take(sig.params.len().saturating_sub(1))
-            .all(|p| !p.variadic),
-        "only the last param may be variadic"
-    );
-
-    let mut arg_tys = Vec::with_capacity(args.len());
-    for arg in args {
-        arg_tys.push(analyze_expr_inner(arg, ctx, diags));
-    }
-
-    if sig.is_variadic() {
-        let required = sig.effective_min_args().max(sig.fixed_params_len());
-        if args.len() < required {
-            let plural = if required == 1 { "" } else { "s" };
-            emit_error(
-                diags,
-                expr.span,
-                format!(
-                    "{}() expects at least {} argument{}",
-                    sig.name, required, plural
-                ),
-            );
         }
-    } else if args.len() != sig.params.len() {
-        let expected = sig.params.len();
-        let plural = if expected == 1 { "" } else { "s" };
-        emit_error(
-            diags,
-            expr.span,
-            format!(
-                "{}() expects exactly {} argument{}",
-                sig.name, expected, plural
-            ),
-        );
-    }
-
-    for (idx, (arg, ty)) in args.iter().zip(arg_tys.iter()).enumerate() {
-        let Some(param) = sig.param_for_arg_index(idx) else {
-            continue;
-        };
-        if !ty_accepts(&param.ty, ty) {
-            if sig.name == "sum" {
-                emit_error(diags, arg.span, "sum() expects number arguments");
-            } else {
-                emit_error(
-                    diags,
-                    arg.span,
-                    format!(
-                        "argument type mismatch: expected {:?}, got {:?}",
-                        param.ty, ty
-                    ),
-                );
+        ExprKind::MemberCall {
+            receiver,
+            method,
+            args,
+        } => {
+            validate_expr(receiver, ctx, map, diags);
+            for arg in args {
+                validate_expr(arg, ctx, map, diags);
             }
+
+            let Some(sig) = lookup_function(ctx, method.text.as_str()) else {
+                return;
+            };
+
+            // Postfix form: `receiver.fn(arg1, ...)` is treated like `fn(receiver, arg1, ...)`.
+            if !postfix_capable_builtin_names().contains(sig.name.as_str()) {
+                return;
+            }
+            let Some(flat) = sig.flat_params() else {
+                return;
+            };
+            if flat.len() <= 1 {
+                return;
+            }
+
+            let mut all_args: Vec<Expr> = Vec::with_capacity(1 + args.len());
+            all_args.push((**receiver).clone());
+            all_args.extend(args.iter().cloned());
+            validate_call(expr.span, method.text.as_str(), sig, &all_args, ctx, map, diags);
         }
     }
-
-    sig.ret.clone()
 }
 
-fn analyze_prop(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnostic>) -> Ty {
-    for arg in args {
-        let _ = analyze_expr_inner(arg, ctx, diags);
-    }
-
+fn validate_prop_call(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnostic>) {
     if args.len() != 1 {
         emit_error(diags, expr.span, "prop() expects exactly 1 argument");
-        return Ty::Unknown;
+        return;
     }
 
     let arg = &args[0];
@@ -348,46 +189,170 @@ fn analyze_prop(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagn
         ExprKind::Lit(lit) if lit.kind == LitKind::String => lit.symbol.text.as_str(),
         _ => {
             emit_error(diags, arg.span, "prop() expects a string literal argument");
-            return Ty::Unknown;
+            return;
         }
     };
 
-    match ctx.lookup(name) {
-        Some(ty) => ty,
-        None => {
-            emit_error(diags, arg.span, format!("Unknown property: {}", name));
-            Ty::Unknown
+    if ctx.lookup(name).is_none() {
+        emit_error(diags, arg.span, format!("Unknown property: {}", name));
+    }
+}
+
+fn validate_call(
+    call_span: Span,
+    name: &str,
+    sig: &FunctionSig,
+    args: &[Expr],
+    _ctx: &Context,
+    map: &TypeMap,
+    diags: &mut Vec<Diagnostic>,
+) {
+    debug_assert!(
+        sig.flat_params().is_none()
+            || sig
+                .flat_params()
+                .is_some_and(|params| {
+                    params
+                        .iter()
+                        .take(params.len().saturating_sub(1))
+                        .all(|p| !p.variadic)
+                }),
+        "only the last param may be variadic"
+    );
+
+    validate_arity(call_span, name, sig, args.len(), diags);
+
+    for (idx, arg) in args.iter().enumerate() {
+        let Some(param) = param_for_arg_index_with_total(sig, idx, args.len()) else {
+            continue;
+        };
+        let actual = map.get(arg.id).cloned().unwrap_or(Ty::Unknown);
+        if !ty_accepts(&param.ty, &actual) {
+            if name == "sum" {
+                emit_error(diags, arg.span, "sum() expects number arguments");
+            } else {
+                emit_error(
+                    diags,
+                    arg.span,
+                    format!(
+                        "argument type mismatch: expected {:?}, got {:?}",
+                        param.ty, actual
+                    ),
+                );
+            }
         }
     }
 }
 
-fn analyze_if(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec<Diagnostic>) -> Ty {
-    if args.len() != 3 {
-        for arg in args {
-            let _ = analyze_expr_inner(arg, ctx, diags);
+fn validate_arity(call_span: Span, name: &str, sig: &FunctionSig, arg_len: usize, diags: &mut Vec<Diagnostic>) {
+    match &sig.layout {
+        ParamLayout::Flat(params) => {
+            if params.last().is_some_and(|p| p.variadic) {
+                let required = sig.required_min_args();
+                if arg_len < required {
+                    let plural = if required == 1 { "" } else { "s" };
+                    emit_error(
+                        diags,
+                        call_span,
+                        format!("{name}() expects at least {required} argument{plural}"),
+                    );
+                }
+                return;
+            }
+
+            let required = sig.required_min_args();
+            let max = params.len();
+            if required == max {
+                if arg_len != max {
+                    let plural = if max == 1 { "" } else { "s" };
+                    emit_error(
+                        diags,
+                        call_span,
+                        format!("{name}() expects exactly {max} argument{plural}"),
+                    );
+                }
+                return;
+            }
+
+            if arg_len < required {
+                let plural = if required == 1 { "" } else { "s" };
+                emit_error(
+                    diags,
+                    call_span,
+                    format!("{name}() expects at least {required} argument{plural}"),
+                );
+            } else if arg_len > max {
+                let plural = if max == 1 { "" } else { "s" };
+                emit_error(
+                    diags,
+                    call_span,
+                    format!("{name}() expects at most {max} argument{plural}"),
+                );
+            }
         }
-        emit_error(diags, expr.span, "if() expects exactly 3 arguments");
-        return Ty::Unknown;
+        ParamLayout::RepeatGroup { head, repeat, tail } => {
+            let head_len = head.len();
+            let repeat_len = repeat.len();
+            let tail_len = tail.len();
+
+            let required = sig.required_min_args();
+            if arg_len < required {
+                let plural = if required == 1 { "" } else { "s" };
+                emit_error(
+                    diags,
+                    call_span,
+                    format!("{name}() expects at least {required} argument{plural}"),
+                );
+                return;
+            }
+
+            if arg_len < head_len + tail_len {
+                emit_error(diags, call_span, format!("{name}() has an invalid argument shape"));
+                return;
+            }
+
+            if repeat_len > 0 {
+                let middle = arg_len - head_len - tail_len;
+                if middle % repeat_len != 0 {
+                    emit_error(diags, call_span, format!("{name}() has an invalid argument shape"));
+                }
+            }
+        }
     }
-
-    let cond_ty = analyze_expr_inner(&args[0], ctx, diags);
-    let then_ty = analyze_expr_inner(&args[1], ctx, diags);
-    let otherwise_ty = analyze_expr_inner(&args[2], ctx, diags);
-
-    if cond_ty != Ty::Unknown && cond_ty != Ty::Boolean {
-        emit_error(diags, args[0].span, "if() condition must be boolean");
-    }
-
-    join_types(then_ty, otherwise_ty)
 }
 
-fn join_types(a: Ty, b: Ty) -> Ty {
-    if a == Ty::Unknown || b == Ty::Unknown {
-        Ty::Unknown
-    } else if a == b {
-        a
-    } else {
-        Ty::Unknown
+fn param_for_arg_index_with_total(sig: &FunctionSig, idx: usize, total: usize) -> Option<&ParamSig> {
+    match &sig.layout {
+        ParamLayout::Flat(params) => {
+            if idx < params.len() {
+                return params.get(idx);
+            }
+            if params.last().is_some_and(|p| p.variadic) {
+                return params.last();
+            }
+            None
+        }
+        ParamLayout::RepeatGroup { head, repeat, tail } => {
+            let head_len = head.len();
+            let tail_len = tail.len();
+            let tail_start = if total >= head_len + tail_len {
+                total - tail_len
+            } else {
+                total
+            };
+
+            if idx < head_len {
+                return head.get(idx);
+            }
+            if idx >= tail_start {
+                return tail.get(idx - tail_start);
+            }
+            if repeat.is_empty() {
+                return None;
+            }
+            let idx = idx - head_len;
+            repeat.get(idx % repeat.len())
+        }
     }
 }
 
