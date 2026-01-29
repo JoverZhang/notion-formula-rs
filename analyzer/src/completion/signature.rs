@@ -10,9 +10,12 @@ pub(super) struct CallContext {
     pub(super) arg_index: usize,
 }
 
-pub(super) fn format_param_list(params: &[semantic::ParamSig]) -> String {
+pub(super) fn format_param_list<'a, I>(params: I) -> String
+where
+    I: IntoIterator<Item = &'a semantic::ParamSig>,
+{
     params
-        .iter()
+        .into_iter()
         .map(|param| {
             let mut label = format_ty(&param.ty);
             if param.optional {
@@ -32,6 +35,7 @@ pub(super) fn format_ty(ty: &semantic::Ty) -> String {
         semantic::Ty::Date => "date".into(),
         semantic::Ty::Null => "null".into(),
         semantic::Ty::Unknown => "unknown".into(),
+        semantic::Ty::Generic(id) => format!("T{}", id.0),
         semantic::Ty::List(inner) => format!("{}[]", format_ty(inner)),
         semantic::Ty::Union(types) => types.iter().map(format_ty).collect::<Vec<_>>().join(" | "),
     }
@@ -42,15 +46,15 @@ fn format_param_sig(param: &semantic::ParamSig) -> String {
     if param.optional {
         ty.push('?');
     }
-    if let Some(name) = &param.name {
-        format!("{name}: {ty}")
-    } else {
-        ty
-    }
+    format!("{}: {ty}", param.name)
 }
 
 fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
-    let params = sig.params.iter().map(format_param_sig).collect::<Vec<_>>();
+    let display_params = sig.display_params();
+    let params = display_params
+        .into_iter()
+        .map(format_param_sig)
+        .collect::<Vec<_>>();
     let mut label_params = params.join(", ");
     if sig.is_variadic() {
         if !label_params.is_empty() {
@@ -58,7 +62,12 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
         }
         label_params.push_str("...");
     }
-    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
+    let label = format!(
+        "{}({}) -> {}",
+        sig.name,
+        label_params,
+        format_ty(&sig.ret)
+    );
     (label, params)
 }
 
@@ -103,9 +112,9 @@ pub(super) fn compute_signature_help_if_in_call(
 
     let is_postfix_call = is_postfix_call().is_some();
     if is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str()) {
-        let receiver = func.params.first().map(format_param_sig);
-        let params = func
-            .params
+        let params_all = func.flat_params()?;
+        let receiver = params_all.first().map(format_param_sig);
+        let params = params_all
             .iter()
             .skip(1)
             .map(format_param_sig)
@@ -118,12 +127,7 @@ pub(super) fn compute_signature_help_if_in_call(
             }
             label_params.push_str("...");
         }
-        let label = format!(
-            "{}({}) -> {}",
-            func.name,
-            label_params,
-            format_ty(&func.ret)
-        );
+        let label = format!("{}({}) -> {}", func.name, label_params, format_ty(&func.ret));
 
         let active_param = if params.is_empty() {
             0

@@ -58,9 +58,9 @@ fn signature_help_postfix_if_label_format() {
     t("true.if($0, 1)")
         .ctx(c)
         .expect_sig_receiver(Some("condition: boolean"))
-        .expect_sig_params(&["then: unknown", "else: unknown"])
+        .expect_sig_params(&["then: T0", "else: T0"])
         .expect_sig_active(0)
-        .expect_sig_label("if(then: unknown, else: unknown) -> unknown");
+        .expect_sig_label("if(then: T0, else: T0) -> T0");
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn signature_help_normal_if_has_no_receiver_and_includes_all_params() {
     t("if($0")
         .ctx(c)
         .expect_sig_receiver(None)
-        .expect_sig_params(&["condition: boolean", "then: unknown", "else: unknown"]);
+        .expect_sig_params(&["condition: boolean", "then: T0", "else: T0"]);
 }
 
 #[test]
@@ -88,4 +88,38 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
         .expect_sig_receiver(None)
         .expect_sig_label("sum(values: number | number[], ...) -> number")
         .expect_sig_label_not_contains(").sum(");
+}
+
+#[test]
+fn signature_help_if_overrides_params_and_ret_union() {
+    let c = ctx().build();
+    t("if(true, 1, \"x\"$0)")
+        .ctx(c)
+        .expect_sig_params(&["condition: boolean", "then: T0", "else: T0"])
+        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
+}
+
+#[test]
+fn signature_help_if_return_prefers_known_branch_over_unknown() {
+    let c = ctx().build();
+    t("if(true, \"x\", $0")
+        .ctx(c)
+        .expect_sig_params(&["condition: boolean", "then: T0", "else: T0"])
+        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
+}
+
+#[test]
+fn signature_help_if_nested_then_type_affects_ret_union() {
+    let c = ctx().build();
+    t("if(true, if(true, 1, 2), \"x\"$0)")
+        .ctx(c)
+        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
+}
+
+#[test]
+fn signature_help_if_union_order_is_deterministic() {
+    let c = ctx().build();
+    t("if(true, \"x\", 1$0)")
+        .ctx(c)
+        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
 }

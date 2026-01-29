@@ -43,30 +43,25 @@ pub(super) fn complete(
     }
 
     let call_ctx = super::signature::detect_call_context(tokens.as_slice(), cursor_u32);
-    let signature_help = super::signature::compute_signature_help_if_in_call(
-        tokens.as_slice(),
-        cursor_u32,
-        ctx,
-        call_ctx.as_ref(),
-    );
-    let in_string =
-        super::position::cursor_strictly_inside_string_literal(tokens.as_slice(), cursor_u32);
-    let position_kind = if in_string {
-        PositionKind::None
-    } else {
-        super::position::detect_position_kind(tokens.as_slice(), cursor_u32, ctx, call_ctx.as_ref())
+
+    let compute = |tokens: &[Token]| {
+        let signature_help =
+            super::signature::compute_signature_help_if_in_call(tokens, cursor_u32, ctx, call_ctx.as_ref());
+        let in_string =
+            super::position::cursor_strictly_inside_string_literal(tokens, cursor_u32);
+        let position_kind = if in_string {
+            PositionKind::None
+        } else {
+            super::position::detect_position_kind(tokens, cursor_u32, ctx, call_ctx.as_ref())
+        };
+
+        let mut output = complete_for_position(position_kind, ctx, tokens, cursor_u32, call_ctx.as_ref());
+        output.signature_help = signature_help;
+
+        super::rank::finalize_output(text, output, config, position_kind)
     };
 
-    let mut output = complete_for_position(
-        position_kind,
-        ctx,
-        tokens.as_slice(),
-        cursor_u32,
-        call_ctx.as_ref(),
-    );
-    output.signature_help = signature_help;
-
-    super::rank::finalize_output(text, output, config, position_kind)
+    compute(tokens.as_slice())
 }
 
 fn complete_for_position(
