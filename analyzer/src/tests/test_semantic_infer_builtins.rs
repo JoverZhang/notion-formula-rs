@@ -9,7 +9,11 @@ fn infer_ok(source: &str, ctx: &Context) -> Ty {
         output.diagnostics
     );
     let (ty, diags) = semantic::analyze_expr(&output.expr, ctx);
-    assert!(diags.is_empty(), "unexpected semantic diagnostics: {:?}", diags);
+    assert!(
+        diags.is_empty(),
+        "unexpected semantic diagnostics: {:?}",
+        diags
+    );
     ty
 }
 
@@ -93,4 +97,3 @@ fn diagnostics_ifs_repeat_shape_error() {
         Span { start: 0, end: 22 },
     );
 }
-

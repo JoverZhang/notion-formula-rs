@@ -27,4 +27,3 @@ fn normalize_union_collapses_single_member() {
 fn normalize_union_empty_is_unknown() {
     assert_eq!(normalize_union(std::iter::empty()), Ty::Unknown);
 }
-

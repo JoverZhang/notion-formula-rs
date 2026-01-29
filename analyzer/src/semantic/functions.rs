@@ -1,6 +1,6 @@
 use super::{
-    FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamLayout, ParamSig,
-    Ty,
+    FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamLayout,
+    ParamSig, Ty,
 };
 
 pub fn builtins_functions() -> Vec<FunctionSig> {

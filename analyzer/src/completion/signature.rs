@@ -62,12 +62,7 @@ fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
         }
         label_params.push_str("...");
     }
-    let label = format!(
-        "{}({}) -> {}",
-        sig.name,
-        label_params,
-        format_ty(&sig.ret)
-    );
+    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
     (label, params)
 }
 
@@ -127,7 +122,12 @@ pub(super) fn compute_signature_help_if_in_call(
             }
             label_params.push_str("...");
         }
-        let label = format!("{}({}) -> {}", func.name, label_params, format_ty(&func.ret));
+        let label = format!(
+            "{}({}) -> {}",
+            func.name,
+            label_params,
+            format_ty(&func.ret)
+        );
 
         let active_param = if params.is_empty() {
             0

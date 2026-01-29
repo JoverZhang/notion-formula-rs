@@ -29,13 +29,21 @@ fn registry_for(sig: &FunctionSig) -> GenericRegistry {
 }
 
 fn bind_generic(subst: &mut Subst, registry: &GenericRegistry, id: GenericId, actual: &Ty) {
-    let kind = registry.get(&id).copied().unwrap_or(GenericParamKind::Plain);
+    let kind = registry
+        .get(&id)
+        .copied()
+        .unwrap_or(GenericParamKind::Plain);
 
     let mut to_add: Vec<Ty> = Vec::new();
     match (kind, actual) {
         (_, Ty::Unknown) => return,
         (GenericParamKind::Variant, Ty::Union(members)) => {
-            to_add.extend(members.iter().filter(|t| !matches!(t, Ty::Unknown)).cloned());
+            to_add.extend(
+                members
+                    .iter()
+                    .filter(|t| !matches!(t, Ty::Unknown))
+                    .cloned(),
+            );
         }
         (GenericParamKind::Variant, other) => {
             if !matches!(other, Ty::Unknown) {
@@ -182,7 +190,8 @@ fn infer_expr_inner(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
                 Ty::Unknown
             } else {
                 let sig = ctx.functions.iter().find(|f| f.name == method.text);
-                let sig = sig.filter(|sig| sig.flat_params().is_some_and(|params| params.len() > 1));
+                let sig =
+                    sig.filter(|sig| sig.flat_params().is_some_and(|params| params.len() > 1));
                 if sig.is_none() {
                     Ty::Unknown
                 } else {

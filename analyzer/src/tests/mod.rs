@@ -18,11 +18,11 @@ mod test_errors;
 #[cfg(test)]
 mod test_format_idempotence;
 #[cfg(test)]
+mod test_generic_infer;
+#[cfg(test)]
 mod test_invariants;
 #[cfg(test)]
 mod test_lexer;
-#[cfg(test)]
-mod test_generic_infer;
 #[cfg(test)]
 mod test_normalize_union;
 #[cfg(test)]

@@ -18,7 +18,7 @@ fn normalize_union_impl(members: impl IntoIterator<Item = Ty>) -> Option<Ty> {
         }
     }
 
-    unique.sort_by(|a, b| ty_sort_key(a).cmp(&ty_sort_key(b)));
+    unique.sort_by_key(ty_sort_key);
 
     match unique.len() {
         0 => None,

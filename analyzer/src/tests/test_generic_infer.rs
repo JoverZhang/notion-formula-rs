@@ -1,8 +1,8 @@
+use crate::analyze;
 use crate::semantic::{
     Context, FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamLayout,
     ParamSig, Ty, TypeMap, infer_expr_with_map,
 };
-use crate::analyze;
 
 fn infer(source: &str, ctx: &Context) -> (Ty, TypeMap, crate::ast::Expr) {
     let output = analyze(source).unwrap();
@@ -154,4 +154,3 @@ fn variant_generic_skips_unknown_when_accumulating_union() {
     let (ty, _, _) = infer("ifs(true, 1, false, x, \"a\")", &ctx);
     assert_eq!(ty, Ty::Union(vec![Ty::Number, Ty::String]));
 }
-

@@ -55,7 +55,9 @@ impl FunctionSig {
     pub fn display_params_len(&self) -> usize {
         match &self.layout {
             ParamLayout::Flat(params) => params.len(),
-            ParamLayout::RepeatGroup { head, repeat, tail } => head.len() + repeat.len() + tail.len(),
+            ParamLayout::RepeatGroup { head, repeat, tail } => {
+                head.len() + repeat.len() + tail.len()
+            }
         }
     }
 
@@ -116,7 +118,11 @@ impl FunctionSig {
                 }
                 None
             }
-            ParamLayout::RepeatGroup { head, repeat, tail: _ } => {
+            ParamLayout::RepeatGroup {
+                head,
+                repeat,
+                tail: _,
+            } => {
                 // Best-effort mapping without knowing total arg count (completion/sighelp).
                 if idx < head.len() {
                     return head.get(idx);

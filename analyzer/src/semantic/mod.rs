@@ -28,9 +28,7 @@ pub fn postfix_capable_builtin_names() -> &'static HashSet<String> {
     &POSTFIX_CAPABLE_BUILTIN_NAMES
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GenericId(pub u32);
 
@@ -173,7 +171,15 @@ fn validate_expr(expr: &Expr, ctx: &Context, map: &TypeMap, diags: &mut Vec<Diag
             let mut all_args: Vec<Expr> = Vec::with_capacity(1 + args.len());
             all_args.push((**receiver).clone());
             all_args.extend(args.iter().cloned());
-            validate_call(expr.span, method.text.as_str(), sig, &all_args, ctx, map, diags);
+            validate_call(
+                expr.span,
+                method.text.as_str(),
+                sig,
+                &all_args,
+                ctx,
+                map,
+                diags,
+            );
         }
     }
 }
@@ -209,14 +215,12 @@ fn validate_call(
 ) {
     debug_assert!(
         sig.flat_params().is_none()
-            || sig
-                .flat_params()
-                .is_some_and(|params| {
-                    params
-                        .iter()
-                        .take(params.len().saturating_sub(1))
-                        .all(|p| !p.variadic)
-                }),
+            || sig.flat_params().is_some_and(|params| {
+                params
+                    .iter()
+                    .take(params.len().saturating_sub(1))
+                    .all(|p| !p.variadic)
+            }),
         "only the last param may be variadic"
     );
 
@@ -244,7 +248,13 @@ fn validate_call(
     }
 }
 
-fn validate_arity(call_span: Span, name: &str, sig: &FunctionSig, arg_len: usize, diags: &mut Vec<Diagnostic>) {
+fn validate_arity(
+    call_span: Span,
+    name: &str,
+    sig: &FunctionSig,
+    arg_len: usize,
+    diags: &mut Vec<Diagnostic>,
+) {
     match &sig.layout {
         ParamLayout::Flat(params) => {
             if params.last().is_some_and(|p| p.variadic) {
@@ -307,21 +317,33 @@ fn validate_arity(call_span: Span, name: &str, sig: &FunctionSig, arg_len: usize
             }
 
             if arg_len < head_len + tail_len {
-                emit_error(diags, call_span, format!("{name}() has an invalid argument shape"));
+                emit_error(
+                    diags,
+                    call_span,
+                    format!("{name}() has an invalid argument shape"),
+                );
                 return;
             }
 
             if repeat_len > 0 {
                 let middle = arg_len - head_len - tail_len;
-                if middle % repeat_len != 0 {
-                    emit_error(diags, call_span, format!("{name}() has an invalid argument shape"));
+                if !middle.is_multiple_of(repeat_len) {
+                    emit_error(
+                        diags,
+                        call_span,
+                        format!("{name}() has an invalid argument shape"),
+                    );
                 }
             }
         }
     }
 }
 
-fn param_for_arg_index_with_total(sig: &FunctionSig, idx: usize, total: usize) -> Option<&ParamSig> {
+fn param_for_arg_index_with_total(
+    sig: &FunctionSig,
+    idx: usize,
+    total: usize,
+) -> Option<&ParamSig> {
     match &sig.layout {
         ParamLayout::Flat(params) => {
             if idx < params.len() {
