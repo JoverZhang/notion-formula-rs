@@ -406,11 +406,9 @@ pub(super) fn compute_signature_help_if_in_call(
     if can_use_postfix_help {
         let params_all = func.flat_params()?;
         let receiver = params_all.first().map(|p| {
-            let ty = arg_tys
-                .first()
-                .and_then(|t| t.as_ref())
-                .or_else(|| inst_param_tys.first())
-                .unwrap_or(&p.ty);
+            let instantiated_expected = inst_param_tys.first().unwrap_or(&p.ty);
+            let actual = arg_tys.first().and_then(|t| t.as_ref());
+            let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
             format_param_sig(&p.name, ty, p.optional)
         });
         let params = params_all
@@ -418,11 +416,9 @@ pub(super) fn compute_signature_help_if_in_call(
             .skip(1)
             .enumerate()
             .map(|(idx, p)| {
-                let ty = arg_tys
-                    .get(idx + 1)
-                    .and_then(|t| t.as_ref())
-                    .or_else(|| inst_param_tys.get(idx + 1))
-                    .unwrap_or(&p.ty);
+                let instantiated_expected = inst_param_tys.get(idx + 1).unwrap_or(&p.ty);
+                let actual = arg_tys.get(idx + 1).and_then(|t| t.as_ref());
+                let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
                 format_param_sig(&p.name, ty, p.optional)
             })
             .collect::<Vec<_>>();

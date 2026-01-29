@@ -92,6 +92,20 @@ fn signature_help_postfix_if_label_format() {
 }
 
 #[test]
+fn signature_help_postfix_if_receiver_is_not_overridden_by_ill_typed_receiver() {
+    let c = ctx().build();
+    t("(1).if(42, \"42\"$0)")
+        .ctx(c.clone())
+        .expect_sig_receiver(Some("condition: boolean"))
+        .expect_sig_label("if(then: number, else: string) -> number | string");
+
+    t("(1 == 1).if(42, \"42\"$0)")
+        .ctx(c)
+        .expect_sig_receiver(Some("condition: boolean"))
+        .expect_sig_label("if(then: number, else: string) -> number | string");
+}
+
+#[test]
 fn signature_help_postfix_if_active_param_then_else() {
     let c = ctx().build();
 
