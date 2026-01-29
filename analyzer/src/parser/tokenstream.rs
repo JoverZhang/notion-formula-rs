@@ -1,8 +1,33 @@
+//! Parser-facing token stream accessors.
+//!
+//! The parser consumes a lexer-produced token stream while skipping trivia for syntactic
+//! decisions. This module also provides **read-only** token query helpers used by formatter and
+//! IDE utilities.
+//!
+//! **Canonical invariants**
+//! - Token spans are [`crate::lexer::Span`] values: **UTF-8 byte offsets** into the original
+//!   source string, using half-open semantics `[start, end)`.
+//! - The token stream includes trivia (comments/newlines) and an explicit EOF token.
+//! - `TokenQuery` is the canonical "neighbor/trivia scanning" API; avoid ad-hoc index arithmetic
+//!   elsewhere so trivia/EOF/empty-span edge cases stay consistent.
+//!
+//! **Read-this-first entry points**
+//! - [`TokenCursor`]: the mutable parser cursor over a token stream.
+//! - [`TokenQuery`]: read-only helpers for span→range and trivia-aware neighbor scans.
+
 use crate::lexer::{Span, Token, TokenIdx, TokenKind, TokenRange, tokens_in_span};
 
+/// A mutable cursor over a token stream for parsing.
+///
+/// The parser maintains `pos` as a boundary index into `tokens` and advances it as tokens are
+/// consumed. Parser methods generally skip trivia when looking at the "current" token, but the
+/// underlying stream retains trivia for diagnostics and formatting.
 pub struct TokenCursor<'a> {
+    /// The original source string that token spans index into.
     pub source: &'a str,
+    /// Tokens in source order, including trivia and an explicit EOF token.
     pub tokens: Vec<Token>,
+    /// Current boundary index into `tokens` used by the parser.
     pub pos: usize,
 }
 
@@ -30,6 +55,7 @@ pub struct TokenQuery<'a> {
 }
 
 impl<'a> TokenQuery<'a> {
+    /// Construct a query view over a token slice (which typically includes trivia + EOF).
     pub fn new(tokens: &'a [Token]) -> Self {
         Self { tokens }
     }
@@ -176,6 +202,7 @@ impl<'a> TokenQuery<'a> {
 }
 
 impl<'a> TokenCursor<'a> {
+    /// Construct a cursor at the start of `tokens`.
     pub fn new(source: &'a str, tokens: Vec<Token>) -> Self {
         TokenCursor {
             source,

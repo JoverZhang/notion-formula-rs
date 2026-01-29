@@ -14,7 +14,13 @@ impl<'a> SourceMap<'a> {
         Self { src, line_starts }
     }
 
-    /// Returns (line, col), both 1-based.
+    /// Returns `(line, col)`, both 1-based.
+    ///
+    /// `byte` is interpreted as a UTF-8 byte offset into `src` and is clamped down to the nearest
+    /// valid UTF-8 char boundary (never panics).
+    ///
+    /// `col` is computed as the number of Rust `char`s (Unicode scalar values) from the start of
+    /// the line to the clamped position.
     pub fn line_col(&self, byte: u32) -> (usize, usize) {
         let b = clamp_to_char_boundary(self.src, byte as usize);
         let line_idx = match self.line_starts.binary_search(&b) {

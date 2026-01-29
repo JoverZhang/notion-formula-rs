@@ -1,6 +1,19 @@
-/// JS/editor boundary uses UTF-16 code units (CodeMirror positions).
+//! UTF-16 ↔ UTF-8 offset conversions for the WASM/JS boundary.
+//!
+//! The core analyzer indexes `&str` by **UTF-8 byte offsets**, while editors/JS typically use
+//! **UTF-16 code unit offsets**.
+//!
+//! Conversions are deterministic:
+//! - out-of-range inputs are clamped
+//! - non-boundary inputs are floored to the nearest valid Unicode scalar boundary
+//! - functions never panic
+
+/// Convert a UTF-16 code unit offset into a UTF-8 byte offset.
 ///
-/// All offsets/ranges are half-open `[start, end)`; `end` is exclusive.
+/// - `utf16` is measured in UTF-16 code units.
+/// - If `utf16` is out of range, it is clamped to the UTF-16 length of `source`.
+/// - If `utf16` falls inside a scalar's UTF-16 encoding, it is floored to that scalar's start
+///   (a Rust `char` boundary).
 pub fn utf16_offset_to_byte(source: &str, utf16: usize) -> usize {
     let utf16_len = source.encode_utf16().count();
     let utf16 = utf16.min(utf16_len);
@@ -16,8 +29,7 @@ pub fn utf16_offset_to_byte(source: &str, utf16: usize) -> usize {
         }
 
         let next = u16_count.saturating_add(ch.len_utf16());
-        // If `utf16` falls inside a surrogate pair (or otherwise inside this scalar's UTF-16
-        // encoding), floor to the start of this Unicode scalar (a Rust `char` boundary).
+        // If `utf16` falls inside this scalar's UTF-16 encoding, floor to the scalar start.
         if next > utf16 {
             return byte_idx;
         }
@@ -27,10 +39,11 @@ pub fn utf16_offset_to_byte(source: &str, utf16: usize) -> usize {
     source.len()
 }
 
-/// Converts a byte offset into a UTF-16 code-unit offset (CodeMirror positions).
+/// Convert a UTF-8 byte offset into a UTF-16 code unit offset.
 ///
-/// If `byte` is not a char boundary (i.e. inside a UTF-8 codepoint), it is floored to the
-/// previous Unicode scalar boundary.
+/// - `byte` is measured in UTF-8 bytes.
+/// - If `byte` is not a UTF-8 char boundary, it is floored to the previous boundary.
+/// - If `byte` is out of range, the returned offset is the UTF-16 length of `source`.
 pub fn byte_offset_to_utf16_offset(source: &str, byte: usize) -> u32 {
     if byte == 0 {
         return 0;
@@ -59,7 +72,7 @@ mod tests {
     use super::{byte_offset_to_utf16_offset, utf16_offset_to_byte};
 
     #[test]
-    fn utf16_offset_to_byte_floors_inside_surrogate_pair() {
+    fn utf16_offset_to_byte_floors_inside_scalar_encoding() {
         let source = "😀a";
         // Inside the emoji's surrogate pair => floor to emoji start (byte 0).
         assert_eq!(utf16_offset_to_byte(source, 1), 0);
@@ -73,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn byte_offset_to_utf16_offset_floors_inside_utf8_codepoint() {
+    fn byte_offset_to_utf16_offset_floors_inside_utf8_encoding() {
         let source = "😀a";
         // Byte 1 is inside the emoji's UTF-8 encoding => floor to UTF-16 offset 0.
         assert_eq!(byte_offset_to_utf16_offset(source, 1), 0);

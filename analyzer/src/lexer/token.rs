@@ -1,3 +1,18 @@
+//! Lexer token model and span/range helpers.
+//!
+//! The lexer produces a linear token stream over the original source text.
+//!
+//! **Canonical invariants**
+//! - [`Span`] uses **UTF-8 byte offsets** into the original source string.
+//! - Spans and token ranges are **half-open**: `[start, end)` (inclusive start, exclusive end).
+//! - The lexer emits an explicit [`TokenKind::Eof`] token whose span is empty at end-of-input.
+//!
+//! **Read-this-first entry points**
+//! - [`Span`]: byte-offset span invariant shared across the analyzer.
+//! - [`TokenRange`]: half-open token-index range used by query APIs.
+//! - [`tokens_in_span`]: maps a byte span to the intersecting token index range (with stable
+//!   insertion-point behavior for empty spans).
+
 pub type NodeId = u32;
 pub type TokenIdx = u32;
 
@@ -17,12 +32,19 @@ pub struct Span {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A half-open range of token indices `[lo, hi)`.
+///
+/// This is the canonical "token slice" type used by query helpers (notably the parser's
+/// `TokenQuery`).
 pub struct TokenRange {
-    pub lo: TokenIdx, // inclusive
-    pub hi: TokenIdx, // exclusive
+    /// Inclusive lower bound.
+    pub lo: TokenIdx,
+    /// Exclusive upper bound.
+    pub hi: TokenIdx,
 }
 
 impl TokenRange {
+    /// Construct a token range `[lo, hi)`.
     pub fn new(lo: TokenIdx, hi: TokenIdx) -> Self {
         Self { lo, hi }
     }
@@ -125,6 +147,9 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Clone)]
+/// A token with its source span.
+///
+/// `span` is a byte offset range into the original source (`[start, end)`).
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
@@ -186,6 +211,11 @@ impl TokenKind {
 /// - The lexer emits an EOF token with an empty span at the end of the input.
 /// - Because EOF has an empty span, non-empty query spans will not intersect it, so it is naturally excluded.
 /// - For empty query spans, the returned insertion point may be the EOF token index (e.g. at end-of-input).
+///
+/// Insertion point semantics for empty spans:
+/// - When `span.start >= span.end`, this returns `idx..idx` where `idx` is the first token whose
+///   `Token::span.start >= span.start` (i.e. the place a new token would be inserted without
+///   breaking source order). This may be `tokens.len() - 1` when the EOF token is present.
 ///
 /// ASCII example (byte offsets shown as *boundary indices*; ASCII-only illustration):
 /// ```text
