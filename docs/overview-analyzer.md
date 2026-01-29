@@ -46,7 +46,7 @@ Core modules:
 ### Core span model (Rust)
 
 - `Span { start: u32, end: u32 }` in `analyzer/src/token.rs`
-- Represents **byte offsets**
+- Represents **UTF-8 byte offsets** into the original source string (safe to slice as `&source[start..end]`).
 - Half-open semantics: `[start, end)`
 
 ### Span → TokenRange
@@ -126,6 +126,10 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
 - Semantic analysis is inference-first:
   - `infer_expr_with_map(expr, ctx, &mut TypeMap)` computes a `TypeMap` of `ExprId`/`NodeId -> Ty`.
   - `analyze_expr` returns the inferred root type and emits diagnostics by comparing inferred argument types to builtin signatures (arity + expected types).
+    - Validation is arity/shape-first: if a call has an arity/shape error, the analyzer emits that single diagnostic and **does not** emit additional per-argument type mismatch diagnostics for the same call.
+  - Type acceptance (`ty_accepts` in `analyzer/src/semantic/mod.rs`):
+    - `Unknown` is permissive (either side being `Unknown` accepts).
+    - `Ty::Generic(_)` is only a wildcard on the **expected** side (generic *inferred actuals* do not silently pass validation).
 - `prop("Name")` is **special-cased** in the semantic analyzer (it is not a `FunctionSig`):
   - expects exactly 1 argument
   - argument must be a string literal
@@ -160,12 +164,18 @@ Completion (`analyzer/src/completion/mod.rs`, ranking/matching in `analyzer/src/
 - When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
 - `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
-  - Signature help displays `FunctionSig` types as-is (including `T0`/`T1` for generics); it does not re-run semantic inference to “hint” call-site types.
+  - Signature help is display-only: it shows the `FunctionSig` shape as-is (generics remain `T0`, `T1`, etc).
   - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin, signature help models the receiver separately:
     - `receiver`: formatted first parameter (`<receiver_param>`)
     - `label`: `<callee>(<remaining_params>[, ...]) -> <ret>`
     - `params`: the remaining parameters only (for flat layouts, this is the parameter list excluding the first “receiver” param)
     - `active_param` indexes into `params` only (excluding receiver).
+  - Repeat-group layouts (`ParamLayout::RepeatGroup`) are pretty-printed as a pattern:
+    - head params once
+    - repeat params twice (numbered: `condition1/value1`, `condition2/value2`)
+    - `...`
+    - tail params once
+    - Example: `ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: number) -> number`
 
 ---
 

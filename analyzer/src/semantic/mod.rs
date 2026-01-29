@@ -62,7 +62,9 @@ pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
     if matches!(expected, Ty::Unknown) || matches!(actual, Ty::Unknown) {
         return true;
     }
-    if matches!(expected, Ty::Generic(_)) || matches!(actual, Ty::Generic(_)) {
+    // Generics wildcard only when the *expected* side is generic.
+    // The inferred "actual" type being Generic(...) must not silently pass validation.
+    if matches!(expected, Ty::Generic(_)) {
         return true;
     }
     match (expected, actual) {
@@ -224,7 +226,9 @@ fn validate_call(
         "only the last param may be variadic"
     );
 
-    validate_arity(call_span, name, sig, args.len(), diags);
+    if !validate_arity(call_span, name, sig, args.len(), diags) {
+        return;
+    }
 
     for (idx, arg) in args.iter().enumerate() {
         let Some(param) = param_for_arg_index_with_total(sig, idx, args.len()) else {
@@ -248,13 +252,17 @@ fn validate_call(
     }
 }
 
+/// Returns `true` when the call has a valid arity/shape for `sig`.
+///
+/// On invalid arity/shape, this function emits exactly one error diagnostic and returns `false`
+/// so callers can early-return without producing cascading diagnostics.
 fn validate_arity(
     call_span: Span,
     name: &str,
     sig: &FunctionSig,
     arg_len: usize,
     diags: &mut Vec<Diagnostic>,
-) {
+) -> bool {
     match &sig.layout {
         ParamLayout::Flat(params) => {
             if params.last().is_some_and(|p| p.variadic) {
@@ -266,8 +274,9 @@ fn validate_arity(
                         call_span,
                         format!("{name}() expects at least {required} argument{plural}"),
                     );
+                    return false;
                 }
-                return;
+                return true;
             }
 
             let required = sig.required_min_args();
@@ -280,8 +289,9 @@ fn validate_arity(
                         call_span,
                         format!("{name}() expects exactly {max} argument{plural}"),
                     );
+                    return false;
                 }
-                return;
+                return true;
             }
 
             if arg_len < required {
@@ -291,6 +301,7 @@ fn validate_arity(
                     call_span,
                     format!("{name}() expects at least {required} argument{plural}"),
                 );
+                return false;
             } else if arg_len > max {
                 let plural = if max == 1 { "" } else { "s" };
                 emit_error(
@@ -298,7 +309,10 @@ fn validate_arity(
                     call_span,
                     format!("{name}() expects at most {max} argument{plural}"),
                 );
+                return false;
             }
+
+            true
         }
         ParamLayout::RepeatGroup { head, repeat, tail } => {
             let head_len = head.len();
@@ -313,7 +327,7 @@ fn validate_arity(
                     call_span,
                     format!("{name}() expects at least {required} argument{plural}"),
                 );
-                return;
+                return false;
             }
 
             if arg_len < head_len + tail_len {
@@ -322,7 +336,7 @@ fn validate_arity(
                     call_span,
                     format!("{name}() has an invalid argument shape"),
                 );
-                return;
+                return false;
             }
 
             if repeat_len > 0 {
@@ -333,8 +347,11 @@ fn validate_arity(
                         call_span,
                         format!("{name}() has an invalid argument shape"),
                     );
+                    return false;
                 }
             }
+
+            true
         }
     }
 }

@@ -7,6 +7,10 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A half-open span (`[start, end)`) in the original source string, using **UTF-8 byte offsets**.
+///
+/// Invariant: `start`/`end` must be valid UTF-8 slice boundaries so that `&source[start..end]`
+/// is always safe (no panics) when `source` is the same string that was lexed/parsed.
 pub struct Span {
     pub start: u32,
     pub end: u32,

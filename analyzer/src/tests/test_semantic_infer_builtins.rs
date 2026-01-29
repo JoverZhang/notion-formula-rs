@@ -97,3 +97,14 @@ fn diagnostics_ifs_repeat_shape_error() {
         Span { start: 0, end: 22 },
     );
 }
+
+#[test]
+fn diagnostics_ifs_shape_error_short_circuits_type_mismatches() {
+    let ctx = builtins_ctx();
+    assert_single_diag(
+        "ifs(true, 1, \"x\", 2)",
+        &ctx,
+        "ifs() has an invalid argument shape",
+        Span { start: 0, end: 20 },
+    );
+}

@@ -81,6 +81,16 @@ fn signature_help_normal_if_has_no_receiver_and_includes_all_params() {
 }
 
 #[test]
+fn signature_help_ifs_repeat_group_label_format() {
+    let c = ctx().build();
+    t("ifs(true, 1, false, 2, 3$0)")
+        .ctx(c)
+        .expect_sig_label(
+            "ifs(condition1: boolean, value1: T0, condition2: boolean, value2: T0, ..., default: T0) -> T0",
+        );
+}
+
+#[test]
 fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
     let c = ctx().build();
     t("true.sum($0")
@@ -88,38 +98,4 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
         .expect_sig_receiver(None)
         .expect_sig_label("sum(values: number | number[], ...) -> number")
         .expect_sig_label_not_contains(").sum(");
-}
-
-#[test]
-fn signature_help_if_overrides_params_and_ret_union() {
-    let c = ctx().build();
-    t("if(true, 1, \"x\"$0)")
-        .ctx(c)
-        .expect_sig_params(&["condition: boolean", "then: T0", "else: T0"])
-        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
-}
-
-#[test]
-fn signature_help_if_return_prefers_known_branch_over_unknown() {
-    let c = ctx().build();
-    t("if(true, \"x\", $0")
-        .ctx(c)
-        .expect_sig_params(&["condition: boolean", "then: T0", "else: T0"])
-        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
-}
-
-#[test]
-fn signature_help_if_nested_then_type_affects_ret_union() {
-    let c = ctx().build();
-    t("if(true, if(true, 1, 2), \"x\"$0)")
-        .ctx(c)
-        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
-}
-
-#[test]
-fn signature_help_if_union_order_is_deterministic() {
-    let c = ctx().build();
-    t("if(true, \"x\", 1$0)")
-        .ctx(c)
-        .expect_sig_label("if(condition: boolean, then: T0, else: T0) -> T0");
 }

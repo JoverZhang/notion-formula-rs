@@ -100,8 +100,10 @@ impl FunctionSig {
             ParamLayout::RepeatGroup { head, repeat, tail } => {
                 // By design, RepeatGroup layouts represent "at least one repeat" plus the fixed
                 // head/tail.
-                let head_required = head.iter().take_while(|p| !p.optional).count();
-                let tail_required = tail.iter().take_while(|p| !p.optional).count();
+                // Count required params defensively even if a signature accidentally places
+                // required params after an optional one (a previous take_while() would undercount).
+                let head_required = head.iter().filter(|p| !p.optional).count();
+                let tail_required = tail.iter().filter(|p| !p.optional).count();
                 head_required + repeat.len() + tail_required
             }
         }

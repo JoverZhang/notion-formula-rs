@@ -1,4 +1,6 @@
-use crate::semantic::{self, Context, FunctionCategory, ParamLayout, Property, Ty};
+use crate::semantic::{
+    self, Context, FunctionCategory, FunctionSig, GenericId, ParamLayout, ParamSig, Property, Ty,
+};
 use crate::{Span, analyze};
 
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
@@ -202,4 +204,101 @@ fn test_sum_accepts_number_list_property() {
     });
     let diags = run_semantic("sum(prop(\"Nums\"))", ctx);
     assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
+}
+
+#[test]
+fn validate_call_does_not_wildcard_inferred_actual_generic() {
+    let output = analyze("foo(prop(\"x\"))").unwrap();
+    assert!(
+        output.diagnostics.is_empty(),
+        "unexpected parser diagnostics: {:?}",
+        output.diagnostics
+    );
+
+    let args = match &output.expr.kind {
+        crate::ast::ExprKind::Call { args, .. } => args,
+        other => panic!("expected Call expr, got {:?}", other),
+    };
+    let arg_span = args[0].span;
+
+    let sig = FunctionSig {
+        name: "foo".into(),
+        layout: ParamLayout::Flat(vec![ParamSig {
+            name: "x".into(),
+            ty: Ty::Number,
+            optional: false,
+            variadic: false,
+        }]),
+        ret: Ty::Number,
+        detail: None,
+        category: FunctionCategory::General,
+        generics: vec![],
+    };
+
+    let ctx = Context {
+        properties: vec![Property {
+            name: "x".into(),
+            ty: Ty::Generic(GenericId(0)),
+            disabled_reason: None,
+        }],
+        functions: vec![sig],
+    };
+
+    let (_, diags) = semantic::analyze_expr(&output.expr, &ctx);
+
+    assert_eq!(diags.len(), 1, "unexpected diagnostics: {:?}", diags);
+    assert!(diags[0].message.contains("argument type mismatch"));
+    assert!(diags[0].message.contains("expected"));
+    assert!(diags[0].message.contains("Number"));
+    assert!(diags[0].message.contains("Generic"));
+    assert_eq!(diags[0].span, arg_span);
+}
+
+#[test]
+fn required_min_args_repeat_group_counts_all_non_optional_in_head_and_tail() {
+    let sig = FunctionSig {
+        name: "rg".into(),
+        layout: ParamLayout::RepeatGroup {
+            head: vec![
+                ParamSig {
+                    name: "h_opt".into(),
+                    ty: Ty::Number,
+                    optional: true,
+                    variadic: false,
+                },
+                ParamSig {
+                    name: "h_req".into(),
+                    ty: Ty::Number,
+                    optional: false,
+                    variadic: false,
+                },
+            ],
+            repeat: vec![ParamSig {
+                name: "r".into(),
+                ty: Ty::Number,
+                optional: false,
+                variadic: false,
+            }],
+            tail: vec![
+                ParamSig {
+                    name: "t_opt".into(),
+                    ty: Ty::Number,
+                    optional: true,
+                    variadic: false,
+                },
+                ParamSig {
+                    name: "t_req".into(),
+                    ty: Ty::Number,
+                    optional: false,
+                    variadic: false,
+                },
+            ],
+        },
+        ret: Ty::Number,
+        detail: None,
+        category: FunctionCategory::General,
+        generics: vec![],
+    };
+
+    assert_eq!(sig.required_min_args(), 3);
 }

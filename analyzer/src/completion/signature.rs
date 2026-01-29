@@ -41,29 +41,68 @@ pub(super) fn format_ty(ty: &semantic::Ty) -> String {
     }
 }
 
-fn format_param_sig(param: &semantic::ParamSig) -> String {
+fn format_param_sig(name: &str, param: &semantic::ParamSig) -> String {
     let mut ty = format_ty(&param.ty);
     if param.optional {
         ty.push('?');
     }
-    format!("{}: {ty}", param.name)
+    format!("{name}: {ty}")
 }
 
 fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
-    let display_params = sig.display_params();
-    let params = display_params
-        .into_iter()
-        .map(format_param_sig)
-        .collect::<Vec<_>>();
-    let mut label_params = params.join(", ");
-    if sig.is_variadic() {
-        if !label_params.is_empty() {
-            label_params.push_str(", ");
+    match &sig.layout {
+        semantic::ParamLayout::Flat(params) => {
+            let params = params
+                .iter()
+                .map(|p| format_param_sig(&p.name, p))
+                .collect::<Vec<_>>();
+
+            let mut label_params = params.join(", ");
+            if sig.is_variadic() {
+                if !label_params.is_empty() {
+                    label_params.push_str(", ");
+                }
+                label_params.push_str("...");
+            }
+
+            let label = format!(
+                "{}({}) -> {}",
+                sig.name,
+                label_params,
+                format_ty(&sig.ret)
+            );
+            (label, params)
         }
-        label_params.push_str("...");
+        semantic::ParamLayout::RepeatGroup { head, repeat, tail } => {
+            let mut params = Vec::<String>::new();
+            params.extend(
+                head.iter()
+                    .map(|p| format_param_sig(&p.name, p)),
+            );
+
+            // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
+            for n in 1..=2 {
+                for p in repeat {
+                    let name = format!("{}{}", p.name, n);
+                    params.push(format_param_sig(&name, p));
+                }
+            }
+            params.push("...".into());
+            params.extend(
+                tail.iter()
+                    .map(|p| format_param_sig(&p.name, p)),
+            );
+
+            let label_params = params.join(", ");
+            let label = format!(
+                "{}({}) -> {}",
+                sig.name,
+                label_params,
+                format_ty(&sig.ret)
+            );
+            (label, params)
+        }
     }
-    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
-    (label, params)
 }
 
 /// Only compute signature help if the cursor is inside a function call argument context
@@ -106,13 +145,14 @@ pub(super) fn compute_signature_help_if_in_call(
     };
 
     let is_postfix_call = is_postfix_call().is_some();
+
     if is_postfix_call && semantic::postfix_capable_builtin_names().contains(func.name.as_str()) {
         let params_all = func.flat_params()?;
-        let receiver = params_all.first().map(format_param_sig);
+        let receiver = params_all.first().map(|p| format_param_sig(&p.name, p));
         let params = params_all
             .iter()
             .skip(1)
-            .map(format_param_sig)
+            .map(|p| format_param_sig(&p.name, p))
             .collect::<Vec<_>>();
 
         let mut label_params = params.join(", ");
