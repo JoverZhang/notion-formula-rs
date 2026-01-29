@@ -10,23 +10,6 @@ pub(super) struct CallContext {
     pub(super) arg_index: usize,
 }
 
-pub(super) fn format_param_list<'a, I>(params: I) -> String
-where
-    I: IntoIterator<Item = &'a semantic::ParamSig>,
-{
-    params
-        .into_iter()
-        .map(|param| {
-            let mut label = format_ty(&param.ty);
-            if param.optional {
-                label.push('?');
-            }
-            label
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
 pub(super) fn format_ty(ty: &semantic::Ty) -> String {
     match ty {
         semantic::Ty::Number => "number".into(),
@@ -50,43 +33,36 @@ fn format_param_sig(name: &str, param: &semantic::ParamSig) -> String {
 }
 
 fn format_signature(sig: &semantic::FunctionSig) -> (String, Vec<String>) {
-    match &sig.layout {
-        semantic::ParamLayout::Flat(params) => {
-            let params = params
-                .iter()
-                .map(|p| format_param_sig(&p.name, p))
-                .collect::<Vec<_>>();
+    if sig.params.repeat.is_empty() {
+        let params = sig
+            .params
+            .head
+            .iter()
+            .chain(sig.params.tail.iter())
+            .map(|p| format_param_sig(&p.name, p))
+            .collect::<Vec<_>>();
 
-            let mut label_params = params.join(", ");
-            if sig.is_variadic() {
-                if !label_params.is_empty() {
-                    label_params.push_str(", ");
-                }
-                label_params.push_str("...");
-            }
+        let label_params = params.join(", ");
+        let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
+        return (label, params);
+    }
 
-            let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
-            (label, params)
-        }
-        semantic::ParamLayout::RepeatGroup { head, repeat, tail } => {
-            let mut params = Vec::<String>::new();
-            params.extend(head.iter().map(|p| format_param_sig(&p.name, p)));
+    let mut params = Vec::<String>::new();
+    params.extend(sig.params.head.iter().map(|p| format_param_sig(&p.name, p)));
 
-            // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
-            for n in 1..=2 {
-                for p in repeat {
-                    let name = format!("{}{}", p.name, n);
-                    params.push(format_param_sig(&name, p));
-                }
-            }
-            params.push("...".into());
-            params.extend(tail.iter().map(|p| format_param_sig(&p.name, p)));
-
-            let label_params = params.join(", ");
-            let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
-            (label, params)
+    // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
+    for n in 1..=2 {
+        for p in &sig.params.repeat {
+            let name = format!("{}{}", p.name, n);
+            params.push(format_param_sig(&name, p));
         }
     }
+    params.push("...".into());
+    params.extend(sig.params.tail.iter().map(|p| format_param_sig(&p.name, p)));
+
+    let label_params = params.join(", ");
+    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(&sig.ret));
+    (label, params)
 }
 
 /// Only compute signature help if the cursor is inside a function call argument context
@@ -139,13 +115,7 @@ pub(super) fn compute_signature_help_if_in_call(
             .map(|p| format_param_sig(&p.name, p))
             .collect::<Vec<_>>();
 
-        let mut label_params = params.join(", ");
-        if func.is_variadic() {
-            if !label_params.is_empty() {
-                label_params.push_str(", ");
-            }
-            label_params.push_str("...");
-        }
+        let label_params = params.join(", ");
         let label = format!(
             "{}({}) -> {}",
             func.name,

@@ -217,17 +217,6 @@ fn validate_call(
     map: &TypeMap,
     diags: &mut Vec<Diagnostic>,
 ) {
-    debug_assert!(
-        sig.flat_params().is_none()
-            || sig.flat_params().is_some_and(|params| {
-                params
-                    .iter()
-                    .take(params.len().saturating_sub(1))
-                    .all(|p| !p.variadic)
-            }),
-        "only the last param may be variadic"
-    );
-
     if !validate_arity(call_span, name, sig, args.len(), diags) {
         return;
     }
@@ -265,97 +254,71 @@ fn validate_arity(
     arg_len: usize,
     diags: &mut Vec<Diagnostic>,
 ) -> bool {
-    match &sig.layout {
-        ParamLayout::Flat(params) => {
-            if params.last().is_some_and(|p| p.variadic) {
-                let required = sig.required_min_args();
-                if arg_len < required {
-                    let plural = if required == 1 { "" } else { "s" };
-                    emit_error(
-                        diags,
-                        call_span,
-                        format!("{name}() expects at least {required} argument{plural}"),
-                    );
-                    return false;
-                }
-                return true;
-            }
+    let required = sig.required_min_args();
+    let head_len = sig.params.head.len();
+    let repeat_len = sig.params.repeat.len();
+    let tail_len = sig.params.tail.len();
 
-            let required = sig.required_min_args();
-            let max = params.len();
-            if required == max {
-                if arg_len != max {
-                    let plural = if max == 1 { "" } else { "s" };
-                    emit_error(
-                        diags,
-                        call_span,
-                        format!("{name}() expects exactly {max} argument{plural}"),
-                    );
-                    return false;
-                }
-                return true;
-            }
-
-            if arg_len < required {
-                let plural = if required == 1 { "" } else { "s" };
-                emit_error(
-                    diags,
-                    call_span,
-                    format!("{name}() expects at least {required} argument{plural}"),
-                );
-                return false;
-            } else if arg_len > max {
+    // Fixed arity: no repeat group.
+    if repeat_len == 0 {
+        let max = head_len + tail_len;
+        if required == max {
+            if arg_len != max {
                 let plural = if max == 1 { "" } else { "s" };
                 emit_error(
                     diags,
                     call_span,
-                    format!("{name}() expects at most {max} argument{plural}"),
+                    format!("{name}() expects exactly {max} argument{plural}"),
                 );
                 return false;
             }
-
-            true
+            return true;
         }
-        ParamLayout::RepeatGroup { head, repeat, tail } => {
-            let head_len = head.len();
-            let repeat_len = repeat.len();
-            let tail_len = tail.len();
 
-            let required = sig.required_min_args();
-            if arg_len < required {
-                let plural = if required == 1 { "" } else { "s" };
-                emit_error(
-                    diags,
-                    call_span,
-                    format!("{name}() expects at least {required} argument{plural}"),
-                );
-                return false;
-            }
-
-            if arg_len < head_len + tail_len {
-                emit_error(
-                    diags,
-                    call_span,
-                    format!("{name}() has an invalid argument shape"),
-                );
-                return false;
-            }
-
-            if repeat_len > 0 {
-                let middle = arg_len - head_len - tail_len;
-                if !middle.is_multiple_of(repeat_len) {
-                    emit_error(
-                        diags,
-                        call_span,
-                        format!("{name}() has an invalid argument shape"),
-                    );
-                    return false;
-                }
-            }
-
-            true
+        if arg_len < required {
+            let plural = if required == 1 { "" } else { "s" };
+            emit_error(
+                diags,
+                call_span,
+                format!("{name}() expects at least {required} argument{plural}"),
+            );
+            return false;
         }
+
+        if arg_len > max {
+            let plural = if max == 1 { "" } else { "s" };
+            emit_error(
+                diags,
+                call_span,
+                format!("{name}() expects at most {max} argument{plural}"),
+            );
+            return false;
+        }
+
+        return true;
     }
+
+    // Repeat-group: head + (repeat group 1+) + tail (tail may be partially present if optional).
+    if arg_len < required {
+        let plural = if required == 1 { "" } else { "s" };
+        emit_error(
+            diags,
+            call_span,
+            format!("{name}() expects at least {required} argument{plural}"),
+        );
+        return false;
+    }
+
+    if resolve_repeat_tail_used(&sig.params, arg_len).is_none() {
+        emit_error(
+            diags,
+            call_span,
+            format!("{name}() has an invalid argument shape"),
+        );
+        return false;
+    }
+
+    true
 }
 
 fn param_for_arg_index_with_total(
@@ -363,38 +326,65 @@ fn param_for_arg_index_with_total(
     idx: usize,
     total: usize,
 ) -> Option<&ParamSig> {
-    match &sig.layout {
-        ParamLayout::Flat(params) => {
-            if idx < params.len() {
-                return params.get(idx);
-            }
-            if params.last().is_some_and(|p| p.variadic) {
-                return params.last();
-            }
-            None
+    if sig.params.repeat.is_empty() {
+        if idx < sig.params.head.len() {
+            return sig.params.head.get(idx);
         }
-        ParamLayout::RepeatGroup { head, repeat, tail } => {
-            let head_len = head.len();
-            let tail_len = tail.len();
-            let tail_start = if total >= head_len + tail_len {
-                total - tail_len
-            } else {
-                total
-            };
+        return sig
+            .params
+            .tail
+            .get(idx.saturating_sub(sig.params.head.len()));
+    }
 
-            if idx < head_len {
-                return head.get(idx);
-            }
-            if idx >= tail_start {
-                return tail.get(idx - tail_start);
-            }
-            if repeat.is_empty() {
-                return None;
-            }
-            let idx = idx - head_len;
-            repeat.get(idx % repeat.len())
+    let head_len = sig.params.head.len();
+    let tail_used = resolve_repeat_tail_used(&sig.params, total)?;
+    let tail_start = total.saturating_sub(tail_used);
+
+    if idx < head_len {
+        return sig.params.head.get(idx);
+    }
+    if idx >= tail_start {
+        return sig.params.tail.get(idx - tail_start);
+    }
+
+    let idx = idx.saturating_sub(head_len);
+    sig.params.repeat.get(idx % sig.params.repeat.len())
+}
+
+fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
+    if params.repeat.is_empty() {
+        return Some(params.tail.len());
+    }
+
+    let head_len = params.head.len();
+    if total < head_len {
+        return None;
+    }
+
+    let repeat_len = params.repeat.len();
+    let tail_min = required_tail_prefix_len(&params.tail);
+
+    for tail_used in (tail_min..=params.tail.len()).rev() {
+        if total < head_len + tail_used {
+            continue;
+        }
+        let middle = total - head_len - tail_used;
+        if middle >= repeat_len && middle.is_multiple_of(repeat_len) {
+            return Some(tail_used);
         }
     }
+
+    None
+}
+
+fn required_tail_prefix_len(tail: &[ParamSig]) -> usize {
+    let mut required = 0usize;
+    for (idx, p) in tail.iter().enumerate() {
+        if !p.optional {
+            required = idx + 1;
+        }
+    }
+    required
 }
 
 fn emit_error(diags: &mut Vec<Diagnostic>, span: Span, message: impl Into<String>) {

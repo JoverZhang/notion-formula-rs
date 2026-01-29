@@ -47,9 +47,9 @@ fn signature_help_only_inside_call() {
 #[test]
 fn signature_help_label_sum_union_variadic() {
     let c = ctx().build();
-    t("sum($0")
-        .ctx(c)
-        .expect_sig_label("sum(values: number | number[], ...) -> number");
+    t("sum($0").ctx(c).expect_sig_label(
+        "sum(values1: number | number[], values2: number | number[], ...) -> number",
+    );
 }
 
 #[test]
@@ -96,6 +96,8 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
     t("true.sum($0")
         .ctx(c)
         .expect_sig_receiver(None)
-        .expect_sig_label("sum(values: number | number[], ...) -> number")
+        .expect_sig_label(
+            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+        )
         .expect_sig_label_not_contains(").sum(");
 }

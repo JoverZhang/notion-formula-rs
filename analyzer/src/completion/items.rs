@@ -7,14 +7,7 @@ pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<Completio
         items.extend(prop_variable_items(ctx));
         items.extend(builtin_expr_start_items());
         items.extend(ctx.functions.iter().map(|func| {
-            let detail = func.detail.clone().or_else(|| {
-                Some(format!(
-                    "{}({}) -> {}",
-                    func.name,
-                    super::signature::format_param_list(func.display_params()),
-                    super::signature::format_ty(&func.ret)
-                ))
-            });
+            let detail = Some(func.detail.clone());
             CompletionItem {
                 label: func.name.clone(),
                 kind: CompletionKind::Function,

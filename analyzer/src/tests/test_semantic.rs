@@ -1,7 +1,23 @@
 use crate::semantic::{
-    self, Context, FunctionCategory, FunctionSig, GenericId, ParamLayout, ParamSig, Property, Ty,
+    self, Context, FunctionCategory, FunctionSig, GenericId, ParamShape, ParamSig, Property, Ty,
 };
 use crate::{Span, analyze};
+
+fn p(name: &str, ty: Ty) -> ParamSig {
+    ParamSig {
+        name: name.into(),
+        ty,
+        optional: false,
+    }
+}
+
+fn opt(name: &str, ty: Ty) -> ParamSig {
+    ParamSig {
+        name: name.into(),
+        ty,
+        optional: true,
+    }
+}
 
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
     let output = analyze(source).unwrap();
@@ -25,46 +41,37 @@ fn ctx_with_builtins() -> Context {
         properties: vec![],
         functions: vec![],
     };
-    ctx.functions.push(crate::semantic::FunctionSig {
-        name: "if".into(),
-        layout: ParamLayout::Flat(vec![
-            crate::semantic::ParamSig {
-                name: "condition".into(),
-                ty: Ty::Boolean,
-                optional: false,
-                variadic: false,
-            },
-            crate::semantic::ParamSig {
-                name: "then".into(),
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            },
-            crate::semantic::ParamSig {
-                name: "else".into(),
-                ty: Ty::Unknown,
-                optional: false,
-                variadic: false,
-            },
-        ]),
-        ret: Ty::Unknown,
-        detail: None,
-        category: FunctionCategory::General,
-        generics: vec![],
-    });
-    ctx.functions.push(crate::semantic::FunctionSig {
-        name: "sum".into(),
-        layout: ParamLayout::Flat(vec![crate::semantic::ParamSig {
-            name: "values".into(),
-            ty: Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
-            optional: false,
-            variadic: true,
-        }]),
-        ret: Ty::Number,
-        detail: None,
-        category: FunctionCategory::Number,
-        generics: vec![],
-    });
+    ctx.functions.push(FunctionSig::new(
+        FunctionCategory::General,
+        "if(condition, then, else)",
+        "if",
+        ParamShape::new(
+            vec![
+                p("condition", Ty::Boolean),
+                p("then", Ty::Unknown),
+                p("else", Ty::Unknown),
+            ],
+            vec![],
+            vec![],
+        ),
+        Ty::Unknown,
+        vec![],
+    ));
+    ctx.functions.push(FunctionSig::new(
+        FunctionCategory::Number,
+        "sum(number|number[], ...)",
+        "sum",
+        ParamShape::new(
+            vec![],
+            vec![p(
+                "values",
+                Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
+            )],
+            vec![],
+        ),
+        Ty::Number,
+        vec![],
+    ));
     ctx
 }
 
@@ -223,15 +230,10 @@ fn validate_call_does_not_wildcard_inferred_actual_generic() {
 
     let sig = FunctionSig {
         name: "foo".into(),
-        layout: ParamLayout::Flat(vec![ParamSig {
-            name: "x".into(),
-            ty: Ty::Number,
-            optional: false,
-            variadic: false,
-        }]),
+        params: ParamShape::new(vec![p("x", Ty::Number)], vec![], vec![]),
         ret: Ty::Number,
-        detail: None,
         category: FunctionCategory::General,
+        detail: "foo(x)".into(),
         generics: vec![],
     };
 
@@ -258,45 +260,14 @@ fn validate_call_does_not_wildcard_inferred_actual_generic() {
 fn required_min_args_repeat_group_counts_all_non_optional_in_head_and_tail() {
     let sig = FunctionSig {
         name: "rg".into(),
-        layout: ParamLayout::RepeatGroup {
-            head: vec![
-                ParamSig {
-                    name: "h_opt".into(),
-                    ty: Ty::Number,
-                    optional: true,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "h_req".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ],
-            repeat: vec![ParamSig {
-                name: "r".into(),
-                ty: Ty::Number,
-                optional: false,
-                variadic: false,
-            }],
-            tail: vec![
-                ParamSig {
-                    name: "t_opt".into(),
-                    ty: Ty::Number,
-                    optional: true,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "t_req".into(),
-                    ty: Ty::Number,
-                    optional: false,
-                    variadic: false,
-                },
-            ],
-        },
+        params: ParamShape::new(
+            vec![opt("h_opt", Ty::Number), p("h_req", Ty::Number)],
+            vec![p("r", Ty::Number)],
+            vec![p("t_req", Ty::Number), opt("t_opt", Ty::Number)],
+        ),
         ret: Ty::Number,
-        detail: None,
         category: FunctionCategory::General,
+        detail: "rg(...)".into(),
         generics: vec![],
     };
 

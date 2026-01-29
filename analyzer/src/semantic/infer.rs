@@ -2,7 +2,7 @@ use crate::ast::{Expr, ExprKind};
 use crate::token::{LitKind, NodeId};
 use std::collections::HashMap;
 
-use super::{Context, FunctionSig, GenericId, GenericParamKind, ParamLayout, Ty, normalize_union};
+use super::{Context, FunctionSig, GenericId, GenericParamKind, Ty, normalize_union};
 
 pub type ExprId = NodeId;
 
@@ -247,55 +247,65 @@ fn infer_call(
     let registry = registry_for(sig);
     let mut subst = Subst::new();
 
-    match &sig.layout {
-        ParamLayout::Flat(params) => {
-            if params.is_empty() {
-                // Nothing to bind.
-            } else if params.last().is_some_and(|p| p.variadic) {
-                let variadic_idx = params.len().saturating_sub(1);
-                for (idx, actual) in arg_tys.iter().enumerate() {
-                    let param = if idx < variadic_idx {
-                        &params[idx]
-                    } else {
-                        &params[variadic_idx]
-                    };
-                    unify(&mut subst, &registry, &param.ty, actual);
-                }
-            } else {
-                for (param, actual) in params.iter().zip(arg_tys.iter()) {
-                    unify(&mut subst, &registry, &param.ty, actual);
-                }
-            }
+    if sig.params.repeat.is_empty() {
+        let params = sig.params.head.iter().chain(sig.params.tail.iter());
+        for (param, actual) in params.zip(arg_tys.iter()) {
+            unify(&mut subst, &registry, &param.ty, actual);
         }
-        ParamLayout::RepeatGroup { head, repeat, tail } => {
-            let head_len = head.len();
-            let tail_len = tail.len();
-            let tail_start = if arg_tys.len() >= head_len + tail_len {
-                arg_tys.len() - tail_len
+    } else {
+        let head_len = sig.params.head.len();
+        let tail_used =
+            resolve_repeat_tail_used(sig, arg_tys.len()).unwrap_or(sig.params.tail.len());
+        let tail_start = arg_tys.len().saturating_sub(tail_used);
+
+        for (idx, actual) in arg_tys.iter().enumerate() {
+            let expected = if idx < head_len {
+                sig.params.head.get(idx)
+            } else if idx >= tail_start {
+                sig.params.tail.get(idx - tail_start)
             } else {
-                arg_tys.len()
+                let r_idx = (idx - head_len) % sig.params.repeat.len();
+                sig.params.repeat.get(r_idx)
             };
 
-            for (idx, actual) in arg_tys.iter().enumerate() {
-                let expected = if idx < head_len {
-                    head.get(idx)
-                } else if idx >= tail_start {
-                    tail.get(idx - tail_start)
-                } else if repeat.is_empty() {
-                    None
-                } else {
-                    let r_idx = (idx - head_len) % repeat.len();
-                    repeat.get(r_idx)
-                };
-
-                if let Some(param) = expected {
-                    unify(&mut subst, &registry, &param.ty, actual);
-                }
+            if let Some(param) = expected {
+                unify(&mut subst, &registry, &param.ty, actual);
             }
         }
     }
 
     apply(&subst, &sig.ret)
+}
+
+fn resolve_repeat_tail_used(sig: &FunctionSig, total: usize) -> Option<usize> {
+    if sig.params.repeat.is_empty() {
+        return Some(sig.params.tail.len());
+    }
+
+    let head_len = sig.params.head.len();
+    if total < head_len {
+        return None;
+    }
+
+    let repeat_len = sig.params.repeat.len();
+    let mut tail_min = 0usize;
+    for (idx, p) in sig.params.tail.iter().enumerate() {
+        if !p.optional {
+            tail_min = idx + 1;
+        }
+    }
+
+    for tail_used in (tail_min..=sig.params.tail.len()).rev() {
+        if total < head_len + tail_used {
+            continue;
+        }
+        let middle = total - head_len - tail_used;
+        if middle >= repeat_len && middle.is_multiple_of(repeat_len) {
+            return Some(tail_used);
+        }
+    }
+
+    None
 }
 
 fn join_types(a: Ty, b: Ty) -> Ty {

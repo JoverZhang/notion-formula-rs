@@ -1,8 +1,16 @@
 use crate::analyze;
 use crate::semantic::{
-    Context, FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamLayout,
+    Context, FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamShape,
     ParamSig, Ty, TypeMap, infer_expr_with_map,
 };
+
+fn p(name: &str, ty: Ty) -> ParamSig {
+    ParamSig {
+        name: name.into(),
+        ty,
+        optional: false,
+    }
+}
 
 fn infer(source: &str, ctx: &Context) -> (Ty, TypeMap, crate::ast::Expr) {
     let output = analyze(source).unwrap();
@@ -21,37 +29,25 @@ fn generic_if_plain_unifies_then_else_into_union() {
     let t = GenericId(0);
     let ctx = Context {
         properties: vec![],
-        functions: vec![FunctionSig {
-            name: "if".into(),
-            layout: ParamLayout::Flat(vec![
-                ParamSig {
-                    name: "condition".into(),
-                    ty: Ty::Boolean,
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "then".into(),
-                    ty: Ty::Generic(t),
-                    optional: false,
-                    variadic: false,
-                },
-                ParamSig {
-                    name: "else".into(),
-                    ty: Ty::Generic(t),
-                    optional: false,
-                    variadic: false,
-                },
-            ]),
-            ret: Ty::Generic(t),
-            detail: None,
-            category: FunctionCategory::General,
-            generics: vec![GenericParam {
+        functions: vec![FunctionSig::new(
+            FunctionCategory::General,
+            "if(condition, then, else)",
+            "if",
+            ParamShape::new(
+                vec![
+                    p("condition", Ty::Boolean),
+                    p("then", Ty::Generic(t)),
+                    p("else", Ty::Generic(t)),
+                ],
+                vec![],
+                vec![],
+            ),
+            Ty::Generic(t),
+            vec![GenericParam {
                 id: t,
-                name: "T".into(),
                 kind: GenericParamKind::Plain,
             }],
-        }],
+        )],
     };
 
     let (ty, map, root) = infer("if(true, 1, \"x\")", &ctx);
@@ -65,44 +61,33 @@ fn generic_list_unifies_inner_type() {
     let ctx = Context {
         properties: vec![],
         functions: vec![
-            FunctionSig {
-                name: "split".into(),
-                layout: ParamLayout::Flat(vec![
-                    ParamSig {
-                        name: "text".into(),
-                        ty: Ty::String,
-                        optional: false,
-                        variadic: false,
-                    },
-                    ParamSig {
-                        name: "separator".into(),
-                        ty: Ty::String,
-                        optional: false,
-                        variadic: false,
-                    },
-                ]),
-                ret: Ty::List(Box::new(Ty::String)),
-                detail: None,
-                category: FunctionCategory::List,
-                generics: vec![],
-            },
-            FunctionSig {
-                name: "first".into(),
-                layout: ParamLayout::Flat(vec![ParamSig {
-                    name: "list".into(),
-                    ty: Ty::List(Box::new(Ty::Generic(t))),
-                    optional: false,
-                    variadic: false,
-                }]),
-                ret: Ty::Generic(t),
-                detail: None,
-                category: FunctionCategory::List,
-                generics: vec![GenericParam {
+            FunctionSig::new(
+                FunctionCategory::List,
+                "split(text, separator)",
+                "split",
+                ParamShape::new(
+                    vec![p("text", Ty::String), p("separator", Ty::String)],
+                    vec![],
+                    vec![],
+                ),
+                Ty::List(Box::new(Ty::String)),
+                vec![],
+            ),
+            FunctionSig::new(
+                FunctionCategory::List,
+                "first(list)",
+                "first",
+                ParamShape::new(
+                    vec![p("list", Ty::List(Box::new(Ty::Generic(t))))],
+                    vec![],
+                    vec![],
+                ),
+                Ty::Generic(t),
+                vec![GenericParam {
                     id: t,
-                    name: "T".into(),
                     kind: GenericParamKind::Plain,
                 }],
-            },
+            ),
         ],
     };
 
@@ -115,40 +100,21 @@ fn variant_generic_skips_unknown_when_accumulating_union() {
     let t = GenericId(0);
     let ctx = Context {
         properties: vec![],
-        functions: vec![FunctionSig {
-            name: "ifs".into(),
-            layout: ParamLayout::RepeatGroup {
-                head: vec![],
-                repeat: vec![
-                    ParamSig {
-                        name: "condition".into(),
-                        ty: Ty::Unknown,
-                        optional: false,
-                        variadic: false,
-                    },
-                    ParamSig {
-                        name: "value".into(),
-                        ty: Ty::Generic(t),
-                        optional: false,
-                        variadic: false,
-                    },
-                ],
-                tail: vec![ParamSig {
-                    name: "default".into(),
-                    ty: Ty::Generic(t),
-                    optional: false,
-                    variadic: false,
-                }],
-            },
-            ret: Ty::Generic(t),
-            detail: None,
-            category: FunctionCategory::General,
-            generics: vec![GenericParam {
+        functions: vec![FunctionSig::new(
+            FunctionCategory::General,
+            "ifs(condition, value, ..., default)",
+            "ifs",
+            ParamShape::new(
+                vec![],
+                vec![p("condition", Ty::Unknown), p("value", Ty::Generic(t))],
+                vec![p("default", Ty::Generic(t))],
+            ),
+            Ty::Generic(t),
+            vec![GenericParam {
                 id: t,
-                name: "T".into(),
                 kind: GenericParamKind::Variant,
             }],
-        }],
+        )],
     };
 
     let (ty, _, _) = infer("ifs(true, 1, false, x, \"a\")", &ctx);

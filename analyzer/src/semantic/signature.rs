@@ -108,12 +108,20 @@ impl FunctionSig {
     }
 
     pub fn required_min_args(&self) -> usize {
-        if self.params.repeat.is_empty() && self.params.tail.is_empty() {
-            // Fixed-arity signature: required min is the last required param index + 1.
+        if self.params.repeat.is_empty() {
+            // Fixed-arity signature (no repeat group): required min is the last required param
+            // index + 1 across the whole list.
+            //
             // This is defensive even if a signature mistakenly places a required param after an
             // optional one.
             let mut required = 0usize;
-            for (idx, p) in self.params.head.iter().enumerate() {
+            for (idx, p) in self
+                .params
+                .head
+                .iter()
+                .chain(self.params.tail.iter())
+                .enumerate()
+            {
                 if !p.optional {
                     required = idx + 1;
                 }
@@ -127,8 +135,11 @@ impl FunctionSig {
     }
 
     pub fn param_for_arg_index(&self, idx: usize) -> Option<&ParamSig> {
-        if self.params.repeat.is_empty() && self.params.tail.is_empty() {
-            return self.params.head.get(idx);
+        if self.params.repeat.is_empty() {
+            if idx < self.params.head.len() {
+                return self.params.head.get(idx);
+            }
+            return self.params.tail.get(idx - self.params.head.len());
         }
 
         // Best-effort mapping without knowing total arg count (completion/sighelp).
