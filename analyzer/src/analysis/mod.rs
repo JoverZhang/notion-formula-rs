@@ -1,6 +1,6 @@
 use crate::ast::{Expr, ExprKind};
 use crate::diagnostics::{Diagnostic, DiagnosticKind};
-use crate::token::{LitKind, Span};
+use crate::{LitKind, Span};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::LazyLock;

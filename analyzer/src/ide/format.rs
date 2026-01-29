@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
+use crate::lexer::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
+use crate::parser::TokenQuery;
 use crate::parser::{infix_binding_power, prefix_binding_power};
 use crate::source_map::SourceMap;
-use crate::token::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
-use crate::tokenstream::TokenQuery;
 
 const INDENT: usize = 2;
 const MAX_WIDTH: usize = 80;

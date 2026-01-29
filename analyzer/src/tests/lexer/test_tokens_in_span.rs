@@ -1,5 +1,5 @@
 use crate::lexer::lex;
-use crate::token::{Span, TokenKind, tokens_in_span};
+use crate::lexer::{Span, TokenKind, tokens_in_span};
 
 #[test]
 fn test_tokens_in_span() {

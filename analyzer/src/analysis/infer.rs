@@ -1,5 +1,5 @@
 use crate::ast::{Expr, ExprKind};
-use crate::token::{LitKind, NodeId};
+use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
 use super::{Context, FunctionSig, GenericId, GenericParamKind, Ty, normalize_union};

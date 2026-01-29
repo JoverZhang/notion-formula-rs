@@ -1,5 +1,5 @@
+use crate::lexer::Span;
 use crate::source_map::SourceMap;
-use crate::token::Span;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiagnosticKind {

@@ -1,5 +1,11 @@
 use crate::diagnostics::{Diagnostic, DiagnosticKind};
-use crate::token::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
+
+mod token;
+
+pub use token::{
+    CommentKind, Lit, LitKind, NodeId, Span, Spanned, Symbol, Token, TokenIdx, TokenKind,
+    TokenRange, tokens_in_span,
+};
 
 pub struct LexOutput {
     pub tokens: Vec<Token>,

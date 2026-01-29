@@ -1,6 +1,6 @@
+use crate::lexer::TokenKind;
 use crate::lexer::lex;
-use crate::token::TokenKind;
-use crate::tokenstream::TokenQuery;
+use crate::parser::TokenQuery;
 
 #[test]
 fn test_token_query_prev_next_nontrivia_around_trivia_and_eof() {

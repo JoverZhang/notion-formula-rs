@@ -1,5 +1,5 @@
 use crate::lexer::lex;
-use crate::token::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
+use crate::lexer::{CommentKind, Lit, LitKind, Span, Symbol, Token, TokenKind};
 
 fn tokens(input: &str) -> Vec<Token> {
     lex(input).tokens

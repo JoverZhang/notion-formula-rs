@@ -1,5 +1,5 @@
 use crate::ast::{BinOpKind, ExprKind};
-use crate::token::LitKind;
+use crate::lexer::LitKind;
 use crate::{analyze, tests::common::trim_indent};
 
 #[test]

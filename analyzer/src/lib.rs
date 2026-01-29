@@ -1,34 +1,34 @@
-use crate::{lexer::lex, parser::Parser, tokenstream::TokenCursor};
+use crate::{lexer::lex, parser::Parser};
 
-mod ast;
-pub mod completion;
+pub mod analysis;
 mod diagnostics;
-mod format;
+pub mod ide;
 mod lexer;
 mod parser;
-pub mod semantic;
 mod source_map;
 mod tests;
-mod token;
-mod tokenstream;
 
 pub use parser::ParseOutput;
 
 pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
     let lex_output = lex(text);
-    let token_cursor = TokenCursor::new(text, lex_output.tokens);
+    let token_cursor = parser::TokenCursor::new(text, lex_output.tokens);
     let mut parser = Parser::new(token_cursor);
     let mut output = parser.parse_expr();
     output.diagnostics.extend(lex_output.diagnostics);
     Ok(output)
 }
 
-pub use completion::{
+pub use analysis as semantic;
+pub use diagnostics::format_diagnostics;
+pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
+pub use ide::completion;
+pub use ide::completion::{
     CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput,
     SignatureHelp, TextEdit, complete,
 };
-pub use diagnostics::format_diagnostics;
-pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
-pub use format::format_expr;
+pub use ide::format::format_expr;
+pub use lexer::{LitKind, Span, Token, TokenKind};
+pub use lexer::{NodeId, Spanned, Symbol, TokenIdx, TokenRange, tokens_in_span};
+pub use parser::ast;
 pub use source_map::SourceMap;
-pub use token::{LitKind, Span, Token, TokenKind};

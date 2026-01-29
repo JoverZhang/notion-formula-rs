@@ -1,6 +1,6 @@
 use super::signature::CallContext;
+use crate::lexer::{LitKind, Span, Token, TokenKind};
 use crate::semantic;
-use crate::token::{LitKind, Span, Token, TokenKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PositionKind {

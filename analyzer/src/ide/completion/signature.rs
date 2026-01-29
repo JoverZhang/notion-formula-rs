@@ -1,7 +1,7 @@
 use super::SignatureHelp;
 use super::position::prev_non_trivia_before;
+use crate::lexer::{Token, TokenKind};
 use crate::semantic;
-use crate::token::{Token, TokenKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CallContext {

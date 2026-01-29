@@ -1,4 +1,4 @@
-use crate::token::{Span, Token, TokenIdx, TokenKind, TokenRange, tokens_in_span};
+use crate::lexer::{Span, Token, TokenIdx, TokenKind, TokenRange, tokens_in_span};
 
 pub struct TokenCursor<'a> {
     pub source: &'a str,

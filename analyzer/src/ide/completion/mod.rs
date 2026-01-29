@@ -1,5 +1,5 @@
+use crate::lexer::Span;
 use crate::semantic;
-use crate::token::Span;
 
 mod items;
 mod matchers;

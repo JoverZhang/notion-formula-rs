@@ -1,9 +1,11 @@
-use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 use crate::diagnostics::{Diagnostic, Diagnostics};
-use crate::token::{LitKind, NodeId, Span, Token, TokenKind};
-use crate::tokenstream::TokenCursor;
 
+pub mod ast;
+use crate::lexer::{LitKind, NodeId, Span, Token, TokenKind};
+use ast::{BinOpKind, Expr, ExprKind, UnOpKind};
 mod expr;
+mod tokenstream;
+pub use tokenstream::{TokenCursor, TokenQuery};
 
 /// Parser span invariants.
 ///

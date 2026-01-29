@@ -1,8 +1,8 @@
 use super::position::PositionKind;
 use super::{CompletionConfig, CompletionOutput};
 use crate::lexer::lex;
+use crate::lexer::{Span, Token, TokenKind};
 use crate::semantic;
-use crate::token::{Span, Token, TokenKind};
 
 pub(super) fn complete(
     text: &str,

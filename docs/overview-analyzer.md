@@ -28,16 +28,16 @@ Entry points:
 Core modules:
 
 - `analyzer/src/lexer/mod.rs`: lexer producing `Token`s + lex diagnostics (strings, numbers, comments, operators)
+- `analyzer/src/lexer/token.rs`: token model (`TokenKind`, `Token`, `Span`, `tokens_in_span(...)`, etc.)
 - `analyzer/src/parser/mod.rs`: Pratt parser plumbing + binding power tables; builds `ParseOutput { expr, diagnostics, tokens }`
 - `analyzer/src/parser/expr.rs`: expression grammar (primary/prefix/infix/ternary/call/member-call) + recovery
-- `analyzer/src/ast.rs`: AST node types (preserves explicit grouping via `ExprKind::Group`)
-- `analyzer/src/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
+- `analyzer/src/parser/ast.rs`: AST node types (preserves explicit grouping via `ExprKind::Group`)
+- `analyzer/src/parser/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
+- `analyzer/src/ide/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
-- `analyzer/src/semantic/mod.rs`: minimal type checking driven by `Context { properties, functions }`
-- `analyzer/src/completion/mod.rs`: byte-offset completion + signature help for editor integrations (pipeline/position/items/signature + ranking/matchers)
+- `analyzer/src/analysis/mod.rs`: minimal type checking driven by `Context { properties, functions }`
+- `analyzer/src/ide/completion/mod.rs`: byte-offset completion + signature help for editor integrations (pipeline/position/items/signature + ranking/matchers)
 - `analyzer/src/source_map.rs`: byte offset → `(line,col)`
-- `analyzer/src/token.rs`: token kinds, `Span` (byte offsets), trivia classification, `tokens_in_span(...)`
-- `analyzer/src/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
 
 ---
 
@@ -45,7 +45,7 @@ Core modules:
 
 ### Core span model (Rust)
 
-- `Span { start: u32, end: u32 }` in `analyzer/src/token.rs`
+- `Span { start: u32, end: u32 }` in `analyzer/src/lexer/token.rs`
 - Represents **UTF-8 byte offsets** into the original source string (safe to slice as `&source[start..end]`).
 - Half-open semantics: `[start, end)`
 
@@ -64,7 +64,7 @@ Core modules:
 
 Location:
 
-- `analyzer/src/tokenstream.rs`
+- `analyzer/src/parser/tokenstream.rs`
 
 `TokenQuery<'a>` centralizes **span → token range → trivia scanning**, replacing ad-hoc loops in formatter and utilities.
 
@@ -115,11 +115,11 @@ Known gaps:
 
 ## Builtins + sugar (where they live)
 
-Semantic analysis (`analyzer/src/semantic/mod.rs`):
+Semantic analysis (`analyzer/src/analysis/mod.rs`):
 
 - `Context` is `{ properties: Vec<Property>, functions: Vec<FunctionSig> }`.
 - Builtin function signatures are defined in `builtins_functions()`.
-- Builtin signatures are declared via a small macro DSL in `analyzer/src/semantic/builtins/macros.rs` and used from `analyzer/src/semantic/functions.rs`.
+- Builtin signatures are declared via a small macro DSL in `analyzer/src/analysis/builtins/macros.rs` and used from `analyzer/src/analysis/functions.rs`.
 - `FunctionSig` includes required `category: FunctionCategory` and required `detail: String` (used by completion/signature help).
 - `FunctionSig` models parameters via `params: ParamShape { head, repeat, tail }`:
   - `head`: fixed prefix params (appear once)
@@ -134,14 +134,14 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
   - `infer_expr_with_map(expr, ctx, &mut TypeMap)` computes a `TypeMap` of `ExprId`/`NodeId -> Ty`.
   - `analyze_expr` returns the inferred root type and emits diagnostics by comparing inferred argument types to builtin signatures (arity + expected types).
     - Validation is arity/shape-first: if a call has an arity/shape error, the analyzer emits that single diagnostic and **does not** emit additional per-argument type mismatch diagnostics for the same call.
-  - Type acceptance (`ty_accepts` in `analyzer/src/semantic/mod.rs`):
+  - Type acceptance (`ty_accepts` in `analyzer/src/analysis/mod.rs`):
     - `Unknown` is permissive (either side being `Unknown` accepts).
     - `Ty::Generic(_)` is only a wildcard on the **expected** side (generic *inferred actuals* do not silently pass validation).
 - `prop("Name")` is **special-cased** in the semantic analyzer (it is not a `FunctionSig`):
   - expects exactly 1 argument
   - argument must be a string literal
   - property name must exist in `Context.properties` (else a diagnostic is emitted)
-- Generic inference is driven by `FunctionSig.generics` + `Ty::Generic` (see `analyzer/src/semantic/infer.rs`):
+- Generic inference is driven by `FunctionSig.generics` + `Ty::Generic` (see `analyzer/src/analysis/infer.rs`):
   - `if<T: Plain>(condition: boolean, then: T, else: T) -> T`
     - `Plain` generics accumulate permissively (conflicts form a union).
   - `ifs<T: Variant>([condition: boolean, value: T]..., default: T) -> T`
@@ -149,13 +149,13 @@ Semantic analysis (`analyzer/src/semantic/mod.rs`):
 - Postfix sugar typing/inference:
   - For postfix-capable builtins, `receiver.fn(arg1, ...)` is treated like `fn(receiver, arg1, ...)` (fixed-arity signatures only).
 
-Completion (`analyzer/src/completion/mod.rs`, ranking/matching in `analyzer/src/completion/rank.rs` + `analyzer/src/completion/matchers.rs`):
+Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/src/ide/completion/rank.rs` + `analyzer/src/ide/completion/matchers.rs`):
 
 - Public entrypoint: `completion::complete(text: &str, cursor: usize, ctx: Option<&semantic::Context>, config: CompletionConfig) -> CompletionOutput`.
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
 - Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
-- Postfix completion is driven by a single builtin-derived allowlist (`postfix_capable_builtin_names()` in `analyzer/src/semantic/mod.rs`), defined as builtins with a **flat parameter list** that has more than one parameter (so there is at least one non-receiver argument):
+- Postfix completion is driven by a single builtin-derived allowlist (`postfix_capable_builtin_names()` in `analyzer/src/analysis/mod.rs`), defined as builtins with a **flat parameter list** that has more than one parameter (so there is at least one non-receiver argument):
   - after an atom: `.if()` is offered (inserts the leading `.`)
   - after `.` with a receiver atom: `.if` is offered and inserts `if()` (the `.` is already in the source)
 - Property completion items insert `prop("Name")` and can be disabled via `Property.disabled_reason` (disabled items have no `primary_edit`/cursor).

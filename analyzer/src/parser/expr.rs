@@ -1,8 +1,7 @@
-use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
+use super::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
+use super::{ParseOutput, Parser, infix_binding_power, prefix_binding_power};
 use crate::diagnostics::Label;
-use crate::parser::{ParseOutput, infix_binding_power};
-use crate::parser::{Parser, prefix_binding_power};
-use crate::token::{Lit, LitKind, Span, Symbol, TokenKind};
+use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
 impl<'a> Parser<'a> {
     pub fn parse_expr(&mut self) -> ParseOutput {

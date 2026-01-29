@@ -1,6 +1,6 @@
 use crate::analyze;
 use crate::ast::{Expr, ExprKind};
-use crate::token::Span;
+use crate::lexer::Span;
 
 fn assert_span(expr: &Expr, start: u32, end: u32) {
     assert_eq!(expr.span, Span { start, end });

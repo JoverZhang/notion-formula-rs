@@ -3,8 +3,8 @@ use super::position::PositionKind;
 use super::{
     CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
 };
+use crate::lexer::Span;
 use crate::semantic;
-use crate::token::Span;
 
 fn kind_priority(kind: CompletionKind) -> u8 {
     match kind {

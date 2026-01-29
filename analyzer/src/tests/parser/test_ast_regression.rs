@@ -3,7 +3,7 @@ use crate::tests::common::trim_indent;
 use crate::{
     analyze,
     ast::{Expr, ExprKind},
-    token::{Lit, LitKind, Span, Symbol},
+    lexer::{Lit, LitKind, Span, Symbol},
 };
 
 #[test]

@@ -1,4 +1,4 @@
-use crate::token::{Lit, NodeId, Span, Spanned, Symbol};
+use crate::lexer::{Lit, NodeId, Span, Spanned, Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOpKind {
