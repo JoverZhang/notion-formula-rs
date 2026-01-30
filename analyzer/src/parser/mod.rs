@@ -1,3 +1,12 @@
+//! Parser for formula expressions.
+//!
+//! Inputs: a [`TokenCursor`] over lexer tokens that include trivia and an explicit EOF token.
+//! Spans are UTF-8 byte offsets into the original source, with half-open semantics `[start, end)`.
+//! The parser skips trivia for `cur()`/`bump()`, but spans remain byte-based.
+//!
+//! Responsibility: build the AST plus parse diagnostics only. Semantic analysis is handled
+//! separately in `analysis`.
+
 use crate::diagnostics::{Diagnostic, Diagnostics};
 
 pub mod ast;
@@ -7,17 +16,6 @@ mod expr;
 mod tokenstream;
 pub use tokenstream::{TokenCursor, TokenQuery};
 
-/// Parser span invariants.
-///
-/// - `Span` is a byte offset range into the original source, using half-open semantics: `[start, end)`.
-/// - The token stream (`TokenCursor.tokens`) includes trivia tokens (comments/newlines) and an EOF token.
-/// - Parsing *skips* trivia when looking at the current token and when consuming tokens (`cur()`/`bump()`).
-///   This means spans are anchored on non-trivia tokens.
-/// - For an expression that successfully parses, `Expr.span` starts at the first non-trivia token of the
-///   construct and ends at the last non-trivia token consumed for that construct.
-///   The span therefore also covers any trivia and whitespace *between* those two tokens.
-/// - Parent expression spans are expected to contain their child expression spans.
-/// - Error recovery may produce `ExprKind::Error` spans that are minimal (often just the unexpected token).
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ParseError {

@@ -11,24 +11,23 @@ pub struct Symbol {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Half-open byte span into the source string: `[start, end)`.
 ///
 /// `start` and `end` must be valid UTF-8 slice boundaries for that same source string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub start: u32,
     pub end: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Half-open range of token indices: `[lo, hi)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TokenRange {
     pub lo: TokenIdx,
     pub hi: TokenIdx,
 }
 
 impl TokenRange {
-    /// Construct a token range `[lo, hi)`.
     pub fn new(lo: TokenIdx, hi: TokenIdx) -> Self {
         Self { lo, hi }
     }
@@ -144,7 +143,6 @@ pub struct Token {
 }
 
 impl Token {
-    #[allow(unused)]
     pub fn can_begin_expr(&self) -> bool {
         matches!(
             self.kind,

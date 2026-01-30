@@ -14,6 +14,9 @@ pub struct TokenCursor<'a> {
     /// Tokens in source order, including trivia and an explicit EOF token.
     pub tokens: Vec<Token>,
     /// Current boundary index into `tokens` used by the parser.
+    ///
+    /// Parser methods advance `pos` but read tokens via trivia-skipping helpers, so `pos` acts as a
+    /// stable boundary even when trivia tokens are present.
     pub pos: usize,
 }
 
@@ -21,6 +24,17 @@ pub struct TokenCursor<'a> {
 ///
 /// Canonical API for span → token-range mapping and neighbor scans.
 /// All ranges are half-open `[lo, hi)` over token indices and are clamped to `tokens.len()`.
+///
+/// EOF: the lexer emits an explicit EOF token with an empty span. Non-empty spans do not intersect
+/// it; empty spans may map to an insertion point at the EOF index.
+///
+/// ```text
+/// source: "a\n+ b"
+/// tokens (incl trivia): Ident("a") Newline Plus Ident("b") Eof   // spaces skipped by lexer
+/// span [0, 1) -> TokenRange covers Ident("a") only
+/// next_nontrivia(1) -> Plus     // skips the Newline trivia token
+/// prev_nontrivia(3) -> Plus     // looks left from Ident("b")
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct TokenQuery<'a> {
     tokens: &'a [Token],

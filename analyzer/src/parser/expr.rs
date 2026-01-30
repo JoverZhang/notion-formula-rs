@@ -1,9 +1,34 @@
+//! Expression parsing (Pratt parser).
+//!
+//! Produces an AST plus parse diagnostics. Spans are UTF-8 byte offsets with half-open semantics
+//! `[start, end)`.
+
 use super::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp, UnOpKind};
 use super::{ParseOutput, Parser, infix_binding_power, prefix_binding_power};
 use crate::diagnostics::Label;
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
 impl<'a> Parser<'a> {
+    /// Parse a full expression and return the [`ParseOutput`].
+    ///
+    /// Supported forms:
+    /// - literals and identifiers
+    /// - unary `!expr` / `-expr`
+    /// - binary operators (`+ - * / % ^`, comparisons, `&&`, `||`)
+    /// - ternary `cond ? then : otherwise`
+    /// - grouping `(expr)` and list literals `[expr, ...]`
+    /// - calls `ident(arg1, ...)` and member calls `receiver.method(arg1, ...)`
+    ///
+    /// Span contract:
+    /// - Spans are UTF-8 byte offsets into the source with half-open semantics `[start, end)`.
+    /// - Token consumption skips trivia, so spans are anchored on non-trivia tokens.
+    /// - A parent span covers from the first to last non-trivia token of the construct, including
+    ///   any trivia that occurs between those anchor tokens.
+    ///
+    /// ```text
+    /// "a + b * c" parses as '+' with rhs '*'
+    /// spans cover from 'a' to 'c' (byte-based)
+    /// ```
     pub fn parse_expr(&mut self) -> ParseOutput {
         let expr = self.parse_expr_bp(0);
 
