@@ -73,6 +73,7 @@ describe("WASM signature help (instantiated types)", () => {
     );
     expect(sig.active_param).toBe(2);
   });
+
   it('ifs(true, 1, false, 2, "a") -> number | string', () => {
     expect(sigLabelAtCloseParen('ifs(true, 1, false, 2, "a")')).toBe(
       "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: string) -> number | string",
