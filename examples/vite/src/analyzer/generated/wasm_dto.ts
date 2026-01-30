@@ -48,13 +48,11 @@ range: Span,
  */
 new_text: string, };
 
-export type DisplaySegmentKindView = "Name" | "Punct" | "ParamName" | "Type" | "Separator" | "Ellipsis" | "Arrow" | "ReturnType";
+export type DisplaySegmentView = { "kind": "Name", text: string, } | { "kind": "Punct", text: string, } | { "kind": "Separator", text: string, } | { "kind": "Ellipsis" } | { "kind": "Arrow", text: string, } | { "kind": "Param", name: string, ty: string, param_index: number | null, } | { "kind": "ReturnType", text: string, };
 
-export type DisplaySegmentView = { kind: DisplaySegmentKindView, text: string, param_index: number | null, };
+export type SignatureItemView = { segments: Array<DisplaySegmentView>, };
 
-export type SignatureHelpSignatureView = { segments: Array<DisplaySegmentView>, };
-
-export type SignatureHelpView = { signatures: Array<SignatureHelpSignatureView>, active_signature: number, active_parameter: number, };
+export type SignatureHelpView = { signatures: Array<SignatureItemView>, active_signature: number, active_parameter: number, };
 
 export type CompletionItemKind = "Function" | "Builtin" | "Property" | "Operator";
 

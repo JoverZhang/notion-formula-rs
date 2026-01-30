@@ -4,16 +4,10 @@
 use super::SignatureHelp;
 use super::position::prev_non_trivia_before;
 use crate::ast::{Expr, ExprKind};
-use crate::ide::display::{
-    DisplaySegment, DisplaySegmentKind, RenderedParam, TypeFormatOptions, build_signature_segments,
-    format_ty,
-};
+use crate::ide::completion::SignatureItem;
+use crate::ide::display::{ParamSlot, RenderedSignature, build_signature_segments};
 use crate::lexer::{Token, TokenKind};
 use crate::semantic;
-
-const TYPE_FORMAT_OPTS: TypeFormatOptions = TypeFormatOptions {
-    paren_union_in_list: true,
-};
 
 /// Call-site info derived from tokens, using byte offsets for the cursor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,7 +27,7 @@ fn ty_contains_generic(ty: &semantic::Ty) -> bool {
 }
 
 fn format_ty_with_optional(ty: &semantic::Ty, optional: bool) -> String {
-    let mut out = format_ty(ty, &TYPE_FORMAT_OPTS);
+    let mut out = ty.to_string();
     if optional {
         out.push('?');
     }
@@ -51,39 +45,42 @@ fn choose_display_ty<'a>(
     actual.unwrap_or(instantiated_expected)
 }
 
-fn push_rendered_param(
-    out: &mut Vec<RenderedParam>,
-    first_param_is_receiver: bool,
-    first_emitted: &mut bool,
-    next_param_index: &mut u32,
-    name: String,
-    ty: String,
-) {
-    let param_index = if first_param_is_receiver && !*first_emitted {
-        None
-    } else {
-        let idx = *next_param_index;
-        *next_param_index = next_param_index.saturating_add(1);
-        Some(idx)
-    };
-    *first_emitted = true;
-    out.push(RenderedParam::Param {
-        name,
-        ty,
-        param_index,
-    });
-}
-
-fn render_signature_params(
+fn render_signature(
     sig: &semantic::FunctionSig,
     arg_tys: &[Option<semantic::Ty>],
     total_args_for_shape: usize,
     inst_param_tys: &[semantic::Ty],
-    first_param_is_receiver: bool,
-) -> Vec<RenderedParam> {
-    let mut out = Vec::<RenderedParam>::new();
+    is_method_style: bool,
+) -> RenderedSignature {
+    let mut receiver: Option<(String, String)> = None;
+    let mut slots = Vec::<ParamSlot>::new();
     let mut next_param_index = 0u32;
-    let mut first_emitted = false;
+
+    fn push_param(
+        receiver: &mut Option<(String, String)>,
+        slots: &mut Vec<ParamSlot>,
+        next_param_index: &mut u32,
+        is_method_style: bool,
+        name: String,
+        ty: String,
+    ) {
+        if is_method_style && receiver.is_none() {
+            *receiver = Some((name, ty));
+            return;
+        }
+
+        let idx = *next_param_index;
+        *next_param_index += 1;
+        slots.push(ParamSlot::Param {
+            name,
+            ty,
+            param_index: idx,
+        });
+    }
+
+    fn push_ellipsis(slots: &mut Vec<ParamSlot>) {
+        slots.push(ParamSlot::Ellipsis);
+    }
 
     if sig.params.repeat.is_empty() {
         let mut idx = 0usize;
@@ -92,25 +89,25 @@ fn render_signature_params(
             let actual = arg_tys.get(idx).and_then(|t| t.as_ref());
             let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
             idx += 1;
-            push_rendered_param(
-                &mut out,
-                first_param_is_receiver,
-                &mut first_emitted,
+            push_param(
+                &mut receiver,
+                &mut slots,
                 &mut next_param_index,
+                is_method_style,
                 p.name.clone(),
                 format_ty_with_optional(ty, p.optional),
             );
         }
-        return out;
+        return RenderedSignature { receiver, slots };
     }
 
     for (idx, p) in sig.params.head.iter().enumerate() {
         let ty = inst_param_tys.get(idx).unwrap_or(&p.ty);
-        push_rendered_param(
-            &mut out,
-            first_param_is_receiver,
-            &mut first_emitted,
+        push_param(
+            &mut receiver,
+            &mut slots,
             &mut next_param_index,
+            is_method_style,
             p.name.clone(),
             format_ty_with_optional(ty, p.optional),
         );
@@ -134,34 +131,34 @@ fn render_signature_params(
             let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
             let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
             let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-            push_rendered_param(
-                &mut out,
-                first_param_is_receiver,
-                &mut first_emitted,
+            push_param(
+                &mut receiver,
+                &mut slots,
                 &mut next_param_index,
+                is_method_style,
                 name,
                 format_ty_with_optional(ty, p.optional),
             );
         }
     }
-    out.push(RenderedParam::Ellipsis);
+    push_ellipsis(&mut slots);
     for (t_idx, p) in sig.params.tail.iter().enumerate() {
         let actual_idx = tail_start.saturating_add(t_idx);
         let inst_idx = repeat_start + repeat_len + t_idx;
         let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
         let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
         let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-        push_rendered_param(
-            &mut out,
-            first_param_is_receiver,
-            &mut first_emitted,
+        push_param(
+            &mut receiver,
+            &mut slots,
             &mut next_param_index,
+            is_method_style,
             p.name.clone(),
             format_ty_with_optional(ty, p.optional),
         );
     }
 
-    out
+    RenderedSignature { receiver, slots }
 }
 
 fn find_call_expr_by_lparen<'a>(
@@ -409,6 +406,28 @@ fn active_param_index(
     head_len + cycle * repeat_len + repeat_pos
 }
 
+fn nearest_param_index(slots: &[ParamSlot], slot_idx: usize) -> usize {
+    let get = |i: usize| match slots.get(i) {
+        Some(ParamSlot::Param { param_index, .. }) => Some(*param_index as usize),
+        _ => None,
+    };
+
+    if let Some(idx) = get(slot_idx) {
+        return idx;
+    }
+    for i in (0..slot_idx).rev() {
+        if let Some(idx) = get(i) {
+            return idx;
+        }
+    }
+    for i in (slot_idx + 1)..slots.len() {
+        if let Some(idx) = get(i) {
+            return idx;
+        }
+    }
+    0
+}
+
 /// Computes signature help when the cursor is inside a call argument list.
 ///
 /// Returns `None` if the cursor is before the `(`, or if the callee is unknown.
@@ -451,108 +470,46 @@ pub(super) fn compute_signature_help_if_in_call(
     };
 
     let is_postfix_call = is_postfix_call().is_some();
-    let can_use_postfix_help = is_postfix_call
+    let is_method_style = is_postfix_call
         && semantic::postfix_capable_builtin_names().contains(func.name.as_str())
         && semantic::is_postfix_capable(func);
 
     let arg_tys =
-        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, can_use_postfix_help);
+        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
     let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
 
     let mut full_call_ctx = call_ctx.clone();
-    if can_use_postfix_help {
+    if is_method_style {
         // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
         full_call_ctx.arg_index = full_call_ctx.arg_index.saturating_add(1);
     }
 
     let total_args_for_shape = arg_tys.len().max(full_call_ctx.arg_index + 1);
-    let first_param_is_receiver = can_use_postfix_help;
-    let full_params = render_signature_params(
+    let rendered = render_signature(
         func,
         arg_tys.as_slice(),
         total_args_for_shape,
         inst_param_tys.as_slice(),
-        first_param_is_receiver,
+        is_method_style,
     );
 
-    let full_slot_idx = if full_params.is_empty() {
+    let active_slot = if rendered.slots.is_empty() {
         0
     } else {
-        active_param_index(func, &full_call_ctx, total_args_for_shape).min(full_params.len() - 1)
+        let full_slot = active_param_index(func, &full_call_ctx, total_args_for_shape);
+        let slot = if is_method_style {
+            full_slot.saturating_sub(1)
+        } else {
+            full_slot
+        };
+        slot.min(rendered.slots.len().saturating_sub(1))
     };
 
-    let (receiver_param, display_params, slot_idx) = if !can_use_postfix_help {
-        (None, full_params, full_slot_idx)
-    } else {
-        let mut iter = full_params.into_iter();
-        let receiver = iter.next();
-        let params = iter.collect::<Vec<_>>();
-        (receiver, params, full_slot_idx.saturating_sub(1))
-    };
-
-    let slot_to_param_index = display_params
-        .iter()
-        .map(|p| match p {
-            RenderedParam::Ellipsis => None,
-            RenderedParam::Param { param_index, .. } => *param_index,
-        })
-        .collect::<Vec<_>>();
-
-    let active_parameter = if slot_to_param_index.is_empty() {
-        0
-    } else {
-        let idx = slot_to_param_index
-            .get(slot_idx)
-            .copied()
-            .flatten()
-            .unwrap_or(0);
-        idx as usize
-    };
-
-    let mut segments = Vec::<DisplaySegment>::new();
-
-    if let Some(RenderedParam::Param { name, ty, .. }) = receiver_param {
-        segments.push(DisplaySegment {
-            kind: DisplaySegmentKind::Punct,
-            text: "(".to_string(),
-            param_index: None,
-        });
-        segments.push(DisplaySegment {
-            kind: DisplaySegmentKind::ParamName,
-            text: name,
-            param_index: None,
-        });
-        segments.push(DisplaySegment {
-            kind: DisplaySegmentKind::Punct,
-            text: ": ".to_string(),
-            param_index: None,
-        });
-        segments.push(DisplaySegment {
-            kind: DisplaySegmentKind::Type,
-            text: ty,
-            param_index: None,
-        });
-        segments.push(DisplaySegment {
-            kind: DisplaySegmentKind::Punct,
-            text: ")".to_string(),
-            param_index: None,
-        });
-        segments.push(DisplaySegment {
-            kind: DisplaySegmentKind::Punct,
-            text: ".".to_string(),
-            param_index: None,
-        });
-    }
-
-    segments.extend(build_signature_segments(
-        func.name.as_str(),
-        display_params.as_slice(),
-        &inst_ret,
-        &TYPE_FORMAT_OPTS,
-    ));
+    let active_parameter = nearest_param_index(rendered.slots.as_slice(), active_slot);
+    let segments = build_signature_segments(func.name.as_str(), &rendered, &inst_ret, is_method_style);
 
     Some(SignatureHelp {
-        signatures: vec![super::SignatureHelpSignature { segments }],
+        signatures: vec![SignatureItem { segments }],
         active_signature: 0,
         active_parameter,
     })
@@ -638,5 +595,29 @@ pub(super) fn expected_call_arg_ty(
     match ty {
         semantic::Ty::Unknown | semantic::Ty::Generic(_) => None,
         other => Some(other),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nearest_param_index;
+    use crate::ide::display::ParamSlot;
+
+    #[test]
+    fn active_parameter_uses_nearest_param_index_when_on_ellipsis() {
+        let slots = vec![
+            ParamSlot::Param {
+                name: "a".into(),
+                ty: "number".into(),
+                param_index: 3,
+            },
+            ParamSlot::Ellipsis,
+            ParamSlot::Param {
+                name: "b".into(),
+                ty: "string".into(),
+                param_index: 4,
+            },
+        ];
+        assert_eq!(nearest_param_index(&slots, 1), 3);
     }
 }

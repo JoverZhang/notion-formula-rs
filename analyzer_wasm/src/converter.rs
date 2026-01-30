@@ -18,8 +18,8 @@ use wasm_bindgen::prelude::JsValue;
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, DisplaySegmentKindView, DisplaySegmentView,
-    FunctionCategoryView, LineColView, SignatureHelpSignatureView, SignatureHelpView,
+    DiagnosticKindView, DiagnosticView, DisplaySegmentView, FunctionCategoryView, LineColView,
+    SignatureItemView, SignatureHelpView,
     Span as SpanDto, SpanView, TextEditView, TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
@@ -142,15 +142,11 @@ impl Converter {
             signatures: sig
                 .signatures
                 .iter()
-                .map(|s| SignatureHelpSignatureView {
+                .map(|s| SignatureItemView {
                     segments: s
                         .segments
                         .iter()
-                        .map(|seg| DisplaySegmentView {
-                            kind: display_segment_kind_view(seg.kind),
-                            text: seg.text.clone(),
-                            param_index: seg.param_index,
-                        })
+                        .map(display_segment_view)
                         .collect(),
                 })
                 .collect(),
@@ -280,16 +276,24 @@ impl Converter {
     }
 }
 
-fn display_segment_kind_view(kind: analyzer::ide::display::DisplaySegmentKind) -> DisplaySegmentKindView {
-    match kind {
-        analyzer::ide::display::DisplaySegmentKind::Name => DisplaySegmentKindView::Name,
-        analyzer::ide::display::DisplaySegmentKind::Punct => DisplaySegmentKindView::Punct,
-        analyzer::ide::display::DisplaySegmentKind::ParamName => DisplaySegmentKindView::ParamName,
-        analyzer::ide::display::DisplaySegmentKind::Type => DisplaySegmentKindView::Type,
-        analyzer::ide::display::DisplaySegmentKind::Separator => DisplaySegmentKindView::Separator,
-        analyzer::ide::display::DisplaySegmentKind::Ellipsis => DisplaySegmentKindView::Ellipsis,
-        analyzer::ide::display::DisplaySegmentKind::Arrow => DisplaySegmentKindView::Arrow,
-        analyzer::ide::display::DisplaySegmentKind::ReturnType => DisplaySegmentKindView::ReturnType,
+fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> DisplaySegmentView {
+    use analyzer::ide::display::DisplaySegment as S;
+    match seg {
+        S::Name { text } => DisplaySegmentView::Name { text: text.clone() },
+        S::Punct { text } => DisplaySegmentView::Punct { text: text.clone() },
+        S::Separator { text } => DisplaySegmentView::Separator { text: text.clone() },
+        S::Ellipsis => DisplaySegmentView::Ellipsis,
+        S::Arrow { text } => DisplaySegmentView::Arrow { text: text.clone() },
+        S::Param {
+            name,
+            ty,
+            param_index,
+        } => DisplaySegmentView::Param {
+            name: name.clone(),
+            ty: ty.clone(),
+            param_index: *param_index,
+        },
+        S::ReturnType { text } => DisplaySegmentView::ReturnType { text: text.clone() },
     }
 }
 

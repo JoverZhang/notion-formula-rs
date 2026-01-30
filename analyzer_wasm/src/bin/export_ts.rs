@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, DisplaySegmentKindView, DisplaySegmentView,
-    FunctionCategoryView, LineColView, SignatureHelpSignatureView, SignatureHelpView, Span,
+    DiagnosticKindView, DiagnosticView, DisplaySegmentView, FunctionCategoryView, LineColView,
+    SignatureItemView, SignatureHelpView, Span,
     SpanView, TextEditView, TokenView,
 };
 use ts_rs::TS;
@@ -30,9 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TokenView::decl(),
         AnalyzeResult::decl(),
         TextEditView::decl(),
-        DisplaySegmentKindView::decl(),
         DisplaySegmentView::decl(),
-        SignatureHelpSignatureView::decl(),
+        SignatureItemView::decl(),
         SignatureHelpView::decl(),
         CompletionItemKind::decl(),
         FunctionCategoryView::decl(),

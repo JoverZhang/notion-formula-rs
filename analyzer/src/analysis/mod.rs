@@ -2,6 +2,7 @@ use crate::ast::{Expr, ExprKind};
 use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::{LitKind, Span};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
@@ -68,6 +69,63 @@ pub enum Ty {
     Generic(GenericId),
     List(Box<Ty>),
     Union(Vec<Ty>),
+}
+
+impl Ty {
+    fn precedence(&self) -> u8 {
+        match self {
+            Ty::Union(_) => 1,
+            Ty::List(_) => 2,
+            Ty::Number
+            | Ty::String
+            | Ty::Boolean
+            | Ty::Date
+            | Ty::Null
+            | Ty::Unknown
+            | Ty::Generic(_) => 3,
+        }
+    }
+
+    fn fmt_with_prec(&self, f: &mut fmt::Formatter<'_>, parent_prec: u8) -> fmt::Result {
+        let my_prec = self.precedence();
+        let needs_parens = my_prec < parent_prec;
+        if needs_parens {
+            f.write_str("(")?;
+        }
+
+        match self {
+            Ty::Number => f.write_str("number")?,
+            Ty::String => f.write_str("string")?,
+            Ty::Boolean => f.write_str("boolean")?,
+            Ty::Date => f.write_str("date")?,
+            Ty::Null => f.write_str("null")?,
+            Ty::Unknown => f.write_str("unknown")?,
+            Ty::Generic(id) => write!(f, "T{}", id.0)?,
+            Ty::List(inner) => {
+                inner.fmt_with_prec(f, my_prec)?;
+                f.write_str("[]")?;
+            }
+            Ty::Union(members) => {
+                for (idx, m) in members.iter().enumerate() {
+                    if idx > 0 {
+                        f.write_str(" | ")?;
+                    }
+                    m.fmt_with_prec(f, my_prec)?;
+                }
+            }
+        };
+
+        if needs_parens {
+            f.write_str(")")?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for Ty {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_with_prec(f, 0)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

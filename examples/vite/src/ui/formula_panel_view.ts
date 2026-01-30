@@ -544,8 +544,19 @@ export function createFormulaPanelView(opts: {
     for (const seg of activeSig.segments) {
       const segEl = document.createElement("span");
       segEl.className = `completion-signature-seg completion-signature-seg--${seg.kind}`;
-      if (seg.param_index === sig.active_parameter) segEl.classList.add("is-active");
-      segEl.textContent = seg.text;
+      if (seg.kind === "Param" && seg.param_index === sig.active_parameter) {
+        segEl.classList.add("is-active");
+      }
+      switch (seg.kind) {
+        case "Ellipsis":
+          segEl.textContent = "...";
+          break;
+        case "Param":
+          segEl.textContent = `${seg.name}: ${seg.ty}`;
+          break;
+        default:
+          segEl.textContent = seg.text;
+      }
       signatureEl.append(segEl);
     }
   }

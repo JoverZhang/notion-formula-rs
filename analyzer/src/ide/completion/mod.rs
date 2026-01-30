@@ -86,14 +86,14 @@ pub enum CompletionData {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureHelpSignature {
+pub struct SignatureItem {
     pub segments: Vec<crate::ide::display::DisplaySegment>,
 }
 
 /// Signature display for a call at the cursor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureHelp {
-    pub signatures: Vec<SignatureHelpSignature>,
+    pub signatures: Vec<SignatureItem>,
     pub active_signature: usize,
     pub active_parameter: usize,
 }

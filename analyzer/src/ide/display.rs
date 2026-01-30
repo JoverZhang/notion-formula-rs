@@ -1,158 +1,110 @@
 //! Shared display formatting helpers for IDE/UI surfaces.
 //!
 //! This module is intentionally small and deterministic. It is the single
-//! canonical place for formatting analyzer types into UI strings.
+//! canonical place for formatting UI-facing signature help segments.
 
 use crate::semantic::Ty;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TypeFormatOptions {
-    /// When true, formats `List(Union(...))` as `(A | B)[]` to preserve precedence.
-    pub paren_union_in_list: bool,
-}
-
-impl Default for TypeFormatOptions {
-    fn default() -> Self {
-        Self {
-            paren_union_in_list: true,
-        }
-    }
-}
-
-/// Formats a type for UI display (e.g. `number[]` or `number | string`).
-pub fn format_ty(ty: &Ty, opts: &TypeFormatOptions) -> String {
-    match ty {
-        Ty::Number => "number".into(),
-        Ty::String => "string".into(),
-        Ty::Boolean => "boolean".into(),
-        Ty::Date => "date".into(),
-        Ty::Null => "null".into(),
-        Ty::Unknown => "unknown".into(),
-        Ty::Generic(id) => format!("T{}", id.0),
-        Ty::List(inner) => {
-            let inner = &**inner;
-            if opts.paren_union_in_list && matches!(inner, Ty::Union(_)) {
-                format!("({})[]", format_ty(inner, opts))
-            } else {
-                format!("{}[]", format_ty(inner, opts))
-            }
-        }
-        Ty::Union(members) => members
-            .iter()
-            .map(|m| format_ty(m, opts))
-            .collect::<Vec<_>>()
-            .join(" | "),
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum DisplaySegmentKind {
-    Name,
-    Punct,
-    ParamName,
-    Type,
-    Separator,
-    Ellipsis,
-    Arrow,
-    ReturnType,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DisplaySegment {
-    pub kind: DisplaySegmentKind,
-    pub text: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub param_index: Option<u32>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RenderedParam {
+#[serde(tag = "kind", rename_all = "PascalCase")]
+pub enum DisplaySegment {
+    Name { text: String },
+    Punct { text: String },
+    Separator { text: String },
+    Ellipsis,
+    Arrow { text: String },
     Param {
         name: String,
         ty: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         param_index: Option<u32>,
+    },
+    ReturnType { text: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParamSlot {
+    Param {
+        name: String,
+        ty: String,
+        param_index: u32,
     },
     Ellipsis,
 }
 
-/// Build signature display segments for a single signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedSignature {
+    pub receiver: Option<(String, String)>,
+    pub slots: Vec<ParamSlot>,
+}
+
+/// Builds signature segments for a single signature candidate.
 ///
-/// Output shape: `name(p1: ty1, p2: ty2, ...) -> ret`, but with punctuation split into segments.
+/// Output shape: `name(p1: ty1, p2: ty2, ...) -> ret`, with punctuation split into segments.
 pub fn build_signature_segments(
     func_name: &str,
-    params: &[RenderedParam],
+    rendered: &RenderedSignature,
     ret: &Ty,
-    opts: &TypeFormatOptions,
+    is_method_style: bool,
 ) -> Vec<DisplaySegment> {
-    let mut segments = Vec::<DisplaySegment>::with_capacity(4 + params.len() * 4);
+    let mut out = Vec::<DisplaySegment>::new();
 
-    segments.push(DisplaySegment {
-        kind: DisplaySegmentKind::Name,
-        text: func_name.to_string(),
-        param_index: None,
-    });
-    segments.push(DisplaySegment {
-        kind: DisplaySegmentKind::Punct,
-        text: "(".to_string(),
-        param_index: None,
-    });
-
-    for (idx, param) in params.iter().enumerate() {
-        if idx > 0 {
-            segments.push(DisplaySegment {
-                kind: DisplaySegmentKind::Separator,
-                text: ", ".to_string(),
+    if is_method_style {
+        if let Some((name, ty)) = &rendered.receiver {
+            out.push(DisplaySegment::Punct {
+                text: "(".to_string(),
+            });
+            out.push(DisplaySegment::Param {
+                name: name.clone(),
+                ty: ty.clone(),
                 param_index: None,
             });
-        }
-
-        match param {
-            RenderedParam::Ellipsis => segments.push(DisplaySegment {
-                kind: DisplaySegmentKind::Ellipsis,
-                text: "...".to_string(),
-                param_index: None,
-            }),
-            RenderedParam::Param {
-                name,
-                ty,
-                param_index,
-            } => {
-                segments.push(DisplaySegment {
-                    kind: DisplaySegmentKind::ParamName,
-                    text: name.clone(),
-                    param_index: *param_index,
-                });
-                segments.push(DisplaySegment {
-                    kind: DisplaySegmentKind::Punct,
-                    text: ": ".to_string(),
-                    param_index: *param_index,
-                });
-                segments.push(DisplaySegment {
-                    kind: DisplaySegmentKind::Type,
-                    text: ty.clone(),
-                    param_index: *param_index,
-                });
-            }
+            out.push(DisplaySegment::Punct {
+                text: ")".to_string(),
+            });
+            out.push(DisplaySegment::Punct {
+                text: ".".to_string(),
+            });
         }
     }
 
-    segments.push(DisplaySegment {
-        kind: DisplaySegmentKind::Punct,
-        text: ")".to_string(),
-        param_index: None,
+    out.push(DisplaySegment::Name {
+        text: func_name.to_string(),
     });
-    segments.push(DisplaySegment {
-        kind: DisplaySegmentKind::Arrow,
-        text: " -> ".to_string(),
-        param_index: None,
-    });
-    segments.push(DisplaySegment {
-        kind: DisplaySegmentKind::ReturnType,
-        text: format_ty(ret, opts),
-        param_index: None,
+    out.push(DisplaySegment::Punct {
+        text: "(".to_string(),
     });
 
-    segments
+    for (idx, slot) in rendered.slots.iter().enumerate() {
+        if idx > 0 {
+            out.push(DisplaySegment::Separator {
+                text: ", ".to_string(),
+            });
+        }
+        match slot {
+            ParamSlot::Ellipsis => out.push(DisplaySegment::Ellipsis),
+            ParamSlot::Param {
+                name,
+                ty,
+                param_index,
+            } => out.push(DisplaySegment::Param {
+                name: name.clone(),
+                ty: ty.clone(),
+                param_index: Some(*param_index),
+            }),
+        }
+    }
+
+    out.push(DisplaySegment::Punct {
+        text: ")".to_string(),
+    });
+    out.push(DisplaySegment::Arrow {
+        text: " -> ".to_string(),
+    });
+    out.push(DisplaySegment::ReturnType {
+        text: ret.to_string(),
+    });
+
+    out
 }

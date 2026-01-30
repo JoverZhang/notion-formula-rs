@@ -12,7 +12,18 @@ function sigLabelAtCloseParen(source: string): string {
   const help = out.signature_help!;
   const activeSig = help.signatures[help.active_signature] ?? help.signatures[0];
   expect(activeSig).toBeTruthy();
-  return activeSig!.segments.map((s) => s.text).join("");
+  return activeSig!.segments
+    .map((s) => {
+      switch (s.kind) {
+        case "Ellipsis":
+          return "...";
+        case "Param":
+          return `${s.name}: ${s.ty}`;
+        default:
+          return s.text;
+      }
+    })
+    .join("");
 }
 
 function sigAtCloseParen(source: string) {

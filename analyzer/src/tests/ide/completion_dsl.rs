@@ -635,7 +635,20 @@ impl CompletionTestBuilder {
             .expect("expected at least one signature");
         let mut rendered = String::new();
         for seg in &active.segments {
-            rendered.push_str(seg.text.as_str());
+            use crate::ide::display::DisplaySegment as S;
+            match seg {
+                S::Name { text }
+                | S::Punct { text }
+                | S::Separator { text }
+                | S::Arrow { text }
+                | S::ReturnType { text } => rendered.push_str(text.as_str()),
+                S::Ellipsis => rendered.push_str("..."),
+                S::Param { name, ty, .. } => {
+                    rendered.push_str(name.as_str());
+                    rendered.push_str(": ");
+                    rendered.push_str(ty.as_str());
+                }
+            }
         }
         assert_eq!(rendered, label);
         self
@@ -654,7 +667,20 @@ impl CompletionTestBuilder {
             .expect("expected at least one signature");
         let mut rendered = String::new();
         for seg in &active.segments {
-            rendered.push_str(seg.text.as_str());
+            use crate::ide::display::DisplaySegment as S;
+            match seg {
+                S::Name { text }
+                | S::Punct { text }
+                | S::Separator { text }
+                | S::Arrow { text }
+                | S::ReturnType { text } => rendered.push_str(text.as_str()),
+                S::Ellipsis => rendered.push_str("..."),
+                S::Param { name, ty, .. } => {
+                    rendered.push_str(name.as_str());
+                    rendered.push_str(": ");
+                    rendered.push_str(ty.as_str());
+                }
+            }
         }
         assert!(
             !rendered.contains(substr),
