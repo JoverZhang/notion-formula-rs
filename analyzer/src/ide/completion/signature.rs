@@ -234,7 +234,8 @@ fn infer_call_arg_tys_best_effort(
             return spans;
         };
 
-        let mut depth = 0i32;
+        let mut paren_depth = 0i32;
+        let mut bracket_depth = 0i32;
         let mut start = lparen.span.end;
 
         for token in tokens.iter().skip(lparen_idx + 1) {
@@ -243,18 +244,26 @@ fn infer_call_arg_tys_best_effort(
             }
 
             match token.kind {
-                TokenKind::OpenParen => depth += 1,
+                TokenKind::OpenParen => paren_depth += 1,
+                TokenKind::OpenBracket => bracket_depth += 1,
                 TokenKind::CloseParen => {
-                    if depth == 0 {
+                    if paren_depth == 0 && bracket_depth == 0 {
                         spans.push(crate::Span {
                             start,
                             end: token.span.start,
                         });
                         return spans;
                     }
-                    depth -= 1;
+                    if paren_depth > 0 {
+                        paren_depth -= 1;
+                    }
                 }
-                TokenKind::Comma if depth == 0 => {
+                TokenKind::CloseBracket => {
+                    if bracket_depth > 0 {
+                        bracket_depth -= 1;
+                    }
+                }
+                TokenKind::Comma if paren_depth == 0 && bracket_depth == 0 => {
                     spans.push(crate::Span {
                         start,
                         end: token.span.start,
@@ -485,7 +494,8 @@ pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallC
         return None;
     };
     let mut arg_index = 0usize;
-    let mut depth = 0i32;
+    let mut paren_depth = 0i32;
+    let mut bracket_depth = 0i32;
     for token in tokens.iter().skip(lparen_idx + 1) {
         if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
             continue;
@@ -494,14 +504,20 @@ pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallC
             break;
         }
         match token.kind {
-            TokenKind::OpenParen => depth += 1,
+            TokenKind::OpenParen => paren_depth += 1,
+            TokenKind::OpenBracket => bracket_depth += 1,
             TokenKind::CloseParen => {
-                if depth > 0 {
-                    depth -= 1;
+                if paren_depth > 0 {
+                    paren_depth -= 1;
+                }
+            }
+            TokenKind::CloseBracket => {
+                if bracket_depth > 0 {
+                    bracket_depth -= 1;
                 }
             }
             TokenKind::Comma => {
-                if depth == 0 {
+                if paren_depth == 0 && bracket_depth == 0 {
                     arg_index += 1;
                 }
             }

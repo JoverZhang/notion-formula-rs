@@ -125,7 +125,7 @@ fn completion_type_ranking_number_prefers_number_props() {
 }
 
 #[test]
-fn completion_type_ranking_sum_number_does_not_prefer_number_list_props() {
+fn completion_type_ranking_sum_number_prefers_number_list_props() {
     let c = ctx()
         .prop("Title", Ty::String)
         .prop("Age", Ty::Number)
@@ -135,7 +135,7 @@ fn completion_type_ranking_sum_number_does_not_prefer_number_list_props() {
     t("sum($0")
         .ctx(c)
         .expect_order("Age", "Title")
-        .expect_order("Title", "Nums")
+        .expect_order("Nums", "Title")
         .expect_replace_contains_cursor();
 }
 
