@@ -230,6 +230,30 @@ fn infer_expr_inner(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
         },
         ExprKind::Ident(_) => Ty::Unknown,
         ExprKind::Group { inner } => infer_expr_with_map(inner, ctx, map),
+        ExprKind::List { items } => {
+            fn contains_unknown(ty: &Ty) -> bool {
+                match ty {
+                    Ty::Unknown => true,
+                    Ty::Union(members) => members.iter().any(contains_unknown),
+                    _ => false,
+                }
+            }
+
+            if items.is_empty() {
+                Ty::List(Box::new(Ty::Unknown))
+            } else {
+                let mut item_tys = Vec::with_capacity(items.len());
+                for item in items {
+                    item_tys.push(infer_expr_with_map(item, ctx, map));
+                }
+
+                if item_tys.iter().any(contains_unknown) {
+                    Ty::List(Box::new(Ty::Unknown))
+                } else {
+                    Ty::List(Box::new(normalize_union(item_tys)))
+                }
+            }
+        }
         ExprKind::Unary { op, expr } => {
             let inner_ty = infer_expr_with_map(expr, ctx, map);
             match op.node {

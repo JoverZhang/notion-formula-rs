@@ -138,6 +138,11 @@ fn find_call_expr_by_lparen<'a>(
 
         match &expr.kind {
             ExprKind::Group { inner } => visit_child(inner),
+            ExprKind::List { items } => {
+                for item in items {
+                    visit_child(item);
+                }
+            }
             ExprKind::Unary { expr: inner, .. } => visit_child(inner),
             ExprKind::Binary { left, right, .. } => {
                 visit_child(left);
@@ -516,9 +521,15 @@ pub(super) fn expected_call_arg_ty(
 ) -> Option<semantic::Ty> {
     let call_ctx = call_ctx?;
     let ctx = ctx?;
-    ctx.functions
+    let ty = ctx
+        .functions
         .iter()
         .find(|func| func.name == call_ctx.callee)
         .and_then(|func| func.param_for_arg_index(call_ctx.arg_index))
-        .map(|param| param.ty.clone())
+        .map(|param| param.ty.clone())?;
+
+    match ty {
+        semantic::Ty::Unknown | semantic::Ty::Generic(_) => None,
+        other => Some(other),
+    }
 }

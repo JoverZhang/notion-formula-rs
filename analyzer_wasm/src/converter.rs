@@ -321,6 +321,8 @@ fn token_kind_string(kind: &TokenKind) -> &'static str {
         Question => "Question",
         OpenParen => "OpenParen",
         CloseParen => "CloseParen",
+        OpenBracket => "OpenBracket",
+        CloseBracket => "CloseBracket",
         Literal(lit) => match lit.kind {
             LitKind::Bool => "Bool",
             LitKind::Number => "Number",

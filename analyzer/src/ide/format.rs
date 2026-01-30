@@ -109,6 +109,18 @@ fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
             let inner = format_expr_one_line_with_prec(inner, 0);
             format!("({})", inner)
         }
+        ExprKind::List { items } => {
+            let mut s = String::new();
+            s.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                s.push_str(&format_expr_one_line_with_prec(item, 0));
+            }
+            s.push(']');
+            s
+        }
         ExprKind::Lit(lit) => render_literal(lit),
 
         ExprKind::Call { callee, args } => {
@@ -251,6 +263,7 @@ impl<'a> Formatter<'a> {
         match &expr.kind {
             ExprKind::Ident(sym) => Rendered::single(indent, sym.text.clone()),
             ExprKind::Group { inner } => self.format_group(expr, indent, parent_prec, inner),
+            ExprKind::List { items } => self.format_list(expr, indent, parent_prec, items),
             ExprKind::Lit(lit) => Rendered::single(indent, render_literal(lit)),
             ExprKind::Call { callee, args } => {
                 self.format_call(expr, indent, parent_prec, &callee.text, args)
@@ -300,6 +313,54 @@ impl<'a> Formatter<'a> {
         let inner_rendered = self.format_expr_rendered(inner, indent + 1, 0);
         out.append(inner_rendered);
         out.push_line(indent, ")");
+        out
+    }
+
+    fn format_list(
+        &mut self,
+        expr: &Expr,
+        indent: usize,
+        _parent_prec: u8,
+        items: &[Expr],
+    ) -> Rendered {
+        let has_newline = self.expr_has_newline(expr);
+
+        if !has_newline {
+            let saved = self.used_comments.clone();
+            let mut parts = Vec::new();
+            let mut inline_ok = true;
+
+            for item in items {
+                if let Some(text) = self.format_expr_single_line(item, indent, 0) {
+                    parts.push(text);
+                } else {
+                    inline_ok = false;
+                    break;
+                }
+            }
+
+            if inline_ok {
+                let text = format!("[{}]", parts.join(", "));
+                let inline_len = text.len();
+                if self.fits_on_line(indent, inline_len) && inline_len <= MAX_WIDTH {
+                    return Rendered::single(indent, text);
+                }
+            }
+
+            self.used_comments = saved;
+        }
+
+        let mut out = Rendered::default();
+        out.push_line(indent, "[");
+        for (idx, item) in items.iter().enumerate() {
+            let mut item_r = self.format_expr_rendered(item, indent + 1, 0);
+            let is_last = idx + 1 == items.len();
+            if !is_last && let Some(last) = item_r.lines.last_mut() {
+                last.text.push(',');
+            }
+            out.append(item_r);
+        }
+        out.push_line(indent, "]");
         out
     }
 
@@ -611,6 +672,7 @@ impl<'a> Formatter<'a> {
         }
         match &expr.kind {
             ExprKind::Group { inner } => self.expr_has_comments(inner),
+            ExprKind::List { items } => items.iter().any(|a| self.expr_has_comments(a)),
             ExprKind::Call { args, .. } => args.iter().any(|a| self.expr_has_comments(a)),
             ExprKind::MemberCall { receiver, args, .. } => {
                 self.expr_has_comments(receiver) || args.iter().any(|a| self.expr_has_comments(a))

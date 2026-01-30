@@ -37,6 +37,7 @@ fn assert_single_diag(diags: Vec<crate::Diagnostic>, message: &str, span: Span) 
 }
 
 fn ctx_with_builtins() -> Context {
+    let t = GenericId(0);
     let mut ctx = Context {
         properties: vec![],
         functions: vec![],
@@ -48,8 +49,8 @@ fn ctx_with_builtins() -> Context {
         ParamShape::new(
             vec![
                 p("condition", Ty::Boolean),
-                p("then", Ty::Unknown),
-                p("else", Ty::Unknown),
+                p("then", Ty::Generic(t)),
+                p("else", Ty::Generic(t)),
             ],
             vec![],
             vec![],

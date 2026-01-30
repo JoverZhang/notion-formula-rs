@@ -26,6 +26,12 @@ fn assert_tree_invariants(expr: &Expr) {
             assert_contains(expr, inner);
             assert_tree_invariants(inner);
         }
+        ExprKind::List { items } => {
+            for item in items {
+                assert_contains(expr, item);
+                assert_tree_invariants(item);
+            }
+        }
         ExprKind::Call { args, .. } => {
             for arg in args {
                 assert_contains(expr, arg);

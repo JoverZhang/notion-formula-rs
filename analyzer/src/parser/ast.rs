@@ -41,6 +41,9 @@ pub enum ExprKind {
     Group {
         inner: Box<Expr>,
     },
+    List {
+        items: Vec<Expr>,
+    },
     Call {
         callee: Symbol,
         args: Vec<Expr>,

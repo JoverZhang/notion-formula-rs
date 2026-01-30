@@ -102,6 +102,10 @@ pub enum TokenKind {
     OpenParen,
     /// `)`
     CloseParen,
+    /// `[`
+    OpenBracket,
+    /// `]`
+    CloseBracket,
 
     /* Literals */
     /// Literal token.
@@ -137,6 +141,7 @@ impl Token {
             self.kind,
             TokenKind::Ident(..)
                 | TokenKind::OpenParen
+                | TokenKind::OpenBracket
                 | TokenKind::Literal(..)
                 | TokenKind::Bang
                 | TokenKind::Minus
