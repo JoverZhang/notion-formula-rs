@@ -427,6 +427,10 @@ impl<'a> Parser<'a> {
     ///
     /// After a comma, the parser expects an expression and emits:
     /// `expected expression after ',' in list literal`.
+    ///
+    /// ```text
+    /// "[1,2,]" -> "trailing comma in list literal is not supported"
+    /// ```
     fn parse_list_literal(&mut self) -> Expr {
         let lbrack = self.bump(); // '['
         let mut items = Vec::new();
@@ -560,6 +564,24 @@ impl<'a> Parser<'a> {
         self.mk_expr(tok.span, ExprKind::Error)
     }
 
+    /// Skip tokens until reaching a synchronization token.
+    ///
+    /// This is used after emitting a diagnostic to avoid cascading errors.
+    /// Typical sync sets in this parser include `,`, `)`, `]`, `:`, and `Eof`.
+    ///
+    /// Error nodes produced during recovery are [`ExprKind::Error`] and usually carry:
+    /// - the span of the unexpected token, or
+    /// - an empty span at end-of-input (an insertion point).
+    ///
+    /// ```text
+    /// source: "(a + b"
+    /// parsing: expects ')', finds Eof
+    /// recovery: recover_to([CloseParen, Comma, Eof]) stops at Eof; an Error expr may use an empty span
+    ///
+    /// source: "a + )"
+    /// parsing: expects an expression after '+', finds ')'
+    /// recovery: sync includes ')', so an Error expr often uses the ')' token span
+    /// ```
     fn recover_to(&mut self, sync: &[TokenKind]) {
         while !sync.iter().any(|k| self.same_kind(self.cur_kind(), k)) {
             if matches!(self.cur_kind(), TokenKind::Eof) {

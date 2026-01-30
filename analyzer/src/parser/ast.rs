@@ -2,19 +2,33 @@ use crate::lexer::{Lit, NodeId, Span, Spanned, Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOpKind {
+    /// `<`
     Lt,
+    /// `<=`
     Le,
+    /// `==`
     EqEq,
+    /// `!=`
     Ne,
+    /// `>=`
     Ge,
+    /// `>`
     Gt,
+    /// `&&`
     AndAnd,
+    /// `||`
     OrOr,
+    /// `+`
     Plus,
+    /// `-`
     Minus,
+    /// `*`
     Star,
+    /// `/`
     Slash,
+    /// `%`
     Percent,
+    /// `^`
     Caret,
 }
 

@@ -222,7 +222,19 @@ impl<'a> Parser<'a> {
     }
 }
 
-// precedence: bigger = tighter binding
+/// Returns the Pratt binding power for an infix operator.
+///
+/// Larger numbers bind tighter.
+///
+/// Operator set handled by the expression parser:
+/// - Logical: `||`, `&&`
+/// - Equality: `==`, `!=`
+/// - Comparison: `<`, `<=`, `>=`, `>`
+/// - Arithmetic: `+`, `-`, `*`, `/`, `%`, `^`
+///
+/// Associativity:
+/// - Most operators are left-associative (e.g. `a - b - c` parses as `(a - b) - c`).
+/// - `^` (power-like) is right-associative (e.g. `2 ^ 2 ^ 3` parses as `2 ^ (2 ^ 3)`).
 pub fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
     use BinOpKind::*;
 
@@ -241,6 +253,9 @@ pub fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
     }
 }
 
+/// Returns the Pratt binding power for a prefix operator.
+///
+/// Prefix operators handled by the expression parser: `!` and unary `-`.
 pub fn prefix_binding_power(op: UnOpKind) -> u8 {
     match op {
         UnOpKind::Not => 14,
