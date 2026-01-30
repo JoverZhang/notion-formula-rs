@@ -12,11 +12,26 @@ type DemoFormulaId = Exclude<FormulaId, "f3">;
 const FORMULA_DEMOS: Record<DemoFormulaId, { label: string; sample: string; note?: string }> = {
   f1: {
     label: "Formula 1",
-    sample: `if(prop("Number") > 10, prop("Text"), "Needs review")`,
+    sample: `if(
+  sum(prop("Number"), [1, 2, 3]) > 20,
+  prop("Text"),
+  [
+    prop("Date"),
+    12,
+    ["34", 56]
+  ]
+)`,
   },
   f2: {
     label: "Formula 2",
-    sample: `formatDate(prop("Date"), "YYYY-MM-DD")`,
+    sample: `(prop("Number") < 1).ifs(
+  prop("Title"),
+  prop("Number") < 2,
+  [prop("Number")],
+  prop("Number") < 3,
+  prop("Date"),
+  4
+)`,
   },
 };
 
