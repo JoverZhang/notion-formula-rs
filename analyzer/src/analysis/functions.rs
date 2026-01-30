@@ -554,7 +554,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
                 p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
                 p!("index", Ty::Number)
             ),
-            Ty::Unknown,
+            Ty::Generic(t0),
         ),
         func_g!(
             FunctionCategory::List,
@@ -562,7 +562,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             generics!(g!(0, Plain)),
             "first",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::Unknown,
+            Ty::Generic(t0),
         ),
         func_g!(
             FunctionCategory::List,
@@ -570,7 +570,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             generics!(g!(0, Plain)),
             "last",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::Unknown,
+            Ty::Generic(t0),
         ),
         func_g!(
             FunctionCategory::List,
@@ -582,7 +582,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
                 p!("start", Ty::Number),
                 opt!("end", Ty::Number)
             ),
-            Ty::List(Box::new(Ty::Unknown)),
+            Ty::List(Box::new(Ty::Generic(t0))),
         ),
         func_g!(
             FunctionCategory::List,
@@ -593,7 +593,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
                 repeat!(p!("lists", Ty::List(Box::new(Ty::Generic(t0))))),
                 tail!(),
             ),
-            Ty::List(Box::new(Ty::Unknown)),
+            Ty::List(Box::new(Ty::Generic(t0))),
         ),
         func_g!(
             FunctionCategory::List,
@@ -601,7 +601,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             generics!(g!(0, Plain)),
             "sort",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::List(Box::new(Ty::Unknown)),
+            Ty::List(Box::new(Ty::Generic(t0))),
         ),
         func_g!(
             FunctionCategory::List,
@@ -609,7 +609,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             generics!(g!(0, Plain)),
             "reverse",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::List(Box::new(Ty::Unknown)),
+            Ty::List(Box::new(Ty::Generic(t0))),
         ),
         func_g!(
             FunctionCategory::List,
@@ -635,7 +635,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             generics!(g!(0, Plain)),
             "unique",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::List(Box::new(Ty::Unknown)),
+            Ty::List(Box::new(Ty::Generic(t0))),
         ),
         func_g!(
             FunctionCategory::List,
@@ -648,83 +648,21 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             ),
             Ty::Boolean,
         ),
-        func_g!(
-            FunctionCategory::List,
-            "find(list, predicate)",
-            generics!(g!(0, Plain)),
-            "find",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!(
-                    "predicate",
-                    // lambda expr (current/index) in Notion DSL
-                    Ty::Generic(t0)
-                )
-            ),
-            Ty::Unknown,
-        ),
-        func_g!(
-            FunctionCategory::List,
-            "findIndex(list, predicate)",
-            generics!(g!(0, Plain)),
-            "findIndex",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!("predicate", Ty::Generic(t0))
-            ),
-            Ty::Number,
-        ),
-        func_g!(
-            FunctionCategory::List,
-            "filter(list, predicate)",
-            generics!(g!(0, Plain)),
-            "filter",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!("predicate", Ty::Generic(t0))
-            ),
-            Ty::List(Box::new(Ty::Unknown)),
-        ),
-        func_g!(
-            FunctionCategory::List,
-            "some(list, predicate)",
-            generics!(g!(0, Plain)),
-            "some",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!("predicate", Ty::Generic(t0))
-            ),
-            Ty::Boolean,
-        ),
-        func_g!(
-            FunctionCategory::List,
-            "every(list, predicate)",
-            generics!(g!(0, Plain)),
-            "every",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!("predicate", Ty::Generic(t0))
-            ),
-            Ty::Boolean,
-        ),
-        func_g!(
-            FunctionCategory::List,
-            "map(list, mapper)",
-            generics!(g!(0, Plain)),
-            "map",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!("mapper", Ty::Generic(t0))
-            ),
-            Ty::List(Box::new(Ty::Unknown)),
-        ),
+        // TODO(lambda-typing): Intentionally removed until we have a real lambda/function type system.
+        // NOTE: Notion’s predicate/mapper DSL may include (current, index) etc.; keep minimal forms here.
+        // TODO(lambda-typing): find<T>(list: T[], predicate: (current) -> boolean) -> T
+        // TODO(lambda-typing): findIndex<T>(list: T[], predicate: (current) -> boolean) -> number
+        // TODO(lambda-typing): filter<T>(list: T[], predicate: (current) -> boolean) -> T[]
+        // TODO(lambda-typing): some<T>(list: T[], predicate: (current) -> boolean) -> boolean
+        // TODO(lambda-typing): every<T>(list: T[], predicate: (current) -> boolean) -> boolean
+        // TODO(lambda-typing): map<T, U>(list: T[], mapper: (current) -> U) -> U[]
         func_g!(
             FunctionCategory::List,
             "flat(list)",
             generics!(g!(0, Plain)),
             "flat",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::List(Box::new(Ty::Unknown)),
+            Ty::List(Box::new(Ty::Generic(t0))),
         ),
         // =========================
         // Special / Utility
@@ -772,7 +710,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
                 p!("value", Ty::Generic(t0)),
                 p!("expr", Ty::Generic(t0))
             ),
-            Ty::Unknown,
+            Ty::Generic(t0),
         ),
         func_g!(
             FunctionCategory::Special,
@@ -792,7 +730,7 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
                 ),
                 tail!(p!("expr", Ty::Generic(t0))),
             ),
-            Ty::Unknown,
+            Ty::Generic(t0),
         ),
     ]
 }

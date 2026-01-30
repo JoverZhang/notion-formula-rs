@@ -99,12 +99,12 @@ macro_rules! generics {
 
 macro_rules! func {
     ($category:expr, $detail:expr, $name:literal, $params:expr, $ret:expr $(,)?) => {
-        $crate::semantic::FunctionSig::new($category, $detail, $name, $params, $ret, vec![])
+        $crate::semantic::FunctionSig::new_builtin($category, $detail, $name, $params, $ret, vec![])
     };
 }
 
 macro_rules! func_g {
     ($category:expr, $detail:expr, $generics:expr, $name:literal, $params:expr, $ret:expr $(,)?) => {
-        $crate::semantic::FunctionSig::new($category, $detail, $name, $params, $ret, $generics)
+        $crate::semantic::FunctionSig::new_builtin($category, $detail, $name, $params, $ret, $generics)
     };
 }

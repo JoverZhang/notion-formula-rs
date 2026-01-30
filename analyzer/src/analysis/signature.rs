@@ -1,5 +1,6 @@
 use super::{FunctionCategory, GenericId, Ty};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -92,6 +93,58 @@ impl FunctionSig {
         }
     }
 
+    pub fn new_builtin(
+        category: FunctionCategory,
+        detail: impl Into<String>,
+        name: impl Into<String>,
+        params: ParamShape,
+        ret: Ty,
+        generics: Vec<GenericParam>,
+    ) -> Self {
+        let sig = Self::new(category, detail, name, params, ret, generics);
+        sig.validate_builtin();
+        sig
+    }
+
+    fn validate_builtin(&self) {
+        let mut declared = HashSet::<GenericId>::new();
+        for g in &self.generics {
+            declared.insert(g.id);
+        }
+
+        for p in self.display_params() {
+            if let Some(ty) = find_unknown_in_ty(&p.ty) {
+                panic!(
+                    "Builtin FunctionSig `{}`: expected param `{}` type must not contain Ty::Unknown (found: {:?})",
+                    self.name, p.name, ty
+                );
+            }
+            for used in collect_generics_in_ty(&p.ty) {
+                if !declared.contains(&used) {
+                    panic!(
+                        "Builtin FunctionSig `{}`: param `{}` type uses generic {:?} but it is not declared in `generics`",
+                        self.name, p.name, used
+                    );
+                }
+            }
+        }
+
+        if let Some(ty) = find_unknown_in_ty(&self.ret) {
+            panic!(
+                "Builtin FunctionSig `{}`: expected return type must not contain Ty::Unknown (found: {:?})",
+                self.name, ty
+            );
+        }
+        for used in collect_generics_in_ty(&self.ret) {
+            if !declared.contains(&used) {
+                panic!(
+                    "Builtin FunctionSig `{}`: return type uses generic {:?} but it is not declared in `generics`",
+                    self.name, used
+                );
+            }
+        }
+    }
+
     pub fn flat_params(&self) -> Option<&[ParamSig]> {
         if self.params.repeat.is_empty() && self.params.tail.is_empty() {
             return Some(&self.params.head);
@@ -160,5 +213,33 @@ impl FunctionSig {
             return None;
         }
         self.params.repeat.get(idx % self.params.repeat.len())
+    }
+}
+
+fn collect_generics_in_ty(ty: &Ty) -> Vec<GenericId> {
+    fn walk(ty: &Ty, out: &mut Vec<GenericId>) {
+        match ty {
+            Ty::Generic(g) => out.push(*g),
+            Ty::List(inner) => walk(inner, out),
+            Ty::Union(members) => {
+                for m in members {
+                    walk(m, out);
+                }
+            }
+            Ty::Number | Ty::String | Ty::Boolean | Ty::Date | Ty::Null | Ty::Unknown => {}
+        }
+    }
+
+    let mut out = Vec::new();
+    walk(ty, &mut out);
+    out
+}
+
+fn find_unknown_in_ty(ty: &Ty) -> Option<&Ty> {
+    match ty {
+        Ty::Unknown => Some(ty),
+        Ty::List(inner) => find_unknown_in_ty(inner),
+        Ty::Union(members) => members.iter().find_map(find_unknown_in_ty),
+        Ty::Number | Ty::String | Ty::Boolean | Ty::Date | Ty::Null | Ty::Generic(_) => None,
     }
 }

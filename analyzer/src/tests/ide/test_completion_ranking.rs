@@ -69,15 +69,14 @@ fn completion_preferred_limit_zero_disables_preferred_indices() {
 #[test]
 fn completion_ranking_contains_beats_fuzzy() {
     let c = ctx()
-        .only_funcs(&["mean", "median", "toNumber", "name", "some"])
+        .only_funcs(&["mean", "median", "toNumber", "name"])
         .build();
 
     t("me$0")
         .ctx(c)
         .expect_order("mean", "toNumber")
         .expect_order("median", "toNumber")
-        .expect_order("name", "toNumber")
-        .expect_order("some", "toNumber");
+        .expect_order("name", "toNumber");
 }
 
 #[test]
