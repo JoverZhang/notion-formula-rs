@@ -105,6 +105,8 @@ macro_rules! func {
 
 macro_rules! func_g {
     ($category:expr, $detail:expr, $generics:expr, $name:literal, $params:expr, $ret:expr $(,)?) => {
-        $crate::semantic::FunctionSig::new_builtin($category, $detail, $name, $params, $ret, $generics)
+        $crate::semantic::FunctionSig::new_builtin(
+            $category, $detail, $name, $params, $ret, $generics,
+        )
     };
 }

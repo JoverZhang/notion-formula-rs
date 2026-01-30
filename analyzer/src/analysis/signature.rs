@@ -38,13 +38,14 @@ impl ParamShape {
             );
         }
 
-        if !repeat.is_empty() && !tail.is_empty() {
-            if let Some(param) = tail.iter().find(|p| p.optional) {
-                panic!(
-                    "ParamShape invariant violated: when repeat params exist, tail params must be required for determinism (found optional: {:?})",
-                    param
-                );
-            }
+        if !repeat.is_empty()
+            && !tail.is_empty()
+            && let Some(param) = tail.iter().find(|p| p.optional)
+        {
+            panic!(
+                "ParamShape invariant violated: when repeat params exist, tail params must be required for determinism (found optional: {:?})",
+                param
+            );
         }
 
         let mut seen_optional = false;

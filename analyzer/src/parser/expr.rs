@@ -414,10 +414,8 @@ impl<'a> Parser<'a> {
 
                 if !self.cur().can_begin_expr() {
                     let found = self.cur().clone();
-                    self.diagnostics.emit_error(
-                        found.span,
-                        "expected expression after ',' in list literal",
-                    );
+                    self.diagnostics
+                        .emit_error(found.span, "expected expression after ',' in list literal");
                     if !matches!(found.kind, TokenKind::Eof) {
                         self.bump();
                     }

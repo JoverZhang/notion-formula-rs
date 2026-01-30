@@ -20,7 +20,10 @@ pub(super) fn format_ty(ty: &semantic::Ty) -> String {
         semantic::Ty::Null => "null".into(),
         semantic::Ty::Unknown => "unknown".into(),
         semantic::Ty::Generic(id) => format!("T{}", id.0),
-        semantic::Ty::List(inner) => format!("{}[]", format_ty(inner)),
+        semantic::Ty::List(inner) => match &**inner {
+            semantic::Ty::Union(_) => format!("({})[]", format_ty(inner)),
+            _ => format!("{}[]", format_ty(inner)),
+        },
         semantic::Ty::Union(types) => types.iter().map(format_ty).collect::<Vec<_>>().join(" | "),
     }
 }
@@ -128,12 +131,7 @@ fn find_call_expr_by_lparen<'a>(
     callee: &str,
     lparen_start: u32,
 ) -> Option<&'a Expr> {
-    fn visit<'a>(
-        expr: &'a Expr,
-        callee: &str,
-        lparen_start: u32,
-        best: &mut Option<&'a Expr>,
-    ) {
+    fn visit<'a>(expr: &'a Expr, callee: &str, lparen_start: u32, best: &mut Option<&'a Expr>) {
         let mut visit_child = |child: &'a Expr| visit(child, callee, lparen_start, best);
 
         match &expr.kind {
@@ -287,27 +285,27 @@ fn infer_call_arg_tys_best_effort(
     let mut arg_tys: Vec<Option<semantic::Ty>> = Vec::new();
 
     // If this is a member call, try to include the receiver type as the leading argument.
-    if include_receiver_as_arg {
-        if let Ok(parsed) = crate::analyze(source) {
-            if let Some(call_expr) =
-                find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
-            {
-                if let ExprKind::MemberCall { receiver, .. } = &call_expr.kind {
-                    let mut map = semantic::TypeMap::default();
-                    let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
-                    let mut ty = map.get(receiver.id).cloned().unwrap_or(semantic::Ty::Unknown);
-                    if matches!(ty, semantic::Ty::Unknown)
-                        && matches!(
-                            &receiver.kind,
-                            ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
-                        )
-                    {
-                        ty = semantic::Ty::Boolean;
-                    }
-                    arg_tys.push(Some(ty));
-                }
-            }
+    if include_receiver_as_arg
+        && let Ok(parsed) = crate::analyze(source)
+        && let Some(call_expr) =
+            find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
+        && let ExprKind::MemberCall { receiver, .. } = &call_expr.kind
+    {
+        let mut map = semantic::TypeMap::default();
+        let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
+        let mut ty = map
+            .get(receiver.id)
+            .cloned()
+            .unwrap_or(semantic::Ty::Unknown);
+        if matches!(ty, semantic::Ty::Unknown)
+            && matches!(
+                &receiver.kind,
+                ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
+            )
+        {
+            ty = semantic::Ty::Boolean;
         }
+        arg_tys.push(Some(ty));
     }
 
     for span in spans {
@@ -323,7 +321,11 @@ fn infer_call_arg_tys_best_effort(
     arg_tys
 }
 
-fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext, total_args_for_shape: usize) -> usize {
+fn active_param_index(
+    sig: &semantic::FunctionSig,
+    call_ctx: &CallContext,
+    total_args_for_shape: usize,
+) -> usize {
     if sig.params.repeat.is_empty() {
         let total_params = sig.params.head.len() + sig.params.tail.len();
         if total_params == 0 {
@@ -344,7 +346,7 @@ fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext, total
         return 0;
     };
     let tail_start = shape.tail_start;
-    let repeat_groups_displayed = shape.repeat_groups.max(1).min(2);
+    let repeat_groups_displayed = shape.repeat_groups.clamp(1, 2);
 
     // Display shape: head, repeat x{1..2}, "...", tail
     let ellipsis_idx = head_len + repeat_len * repeat_groups_displayed;
@@ -450,7 +452,12 @@ pub(super) fn compute_signature_help_if_in_call(
     // Postfix rendering is a presentation-only transformation: split off the receiver slot.
     let receiver = full_params.first().cloned();
     let params = full_params.into_iter().skip(1).collect::<Vec<_>>();
-    let label = format!("{}({}) -> {}", func.name, params.join(", "), format_ty(&inst_ret));
+    let label = format!(
+        "{}({}) -> {}",
+        func.name,
+        params.join(", "),
+        format_ty(&inst_ret)
+    );
 
     let active_param = if params.is_empty() {
         0

@@ -77,7 +77,9 @@ fn signature_help_sum_variadic_number_only_case_3_second_arg_empty() {
     t("sum(42, $0)")
         .ctx(c)
         .expect_sig_active(1)
-        .expect_sig_label("sum(values1: number | number[], values2: number | number[], ...) -> number");
+        .expect_sig_label(
+            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+        );
 }
 
 #[test]
@@ -86,7 +88,9 @@ fn signature_help_sum_variadic_number_only_case_4_two_numbers() {
     t("sum(42, 42$0)")
         .ctx(c)
         .expect_sig_active(1)
-        .expect_sig_label("sum(values1: number | number[], values2: number | number[], ...) -> number");
+        .expect_sig_label(
+            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+        );
 }
 
 #[test]
@@ -163,9 +167,7 @@ fn signature_help_if_shows_instantiated_union_return_type() {
     t("if(true, 1, \"x\"$0)")
         .ctx(c)
         .expect_sig_active(2)
-        .expect_sig_label(
-            "if(condition: boolean, then: number, else: string) -> number | string",
-        );
+        .expect_sig_label("if(condition: boolean, then: number, else: string) -> number | string");
 }
 
 #[test]
@@ -203,7 +205,9 @@ fn signature_help_ifs_single_group_highlights_default_and_omits_second_group() {
     t("ifs(true, \"42\", $0)")
         .ctx(c)
         .expect_sig_active(3)
-        .expect_sig_label("ifs(condition1: boolean, value1: string, ..., default: string) -> string");
+        .expect_sig_label(
+            "ifs(condition1: boolean, value1: string, ..., default: string) -> string",
+        );
 }
 
 #[test]
@@ -267,4 +271,15 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
         .expect_sig_receiver(None)
         .expect_sig_label("sum(values1: number | number[], ...) -> number")
         .expect_sig_label_not_contains(").sum(");
+}
+
+#[test]
+fn signature_help_if_list_of_union_is_parenthesized() {
+    let c = ctx().build();
+    t("if(true, 42, [42, \"42\"]$0)")
+        .ctx(c)
+        .expect_sig_active(2)
+        .expect_sig_label(
+            "if(condition: boolean, then: number, else: (number | string)[]) -> number | (number | string)[]",
+        );
 }

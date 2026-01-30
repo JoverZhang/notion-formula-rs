@@ -26,7 +26,6 @@ beforeAll(async () => {
 });
 
 describe("WASM signature help (instantiated types)", () => {
-  // TODO: restore `number[]` support for `sum` once list literals or an equivalent array expression exists.
   it("sum() shows variadic number signature and highlights first arg", () => {
     const sig = sigAtCloseParen("sum()");
     expect(sig.label).toBe("sum(values1: number | number[], ...) -> number");
@@ -61,13 +60,21 @@ describe("WASM signature help (instantiated types)", () => {
     );
   });
 
-  it("if(true, 1, \"x\") -> number | string", () => {
+  it('if(true, 1, "x") -> number | string', () => {
     expect(sigLabelAtCloseParen('if(true, 1, "x")')).toBe(
       "if(condition: boolean, then: number, else: string) -> number | string",
     );
   });
 
-  it("ifs(true, 1, false, 2, \"a\") -> number | string", () => {
+  it('if(true, 42, [42, "42"]) list-of-union is parenthesized', () => {
+    const sig = sigAtCloseParen('if(true, 42, [42, "42"])');
+    expect(sig.label).toBe(
+      "if(condition: boolean, then: number, else: (number | string)[]) -> number | (number | string)[]",
+    );
+    expect(sig.active_param).toBe(2);
+  });
+
+  it('ifs(true, 1, false, 2, "a") -> number | string', () => {
     expect(sigLabelAtCloseParen('ifs(true, 1, false, 2, "a")')).toBe(
       "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: string) -> number | string",
     );
