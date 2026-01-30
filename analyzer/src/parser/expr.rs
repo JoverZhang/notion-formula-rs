@@ -395,6 +395,13 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse a list literal: `[expr, expr, ...]`.
+    ///
+    /// Trailing comma (`[1, 2,]`) is rejected with a dedicated diagnostic:
+    /// `trailing comma in list literal is not supported`.
+    ///
+    /// After a comma, the parser expects an expression and emits:
+    /// `expected expression after ',' in list literal`.
     fn parse_list_literal(&mut self) -> Expr {
         let lbrack = self.bump(); // '['
         let mut items = Vec::new();

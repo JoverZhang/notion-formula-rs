@@ -12,6 +12,11 @@ pub struct LexOutput {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+/// Lex the input into tokens.
+///
+/// - Numbers: ASCII digits only (no decimals).
+/// - Strings: double-quoted, no escapes.
+/// - Identifiers: ASCII letters/`_` and any non-ASCII codepoint.
 pub fn lex(input: &str) -> LexOutput {
     let mut tokens = Vec::new();
     let mut diagnostics = Vec::new();

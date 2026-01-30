@@ -12,7 +12,7 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// A span in the original source, using UTF-8 byte offsets (half-open `[start, end)`).
+/// Half-open byte span into the source string: `[start, end)`.
 ///
 /// `start` and `end` must be valid UTF-8 slice boundaries for that same source string.
 pub struct Span {
@@ -21,7 +21,7 @@ pub struct Span {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// A half-open range of token indices `[lo, hi)`.
+/// Half-open range of token indices: `[lo, hi)`.
 pub struct TokenRange {
     pub lo: TokenIdx,
     pub hi: TokenIdx,
@@ -181,44 +181,21 @@ impl TokenKind {
     }
 }
 
-/// Returns the index range of all tokens whose `Token::span` intersects `span`.
+/// Returns the token-index range `[lo, hi)` covered by `span`.
 ///
-/// Spans are half-open byte ranges: `[start, end)`.
+/// `span` is a half-open byte range (UTF-8 offsets) into the original source: `[start, end)`.
+/// For non-empty spans, this returns the tokens whose spans intersect `span`.
+/// For empty spans (`start >= end`), this returns a stable insertion point `i..i`
+/// (the first token with `token.span.start >= start`), which may be the EOF token.
 ///
-/// Intersection rule (also half-open):
-/// - `token.start < span.end && span.start < token.end`
-///
-/// The returned `TokenRange` uses the same half-open convention over indices:
-/// - `lo` is inclusive
-/// - `hi` is exclusive
-///
-/// If `span` is empty (`start >= end`), the result is always empty (`lo == hi`).
-///
-/// This assumes tokens are in source order (monotonic by `Token::span.start`).
-///
-/// EOF note:
-/// - The lexer emits an EOF token with an empty span at the end of the input.
-/// - Because EOF has an empty span, non-empty query spans will not intersect it, so it is naturally excluded.
-/// - For empty query spans, the returned insertion point may be the EOF token index (e.g. at end-of-input).
-///
-/// Insertion point semantics for empty spans:
-/// - When `span.start >= span.end`, this returns `idx..idx` where `idx` is the first token whose
-///   `Token::span.start >= span.start` (i.e. the place a new token would be inserted without
-///   breaking source order). This may be `tokens.len() - 1` when the EOF token is present.
-///
-/// ASCII example (byte offsets shown as *boundary indices*; ASCII-only illustration):
+/// Example (byte offsets are boundary indices; trivia omitted from token list):
 /// ```text
 /// Source:  ( a + b )
-/// Char:    ( ␠ a ␠ + ␠ b ␠ )
-/// Index:   0 1 2 3 4 5 6 7 8
-/// Tokens:  0:'(' 1:'a' 2:'+' 3:'b' 4:')'   // trivia omitted from token list for brevity
-/// Span:        [2, 7) covers 'a' '+' 'b' (including any trivia between them)
-/// Result:  lo=1, hi=4   (tokens[1..4])
+/// Tokens:  0:'(' 1:'a' 2:'+' 3:'b' 4:')' 5:EOF
 ///
-/// Boundary example (half-open end is excluded):
-/// Source:  a+b
-/// Tokens:  0:'a' 1:'+' 2:'b'
-/// Span:    [0,1) covers only 'a' (it does NOT include '+')
+/// Span [2, 7) covers "a + b"  ->  [lo, hi) = [1, 4)  (tokens 1..4)
+/// Span [0, 1) covers "("      ->  [lo, hi) = [0, 1)
+/// Span [8, 8) at end-of-input ->  [lo, hi) = [5, 5)  (insertion point at EOF)
 /// ```
 pub fn tokens_in_span(tokens: &[Token], span: Span) -> TokenRange {
     if tokens.is_empty() {

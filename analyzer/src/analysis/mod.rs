@@ -1,3 +1,8 @@
+//! Semantic analysis and type model for formulas.
+//!
+//! This layer infers a best-effort [`Ty`] for expressions and validates calls against builtin
+//! [`FunctionSig`]s plus the special-cased `prop("Name")` form.
+
 use crate::ast::{Expr, ExprKind};
 use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::{LitKind, Span};
@@ -25,6 +30,12 @@ static POSTFIX_CAPABLE_BUILTIN_NAMES: LazyLock<HashSet<String>> = LazyLock::new(
         .collect()
 });
 
+/// Return the set of builtin function names that support postfix-call sugar.
+///
+/// A member call `receiver.name(args...)` is eligible for semantic treatment as
+/// `name(receiver, args...)` when:
+/// - `name` resolves to a builtin [`FunctionSig`], and
+/// - [`is_postfix_capable`] is true for that signature.
 pub fn postfix_capable_builtin_names() -> &'static HashSet<String> {
     &POSTFIX_CAPABLE_BUILTIN_NAMES
 }
@@ -52,10 +63,20 @@ pub fn is_postfix_capable(sig: &FunctionSig) -> bool {
     false
 }
 
+/// Identifier for a generic type parameter in [`Ty::Generic`].
+///
+/// Currently the UI-facing generic names are derived from this numeric id (e.g. `T0`, `T1`, ...).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GenericId(pub u32);
 
+/// Formula type used by inference, validation, and editor tooling.
+///
+/// - [`Ty::Unknown`] represents “unknown / could not be inferred”.
+/// - [`Ty::Generic`] represents a type parameter (see [`GenericId`]) and is instantiated via generic
+///   unification (see `infer::instantiate_sig`).
+///
+/// See [`ty_accepts`] for validation acceptance rules.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum Ty {
@@ -70,6 +91,7 @@ pub enum Ty {
     Union(Vec<Ty>),
 }
 
+/// Category bucket for builtin functions (used for editor grouping).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum FunctionCategory {
@@ -82,6 +104,14 @@ pub enum FunctionCategory {
     Special,
 }
 
+/// Returns whether `actual` is accepted by `expected` for semantic validation.
+///
+/// Currently:
+/// - `actual = Unknown` is accepted (avoids cascading mismatch noise when inference is unsure).
+/// - `expected = Generic(_)` is treated as a wildcard (the inferred actual being `Generic(_)` does
+///   *not* imply wildcarding).
+/// - `Union` uses containment semantics (unions are treated as sets for acceptance checks).
+/// - `List` is covariant: `List(E)` accepts `List(A)` iff `E` accepts `A`.
 pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
     if matches!(actual, Ty::Unknown) {
         return true;
@@ -104,14 +134,22 @@ pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
     }
 }
 
+/// A property available to `prop("Name")` calls and to editor completion.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Property {
+    /// Canonical property name as referenced by `prop("...")`.
     pub name: String,
     #[serde(rename = "type")]
+    /// Declared property type.
     pub ty: Ty,
+    /// If set, editor completions may surface this item as disabled and provide this reason.
     pub disabled_reason: Option<String>,
 }
 
+/// Semantic environment used for validation and editor features.
+///
+/// - `properties` are supplied externally (e.g. by the WASM layer via JSON) and used by `prop(...)`.
+/// - `functions` are sourced from Rust builtins at the WASM boundary (JS cannot supply them).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Context {
     pub properties: Vec<Property>,
@@ -119,6 +157,9 @@ pub struct Context {
 }
 
 impl Context {
+    /// Look up a property type by name.
+    ///
+    /// Currently this is used for `prop("Name")` resolution.
     pub fn lookup(&self, name: &str) -> Option<Ty> {
         self.properties
             .iter()
@@ -127,6 +168,16 @@ impl Context {
     }
 }
 
+/// Infer the expression type and emit semantic diagnostics.
+///
+/// Returns `(root_type, diagnostics)`.
+///
+/// Currently diagnostics are validation-first:
+/// - Calls are checked for arity/shape errors first; on a shape error, validation emits exactly one
+///   diagnostic for that call and does not emit per-argument type mismatches for the same call.
+/// - `prop("Name")` is special-cased (it is not modeled as a [`FunctionSig`]).
+/// - Postfix member calls may be treated as calls when the callee is a postfix-capable builtin (see
+///   [`is_postfix_capable`]).
 pub fn analyze_expr(expr: &Expr, ctx: &Context) -> (Ty, Vec<Diagnostic>) {
     let mut map = TypeMap::default();
     let ty = infer_expr_with_map(expr, ctx, &mut map);

@@ -17,13 +17,10 @@ pub struct TokenCursor<'a> {
     pub pos: usize,
 }
 
-/// Read-only query helpers over a token slice.
+/// Trivia-aware query helpers over a token slice.
 ///
-/// This type centralizes "span → token range → neighbor token scanning" in one place so
-/// callers (notably the formatter) don't duplicate index arithmetic or trivia-skipping loops.
-/// It handles trivia and EOF in one consistent way.
-///
-/// All ranges are half-open `[lo, hi)` over token indices; indices are clamped to `tokens.len()`.
+/// Canonical API for span → token-range mapping and neighbor scans.
+/// All ranges are half-open `[lo, hi)` over token indices and are clamped to `tokens.len()`.
 #[derive(Debug, Clone, Copy)]
 pub struct TokenQuery<'a> {
     tokens: &'a [Token],

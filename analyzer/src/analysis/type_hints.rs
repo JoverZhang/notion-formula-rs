@@ -1,5 +1,15 @@
+//! Helpers for deterministic union normalization.
+
 use super::Ty;
 
+/// Normalize a union-like set of types into a deterministic [`Ty`].
+///
+/// Currently this:
+/// - flattens nested `Union` members,
+/// - deduplicates members,
+/// - sorts members deterministically (so outputs are stable across runs),
+/// - returns the single member directly when only one remains,
+/// - returns [`Ty::Unknown`] when given an empty iterator.
 pub fn normalize_union(members: impl IntoIterator<Item = Ty>) -> Ty {
     normalize_union_impl(members).unwrap_or(Ty::Unknown)
 }

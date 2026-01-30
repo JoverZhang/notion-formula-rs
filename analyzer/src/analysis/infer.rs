@@ -1,21 +1,33 @@
+//! Type inference and generic instantiation.
+//!
+//! Best-effort inference: returns [`Ty::Unknown`] when it can’t determine a type. Emits no
+//! diagnostics.
+
 use crate::ast::{Expr, ExprKind};
 use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
 use super::{Context, FunctionSig, GenericId, GenericParamKind, Ty, normalize_union};
 
+/// Identifier for an expression node used as the key in [`TypeMap`].
 pub type ExprId = NodeId;
 
+/// Map from expression id to its inferred [`Ty`].
+///
+/// [`infer_expr_with_map`] records types for all visited [`ExprId`]s, including intermediate nodes,
+/// so downstream consumers can look up types for subexpressions.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TypeMap {
     inner: HashMap<ExprId, Ty>,
 }
 
 impl TypeMap {
+    /// Record the inferred type for `id`.
     pub fn insert(&mut self, id: ExprId, ty: Ty) {
         self.inner.insert(id, ty);
     }
 
+    /// Look up the inferred type for `id`, if it was visited.
     pub fn get(&self, id: ExprId) -> Option<&Ty> {
         self.inner.get(&id)
     }
@@ -217,6 +229,13 @@ pub(crate) fn instantiate_sig(sig: &FunctionSig, arg_tys: &[Option<Ty>]) -> (Vec
     (params, ret)
 }
 
+/// Infer the type of `expr` and populate `map` with types for subexpressions.
+///
+/// - Identifiers are not resolved here and default to [`Ty::Unknown`].
+/// - list literals infer to `List(Unknown)` if any item is unknown, otherwise `List(Union(items))`,
+/// - member calls use postfix-call sugar only for postfix-capable builtins; otherwise they fall
+///   back to [`Ty::Unknown`],
+/// - types are recorded in `map` after inferring each expression node.
 pub fn infer_expr_with_map(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
     infer_expr_inner(expr, ctx, map)
 }
