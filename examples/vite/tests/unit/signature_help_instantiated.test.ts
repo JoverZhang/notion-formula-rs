@@ -57,13 +57,13 @@ describe("WASM signature help (instantiated types)", () => {
     );
   });
 
-  it("if(true, 1, \"x\") -> number | string", () => {
+  it('if(true, 1, "x") -> number | string', () => {
     expect(sigLabelAtCloseParen('if(true, 1, "x")')).toBe(
       "if(condition: boolean, then: number, else: string) -> number | string",
     );
   });
 
-  it("ifs(true, 1, false, 2, \"a\") -> number | string", () => {
+  it('ifs(true, 1, false, 2, "a") -> number | string', () => {
     expect(sigLabelAtCloseParen('ifs(true, 1, false, 2, "a")')).toBe(
       "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: string) -> number | string",
     );

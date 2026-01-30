@@ -1,5 +1,8 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+build:
+  cd examples/vite && pnpm -s run wasm:build && pnpm -s i && pnpm -s run build
+
 check:
   cargo check && cargo clippy && cd examples/vite && pnpm -s run check
 

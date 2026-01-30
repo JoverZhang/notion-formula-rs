@@ -8,5 +8,5 @@
     ],
     "types": ["node", "@playwright/test"]
   },
-  "include": ["../playwright.config.ts", "e2e/**/*"]
+  "include": ["e2e/**/*"]
 }
