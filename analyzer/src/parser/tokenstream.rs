@@ -1,27 +1,13 @@
-//! Parser-facing token stream accessors.
+//! Token stream helpers for the parser.
 //!
-//! The parser consumes a lexer-produced token stream while skipping trivia for syntactic
-//! decisions. This module also provides **read-only** token query helpers used by formatter and
-//! IDE utilities.
-//!
-//! **Canonical invariants**
-//! - Token spans are [`crate::lexer::Span`] values: **UTF-8 byte offsets** into the original
-//!   source string, using half-open semantics `[start, end)`.
-//! - The token stream includes trivia (comments/newlines) and an explicit EOF token.
-//! - `TokenQuery` is the canonical "neighbor/trivia scanning" API; avoid ad-hoc index arithmetic
-//!   elsewhere so trivia/EOF/empty-span edge cases stay consistent.
-//!
-//! **Read-this-first entry points**
-//! - [`TokenCursor`]: the mutable parser cursor over a token stream.
-//! - [`TokenQuery`]: read-only helpers for span→range and trivia-aware neighbor scans.
+//! Tokens keep trivia and an explicit EOF token, but the parser usually skips trivia.
+//! Use [`TokenQuery`] for span-to-range and trivia-aware neighbor scans.
 
 use crate::lexer::{Span, Token, TokenIdx, TokenKind, TokenRange, tokens_in_span};
 
-/// A mutable cursor over a token stream for parsing.
+/// A mutable cursor over a token stream.
 ///
-/// The parser maintains `pos` as a boundary index into `tokens` and advances it as tokens are
-/// consumed. Parser methods generally skip trivia when looking at the "current" token, but the
-/// underlying stream retains trivia for diagnostics and formatting.
+/// `tokens` includes trivia and EOF. `pos` is a boundary index used by the parser.
 pub struct TokenCursor<'a> {
     /// The original source string that token spans index into.
     pub source: &'a str,
@@ -35,45 +21,28 @@ pub struct TokenCursor<'a> {
 ///
 /// This type centralizes "span → token range → neighbor token scanning" in one place so
 /// callers (notably the formatter) don't duplicate index arithmetic or trivia-skipping loops.
+/// It handles trivia and EOF in one consistent way.
 ///
-/// # Index & range semantics
-/// - All indices returned by this API are **token indices** into the underlying slice.
-/// - All ranges follow Rust's standard **half-open** convention: `[lo, hi)`.
-/// - Methods that take an `idx: usize` treat it as a **boundary index** in `[0, tokens.len()]`.
-///   Passing an out-of-bounds value is treated as if it were `tokens.len()`.
-///
-/// # Trivia policy
-/// - `Token::is_trivia()` is the sole definition of trivia here (comments + newlines today).
-/// - EOF (`TokenKind::Eof`) is **not** trivia.
-///
-/// # EOF handling
-/// The lexer emits an explicit EOF token. Neighbor scans treat EOF like any other non-trivia
-/// token and may return its index when scanning across trailing trivia at end-of-input.
+/// All ranges are half-open `[lo, hi)` over token indices; indices are clamped to `tokens.len()`.
 #[derive(Debug, Clone, Copy)]
 pub struct TokenQuery<'a> {
     tokens: &'a [Token],
 }
 
 impl<'a> TokenQuery<'a> {
-    /// Construct a query view over a token slice (which typically includes trivia + EOF).
+    /// Build a query view over a token slice.
     pub fn new(tokens: &'a [Token]) -> Self {
         Self { tokens }
     }
 
-    /// Returns the index range of all tokens whose `Token::span` intersects `span`.
+    /// Get the token index range that intersects `span`.
     ///
-    /// This delegates to [`tokens_in_span`]; see that function for the precise intersection
-    /// rule and empty-span behavior.
-    ///
-    /// The returned [`TokenRange`] is half-open over token indices: `[lo, hi)`.
+    /// Delegates to [`tokens_in_span`] for the exact rules (including empty spans).
     pub fn range_for_span(&self, span: Span) -> TokenRange {
         tokens_in_span(self.tokens, span)
     }
 
-    /// Returns the nearest non-trivia token index strictly **before** `idx`.
-    ///
-    /// - `idx` is a boundary index in `[0, tokens.len()]`.
-    /// - Returns `None` if there is no non-trivia token before `idx`.
+    /// Find the nearest non-trivia token strictly before `idx`.
     pub fn prev_nontrivia(&self, idx: usize) -> Option<usize> {
         let idx = idx.min(self.tokens.len());
         if idx == 0 {
@@ -93,10 +62,7 @@ impl<'a> TokenQuery<'a> {
         None
     }
 
-    /// Returns the nearest non-trivia token index at or **after** `idx`.
-    ///
-    /// - `idx` is a boundary index in `[0, tokens.len()]`.
-    /// - Returns `None` if there is no non-trivia token at or after `idx`.
+    /// Find the nearest non-trivia token at or after `idx`.
     #[allow(dead_code)]
     pub fn next_nontrivia(&self, idx: usize) -> Option<usize> {
         let mut i = idx.min(self.tokens.len());
@@ -110,9 +76,7 @@ impl<'a> TokenQuery<'a> {
         None
     }
 
-    /// Returns the first non-trivia token index inside `range` (half-open).
-    ///
-    /// Returns `None` if the clamped range is empty or contains only trivia.
+    /// Find the first non-trivia token inside `range` (`[lo, hi)`).
     #[allow(dead_code)]
     pub fn first_nontrivia(&self, range: TokenRange) -> Option<usize> {
         let (lo, hi) = self.clamp_range_usize(range);
@@ -120,9 +84,7 @@ impl<'a> TokenQuery<'a> {
         (idx < hi).then_some(idx)
     }
 
-    /// Returns the last non-trivia token index inside `range` (half-open).
-    ///
-    /// Returns `None` if the clamped range is empty or contains only trivia.
+    /// Find the last non-trivia token inside `range` (`[lo, hi)`).
     #[allow(dead_code)]
     pub fn last_nontrivia(&self, range: TokenRange) -> Option<usize> {
         let (lo, hi) = self.clamp_range_usize(range);
@@ -130,17 +92,13 @@ impl<'a> TokenQuery<'a> {
         (idx >= lo).then_some(idx)
     }
 
-    /// Returns the first token index inside `range` (half-open), if non-empty.
-    ///
-    /// This does **not** skip trivia.
+    /// Get the first token index inside `range` (`[lo, hi)`), if any.
     pub fn first_in_range(&self, range: TokenRange) -> Option<usize> {
         let (lo, hi) = self.clamp_range_usize(range);
         (lo < hi).then_some(lo)
     }
 
-    /// Returns the last token index inside `range` (half-open), if non-empty.
-    ///
-    /// This does **not** skip trivia.
+    /// Get the last token index inside `range` (`[lo, hi)`), if any.
     pub fn last_in_range(&self, range: TokenRange) -> Option<usize> {
         let (lo, hi) = self.clamp_range_usize(range);
         (lo < hi).then_some(hi - 1)
@@ -180,10 +138,7 @@ impl<'a> TokenQuery<'a> {
         idx.min(self.tokens.len())..i
     }
 
-    /// Returns the clamped `[lo, hi)` bounds of `range` as `usize`.
-    ///
-    /// - Both ends are clamped to `tokens.len()`.
-    /// - If `range.hi < range.lo`, the result is an empty range at `lo`.
+    /// Get the clamped `[lo, hi)` bounds of `range` as `usize`.
     pub fn bounds_usize(&self, range: TokenRange) -> (usize, usize) {
         self.clamp_range_usize(range)
     }

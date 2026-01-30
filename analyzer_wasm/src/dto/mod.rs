@@ -1,9 +1,4 @@
-//! Versioned DTO surface for WASM exports.
+//! JS-facing DTO types for `analyzer_wasm`.
 //!
-//! All exported views are designed for the JS/editor boundary:
-//! - Offsets and spans are in **UTF-16 code units**.
-//! - All ranges are **half-open** `[start, end)` (inclusive start, exclusive end).
-//!
-//! **Entry points**
-//! - [`v1`]: current stable DTO version used by the WASM exports.
+//! Spans and offsets use UTF-16 code units and are half-open `[start, end)`.
 pub mod v1;

@@ -1,19 +1,39 @@
+//! Resolve repeat/tail mapping for [`ParamShape`].
+//!
+//! This splits a call's `total` args into `head + repeat_groups * repeat + tail_used`.
+//! Used by signature help and arity checks. If more than one split fits, it picks the largest
+//! `tail_used`.
+
 use super::{ParamShape, ParamSig};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CompletedRepeatShape {
-    /// The (possibly increased) total argument count used to make the shape parseable.
+    /// The total arg count (may be increased to reach the next valid shape).
     pub(crate) total: usize,
+    /// How many args at the end are assigned to `tail`.
     pub(crate) tail_used: usize,
+    /// Tail starts at `tail_start`, so tail args are `[tail_start, total)`.
     pub(crate) tail_start: usize,
+    /// How many repeat groups were used.
     pub(crate) repeat_groups: usize,
 }
 
+/// Resolve `tail_used` for `total` args.
+///
+/// Returns `None` if `total` cannot fit the repeat shape, or if there is no repeat section.
+/// If more than one split fits, it prefers the largest `tail_used`.
 pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
     resolve_repeat_tail_used_with_min_groups(params, total, 1)
 }
 
-pub(crate) fn complete_repeat_shape(params: &ParamShape, total: usize) -> Option<CompletedRepeatShape> {
+/// Return a parseable repeat shape, bumping `total` up when needed.
+///
+/// If `total` does not fit, this picks the smallest valid `total >= total` (then the largest
+/// `tail_used` on ties).
+pub(crate) fn complete_repeat_shape(
+    params: &ParamShape,
+    total: usize,
+) -> Option<CompletedRepeatShape> {
     complete_repeat_shape_with_min_groups(params, total, 1)
 }
 
@@ -64,7 +84,9 @@ fn complete_repeat_shape_with_min_groups(
     }
 
     // If already parseable, keep `total` as-is.
-    if let Some(tail_used) = resolve_repeat_tail_used_with_min_groups(params, total, repeat_min_groups) {
+    if let Some(tail_used) =
+        resolve_repeat_tail_used_with_min_groups(params, total, repeat_min_groups)
+    {
         let tail_start = total.saturating_sub(tail_used);
         let middle = total.saturating_sub(head_len + tail_used);
         let repeat_groups = middle / repeat_len;
@@ -135,10 +157,49 @@ fn ceil_to_multiple(n: usize, m: usize) -> usize {
         return 0;
     }
     let rem = n % m;
-    if rem == 0 {
-        n
-    } else {
-        n + (m - rem)
-    }
+    if rem == 0 { n } else { n + (m - rem) }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::Ty;
+
+    fn p(name: &str, optional: bool) -> ParamSig {
+        ParamSig {
+            name: name.to_string(),
+            ty: Ty::Unknown,
+            optional,
+        }
+    }
+
+    #[test]
+    fn resolve_repeat_tail_used_prefers_largest_tail_used_when_ambiguous() {
+        // NOTE: This shape violates `ParamShape::new` invariants (repeat + optional tail).
+        // We still test the resolver's deterministic choice rule to prevent future drift.
+        let params = ParamShape {
+            head: vec![],
+            repeat: vec![p("x", false), p("y", false)],
+            tail: vec![p("t1", true), p("t2", true)],
+        };
+
+        // total=4 can be:
+        // - tail_used=2, middle=2 (1 repeat group)
+        // - tail_used=0, middle=4 (2 repeat groups)
+        // Prefer the larger tail_used.
+        assert_eq!(resolve_repeat_tail_used(&params, 4), Some(2));
+    }
+
+    #[test]
+    fn complete_repeat_shape_bumps_total_to_next_valid_multiple() {
+        let params = ParamShape::new(vec![], vec![p("x", false), p("y", false)], vec![]);
+
+        // total=3 cannot be split into 2-wide repeat groups with at least 1 group.
+        // The next valid total is 4.
+        let shape = complete_repeat_shape(&params, 3).expect("expected completion shape");
+        assert_eq!(shape.total, 4);
+        assert_eq!(shape.tail_used, 0);
+        assert_eq!(shape.tail_start, 4);
+        assert_eq!(shape.repeat_groups, 2);
+    }
+}

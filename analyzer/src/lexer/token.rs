@@ -1,17 +1,7 @@
-//! Lexer token model and span/range helpers.
+//! Lexer tokens and spans.
 //!
-//! The lexer produces a linear token stream over the original source text.
-//!
-//! **Canonical invariants**
-//! - [`Span`] uses **UTF-8 byte offsets** into the original source string.
-//! - Spans and token ranges are **half-open**: `[start, end)` (inclusive start, exclusive end).
-//! - The lexer emits an explicit [`TokenKind::Eof`] token whose span is empty at end-of-input.
-//!
-//! **Read-this-first entry points**
-//! - [`Span`]: byte-offset span invariant shared across the analyzer.
-//! - [`TokenRange`]: half-open token-index range used by query APIs.
-//! - [`tokens_in_span`]: maps a byte span to the intersecting token index range (with stable
-//!   insertion-point behavior for empty spans).
+//! [`Span`] uses UTF-8 byte offsets into the original source and is half-open `[start, end)`.
+//! The lexer also emits a [`TokenKind::Eof`] token with an empty span at end of input.
 
 pub type NodeId = u32;
 pub type TokenIdx = u32;
@@ -22,10 +12,9 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// A half-open span (`[start, end)`) in the original source string, using **UTF-8 byte offsets**.
+/// A span in the original source, using UTF-8 byte offsets (half-open `[start, end)`).
 ///
-/// Invariant: `start`/`end` must be valid UTF-8 slice boundaries so that `&source[start..end]`
-/// is always safe (no panics) when `source` is the same string that was lexed/parsed.
+/// `start` and `end` must be valid UTF-8 slice boundaries for that same source string.
 pub struct Span {
     pub start: u32,
     pub end: u32,
@@ -33,13 +22,8 @@ pub struct Span {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// A half-open range of token indices `[lo, hi)`.
-///
-/// This is the canonical "token slice" type used by query helpers (notably the parser's
-/// `TokenQuery`).
 pub struct TokenRange {
-    /// Inclusive lower bound.
     pub lo: TokenIdx,
-    /// Exclusive upper bound.
     pub hi: TokenIdx,
 }
 

@@ -1,19 +1,11 @@
-//! UTF-16 ↔ UTF-8 offset conversions for the WASM/JS boundary.
+//! Convert between UTF-16 offsets (editors) and UTF-8 byte offsets (Rust).
 //!
-//! The core analyzer indexes `&str` by **UTF-8 byte offsets**, while editors/JS typically use
-//! **UTF-16 code unit offsets**.
-//!
-//! Conversions are deterministic:
-//! - out-of-range inputs are clamped
-//! - non-boundary inputs are floored to the nearest valid Unicode scalar boundary
-//! - functions never panic
+//! Inputs are clamped and floored to valid boundaries, so these helpers never panic.
 
 /// Convert a UTF-16 code unit offset into a UTF-8 byte offset.
 ///
-/// - `utf16` is measured in UTF-16 code units.
-/// - If `utf16` is out of range, it is clamped to the UTF-16 length of `source`.
-/// - If `utf16` falls inside a scalar's UTF-16 encoding, it is floored to that scalar's start
-///   (a Rust `char` boundary).
+/// Out-of-range values are clamped. If the offset lands inside a scalar's UTF-16 encoding (for
+/// example, inside a surrogate pair), it is floored to the scalar start.
 pub fn utf16_offset_to_byte(source: &str, utf16: usize) -> usize {
     let utf16_len = source.encode_utf16().count();
     let utf16 = utf16.min(utf16_len);
@@ -41,9 +33,8 @@ pub fn utf16_offset_to_byte(source: &str, utf16: usize) -> usize {
 
 /// Convert a UTF-8 byte offset into a UTF-16 code unit offset.
 ///
-/// - `byte` is measured in UTF-8 bytes.
-/// - If `byte` is not a UTF-8 char boundary, it is floored to the previous boundary.
-/// - If `byte` is out of range, the returned offset is the UTF-16 length of `source`.
+/// If `byte` is not a UTF-8 char boundary, it is floored to the previous boundary.
+/// If `byte`is past the end, this returns the UTF-16 length of `source`.
 pub fn byte_offset_to_utf16_offset(source: &str, byte: usize) -> u32 {
     if byte == 0 {
         return 0;

@@ -1,11 +1,7 @@
 //! WASM DTOs (v1).
 //!
-//! Stable, JS-facing serialization types returned by `analyzer_wasm` exports.
-//!
-//! Encoding boundary:
-//! - Rust core uses UTF-8 byte offsets.
-//! - This DTO uses UTF-16 code unit offsets (editor / JS string indexing).
-//! - All spans/ranges are half-open: `[start, end)`.
+//! JS-facing types returned by `analyzer_wasm`.
+//! Spans and offsets use UTF-16 code units and are half-open `[start, end)`.
 
 use serde::Serialize;
 use ts_rs::TS;
@@ -60,10 +56,9 @@ pub struct SpanView {
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LineColView {
     pub line: u32,
-    /// 1-based column as computed by `SourceMap::line_col`.
+    /// 1-based column from `SourceMap::line_col`.
     ///
-    /// Measured as Rust `char` count (Unicode scalar values) from line start to the clamped byte
-    /// position. Not UTF-16 code units.
+    /// This is a Rust `char` count (Unicode scalar values). It is not UTF-16.
     pub col: u32,
 }
 
@@ -118,11 +113,11 @@ pub struct CompletionItemView {
     pub kind: CompletionItemKind,
     pub category: Option<FunctionCategoryView>,
     pub insert_text: String,
-    /// Primary edit to apply (original document coordinates, UTF-16), if available.
+    /// Primary edit to apply in the original document (UTF-16), if available.
     pub primary_edit: Option<TextEditView>,
     /// Cursor position in the updated document after applying edits (UTF-16).
     pub cursor: Option<u32>,
-    /// Additional edits to apply (original document coordinates, UTF-16).
+    /// Additional edits to apply in the original document (UTF-16).
     pub additional_edits: Vec<TextEditView>,
     pub detail: Option<String>,
     pub is_disabled: bool,

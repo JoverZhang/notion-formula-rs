@@ -1,3 +1,8 @@
+//! Line/column lookup for a source string.
+//!
+//! Input byte offsets are clamped down to a UTF-8 char boundary.
+//! The column is a Rust `char` count (Unicode scalar values), not bytes or UTF-16.
+
 pub struct SourceMap<'a> {
     src: &'a str,
     line_starts: Vec<usize>,
@@ -14,13 +19,8 @@ impl<'a> SourceMap<'a> {
         Self { src, line_starts }
     }
 
-    /// Returns `(line, col)`, both 1-based.
-    ///
-    /// `byte` is interpreted as a UTF-8 byte offset into `src` and is clamped down to the nearest
-    /// valid UTF-8 char boundary (never panics).
-    ///
-    /// `col` is computed as the number of Rust `char`s (Unicode scalar values) from the start of
-    /// the line to the clamped position.
+    /// Return `(line, col)`, both 1-based.
+    /// `byte` is a UTF-8 byte offset into `src`.
     pub fn line_col(&self, byte: u32) -> (usize, usize) {
         let b = clamp_to_char_boundary(self.src, byte as usize);
         let line_idx = match self.line_starts.binary_search(&b) {
