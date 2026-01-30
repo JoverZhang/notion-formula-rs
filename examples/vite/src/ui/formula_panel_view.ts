@@ -532,51 +532,22 @@ export function createFormulaPanelView(opts: {
       signatureEl.textContent = "";
       return;
     }
+    const activeSig = sig.signatures[sig.active_signature] ?? sig.signatures[0];
+    if (!activeSig) {
+      signatureEl.classList.add("hidden");
+      signatureEl.textContent = "";
+      return;
+    }
     signatureEl.classList.remove("hidden");
     signatureEl.replaceChildren();
 
-    if (sig.receiver) {
-      const receiverEl = document.createElement("span");
-      receiverEl.className = "completion-signature-receiver";
-      receiverEl.textContent = `(${sig.receiver})`;
-      signatureEl.append(receiverEl);
-      signatureEl.append(document.createTextNode("."));
+    for (const seg of activeSig.segments) {
+      const segEl = document.createElement("span");
+      segEl.className = `completion-signature-seg completion-signature-seg--${seg.kind}`;
+      if (seg.param_index === sig.active_parameter) segEl.classList.add("is-active");
+      segEl.textContent = seg.text;
+      signatureEl.append(segEl);
     }
-    if (sig.params.length === 0) {
-      signatureEl.append(document.createTextNode(sig.label));
-      return;
-    }
-
-    const openParen = sig.label.indexOf("(");
-    const closeParen = (() => {
-      if (openParen < 0) return -1;
-      let depth = 0;
-      for (let i = openParen; i < sig.label.length; i++) {
-        const ch = sig.label[i];
-        if (ch === "(") depth++;
-        else if (ch === ")") {
-          depth--;
-          if (depth === 0) return i;
-        }
-      }
-      return -1;
-    })();
-
-    if (openParen === -1 || closeParen === -1 || closeParen <= openParen) {
-      signatureEl.append(document.createTextNode(sig.label));
-      return;
-    }
-
-    signatureEl.append(document.createTextNode(sig.label.slice(0, openParen + 1)));
-    sig.params.forEach((param, idx) => {
-      const paramEl = document.createElement("span");
-      paramEl.className = "completion-signature-param";
-      if (idx === sig.active_param) paramEl.classList.add("is-active");
-      paramEl.textContent = param;
-      signatureEl.append(paramEl);
-      if (idx !== sig.params.length - 1) signatureEl.append(document.createTextNode(", "));
-    });
-    signatureEl.append(document.createTextNode(sig.label.slice(closeParen)));
   }
 
   function renderItems() {

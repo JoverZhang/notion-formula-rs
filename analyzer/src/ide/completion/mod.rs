@@ -85,13 +85,17 @@ pub enum CompletionData {
     PostfixMethod { name: String },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureHelpSignature {
+    pub segments: Vec<crate::ide::display::DisplaySegment>,
+}
+
 /// Signature display for a call at the cursor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureHelp {
-    pub receiver: Option<String>,
-    pub label: String,
-    pub params: Vec<String>,
-    pub active_param: usize,
+    pub signatures: Vec<SignatureHelpSignature>,
+    pub active_signature: usize,
+    pub active_parameter: usize,
 }
 
 /// Computes completion items and signature help at a cursor position.

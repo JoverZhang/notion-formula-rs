@@ -4,4 +4,5 @@
 //! Use `completion::complete` for completion + signature help.
 
 pub mod completion;
+pub mod display;
 pub mod format;

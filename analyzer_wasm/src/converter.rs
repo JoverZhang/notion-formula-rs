@@ -18,7 +18,8 @@ use wasm_bindgen::prelude::JsValue;
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, FunctionCategoryView, LineColView, SignatureHelpView,
+    DiagnosticKindView, DiagnosticView, DisplaySegmentKindView, DisplaySegmentView,
+    FunctionCategoryView, LineColView, SignatureHelpSignatureView, SignatureHelpView,
     Span as SpanDto, SpanView, TextEditView, TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
@@ -138,10 +139,23 @@ impl Converter {
     ) -> CompletionOutputView {
         let replace = Self::span_dto(source, output.replace);
         let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelpView {
-            receiver: sig.receiver.clone(),
-            label: sig.label.clone(),
-            params: sig.params.clone(),
-            active_param: sig.active_param,
+            signatures: sig
+                .signatures
+                .iter()
+                .map(|s| SignatureHelpSignatureView {
+                    segments: s
+                        .segments
+                        .iter()
+                        .map(|seg| DisplaySegmentView {
+                            kind: display_segment_kind_view(seg.kind),
+                            text: seg.text.clone(),
+                            param_index: seg.param_index,
+                        })
+                        .collect(),
+                })
+                .collect(),
+            active_signature: sig.active_signature,
+            active_parameter: sig.active_parameter,
         });
 
         let items = output
@@ -263,6 +277,19 @@ impl Converter {
 
     pub fn span_dto(source: &str, span: Span) -> SpanDto {
         byte_span_to_utf16_span(source, span)
+    }
+}
+
+fn display_segment_kind_view(kind: analyzer::ide::display::DisplaySegmentKind) -> DisplaySegmentKindView {
+    match kind {
+        analyzer::ide::display::DisplaySegmentKind::Name => DisplaySegmentKindView::Name,
+        analyzer::ide::display::DisplaySegmentKind::Punct => DisplaySegmentKindView::Punct,
+        analyzer::ide::display::DisplaySegmentKind::ParamName => DisplaySegmentKindView::ParamName,
+        analyzer::ide::display::DisplaySegmentKind::Type => DisplaySegmentKindView::Type,
+        analyzer::ide::display::DisplaySegmentKind::Separator => DisplaySegmentKindView::Separator,
+        analyzer::ide::display::DisplaySegmentKind::Ellipsis => DisplaySegmentKindView::Ellipsis,
+        analyzer::ide::display::DisplaySegmentKind::Arrow => DisplaySegmentKindView::Arrow,
+        analyzer::ide::display::DisplaySegmentKind::ReturnType => DisplaySegmentKindView::ReturnType,
     }
 }
 

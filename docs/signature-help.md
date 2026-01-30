@@ -4,7 +4,7 @@ This document defines the deterministic Signature Help algorithm for functions w
 
 `ParamShape { head, repeat, tail }`
 
-It is intended as a concise, code-backed spec for editor integrations (labels + `activeParam`).
+It is intended as a concise, code-backed spec for editor integrations (structured display segments + `active_parameter`).
 
 ## Invariants (for determinism)
 
@@ -12,6 +12,7 @@ It is intended as a concise, code-backed spec for editor integrations (labels + 
 - If `repeat.len() > 0` and `tail.len() > 0`, then all `tail` parameters are required (non-optional).  
   (Optional tail under repeat is ambiguous, so it is rejected at builtin construction time.)
 - The rendered `...` token is never the active parameter highlight.
+- The rendered `...` token has no parameter index and is never highlighted.
 
 ## Shape parsing (`repeat` + optional `tail`)
 
@@ -39,7 +40,7 @@ Signature Help must be stable even for calls whose `total_args` are not parseabl
 
 If `resolve_repeat_tail_used(params, total_args)` returns `None`, compute the smallest `total' >= total_args` such that `resolve_repeat_tail_used(params, total')` succeeds. Use `total'` only for:
 
-- mapping `arg_index -> activeParam`
+- mapping `arg_index -> active_parameter`
 - deciding whether the call has entered the tail
 - deciding how many repeat groups have been entered
 
@@ -69,7 +70,7 @@ For repeat-group signatures, the UI display order is:
 
 “Entered” is based on the parseable/completed total: `repeat_groups = (total' - head_len - tail_used) / repeat_len`.
 
-### Mapping `call_ctx.arg_index -> activeParam`
+### Mapping `call_ctx.arg_index -> active_parameter`
 
 Let `total_args` for mapping be:
 
@@ -95,45 +96,45 @@ NOTE: Each variadic slot accepts either a scalar `number` or a `number[]`.
 
 1) `sum($0)`
    - label: `sum(values1: number | number[], ...) -> number`
-   - `activeParam`: `0`
+   - `active_parameter`: `0`
 
 2) `sum(42$0)`
    - label: `sum(values1: number | number[], ...) -> number`
-   - `activeParam`: `0`
+   - `active_parameter`: `0`
 
 3) `sum([1,2,3]$0)`
    - label: `sum(values1: number | number[], ...) -> number`
-   - `activeParam`: `0`
+   - `active_parameter`: `0`
 
 4) `sum(42, $0)`
    - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
-   - `activeParam`: `1`
+   - `active_parameter`: `1`
 
 5) `sum(42, 42$0)`
    - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
-   - `activeParam`: `1`
+   - `active_parameter`: `1`
 
 ### IF
 
 - `if(true, "123", 123$0)`
   - label: `if(condition: boolean, then: string, else: number) -> number | string`
-  - `activeParam`: `2`
+  - `active_parameter`: `2`
 
 - `if(true, x, 1$0)`
   - label: `if(condition: boolean, then: unknown, else: number) -> unknown`
-  - `activeParam`: `2`
+  - `active_parameter`: `2`
 
 ### IFS (head=0, repeat=(condition,value), tail=(default), repeat_min_groups=1)
 
 - `ifs(true, "42", $0)`
-  - `activeParam`: `3` (default)
+  - `active_parameter`: `2` (default)
 
 - `ifs(true, "42", false, $0)` (invalid total=4)
   - guides completion toward `value2`
-  - `activeParam`: `3`
+  - `active_parameter`: `3`
 
 - `ifs(true, "42", false, 7, $0)` (total=5)
-  - `activeParam`: `5` (default)
+  - `active_parameter`: `4` (default)
 
 ## Postfix form (presentation-only)
 
@@ -146,7 +147,5 @@ Member-call syntax is treated as a normal call internally:
 
 Signature help output is then transformed only for rendering:
 
-- `signature_help.receiver` is the first formatted parameter slot
-- `signature_help.params` is the remaining slots
-- `signature_help.label` prints only `params` (return type unchanged)
-- `signature_help.active_param` is the “full call” active index shifted by `-1` (clamped), and never highlights `...`
+- The receiver slot is rendered as a prefix in the signature segments: `(<receiver_param>).` before the function name.
+- The receiver slot has no parameter index and is never highlighted.

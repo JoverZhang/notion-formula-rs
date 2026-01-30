@@ -33,6 +33,7 @@ Core modules:
 - `analyzer/src/parser/expr.rs`: expression grammar (primary/prefix/infix/ternary/call/member-call) + recovery
 - `analyzer/src/parser/ast.rs`: AST node types (preserves explicit grouping via `ExprKind::Group`)
 - `analyzer/src/parser/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
+- `analyzer/src/ide/display.rs`: canonical UI display formatting (e.g. `format_ty(...)` used by signature help)
 - `analyzer/src/ide/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
 - `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
 - `analyzer/src/analysis/mod.rs`: minimal type checking driven by `Context { properties, functions }`
@@ -185,13 +186,16 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
   - Signature help is **call-site instantiated**:
     - it best-effort infers argument expression types from the source
     - it instantiates the `FunctionSig` using the same unification/substitution logic as semantic inference (`instantiate_sig` in `analyzer/src/analysis/infer.rs`)
+    - type strings are formatted via `analyzer/src/ide/display.rs` (`format_ty(...)`); `List(Union(...))` renders as `(A | B)[]`
     - instantiated `Unknown` is rendered as `unknown` (including unconstrained generics)
-    - parameter labels prefer the per-argument inferred (actual) types when the argument expression is non-empty; empty argument slots fall back to instantiated expected types
-  - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin, signature help models the receiver separately:
-    - `receiver`: formatted first parameter (`<receiver_param>`)
-    - `label`: `<callee>(<remaining_params>[, ...]) -> <ret>`
-    - `params`: the remaining parameters only (for fixed-arity signatures, this is the parameter list excluding the first “receiver” param)
-    - `active_param` indexes into `params` only (excluding receiver).
+    - parameters prefer per-argument inferred (actual) types when the argument expression is non-empty; empty argument slots fall back to instantiated expected types
+  - Signature help output is structured (no frontend parsing):
+    - `signatures[n].segments`: `DisplaySegment[]` (punctuation split into its own segments; params carry `param_index`)
+    - `active_signature`: selected overload index (currently always `0`)
+    - `active_parameter`: selected parameter index (matches `DisplaySegment.param_index`; excludes `...` and any receiver prefix)
+  - For postfix calls `<receiver>.<callee>(...)` where `<callee>` is a postfix-capable builtin:
+    - the receiver slot is rendered as a prefix segment sequence: `(<receiver_param>).` before the function name
+    - receiver segments have `param_index = None` and are never highlighted
   - Repeat-group shapes (a `ParamShape` with non-empty `repeat`) are pretty-printed as a pattern (see `docs/signature-help.md` for the spec):
     - head params once
     - repeat params **up to twice** (numbered: `condition1/value1`, `condition2/value2`), but the second repeat group is only shown once the call has entered it (or when the call is completed to the next valid shape for guidance)
@@ -359,7 +363,7 @@ Rendering behavior:
 Styling:
 
 - Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
-- Signature help for postfix calls de-emphasizes the receiver prefix (the `(receiver)` portion) in the completion panel UI.
+- Signature help is rendered from analyzer-provided segments; the UI does not parse or format signature/type strings.
 - The formula editor auto-grows with content (no fixed max-height cap) and keeps a small minimum height via
   `.editor .cm-editor .cm-scroller`.
 

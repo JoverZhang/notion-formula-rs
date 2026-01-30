@@ -9,4 +9,6 @@ mod test_completion_signature_help;
 #[cfg(test)]
 mod test_completion_smoke;
 #[cfg(test)]
+mod test_display_format_ty;
+#[cfg(test)]
 mod test_format_idempotence;
