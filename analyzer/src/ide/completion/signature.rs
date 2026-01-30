@@ -4,6 +4,8 @@
 use super::SignatureHelp;
 use super::position::prev_non_trivia_before;
 use crate::ast::{Expr, ExprKind};
+use crate::ide::completion::SignatureItem;
+use crate::ide::display::{ParamSlot, RenderedSignature, build_signature_segments};
 use crate::lexer::{Token, TokenKind};
 use crate::semantic;
 
@@ -15,24 +17,6 @@ pub(super) struct CallContext {
     pub(super) arg_index: usize,
 }
 
-/// Formats a type for UI display (e.g. `number[]` or `a | b`).
-pub(super) fn format_ty(ty: &semantic::Ty) -> String {
-    match ty {
-        semantic::Ty::Number => "number".into(),
-        semantic::Ty::String => "string".into(),
-        semantic::Ty::Boolean => "boolean".into(),
-        semantic::Ty::Date => "date".into(),
-        semantic::Ty::Null => "null".into(),
-        semantic::Ty::Unknown => "unknown".into(),
-        semantic::Ty::Generic(id) => format!("T{}", id.0),
-        semantic::Ty::List(inner) => match &**inner {
-            semantic::Ty::Union(_) => format!("({})[]", format_ty(inner)),
-            _ => format!("{}[]", format_ty(inner)),
-        },
-        semantic::Ty::Union(types) => types.iter().map(format_ty).collect::<Vec<_>>().join(" | "),
-    }
-}
-
 fn ty_contains_generic(ty: &semantic::Ty) -> bool {
     match ty {
         semantic::Ty::Generic(_) => true,
@@ -42,12 +26,12 @@ fn ty_contains_generic(ty: &semantic::Ty) -> bool {
     }
 }
 
-fn format_param_sig(name: &str, ty: &semantic::Ty, optional: bool) -> String {
-    let mut ty = format_ty(ty);
+fn format_ty_with_optional(ty: &semantic::Ty, optional: bool) -> String {
+    let mut out = ty.to_string();
     if optional {
-        ty.push('?');
+        out.push('?');
     }
-    format!("{name}: {ty}")
+    out
 }
 
 fn choose_display_ty<'a>(
@@ -61,38 +45,72 @@ fn choose_display_ty<'a>(
     actual.unwrap_or(instantiated_expected)
 }
 
-fn format_signature_display(
+fn render_signature(
     sig: &semantic::FunctionSig,
     arg_tys: &[Option<semantic::Ty>],
     total_args_for_shape: usize,
     inst_param_tys: &[semantic::Ty],
-    inst_ret: &semantic::Ty,
-) -> (String, Vec<String>) {
-    if sig.params.repeat.is_empty() {
-        let mut idx = 0usize;
-        let params = sig
-            .params
-            .head
-            .iter()
-            .chain(sig.params.tail.iter())
-            .map(|p| {
-                let instantiated_expected = inst_param_tys.get(idx).unwrap_or(&p.ty);
-                let actual = arg_tys.get(idx).and_then(|t| t.as_ref());
-                let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-                idx += 1;
-                format_param_sig(&p.name, ty, p.optional)
-            })
-            .collect::<Vec<_>>();
+    is_method_style: bool,
+) -> RenderedSignature {
+    let mut receiver: Option<(String, String)> = None;
+    let mut slots = Vec::<ParamSlot>::new();
+    let mut next_param_index = 0u32;
 
-        let label_params = params.join(", ");
-        let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(inst_ret));
-        return (label, params);
+    fn push_param(
+        receiver: &mut Option<(String, String)>,
+        slots: &mut Vec<ParamSlot>,
+        next_param_index: &mut u32,
+        is_method_style: bool,
+        name: String,
+        ty: String,
+    ) {
+        if is_method_style && receiver.is_none() {
+            *receiver = Some((name, ty));
+            return;
+        }
+
+        let idx = *next_param_index;
+        *next_param_index += 1;
+        slots.push(ParamSlot::Param {
+            name,
+            ty,
+            param_index: idx,
+        });
     }
 
-    let mut params = Vec::<String>::new();
+    fn push_ellipsis(slots: &mut Vec<ParamSlot>) {
+        slots.push(ParamSlot::Ellipsis);
+    }
+
+    if sig.params.repeat.is_empty() {
+        let mut idx = 0usize;
+        for p in sig.params.head.iter().chain(sig.params.tail.iter()) {
+            let instantiated_expected = inst_param_tys.get(idx).unwrap_or(&p.ty);
+            let actual = arg_tys.get(idx).and_then(|t| t.as_ref());
+            let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
+            idx += 1;
+            push_param(
+                &mut receiver,
+                &mut slots,
+                &mut next_param_index,
+                is_method_style,
+                p.name.clone(),
+                format_ty_with_optional(ty, p.optional),
+            );
+        }
+        return RenderedSignature { receiver, slots };
+    }
+
     for (idx, p) in sig.params.head.iter().enumerate() {
         let ty = inst_param_tys.get(idx).unwrap_or(&p.ty);
-        params.push(format_param_sig(&p.name, ty, p.optional));
+        push_param(
+            &mut receiver,
+            &mut slots,
+            &mut next_param_index,
+            is_method_style,
+            p.name.clone(),
+            format_ty_with_optional(ty, p.optional),
+        );
     }
 
     // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
@@ -113,22 +131,34 @@ fn format_signature_display(
             let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
             let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
             let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-            params.push(format_param_sig(&name, ty, p.optional));
+            push_param(
+                &mut receiver,
+                &mut slots,
+                &mut next_param_index,
+                is_method_style,
+                name,
+                format_ty_with_optional(ty, p.optional),
+            );
         }
     }
-    params.push("...".into());
+    push_ellipsis(&mut slots);
     for (t_idx, p) in sig.params.tail.iter().enumerate() {
         let actual_idx = tail_start.saturating_add(t_idx);
         let inst_idx = repeat_start + repeat_len + t_idx;
         let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
         let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
         let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-        params.push(format_param_sig(&p.name, ty, p.optional));
+        push_param(
+            &mut receiver,
+            &mut slots,
+            &mut next_param_index,
+            is_method_style,
+            p.name.clone(),
+            format_ty_with_optional(ty, p.optional),
+        );
     }
 
-    let label_params = params.join(", ");
-    let label = format!("{}({}) -> {}", sig.name, label_params, format_ty(inst_ret));
-    (label, params)
+    RenderedSignature { receiver, slots }
 }
 
 fn find_call_expr_by_lparen<'a>(
@@ -376,6 +406,28 @@ fn active_param_index(
     head_len + cycle * repeat_len + repeat_pos
 }
 
+fn nearest_param_index(slots: &[ParamSlot], slot_idx: usize) -> usize {
+    let get = |i: usize| match slots.get(i) {
+        Some(ParamSlot::Param { param_index, .. }) => Some(*param_index as usize),
+        _ => None,
+    };
+
+    if let Some(idx) = get(slot_idx) {
+        return idx;
+    }
+    for i in (0..slot_idx).rev() {
+        if let Some(idx) = get(i) {
+            return idx;
+        }
+    }
+    for i in (slot_idx + 1)..slots.len() {
+        if let Some(idx) = get(i) {
+            return idx;
+        }
+    }
+    0
+}
+
 /// Computes signature help when the cursor is inside a call argument list.
 ///
 /// Returns `None` if the cursor is before the `(`, or if the callee is unknown.
@@ -418,69 +470,48 @@ pub(super) fn compute_signature_help_if_in_call(
     };
 
     let is_postfix_call = is_postfix_call().is_some();
-    let can_use_postfix_help = is_postfix_call
+    let is_method_style = is_postfix_call
         && semantic::postfix_capable_builtin_names().contains(func.name.as_str())
         && semantic::is_postfix_capable(func);
 
     let arg_tys =
-        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, can_use_postfix_help);
+        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
     let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
 
     let mut full_call_ctx = call_ctx.clone();
-    if can_use_postfix_help {
+    if is_method_style {
         // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
         full_call_ctx.arg_index = full_call_ctx.arg_index.saturating_add(1);
     }
 
     let total_args_for_shape = arg_tys.len().max(full_call_ctx.arg_index + 1);
-    let (full_label, full_params) = format_signature_display(
+    let rendered = render_signature(
         func,
         arg_tys.as_slice(),
         total_args_for_shape,
         inst_param_tys.as_slice(),
-        &inst_ret,
-    );
-    let full_active_param = if full_params.is_empty() {
-        0
-    } else {
-        active_param_index(func, &full_call_ctx, total_args_for_shape).min(full_params.len() - 1)
-    };
-
-    if !can_use_postfix_help {
-        return Some(SignatureHelp {
-            receiver: None,
-            label: full_label,
-            params: full_params,
-            active_param: full_active_param,
-        });
-    }
-
-    // Postfix rendering is a presentation-only transformation: split off the receiver slot.
-    let receiver = full_params.first().cloned();
-    let params = full_params.into_iter().skip(1).collect::<Vec<_>>();
-    let label = format!(
-        "{}({}) -> {}",
-        func.name,
-        params.join(", "),
-        format_ty(&inst_ret)
+        is_method_style,
     );
 
-    let active_param = if params.is_empty() {
+    let active_slot = if rendered.slots.is_empty() {
         0
     } else {
-        let shifted = if full_active_param == 0 {
-            0
+        let full_slot = active_param_index(func, &full_call_ctx, total_args_for_shape);
+        let slot = if is_method_style {
+            full_slot.saturating_sub(1)
         } else {
-            full_active_param - 1
+            full_slot
         };
-        shifted.min(params.len() - 1)
+        slot.min(rendered.slots.len().saturating_sub(1))
     };
+
+    let active_parameter = nearest_param_index(rendered.slots.as_slice(), active_slot);
+    let segments = build_signature_segments(func.name.as_str(), &rendered, &inst_ret, is_method_style);
 
     Some(SignatureHelp {
-        receiver,
-        label,
-        params,
-        active_param,
+        signatures: vec![SignatureItem { segments }],
+        active_signature: 0,
+        active_parameter,
     })
 }
 
@@ -564,5 +595,29 @@ pub(super) fn expected_call_arg_ty(
     match ty {
         semantic::Ty::Unknown | semantic::Ty::Generic(_) => None,
         other => Some(other),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nearest_param_index;
+    use crate::ide::display::ParamSlot;
+
+    #[test]
+    fn active_parameter_uses_nearest_param_index_when_on_ellipsis() {
+        let slots = vec![
+            ParamSlot::Param {
+                name: "a".into(),
+                ty: "number".into(),
+                param_index: 3,
+            },
+            ParamSlot::Ellipsis,
+            ParamSlot::Param {
+                name: "b".into(),
+                ty: "string".into(),
+                param_index: 4,
+            },
+        ];
+        assert_eq!(nearest_param_index(&slots, 1), 3);
     }
 }

@@ -415,20 +415,17 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.completion-signature-receiver {
-  color: var(--muted);
-  opacity: 0.9;
-}
-
-.completion-signature-param {
+.completion-signature-seg {
   display: inline-block;
   padding: 1px 3px;
   border-radius: 6px;
 }
 
-.completion-signature-param.is-active {
+.completion-signature-seg.is-active {
   background: var(--selection);
   color: var(--text);
   font-weight: 600;

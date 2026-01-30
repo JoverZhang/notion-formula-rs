@@ -9,7 +9,21 @@ function sigLabelAtCloseParen(source: string): string {
 
   const out = completeSource(source, cursor, contextJson);
   expect(out.signature_help).not.toBeNull();
-  return out.signature_help!.label;
+  const help = out.signature_help!;
+  const activeSig = help.signatures[help.active_signature] ?? help.signatures[0];
+  expect(activeSig).toBeTruthy();
+  return activeSig!.segments
+    .map((s) => {
+      switch (s.kind) {
+        case "Ellipsis":
+          return "...";
+        case "Param":
+          return `${s.name}: ${s.ty}`;
+        default:
+          return s.text;
+      }
+    })
+    .join("");
 }
 
 function sigAtCloseParen(source: string) {
@@ -28,30 +42,30 @@ beforeAll(async () => {
 describe("WASM signature help (instantiated types)", () => {
   it("sum() shows variadic number signature and highlights first arg", () => {
     const sig = sigAtCloseParen("sum()");
-    expect(sig.label).toBe("sum(values1: number | number[], ...) -> number");
-    expect(sig.active_param).toBe(0);
+    expect(sigLabelAtCloseParen("sum()")).toBe("sum(values1: number | number[], ...) -> number");
+    expect(sig.active_parameter).toBe(0);
   });
 
   it("sum(42) highlights first arg", () => {
     const sig = sigAtCloseParen("sum(42)");
-    expect(sig.label).toBe("sum(values1: number | number[], ...) -> number");
-    expect(sig.active_param).toBe(0);
+    expect(sigLabelAtCloseParen("sum(42)")).toBe("sum(values1: number | number[], ...) -> number");
+    expect(sig.active_parameter).toBe(0);
   });
 
   it("sum(42, <empty>) highlights second arg", () => {
     const sig = sigAtCloseParen("sum(42, )");
-    expect(sig.label).toBe(
+    expect(sigLabelAtCloseParen("sum(42, )")).toBe(
       "sum(values1: number | number[], values2: number | number[], ...) -> number",
     );
-    expect(sig.active_param).toBe(1);
+    expect(sig.active_parameter).toBe(1);
   });
 
   it("sum(42, 42) highlights second arg", () => {
     const sig = sigAtCloseParen("sum(42, 42)");
-    expect(sig.label).toBe(
+    expect(sigLabelAtCloseParen("sum(42, 42)")).toBe(
       "sum(values1: number | number[], values2: number | number[], ...) -> number",
     );
-    expect(sig.active_param).toBe(1);
+    expect(sig.active_parameter).toBe(1);
   });
 
   it("if(true, unknown, 1) -> unknown", () => {
@@ -68,10 +82,10 @@ describe("WASM signature help (instantiated types)", () => {
 
   it('if(true, 42, [42, "42"]) list-of-union is parenthesized', () => {
     const sig = sigAtCloseParen('if(true, 42, [42, "42"])');
-    expect(sig.label).toBe(
+    expect(sigLabelAtCloseParen('if(true, 42, [42, "42"])')).toBe(
       "if(condition: boolean, then: number, else: (number | string)[]) -> number | (number | string)[]",
     );
-    expect(sig.active_param).toBe(2);
+    expect(sig.active_parameter).toBe(2);
   });
 
   it('ifs(true, 1, false, 2, "a") -> number | string', () => {
@@ -88,14 +102,14 @@ describe("WASM signature help (instantiated types)", () => {
 
   it("ifs(..., <empty>) highlights default (tail)", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", )');
-    expect(sig.label).toBe(
+    expect(sigLabelAtCloseParen('ifs(true, "123", true, "123", )')).toBe(
       "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., default: string) -> string",
     );
-    expect(sig.active_param).toBe(5);
+    expect(sig.active_parameter).toBe(4);
   });
 
   it("ifs(..., true, <empty>) highlights value in repeat pair", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", true, )');
-    expect(sig.active_param).toBe(3);
+    expect(sig.active_parameter).toBe(3);
   });
 });

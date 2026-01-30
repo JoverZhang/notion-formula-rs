@@ -18,7 +18,8 @@ use wasm_bindgen::prelude::JsValue;
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, FunctionCategoryView, LineColView, SignatureHelpView,
+    DiagnosticKindView, DiagnosticView, DisplaySegmentView, FunctionCategoryView, LineColView,
+    SignatureItemView, SignatureHelpView,
     Span as SpanDto, SpanView, TextEditView, TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
@@ -138,10 +139,19 @@ impl Converter {
     ) -> CompletionOutputView {
         let replace = Self::span_dto(source, output.replace);
         let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelpView {
-            receiver: sig.receiver.clone(),
-            label: sig.label.clone(),
-            params: sig.params.clone(),
-            active_param: sig.active_param,
+            signatures: sig
+                .signatures
+                .iter()
+                .map(|s| SignatureItemView {
+                    segments: s
+                        .segments
+                        .iter()
+                        .map(display_segment_view)
+                        .collect(),
+                })
+                .collect(),
+            active_signature: sig.active_signature,
+            active_parameter: sig.active_parameter,
         });
 
         let items = output
@@ -263,6 +273,27 @@ impl Converter {
 
     pub fn span_dto(source: &str, span: Span) -> SpanDto {
         byte_span_to_utf16_span(source, span)
+    }
+}
+
+fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> DisplaySegmentView {
+    use analyzer::ide::display::DisplaySegment as S;
+    match seg {
+        S::Name { text } => DisplaySegmentView::Name { text: text.clone() },
+        S::Punct { text } => DisplaySegmentView::Punct { text: text.clone() },
+        S::Separator { text } => DisplaySegmentView::Separator { text: text.clone() },
+        S::Ellipsis => DisplaySegmentView::Ellipsis,
+        S::Arrow { text } => DisplaySegmentView::Arrow { text: text.clone() },
+        S::Param {
+            name,
+            ty,
+            param_index,
+        } => DisplaySegmentView::Param {
+            name: name.clone(),
+            ty: ty.clone(),
+            param_index: *param_index,
+        },
+        S::ReturnType { text } => DisplaySegmentView::ReturnType { text: text.clone() },
     }
 }
 

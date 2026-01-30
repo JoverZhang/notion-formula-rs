@@ -618,7 +618,7 @@ impl CompletionTestBuilder {
             .signature_help
             .as_ref()
             .expect("expected signature help");
-        assert_eq!(sig.active_param, active_param);
+        assert_eq!(sig.active_parameter, active_param);
         self
     }
 
@@ -628,7 +628,29 @@ impl CompletionTestBuilder {
             .signature_help
             .as_ref()
             .expect("expected signature help");
-        assert_eq!(sig.label, label);
+        let active = sig
+            .signatures
+            .get(sig.active_signature)
+            .or_else(|| sig.signatures.first())
+            .expect("expected at least one signature");
+        let mut rendered = String::new();
+        for seg in &active.segments {
+            use crate::ide::display::DisplaySegment as S;
+            match seg {
+                S::Name { text }
+                | S::Punct { text }
+                | S::Separator { text }
+                | S::Arrow { text }
+                | S::ReturnType { text } => rendered.push_str(text.as_str()),
+                S::Ellipsis => rendered.push_str("..."),
+                S::Param { name, ty, .. } => {
+                    rendered.push_str(name.as_str());
+                    rendered.push_str(": ");
+                    rendered.push_str(ty.as_str());
+                }
+            }
+        }
+        assert_eq!(rendered, label);
         self
     }
 
@@ -638,32 +660,32 @@ impl CompletionTestBuilder {
             .signature_help
             .as_ref()
             .expect("expected signature help");
+        let active = sig
+            .signatures
+            .get(sig.active_signature)
+            .or_else(|| sig.signatures.first())
+            .expect("expected at least one signature");
+        let mut rendered = String::new();
+        for seg in &active.segments {
+            use crate::ide::display::DisplaySegment as S;
+            match seg {
+                S::Name { text }
+                | S::Punct { text }
+                | S::Separator { text }
+                | S::Arrow { text }
+                | S::ReturnType { text } => rendered.push_str(text.as_str()),
+                S::Ellipsis => rendered.push_str("..."),
+                S::Param { name, ty, .. } => {
+                    rendered.push_str(name.as_str());
+                    rendered.push_str(": ");
+                    rendered.push_str(ty.as_str());
+                }
+            }
+        }
         assert!(
-            !sig.label.contains(substr),
-            "did not expect signature label to contain {substr:?}, got: {}",
-            sig.label
+            !rendered.contains(substr),
+            "did not expect signature label to contain {substr:?}, got: {rendered}",
         );
-        self
-    }
-
-    pub fn expect_sig_receiver(mut self, expected: Option<&str>) -> Self {
-        let out = self.ensure_run();
-        let sig = out
-            .signature_help
-            .as_ref()
-            .expect("expected signature help");
-        assert_eq!(sig.receiver.as_deref(), expected);
-        self
-    }
-
-    pub fn expect_sig_params(mut self, expected: &[&str]) -> Self {
-        let out = self.ensure_run();
-        let sig = out
-            .signature_help
-            .as_ref()
-            .expect("expected signature help");
-        let expected = expected.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert_eq!(sig.params, expected);
         self
     }
 

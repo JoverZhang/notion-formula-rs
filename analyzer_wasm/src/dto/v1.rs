@@ -100,10 +100,31 @@ pub struct TextEditView {
 /// Signature help for a call expression.
 #[derive(Serialize, TS)]
 pub struct SignatureHelpView {
-    pub receiver: Option<String>,
-    pub label: String,
-    pub params: Vec<String>,
-    pub active_param: usize,
+    pub signatures: Vec<SignatureItemView>,
+    pub active_signature: usize,
+    pub active_parameter: usize,
+}
+
+/// A single signature in signature help.
+#[derive(Serialize, TS)]
+pub struct SignatureItemView {
+    pub segments: Vec<DisplaySegmentView>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(tag = "kind", rename_all = "PascalCase")]
+pub enum DisplaySegmentView {
+    Name { text: String },
+    Punct { text: String },
+    Separator { text: String },
+    Ellipsis,
+    Arrow { text: String },
+    Param {
+        name: String,
+        ty: String,
+        param_index: Option<u32>,
+    },
+    ReturnType { text: String },
 }
 
 /// A single completion item.

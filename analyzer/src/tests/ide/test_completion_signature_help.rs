@@ -98,10 +98,8 @@ fn signature_help_postfix_if_label_format() {
     let c = ctx().build();
     t("true.if($0, 1)")
         .ctx(c)
-        .expect_sig_receiver(Some("condition: boolean"))
-        .expect_sig_params(&["then: number", "else: number"])
         .expect_sig_active(0)
-        .expect_sig_label("if(then: number, else: number) -> number");
+        .expect_sig_label("(condition: boolean).if(then: number, else: number) -> number");
 }
 
 #[test]
@@ -109,13 +107,15 @@ fn signature_help_postfix_if_receiver_is_not_overridden_by_ill_typed_receiver() 
     let c = ctx().build();
     t("(1).if(42, \"42\"$0)")
         .ctx(c.clone())
-        .expect_sig_receiver(Some("condition: boolean"))
-        .expect_sig_label("if(then: number, else: string) -> number | string");
+        .expect_sig_label(
+            "(condition: boolean).if(then: number, else: string) -> number | string",
+        );
 
     t("(1 == 1).if(42, \"42\"$0)")
         .ctx(c)
-        .expect_sig_receiver(Some("condition: boolean"))
-        .expect_sig_label("if(then: number, else: string) -> number | string");
+        .expect_sig_label(
+            "(condition: boolean).if(then: number, else: string) -> number | string",
+        );
 }
 
 #[test]
@@ -124,14 +124,16 @@ fn signature_help_postfix_ifs_uses_method_style_and_boolean_receiver() {
 
     t("(1 == 1).ifs(42, \"42\"$0)")
         .ctx(c.clone())
-        .expect_sig_receiver(Some("condition1: boolean"))
-        .expect_sig_label("ifs(value1: number, ..., default: string) -> number | string");
+        .expect_sig_label(
+            "(condition1: boolean).ifs(value1: number, ..., default: string) -> number | string",
+        );
 
     // Ill-typed receiver should not override the hard-constrained boolean receiver slot.
     t("(1).ifs(42, \"42\"$0)")
         .ctx(c)
-        .expect_sig_receiver(Some("condition1: boolean"))
-        .expect_sig_label("ifs(value1: number, ..., default: string) -> number | string");
+        .expect_sig_label(
+            "(condition1: boolean).ifs(value1: number, ..., default: string) -> number | string",
+        );
 }
 
 #[test]
@@ -147,8 +149,7 @@ fn signature_help_normal_if_has_no_receiver_and_includes_all_params() {
     let c = ctx().build();
     t("if($0")
         .ctx(c)
-        .expect_sig_receiver(None)
-        .expect_sig_params(&["condition: boolean", "then: unknown", "else: unknown"]);
+        .expect_sig_label("if(condition: boolean, then: unknown, else: unknown) -> unknown");
 }
 
 #[test]
@@ -204,7 +205,7 @@ fn signature_help_ifs_single_group_highlights_default_and_omits_second_group() {
     let c = ctx().build();
     t("ifs(true, \"42\", $0)")
         .ctx(c)
-        .expect_sig_active(3)
+        .expect_sig_active(2)
         .expect_sig_label(
             "ifs(condition1: boolean, value1: string, ..., default: string) -> string",
         );
@@ -235,7 +236,7 @@ fn signature_help_ifs_total_5_highlights_default() {
     let c = ctx().build();
     t("ifs(true, \"42\", false, 7, $0)")
         .ctx(c)
-        .expect_sig_active(5)
+        .expect_sig_active(4)
         .expect_sig_label("ifs(condition1: boolean, value1: string, condition2: boolean, value2: number, ..., default: number | string) -> number | string");
 }
 
@@ -252,7 +253,7 @@ fn signature_help_ifs_active_param_empty_default_highlights_tail() {
     let c = ctx().build();
     t("ifs(true, \"123\", true, \"123\", $0)")
         .ctx(c)
-        .expect_sig_active(5);
+        .expect_sig_active(4);
 }
 
 #[test]
@@ -268,7 +269,6 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
     let c = ctx().build();
     t("true.sum($0")
         .ctx(c)
-        .expect_sig_receiver(None)
         .expect_sig_label("sum(values1: number | number[], ...) -> number")
         .expect_sig_label_not_contains(").sum(");
 }
