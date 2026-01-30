@@ -89,6 +89,7 @@ impl<'a> Parser<'a> {
                 };
                 let sync = [
                     TokenKind::Comma,
+                    TokenKind::CloseBracket,
                     TokenKind::CloseParen,
                     TokenKind::Colon,
                     TokenKind::Eof,
@@ -359,6 +360,7 @@ impl<'a> Parser<'a> {
                     );
                     self.recover_to(&[
                         TokenKind::CloseParen,
+                        TokenKind::CloseBracket,
                         TokenKind::Comma,
                         TokenKind::Colon,
                         TokenKind::Eof,
@@ -380,6 +382,8 @@ impl<'a> Parser<'a> {
                 )
             }
 
+            TokenKind::OpenBracket => self.parse_list_literal(),
+
             _ => {
                 let tok = self.cur().clone();
                 self.diagnostics.emit_error(
@@ -389,6 +393,86 @@ impl<'a> Parser<'a> {
                 self.error_expr_bump()
             }
         }
+    }
+
+    fn parse_list_literal(&mut self) -> Expr {
+        let lbrack = self.bump(); // '['
+        let mut items = Vec::new();
+
+        if !matches!(self.cur_kind(), TokenKind::CloseBracket) {
+            items.push(self.parse_expr_bp(0));
+            while matches!(self.cur_kind(), TokenKind::Comma) {
+                let comma = self.bump(); // ','
+
+                if matches!(self.cur_kind(), TokenKind::CloseBracket) {
+                    self.diagnostics.emit_error(
+                        comma.span,
+                        "trailing comma in list literal is not supported",
+                    );
+                    break;
+                }
+
+                if !self.cur().can_begin_expr() {
+                    let found = self.cur().clone();
+                    self.diagnostics.emit_error(
+                        found.span,
+                        "expected expression after ',' in list literal",
+                    );
+                    if !matches!(found.kind, TokenKind::Eof) {
+                        self.bump();
+                    }
+                    self.recover_to(&[
+                        TokenKind::Comma,
+                        TokenKind::CloseBracket,
+                        TokenKind::CloseParen,
+                        TokenKind::Colon,
+                        TokenKind::Eof,
+                    ]);
+                    if !self.cur().can_begin_expr() {
+                        continue;
+                    }
+                }
+
+                items.push(self.parse_expr_bp(0));
+            }
+        }
+
+        if let Err(()) = self.expect_punct(TokenKind::CloseBracket, "']'") {
+            let found = self.cur().clone();
+            let labels = vec![Label {
+                span: lbrack.span,
+                message: Some("this '[' is not closed".into()),
+            }];
+            let primary_span = if matches!(found.kind, TokenKind::Eof) {
+                Span {
+                    start: found.span.start,
+                    end: found.span.start,
+                }
+            } else {
+                found.span
+            };
+            self.diagnostics.emit_error_with_labels(
+                primary_span,
+                format!("expected ']', found {:?}", found.kind),
+                labels,
+            );
+            self.recover_to(&[
+                TokenKind::CloseBracket,
+                TokenKind::Comma,
+                TokenKind::CloseParen,
+                TokenKind::Colon,
+                TokenKind::Eof,
+            ]);
+            if matches!(self.cur_kind(), TokenKind::CloseBracket) {
+                self.bump();
+            }
+        }
+
+        let span = Span {
+            start: lbrack.span.start,
+            end: self.last_bumped_end(),
+        };
+        self.mk_expr(span, ExprKind::List { items })
     }
 
     fn parse_number_literal(&mut self) -> Expr {

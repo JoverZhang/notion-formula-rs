@@ -85,7 +85,7 @@ pub enum FunctionCategory {
 }
 
 pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
-    if matches!(expected, Ty::Unknown) || matches!(actual, Ty::Unknown) {
+    if matches!(actual, Ty::Unknown) {
         return true;
     }
     // Generics wildcard only when the *expected* side is generic.
@@ -94,7 +94,9 @@ pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
         return true;
     }
     match (expected, actual) {
+        (Ty::Union(_), Ty::Union(actual_members)) => actual_members.iter().all(|a| ty_accepts(expected, a)),
         (Ty::Union(branches), actual) => branches.iter().any(|t| ty_accepts(t, actual)),
+        (expected, Ty::Union(actual_members)) => actual_members.iter().all(|a| ty_accepts(expected, a)),
         (Ty::List(e), Ty::List(a)) => ty_accepts(e, a),
         _ => expected == actual,
     }
@@ -141,6 +143,11 @@ fn validate_expr(expr: &Expr, ctx: &Context, map: &TypeMap, diags: &mut Vec<Diag
     match &expr.kind {
         ExprKind::Lit(_) | ExprKind::Ident(_) | ExprKind::Error => {}
         ExprKind::Group { inner } => validate_expr(inner, ctx, map, diags),
+        ExprKind::List { items } => {
+            for item in items {
+                validate_expr(item, ctx, map, diags);
+            }
+        }
         ExprKind::Unary { expr, .. } => validate_expr(expr, ctx, map, diags),
         ExprKind::Binary { left, right, .. } => {
             validate_expr(left, ctx, map, diags);

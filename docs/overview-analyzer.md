@@ -101,6 +101,9 @@ Expression forms (AST):
 - binary: `< <= == != >= > && || + - * / % ^`
 - ternary: `cond ? then : otherwise`
 - grouping: `(expr)` preserved as `ExprKind::Group`
+- list literal: `[expr (, expr)*]` preserved as `ExprKind::List { items: Vec<Expr> }`
+  - empty list `[]` is allowed
+  - trailing comma is a parse error (e.g. `[1,2,]`)
 - calls: `ident(arg1, arg2, ...)`
 - member-call: `receiver.method(arg1, ...)`
   (member access without `(...)` is rejected)
@@ -135,8 +138,12 @@ Semantic analysis (`analyzer/src/analysis/mod.rs`):
   - `analyze_expr` returns the inferred root type and emits diagnostics by comparing inferred argument types to builtin signatures (arity + expected types).
     - Validation is arity/shape-first: if a call has an arity/shape error, the analyzer emits that single diagnostic and **does not** emit additional per-argument type mismatch diagnostics for the same call.
   - Type acceptance (`ty_accepts` in `analyzer/src/analysis/mod.rs`):
-    - `Unknown` is permissive (either side being `Unknown` accepts).
+    - `Unknown` is permissive only on the **actual** side (when inference cannot determine a type, it does not produce additional mismatch noise).
     - `Ty::Generic(_)` is only a wildcard on the **expected** side (generic *inferred actuals* do not silently pass validation).
+    - `Ty::Union(...)` uses containment semantics:
+      - `expected = Union(E1|E2|...)` accepts `actual = Union(A1|A2|...)` iff each `Ai` is accepted by `expected`
+      - `expected = T` accepts `actual = Union(A1|...)` iff `T` accepts each `Ai`
+    - `Ty::List(E)` accepts `Ty::List(A)` iff `E` accepts `A` (directional/covariant).
 - `prop("Name")` is **special-cased** in the semantic analyzer (it is not a `FunctionSig`):
   - expects exactly 1 argument
   - argument must be a string literal
@@ -172,6 +179,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
   3) fuzzy subsequence match (existing subsequence scoring)
   Within exact/contains, shorter normalized labels rank first (and for contains, earlier substring occurrence breaks ties); fuzzy ties use the subsequence score; all remaining ties are deterministic by original index. Other completion kinds are left in original relative order after matched items.
 - When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
+  - Type ranking is skipped when the expected argument type is `Unknown` or `Generic(_)` (wildcard-ish and not informative).
 - `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
   - Signature help is **call-site instantiated**:

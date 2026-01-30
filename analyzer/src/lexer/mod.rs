@@ -212,6 +212,8 @@ pub fn lex(input: &str) -> LexOutput {
             '?' => TokenKind::Question,
             '(' => TokenKind::OpenParen,
             ')' => TokenKind::CloseParen,
+            '[' => TokenKind::OpenBracket,
+            ']' => TokenKind::CloseBracket,
 
             '"' => {
                 // Read string until next quote (no escapes in v1).

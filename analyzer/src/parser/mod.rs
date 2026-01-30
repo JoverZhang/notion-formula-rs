@@ -181,6 +181,8 @@ impl<'a> Parser<'a> {
             // Parentheses and EOF
             | (OpenParen, OpenParen)
             | (CloseParen, CloseParen)
+            | (OpenBracket, OpenBracket)
+            | (CloseBracket, CloseBracket)
             | (Eof, Eof)
         )
     }

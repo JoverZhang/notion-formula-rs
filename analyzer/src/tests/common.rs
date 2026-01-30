@@ -93,3 +93,15 @@ macro_rules! assert_call {
         }
     }};
 }
+
+macro_rules! assert_list {
+    ($e:expr, $items:expr) => {{
+        match &($e).kind {
+            ExprKind::List { items, .. } => {
+                assert_eq!(items.len(), $items);
+                items
+            }
+            other => panic!("expected List, got {:?}", other),
+        }
+    }};
+}

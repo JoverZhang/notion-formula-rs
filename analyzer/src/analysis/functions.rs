@@ -30,37 +30,41 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             ),
             Ty::Generic(t0),
         ),
-        func!(
+        func_g!(
             FunctionCategory::General,
             "empty(value)",
+            generics!(g!(0, Plain)),
             "empty",
-            params!(p!("value", Ty::Unknown)),
+            params!(p!("value", Ty::Generic(t0))),
             Ty::Boolean,
         ),
-        func!(
+        func_g!(
             FunctionCategory::General,
             "format(value)",
+            generics!(g!(0, Plain)),
             "format",
-            params!(p!("value", Ty::Unknown)),
+            params!(p!("value", Ty::Generic(t0))),
             Ty::String,
         ),
-        func!(
+        func_g!(
             FunctionCategory::General,
             "toNumber(value)",
+            generics!(g!(0, Plain)),
             "toNumber",
-            params!(p!("value", Ty::Unknown)),
+            params!(p!("value", Ty::Generic(t0))),
             Ty::Number,
         ),
         // =========================
         // Text
         // =========================
-        func!(
+        func_g!(
             FunctionCategory::Text,
             "length(text|any[])",
+            generics!(g!(0, Plain)),
             "length",
             params!(p!(
                 "value",
-                Ty::Union(vec![Ty::String, Ty::List(Box::new(Ty::Unknown))])
+                Ty::Union(vec![Ty::String, Ty::List(Box::new(Ty::Generic(t0)))])
             )),
             Ty::Number,
         ),
@@ -514,96 +518,106 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
         // =========================
         // People
         // =========================
-        func!(
+        func_g!(
             FunctionCategory::People,
             "name(person)",
+            generics!(g!(0, Plain)),
             "name",
             params!(p!(
                 "person",
                 // TODO: Notion's person type is more complex than this.
-                Ty::Unknown
+                Ty::Generic(t0)
             )),
             Ty::String,
         ),
-        func!(
+        func_g!(
             FunctionCategory::People,
             "email(person)",
+            generics!(g!(0, Plain)),
             "email",
             params!(p!(
                 "person",
                 // TODO: Notion's person type is more complex than this.
-                Ty::Unknown
+                Ty::Generic(t0)
             )),
             Ty::String,
         ),
         // =========================
         // List
         // =========================
-        func!(
+        func_g!(
             FunctionCategory::List,
             "at(list, index)",
+            generics!(g!(0, Plain)),
             "at",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
                 p!("index", Ty::Number)
             ),
             Ty::Unknown,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "first(list)",
+            generics!(g!(0, Plain)),
             "first",
-            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::Unknown,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "last(list)",
+            generics!(g!(0, Plain)),
             "last",
-            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::Unknown,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "slice(list, start, end?)",
+            generics!(g!(0, Plain)),
             "slice",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
                 p!("start", Ty::Number),
                 opt!("end", Ty::Number)
             ),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "concat(list, ...)",
+            generics!(g!(0, Plain)),
             "concat",
             repeat_params_with_tail!(
-                repeat!(p!("lists", Ty::List(Box::new(Ty::Unknown)))),
+                repeat!(p!("lists", Ty::List(Box::new(Ty::Generic(t0))))),
                 tail!(),
             ),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "sort(list)",
+            generics!(g!(0, Plain)),
             "sort",
-            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "reverse(list)",
+            generics!(g!(0, Plain)),
             "reverse",
-            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "join(list, separator)",
+            generics!(g!(0, Plain)),
             "join",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
                 p!("separator", Ty::String)
             ),
             Ty::String,
@@ -615,141 +629,155 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
             params!(p!("text", Ty::String), p!("separator", Ty::String)),
             Ty::List(Box::new(Ty::String)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "unique(list)",
+            generics!(g!(0, Plain)),
             "unique",
-            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "includes(list, value)",
+            generics!(g!(0, Plain)),
             "includes",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
-                p!("value", Ty::Unknown)
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("value", Ty::Generic(t0))
             ),
             Ty::Boolean,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "find(list, predicate)",
+            generics!(g!(0, Plain)),
             "find",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
                 p!(
                     "predicate",
                     // lambda expr (current/index) in Notion DSL
-                    Ty::Unknown
+                    Ty::Generic(t0)
                 )
             ),
             Ty::Unknown,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "findIndex(list, predicate)",
+            generics!(g!(0, Plain)),
             "findIndex",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
-                p!("predicate", Ty::Unknown)
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("predicate", Ty::Generic(t0))
             ),
             Ty::Number,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "filter(list, predicate)",
+            generics!(g!(0, Plain)),
             "filter",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
-                p!("predicate", Ty::Unknown)
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("predicate", Ty::Generic(t0))
             ),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "some(list, predicate)",
+            generics!(g!(0, Plain)),
             "some",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
-                p!("predicate", Ty::Unknown)
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("predicate", Ty::Generic(t0))
             ),
             Ty::Boolean,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "every(list, predicate)",
+            generics!(g!(0, Plain)),
             "every",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
-                p!("predicate", Ty::Unknown)
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("predicate", Ty::Generic(t0))
             ),
             Ty::Boolean,
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "map(list, mapper)",
+            generics!(g!(0, Plain)),
             "map",
             params!(
-                p!("list", Ty::List(Box::new(Ty::Unknown))),
-                p!("mapper", Ty::Unknown)
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("mapper", Ty::Generic(t0))
             ),
             Ty::List(Box::new(Ty::Unknown)),
         ),
-        func!(
+        func_g!(
             FunctionCategory::List,
             "flat(list)",
+            generics!(g!(0, Plain)),
             "flat",
-            params!(p!("list", Ty::List(Box::new(Ty::Unknown)))),
+            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::List(Box::new(Ty::Unknown)),
         ),
         // =========================
         // Special / Utility
         // =========================
-        func!(
+        func_g!(
             FunctionCategory::Special,
             "id(page?)",
+            generics!(g!(0, Plain)),
             "id",
             params!(opt!(
                 "page",
                 // if you have Ty::Page, use it here
-                Ty::Unknown
+                Ty::Generic(t0)
             )),
             Ty::String,
         ),
-        func!(
+        func_g!(
             FunctionCategory::Special,
             "equal(a, b)",
+            generics!(g!(0, Plain)),
             "equal",
-            params!(p!("a", Ty::Unknown), p!("b", Ty::Unknown)),
+            params!(p!("a", Ty::Generic(t0)), p!("b", Ty::Generic(t0))),
             Ty::Boolean,
         ),
-        func!(
+        func_g!(
             FunctionCategory::Special,
             "unequal(a, b)",
+            generics!(g!(0, Plain)),
             "unequal",
-            params!(p!("a", Ty::Unknown), p!("b", Ty::Unknown)),
+            params!(p!("a", Ty::Generic(t0)), p!("b", Ty::Generic(t0))),
             Ty::Boolean,
         ),
-        func!(
+        func_g!(
             FunctionCategory::Special,
             "let(var, value, expr)",
+            generics!(g!(0, Plain)),
             "let",
             // let(var, value, expr)
             params!(
                 p!(
                     "var",
                     // identifier slot
-                    Ty::Unknown
+                    Ty::Generic(t0)
                 ),
-                p!("value", Ty::Unknown),
-                p!("expr", Ty::Unknown)
+                p!("value", Ty::Generic(t0)),
+                p!("expr", Ty::Generic(t0))
             ),
             Ty::Unknown,
         ),
-        func!(
+        func_g!(
             FunctionCategory::Special,
             "lets(var1, value1, ..., expr)",
+            generics!(g!(0, Plain)),
             "lets",
             // lets(a, v1, b, v2, ..., expr)
             repeat_params!(
@@ -758,11 +786,11 @@ pub fn builtins_functions() -> Vec<FunctionSig> {
                     p!(
                         "var",
                         // identifier slot
-                        Ty::Unknown
+                        Ty::Generic(t0)
                     ),
-                    p!("value", Ty::Unknown)
+                    p!("value", Ty::Generic(t0))
                 ),
-                tail!(p!("expr", Ty::Unknown)),
+                tail!(p!("expr", Ty::Generic(t0))),
             ),
             Ty::Unknown,
         ),

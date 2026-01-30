@@ -1,4 +1,5 @@
 use crate::analyze;
+use crate::ast::ExprKind;
 use crate::diagnostics::DiagnosticKind;
 
 #[test]
@@ -22,4 +23,22 @@ fn test_multiple_errors_collected() {
         "expected at least two diagnostics, got {:?}",
         result.diagnostics
     );
+}
+
+#[test]
+fn diagnostics_list_trailing_comma_recovers() {
+    let result = analyze("[1,2,]").unwrap();
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.kind == DiagnosticKind::Error && d.message.contains("trailing comma")),
+        "unexpected diagnostics: {:?}",
+        result.diagnostics
+    );
+
+    match &result.expr.kind {
+        ExprKind::List { items } => assert_eq!(items.len(), 2),
+        other => panic!("expected List, got {:?}", other),
+    }
 }

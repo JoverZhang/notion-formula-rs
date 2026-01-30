@@ -30,6 +30,12 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
             assert_child_range(inner, expr, tokens);
             check_invariants(inner, tokens);
         }
+        ExprKind::List { items } => {
+            for item in items {
+                assert_child_range(item, expr, tokens);
+                check_invariants(item, tokens);
+            }
+        }
         ExprKind::Call { args, .. } => {
             for arg in args {
                 assert_child_range(arg, expr, tokens);
