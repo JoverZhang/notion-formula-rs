@@ -89,25 +89,28 @@ Then:
 
 ## Canonical examples
 
-### SUM (variadic `number` only)
+### SUM (variadic `number | number[]`)
 
-NOTE: Array arguments (`number[]`) are deferred until the language has list literals (or an equivalent array expression).  
-TODO: restore `number[]` support once arrays exist.
+NOTE: Each variadic slot accepts either a scalar `number` or a `number[]`.
 
 1) `sum($0)`
-   - label: `sum(values1: number, ...) -> number`
+   - label: `sum(values1: number | number[], ...) -> number`
    - `activeParam`: `0`
 
 2) `sum(42$0)`
-   - label: `sum(values1: number, ...) -> number`
+   - label: `sum(values1: number | number[], ...) -> number`
    - `activeParam`: `0`
 
-3) `sum(42, $0)`
-   - label: `sum(values1: number, values2: number, ...) -> number`
+3) `sum([1,2,3]$0)`
+   - label: `sum(values1: number | number[], ...) -> number`
+   - `activeParam`: `0`
+
+4) `sum(42, $0)`
+   - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
    - `activeParam`: `1`
 
-4) `sum(42, 42$0)`
-   - label: `sum(values1: number, values2: number, ...) -> number`
+5) `sum(42, 42$0)`
+   - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
    - `activeParam`: `1`
 
 ### IF

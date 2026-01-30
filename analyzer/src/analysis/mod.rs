@@ -5,10 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-#[macro_use]
 mod builtins;
-mod functions;
-pub use functions::builtins_functions;
+pub use builtins::builtins_functions;
 mod signature;
 pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig};
 mod param_shape;

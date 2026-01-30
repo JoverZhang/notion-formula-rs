@@ -69,15 +69,14 @@ fn completion_preferred_limit_zero_disables_preferred_indices() {
 #[test]
 fn completion_ranking_contains_beats_fuzzy() {
     let c = ctx()
-        .only_funcs(&["mean", "median", "toNumber", "name", "some"])
+        .only_funcs(&["mean", "median", "toNumber", "name"])
         .build();
 
     t("me$0")
         .ctx(c)
         .expect_order("mean", "toNumber")
         .expect_order("median", "toNumber")
-        .expect_order("name", "toNumber")
-        .expect_order("some", "toNumber");
+        .expect_order("name", "toNumber");
 }
 
 #[test]
@@ -126,7 +125,7 @@ fn completion_type_ranking_number_prefers_number_props() {
 }
 
 #[test]
-fn completion_type_ranking_sum_number_does_not_prefer_number_list_props() {
+fn completion_type_ranking_sum_number_prefers_number_list_props() {
     let c = ctx()
         .prop("Title", Ty::String)
         .prop("Age", Ty::Number)
@@ -136,7 +135,7 @@ fn completion_type_ranking_sum_number_does_not_prefer_number_list_props() {
     t("sum($0")
         .ctx(c)
         .expect_order("Age", "Title")
-        .expect_order("Title", "Nums")
+        .expect_order("Nums", "Title")
         .expect_replace_contains_cursor();
 }
 

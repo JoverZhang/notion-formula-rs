@@ -26,28 +26,31 @@ beforeAll(async () => {
 });
 
 describe("WASM signature help (instantiated types)", () => {
-  // TODO: restore `number[]` support for `sum` once list literals or an equivalent array expression exists.
   it("sum() shows variadic number signature and highlights first arg", () => {
     const sig = sigAtCloseParen("sum()");
-    expect(sig.label).toBe("sum(values1: number, ...) -> number");
+    expect(sig.label).toBe("sum(values1: number | number[], ...) -> number");
     expect(sig.active_param).toBe(0);
   });
 
   it("sum(42) highlights first arg", () => {
     const sig = sigAtCloseParen("sum(42)");
-    expect(sig.label).toBe("sum(values1: number, ...) -> number");
+    expect(sig.label).toBe("sum(values1: number | number[], ...) -> number");
     expect(sig.active_param).toBe(0);
   });
 
   it("sum(42, <empty>) highlights second arg", () => {
     const sig = sigAtCloseParen("sum(42, )");
-    expect(sig.label).toBe("sum(values1: number, values2: number, ...) -> number");
+    expect(sig.label).toBe(
+      "sum(values1: number | number[], values2: number | number[], ...) -> number",
+    );
     expect(sig.active_param).toBe(1);
   });
 
   it("sum(42, 42) highlights second arg", () => {
     const sig = sigAtCloseParen("sum(42, 42)");
-    expect(sig.label).toBe("sum(values1: number, values2: number, ...) -> number");
+    expect(sig.label).toBe(
+      "sum(values1: number | number[], values2: number | number[], ...) -> number",
+    );
     expect(sig.active_param).toBe(1);
   });
 
@@ -63,6 +66,13 @@ describe("WASM signature help (instantiated types)", () => {
     );
   });
 
+  it('if(true, 42, [42, "42"]) list-of-union is parenthesized', () => {
+    const sig = sigAtCloseParen('if(true, 42, [42, "42"])');
+    expect(sig.label).toBe(
+      "if(condition: boolean, then: number, else: (number | string)[]) -> number | (number | string)[]",
+    );
+    expect(sig.active_param).toBe(2);
+  });
   it('ifs(true, 1, false, 2, "a") -> number | string', () => {
     expect(sigLabelAtCloseParen('ifs(true, 1, false, 2, "a")')).toBe(
       "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: string) -> number | string",

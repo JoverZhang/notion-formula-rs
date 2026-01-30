@@ -50,7 +50,7 @@ fn signature_help_sum_variadic_number_only_case_1_empty_first_arg() {
     t("sum($0")
         .ctx(c)
         .expect_sig_active(0)
-        .expect_sig_label("sum(values1: number, ...) -> number");
+        .expect_sig_label("sum(values1: number | number[], ...) -> number");
 }
 
 #[test]
@@ -59,7 +59,16 @@ fn signature_help_sum_variadic_number_only_case_2_single_number() {
     t("sum(42$0)")
         .ctx(c)
         .expect_sig_active(0)
-        .expect_sig_label("sum(values1: number, ...) -> number");
+        .expect_sig_label("sum(values1: number | number[], ...) -> number");
+}
+
+#[test]
+fn signature_help_sum_variadic_number_only_case_2_list_literal() {
+    let c = ctx().build();
+    t("sum([1,2,3]$0)")
+        .ctx(c)
+        .expect_sig_active(0)
+        .expect_sig_label("sum(values1: number | number[], ...) -> number");
 }
 
 #[test]
@@ -68,7 +77,9 @@ fn signature_help_sum_variadic_number_only_case_3_second_arg_empty() {
     t("sum(42, $0)")
         .ctx(c)
         .expect_sig_active(1)
-        .expect_sig_label("sum(values1: number, values2: number, ...) -> number");
+        .expect_sig_label(
+            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+        );
 }
 
 #[test]
@@ -77,7 +88,9 @@ fn signature_help_sum_variadic_number_only_case_4_two_numbers() {
     t("sum(42, 42$0)")
         .ctx(c)
         .expect_sig_active(1)
-        .expect_sig_label("sum(values1: number, values2: number, ...) -> number");
+        .expect_sig_label(
+            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+        );
 }
 
 #[test]
@@ -256,6 +269,17 @@ fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
     t("true.sum($0")
         .ctx(c)
         .expect_sig_receiver(None)
-        .expect_sig_label("sum(values1: number, ...) -> number")
+        .expect_sig_label("sum(values1: number | number[], ...) -> number")
         .expect_sig_label_not_contains(").sum(");
+}
+
+#[test]
+fn signature_help_if_list_of_union_is_parenthesized() {
+    let c = ctx().build();
+    t("if(true, 42, [42, \"42\"]$0)")
+        .ctx(c)
+        .expect_sig_active(2)
+        .expect_sig_label(
+            "if(condition: boolean, then: number, else: (number | string)[]) -> number | (number | string)[]",
+        );
 }

@@ -25,7 +25,10 @@ pub(super) fn format_ty(ty: &semantic::Ty) -> String {
         semantic::Ty::Null => "null".into(),
         semantic::Ty::Unknown => "unknown".into(),
         semantic::Ty::Generic(id) => format!("T{}", id.0),
-        semantic::Ty::List(inner) => format!("{}[]", format_ty(inner)),
+        semantic::Ty::List(inner) => match &**inner {
+            semantic::Ty::Union(_) => format!("({})[]", format_ty(inner)),
+            _ => format!("{}[]", format_ty(inner)),
+        },
         semantic::Ty::Union(types) => types.iter().map(format_ty).collect::<Vec<_>>().join(" | "),
     }
 }
@@ -234,7 +237,8 @@ fn infer_call_arg_tys_best_effort(
             return spans;
         };
 
-        let mut depth = 0i32;
+        let mut paren_depth = 0i32;
+        let mut bracket_depth = 0i32;
         let mut start = lparen.span.end;
 
         for token in tokens.iter().skip(lparen_idx + 1) {
@@ -243,18 +247,26 @@ fn infer_call_arg_tys_best_effort(
             }
 
             match token.kind {
-                TokenKind::OpenParen => depth += 1,
+                TokenKind::OpenParen => paren_depth += 1,
+                TokenKind::OpenBracket => bracket_depth += 1,
                 TokenKind::CloseParen => {
-                    if depth == 0 {
+                    if paren_depth == 0 && bracket_depth == 0 {
                         spans.push(crate::Span {
                             start,
                             end: token.span.start,
                         });
                         return spans;
                     }
-                    depth -= 1;
+                    if paren_depth > 0 {
+                        paren_depth -= 1;
+                    }
                 }
-                TokenKind::Comma if depth == 0 => {
+                TokenKind::CloseBracket => {
+                    if bracket_depth > 0 {
+                        bracket_depth -= 1;
+                    }
+                }
+                TokenKind::Comma if paren_depth == 0 && bracket_depth == 0 => {
                     spans.push(crate::Span {
                         start,
                         end: token.span.start,
@@ -278,30 +290,27 @@ fn infer_call_arg_tys_best_effort(
     let mut arg_tys: Vec<Option<semantic::Ty>> = Vec::new();
 
     // If this is a member call, try to include the receiver type as the leading argument.
-    if include_receiver_as_arg {
-        if let Ok(parsed) = crate::analyze(source) {
-            if let Some(call_expr) =
-                find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
-            {
-                if let ExprKind::MemberCall { receiver, .. } = &call_expr.kind {
-                    let mut map = semantic::TypeMap::default();
-                    let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
-                    let mut ty = map
-                        .get(receiver.id)
-                        .cloned()
-                        .unwrap_or(semantic::Ty::Unknown);
-                    if matches!(ty, semantic::Ty::Unknown)
-                        && matches!(
-                            &receiver.kind,
-                            ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
-                        )
-                    {
-                        ty = semantic::Ty::Boolean;
-                    }
-                    arg_tys.push(Some(ty));
-                }
-            }
+    if include_receiver_as_arg
+        && let Ok(parsed) = crate::analyze(source)
+        && let Some(call_expr) =
+            find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
+        && let ExprKind::MemberCall { receiver, .. } = &call_expr.kind
+    {
+        let mut map = semantic::TypeMap::default();
+        let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
+        let mut ty = map
+            .get(receiver.id)
+            .cloned()
+            .unwrap_or(semantic::Ty::Unknown);
+        if matches!(ty, semantic::Ty::Unknown)
+            && matches!(
+                &receiver.kind,
+                ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
+            )
+        {
+            ty = semantic::Ty::Boolean;
         }
+        arg_tys.push(Some(ty));
     }
 
     for span in spans {
@@ -342,7 +351,7 @@ fn active_param_index(
         return 0;
     };
     let tail_start = shape.tail_start;
-    let repeat_groups_displayed = shape.repeat_groups.max(1).min(2);
+    let repeat_groups_displayed = shape.repeat_groups.clamp(1, 2);
 
     // Display shape: head, repeat x{1..2}, "...", tail
     let ellipsis_idx = head_len + repeat_len * repeat_groups_displayed;
@@ -499,7 +508,8 @@ pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallC
         return None;
     };
     let mut arg_index = 0usize;
-    let mut depth = 0i32;
+    let mut paren_depth = 0i32;
+    let mut bracket_depth = 0i32;
     for token in tokens.iter().skip(lparen_idx + 1) {
         if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
             continue;
@@ -508,14 +518,20 @@ pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallC
             break;
         }
         match token.kind {
-            TokenKind::OpenParen => depth += 1,
+            TokenKind::OpenParen => paren_depth += 1,
+            TokenKind::OpenBracket => bracket_depth += 1,
             TokenKind::CloseParen => {
-                if depth > 0 {
-                    depth -= 1;
+                if paren_depth > 0 {
+                    paren_depth -= 1;
+                }
+            }
+            TokenKind::CloseBracket => {
+                if bracket_depth > 0 {
+                    bracket_depth -= 1;
                 }
             }
             TokenKind::Comma => {
-                if depth == 0 {
+                if paren_depth == 0 && bracket_depth == 0 {
                     arg_index += 1;
                 }
             }

@@ -37,41 +37,10 @@ fn assert_single_diag(diags: Vec<crate::Diagnostic>, message: &str, span: Span) 
 }
 
 fn ctx_with_builtins() -> Context {
-    let t = GenericId(0);
-    let mut ctx = Context {
+    Context {
         properties: vec![],
-        functions: vec![],
-    };
-    ctx.functions.push(FunctionSig::new(
-        FunctionCategory::General,
-        "if(condition, then, else)",
-        "if",
-        ParamShape::new(
-            vec![
-                p("condition", Ty::Boolean),
-                p("then", Ty::Generic(t)),
-                p("else", Ty::Generic(t)),
-            ],
-            vec![],
-            vec![],
-        ),
-        Ty::Unknown,
-        vec![],
-    ));
-    ctx.functions.push(FunctionSig::new(
-        FunctionCategory::Number,
-        "sum(number, ...)",
-        "sum",
-        ParamShape::new(
-            vec![],
-            // TODO: restore `number[]` once list literals or an equivalent array expression exists.
-            vec![p("values", Ty::Number)],
-            vec![],
-        ),
-        Ty::Number,
-        vec![],
-    ));
-    ctx
+        functions: semantic::builtins_functions(),
+    }
 }
 
 #[test]
@@ -201,7 +170,7 @@ fn test_sum_type_mismatch_emits_error() {
 }
 
 #[test]
-fn test_sum_rejects_number_list_property() {
+fn test_sum_accepts_number_list_property() {
     let mut ctx = ctx_with_builtins();
     ctx.properties.push(Property {
         name: "Nums".into(),
@@ -209,11 +178,7 @@ fn test_sum_rejects_number_list_property() {
         disabled_reason: None,
     });
     let diags = run_semantic("sum(prop(\"Nums\"))", ctx);
-    assert_single_diag(
-        diags,
-        "sum() expects number arguments",
-        Span { start: 4, end: 16 },
-    );
+    assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
 }
 
 #[test]
