@@ -1,3 +1,7 @@
+//! Completion + signature help for editors.
+//! All coordinates are UTF-8 byte offsets into the input `text`.
+//! Spans are half-open ranges `[start, end)`.
+
 use crate::lexer::Span;
 use crate::semantic;
 
@@ -8,10 +12,13 @@ mod position;
 mod rank;
 mod signature;
 
+/// Default for `CompletionConfig.preferred_limit`.
 pub const DEFAULT_PREFERRED_LIMIT: usize = 5;
 
+/// Configuration knobs for `complete`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompletionConfig {
+    /// Max length of `CompletionOutput.preferred_indices` (0 disables it).
     pub preferred_limit: usize,
 }
 
@@ -23,20 +30,29 @@ impl Default for CompletionConfig {
     }
 }
 
+/// Result of a completion query at a byte cursor.
+///
+/// `replace` and all edit ranges are UTF-8 byte spans, half-open `[start, end)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionOutput {
     pub items: Vec<CompletionItem>,
     pub replace: Span,
     pub signature_help: Option<SignatureHelp>,
+    /// Indices into `items` for the UI default selection.
     pub preferred_indices: Vec<usize>,
 }
 
+/// A single text edit in byte offsets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextEdit {
     pub range: Span,
     pub new_text: String,
 }
 
+/// One completion candidate for an editor UI.
+///
+/// If `cursor` is set, it is a desired byte offset in the updated document after applying
+/// the primary edit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionItem {
     pub label: String,
@@ -52,6 +68,7 @@ pub struct CompletionItem {
     pub data: Option<CompletionData>,
 }
 
+/// High-level bucket for UI grouping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompletionKind {
     Function,
@@ -60,6 +77,7 @@ pub enum CompletionKind {
     Operator,
 }
 
+/// Extra metadata used for cursor placement and type ranking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionData {
     Function { name: String },
@@ -67,6 +85,7 @@ pub enum CompletionData {
     PostfixMethod { name: String },
 }
 
+/// Signature display for a call at the cursor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureHelp {
     pub receiver: Option<String>,
@@ -75,7 +94,9 @@ pub struct SignatureHelp {
     pub active_param: usize,
 }
 
-/// Compute completions using byte offsets for the cursor and replace span.
+/// Computes completion items and signature help at a cursor position.
+///
+/// `cursor` is a UTF-8 byte offset into `text`.
 pub fn complete(
     text: &str,
     cursor: usize,

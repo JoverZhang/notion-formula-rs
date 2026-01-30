@@ -135,8 +135,8 @@ fn unify_call_args(sig: &FunctionSig, arg_tys: &[Ty], subst: &mut Subst) {
     }
 
     let head_len = sig.params.head.len();
-    let tail_used =
-        super::resolve_repeat_tail_used(&sig.params, arg_tys.len()).unwrap_or(sig.params.tail.len());
+    let tail_used = super::resolve_repeat_tail_used(&sig.params, arg_tys.len())
+        .unwrap_or(sig.params.tail.len());
     let tail_start = arg_tys.len().saturating_sub(tail_used);
 
     for (idx, actual) in arg_tys.iter().enumerate() {

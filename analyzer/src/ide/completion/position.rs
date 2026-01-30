@@ -1,7 +1,11 @@
+//! Cursor/position helpers for completion.
+//! All `cursor` values are UTF-8 byte offsets into the original source text.
+
 use super::signature::CallContext;
 use crate::lexer::{LitKind, Span, Token, TokenKind};
 use crate::semantic;
 
+/// Coarse completion position, derived from nearby non-trivia tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PositionKind {
     NeedExpr,
@@ -10,6 +14,7 @@ pub(super) enum PositionKind {
     None,
 }
 
+/// Classifies the cursor position using token neighbors.
 pub(super) fn detect_position_kind(
     tokens: &[Token],
     cursor: u32,
@@ -176,11 +181,9 @@ pub(super) fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &
     prev
 }
 
-/// Like `prev_non_trivia`, but treats a cursor at a token boundary (`cursor == token.span.start`)
-/// as an insertion point *before* that token.
+/// Like `prev_non_trivia`, but treats `cursor == token.span.start` as “before the token”.
 ///
-/// This prevents `)` from being treated as the "previous" token when completing immediately
-/// before a close-paren, while still treating a cursor strictly inside a token as "within" it.
+/// This makes completion before `)` behave like insertion, not “after `)`”.
 pub(super) fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
         && token.span.start < cursor
@@ -204,6 +207,7 @@ pub(super) fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option
     prev
 }
 
+/// Finds the previous non-trivia token before `idx` (token index, not bytes).
 pub(super) fn prev_non_trivia_before(tokens: &[Token], idx: usize) -> Option<(usize, &Token)> {
     let mut i = idx;
     while i > 0 {
@@ -235,12 +239,14 @@ fn is_expr_start_position(prev_token: Option<&Token>) -> bool {
     }
 }
 
+/// Chooses the replace span for expression-start completion.
+///
+/// At an identifier boundary, it may return the identifier span for prefix editing.
 pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
         && matches!(token.kind, TokenKind::Ident(_))
     {
-        // At an expr-start position, completing before an existing expression should insert
-        // instead of replacing tokens to the right.
+        // Completing right before an identifier inserts (does not replace it).
         if cursor == token.span.start {
             return Span {
                 start: cursor,
@@ -248,7 +254,7 @@ pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span
             };
         }
 
-        // If the cursor is actually inside the identifier token, treat it as prefix editing.
+        // Strictly inside an identifier: treat as prefix editing.
         return tokens[idx].span;
     }
     if let Some((_, token)) = prev_non_trivia(tokens, cursor)

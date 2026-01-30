@@ -14,8 +14,8 @@ pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, Par
 mod param_shape;
 pub(crate) use param_shape::complete_repeat_shape;
 mod infer;
-pub use infer::{ExprId, TypeMap, infer_expr_with_map};
 pub(crate) use infer::instantiate_sig;
+pub use infer::{ExprId, TypeMap, infer_expr_with_map};
 mod type_hints;
 pub use type_hints::normalize_union;
 
@@ -94,9 +94,13 @@ pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
         return true;
     }
     match (expected, actual) {
-        (Ty::Union(_), Ty::Union(actual_members)) => actual_members.iter().all(|a| ty_accepts(expected, a)),
+        (Ty::Union(_), Ty::Union(actual_members)) => {
+            actual_members.iter().all(|a| ty_accepts(expected, a))
+        }
         (Ty::Union(branches), actual) => branches.iter().any(|t| ty_accepts(t, actual)),
-        (expected, Ty::Union(actual_members)) => actual_members.iter().all(|a| ty_accepts(expected, a)),
+        (expected, Ty::Union(actual_members)) => {
+            actual_members.iter().all(|a| ty_accepts(expected, a))
+        }
         (Ty::List(e), Ty::List(a)) => ty_accepts(e, a),
         _ => expected == actual,
     }

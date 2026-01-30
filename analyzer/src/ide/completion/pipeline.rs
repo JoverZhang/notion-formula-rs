@@ -1,9 +1,13 @@
+//! Completion pipeline entry point.
+//! Works in UTF-8 byte offsets (cursor and edit ranges).
+
 use super::position::PositionKind;
 use super::{CompletionConfig, CompletionOutput};
 use crate::lexer::lex;
 use crate::lexer::{Span, Token, TokenKind};
 use crate::semantic;
 
+/// Computes completion output for a single cursor position.
 pub(super) fn complete(
     text: &str,
     cursor: usize,

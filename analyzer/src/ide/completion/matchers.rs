@@ -1,3 +1,6 @@
+//! Query normalization and fuzzy matching for completion labels.
+//! Matching is ASCII-case-insensitive and treats `_` as insignificant.
+
 use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9,6 +12,7 @@ pub(super) struct FuzzyScore {
     pub(super) label_len: usize,
 }
 
+/// Returns a fuzzy match score for `query` in `label`, or `None` if it does not match.
 pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
     let query_chars: Vec<char> = query.chars().map(|c| c.to_ascii_lowercase()).collect();
     if query_chars.is_empty() {
@@ -64,6 +68,7 @@ pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
     })
 }
 
+/// Ordering for `FuzzyScore` (better scores sort first).
 pub(super) fn fuzzy_score_cmp(a: FuzzyScore, b: FuzzyScore) -> Ordering {
     b.is_prefix
         .cmp(&a.is_prefix)
@@ -73,6 +78,7 @@ pub(super) fn fuzzy_score_cmp(a: FuzzyScore, b: FuzzyScore) -> Ordering {
         .then_with(|| a.label_len.cmp(&b.label_len))
 }
 
+/// Normalizes a label/query for matching (lowercases ASCII and removes `_`).
 pub(super) fn normalize_for_match(s: &str) -> String {
     s.chars()
         .filter(|c| *c != '_')

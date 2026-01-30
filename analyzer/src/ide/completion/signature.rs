@@ -1,9 +1,13 @@
+//! Signature help for calls under the cursor.
+//! Uses UTF-8 byte offsets (via tokens/spans) and best-effort type inference.
+
 use super::SignatureHelp;
 use super::position::prev_non_trivia_before;
 use crate::ast::{Expr, ExprKind};
 use crate::lexer::{Token, TokenKind};
 use crate::semantic;
 
+/// Call-site info derived from tokens, using byte offsets for the cursor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CallContext {
     pub(super) callee: String,
@@ -11,6 +15,7 @@ pub(super) struct CallContext {
     pub(super) arg_index: usize,
 }
 
+/// Formats a type for UI display (e.g. `number[]` or `a | b`).
 pub(super) fn format_ty(ty: &semantic::Ty) -> String {
     match ty {
         semantic::Ty::Number => "number".into(),
@@ -128,12 +133,7 @@ fn find_call_expr_by_lparen<'a>(
     callee: &str,
     lparen_start: u32,
 ) -> Option<&'a Expr> {
-    fn visit<'a>(
-        expr: &'a Expr,
-        callee: &str,
-        lparen_start: u32,
-        best: &mut Option<&'a Expr>,
-    ) {
+    fn visit<'a>(expr: &'a Expr, callee: &str, lparen_start: u32, best: &mut Option<&'a Expr>) {
         let mut visit_child = |child: &'a Expr| visit(child, callee, lparen_start, best);
 
         match &expr.kind {
@@ -286,7 +286,10 @@ fn infer_call_arg_tys_best_effort(
                 if let ExprKind::MemberCall { receiver, .. } = &call_expr.kind {
                     let mut map = semantic::TypeMap::default();
                     let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
-                    let mut ty = map.get(receiver.id).cloned().unwrap_or(semantic::Ty::Unknown);
+                    let mut ty = map
+                        .get(receiver.id)
+                        .cloned()
+                        .unwrap_or(semantic::Ty::Unknown);
                     if matches!(ty, semantic::Ty::Unknown)
                         && matches!(
                             &receiver.kind,
@@ -314,7 +317,11 @@ fn infer_call_arg_tys_best_effort(
     arg_tys
 }
 
-fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext, total_args_for_shape: usize) -> usize {
+fn active_param_index(
+    sig: &semantic::FunctionSig,
+    call_ctx: &CallContext,
+    total_args_for_shape: usize,
+) -> usize {
     if sig.params.repeat.is_empty() {
         let total_params = sig.params.head.len() + sig.params.tail.len();
         if total_params == 0 {
@@ -360,8 +367,9 @@ fn active_param_index(sig: &semantic::FunctionSig, call_ctx: &CallContext, total
     head_len + cycle * repeat_len + repeat_pos
 }
 
-/// Only compute signature help if the cursor is inside a function call argument context
-/// (i.e., after the opening parenthesis).
+/// Computes signature help when the cursor is inside a call argument list.
+///
+/// Returns `None` if the cursor is before the `(`, or if the callee is unknown.
 pub(super) fn compute_signature_help_if_in_call(
     source: &str,
     tokens: &[Token],
@@ -441,7 +449,12 @@ pub(super) fn compute_signature_help_if_in_call(
     // Postfix rendering is a presentation-only transformation: split off the receiver slot.
     let receiver = full_params.first().cloned();
     let params = full_params.into_iter().skip(1).collect::<Vec<_>>();
-    let label = format!("{}({}) -> {}", func.name, params.join(", "), format_ty(&inst_ret));
+    let label = format!(
+        "{}({}) -> {}",
+        func.name,
+        params.join(", "),
+        format_ty(&inst_ret)
+    );
 
     let active_param = if params.is_empty() {
         0
@@ -462,6 +475,7 @@ pub(super) fn compute_signature_help_if_in_call(
     })
 }
 
+/// Finds the innermost call whose `(` starts before `cursor`.
 pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallContext> {
     let mut stack = Vec::new();
     for (idx, token) in tokens.iter().enumerate() {
@@ -515,6 +529,9 @@ pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallC
     })
 }
 
+/// Best-effort expected type for the active argument position.
+///
+/// Returns `None` for wildcard-ish types (`Unknown` and `Generic(_)`).
 pub(super) fn expected_call_arg_ty(
     call_ctx: Option<&CallContext>,
     ctx: Option<&semantic::Context>,

@@ -1,3 +1,7 @@
+//! Pretty-prints an `Expr` back to source text.
+//! Spans are UTF-8 byte offsets and use half-open ranges `[start, end)`.
+//! Uses `TokenQuery` for safe trivia/comment attachment.
+
 use std::collections::HashSet;
 
 use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
@@ -29,6 +33,9 @@ fn source_has_newline(span: Span, source: &str) -> bool {
     })
 }
 
+/// Formats an expression using the original `source` and its lexed `tokens`.
+///
+/// `tokens` must come from lexing the same `source`, or comment placement may be wrong.
 pub struct Formatter<'a> {
     source: &'a str,
     tokens: &'a [Token],
@@ -195,6 +202,9 @@ fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
     }
 }
 
+/// Formats `expr` into a stable string, ending with a single trailing `\n`.
+///
+/// `source` and `tokens` must describe the same original text.
 pub fn format_expr(expr: &Expr, source: &str, tokens: &[Token]) -> String {
     let mut fmt = Formatter::new(source, tokens);
     let one_line = format_expr_one_line(expr);
@@ -217,6 +227,7 @@ pub fn format_expr(expr: &Expr, source: &str, tokens: &[Token]) -> String {
 }
 
 impl<'a> Formatter<'a> {
+    /// Creates a formatter for `source` and its `tokens`.
     pub fn new(source: &'a str, tokens: &'a [Token]) -> Self {
         Self {
             source,

@@ -1,3 +1,7 @@
+//! Ranks and post-processes completion items.
+//! Ranking uses an ASCII-ish normalized query (lowercased; `_` removed).
+//! Spans/cursors are UTF-8 byte offsets; ranges are half-open `[start, end)`.
+
 use super::matchers::{FuzzyScore, fuzzy_score, fuzzy_score_cmp, normalize_for_match};
 use super::position::PositionKind;
 use super::{
@@ -89,9 +93,7 @@ fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
 
         item.cursor = match &item.data {
             Some(CompletionData::Function { .. }) => {
-                // Function completions are expected to include `(` (e.g. `sum()`), so the editor
-                // can place the cursor inside the parentheses. If the inserted text does not
-                // contain `(`, we leave cursor placement to the default behavior.
+                // Prefer placing the cursor inside `(...)` when we insert it.
                 item.insert_text.find('(').map(|idx| {
                     output_replace
                         .start
@@ -99,8 +101,7 @@ fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
                 })
             }
             Some(CompletionData::PropExpr { .. }) => {
-                // Property completions insert the full expression (e.g., `prop("Title")`).
-                // Place the cursor at the end of the inserted text.
+                // `prop("Name")`: place the cursor at the end.
                 Some(
                     output_replace
                         .start
@@ -117,6 +118,7 @@ fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
     }
 }
 
+/// Ranks items by query match quality, with deterministic tie-breaks.
 pub(super) fn fuzzy_rank_items(query: &str, items: &mut Vec<CompletionItem>) {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum MatchClass {
@@ -205,6 +207,7 @@ pub(super) fn fuzzy_rank_items(query: &str, items: &mut Vec<CompletionItem>) {
     *items = ranked.into_iter().map(|r| r.item).collect();
 }
 
+/// Filters postfix-method items to matches, then ranks them (label match ignores the leading `.`).
 pub(super) fn fuzzy_filter_and_rank_postfix_items(query: &str, items: &mut Vec<CompletionItem>) {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum MatchClass {
@@ -291,6 +294,7 @@ pub(super) fn fuzzy_filter_and_rank_postfix_items(query: &str, items: &mut Vec<C
     *items = ranked.into_iter().map(|r| r.item).collect();
 }
 
+/// Picks “smart” item indices that match the query, up to `preferred_limit`.
 pub(super) fn preferred_indices_for_items(
     items: &[CompletionItem],
     query: &str,
@@ -329,6 +333,7 @@ pub(super) fn preferred_indices_for_items(
     out
 }
 
+/// Groups items by `CompletionKind` and reorders groups toward `expected_ty`.
 pub(super) fn apply_type_ranking(
     items: &mut Vec<CompletionItem>,
     expected_ty: Option<semantic::Ty>,

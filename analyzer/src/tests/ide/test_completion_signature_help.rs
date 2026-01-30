@@ -154,9 +154,7 @@ fn signature_help_if_shows_instantiated_union_return_type() {
     t("if(true, 1, \"x\"$0)")
         .ctx(c)
         .expect_sig_active(2)
-        .expect_sig_label(
-            "if(condition: boolean, then: number, else: string) -> number | string",
-        );
+        .expect_sig_label("if(condition: boolean, then: number, else: string) -> number | string");
 }
 
 #[test]
@@ -194,7 +192,9 @@ fn signature_help_ifs_single_group_highlights_default_and_omits_second_group() {
     t("ifs(true, \"42\", $0)")
         .ctx(c)
         .expect_sig_active(3)
-        .expect_sig_label("ifs(condition1: boolean, value1: string, ..., default: string) -> string");
+        .expect_sig_label(
+            "ifs(condition1: boolean, value1: string, ..., default: string) -> string",
+        );
 }
 
 #[test]

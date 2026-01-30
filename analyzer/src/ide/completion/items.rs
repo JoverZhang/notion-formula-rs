@@ -1,6 +1,10 @@
+//! Builds the raw completion item list for a position.
+//! Items are not ranked here (ranking happens in `rank`).
+
 use super::{CompletionData, CompletionItem, CompletionKind};
 use crate::semantic;
 
+/// Completion items at an expression start.
 pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     let mut items = Vec::new();
     if let Some(ctx) = ctx {
@@ -30,6 +34,7 @@ pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<Completio
     items
 }
 
+/// Completion items after an atom (e.g. after `ident`, a literal, or `)`).
 pub(super) fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     const OPS: [&str; 10] = ["==", "!=", ">=", ">", "<=", "<", "+", "-", "*", "/"];
 
@@ -53,6 +58,7 @@ pub(super) fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<Completio
     items
 }
 
+/// Completion items right after a `.` (member-access context).
 pub(super) fn after_dot_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
     // In a member-access context, the `.` already exists in the source.
     postfix_method_items(ctx, false)
