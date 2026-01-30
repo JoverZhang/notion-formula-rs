@@ -548,7 +548,19 @@ export function createFormulaPanelView(opts: {
     }
 
     const openParen = sig.label.indexOf("(");
-    const closeParen = sig.label.lastIndexOf(")");
+    const closeParen = (() => {
+      if (openParen < 0) return -1;
+      let depth = 0;
+      for (let i = openParen; i < sig.label.length; i++) {
+        const ch = sig.label[i];
+        if (ch === "(") depth++;
+        else if (ch === ")") {
+          depth--;
+          if (depth === 0) return i;
+        }
+      }
+      return -1;
+    })();
 
     if (openParen === -1 || closeParen === -1 || closeParen <= openParen) {
       signatureEl.append(document.createTextNode(sig.label));
