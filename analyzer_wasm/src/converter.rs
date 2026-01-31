@@ -19,8 +19,7 @@ use wasm_bindgen::prelude::JsValue;
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
     DiagnosticKindView, DiagnosticView, DisplaySegmentView, FunctionCategoryView, LineColView,
-    SignatureItemView, SignatureHelpView,
-    Span as SpanDto, SpanView, TextEditView, TokenView,
+    SignatureHelpView, SignatureItemView, Span as SpanDto, SpanView, TextEditView, TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::offsets::utf16_offset_to_byte;
@@ -143,11 +142,7 @@ impl Converter {
                 .signatures
                 .iter()
                 .map(|s| SignatureItemView {
-                    segments: s
-                        .segments
-                        .iter()
-                        .map(display_segment_view)
-                        .collect(),
+                    segments: s.segments.iter().map(display_segment_view).collect(),
                 })
                 .collect(),
             active_signature: sig.active_signature,

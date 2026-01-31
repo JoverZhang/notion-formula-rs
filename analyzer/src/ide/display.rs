@@ -9,18 +9,28 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "PascalCase")]
 pub enum DisplaySegment {
-    Name { text: String },
-    Punct { text: String },
-    Separator { text: String },
+    Name {
+        text: String,
+    },
+    Punct {
+        text: String,
+    },
+    Separator {
+        text: String,
+    },
     Ellipsis,
-    Arrow { text: String },
+    Arrow {
+        text: String,
+    },
     Param {
         name: String,
         ty: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         param_index: Option<u32>,
     },
-    ReturnType { text: String },
+    ReturnType {
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

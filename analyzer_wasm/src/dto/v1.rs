@@ -114,17 +114,27 @@ pub struct SignatureItemView {
 #[derive(Serialize, TS)]
 #[serde(tag = "kind", rename_all = "PascalCase")]
 pub enum DisplaySegmentView {
-    Name { text: String },
-    Punct { text: String },
-    Separator { text: String },
+    Name {
+        text: String,
+    },
+    Punct {
+        text: String,
+    },
+    Separator {
+        text: String,
+    },
     Ellipsis,
-    Arrow { text: String },
+    Arrow {
+        text: String,
+    },
     Param {
         name: String,
         ty: String,
         param_index: Option<u32>,
     },
-    ReturnType { text: String },
+    ReturnType {
+        text: String,
+    },
 }
 
 /// A single completion item.

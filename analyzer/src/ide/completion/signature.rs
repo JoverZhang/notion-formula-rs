@@ -474,8 +474,7 @@ pub(super) fn compute_signature_help_if_in_call(
         && semantic::postfix_capable_builtin_names().contains(func.name.as_str())
         && semantic::is_postfix_capable(func);
 
-    let arg_tys =
-        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
+    let arg_tys = infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
     let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
 
     let mut full_call_ctx = call_ctx.clone();
@@ -506,7 +505,8 @@ pub(super) fn compute_signature_help_if_in_call(
     };
 
     let active_parameter = nearest_param_index(rendered.slots.as_slice(), active_slot);
-    let segments = build_signature_segments(func.name.as_str(), &rendered, &inst_ret, is_method_style);
+    let segments =
+        build_signature_segments(func.name.as_str(), &rendered, &inst_ret, is_method_style);
 
     Some(SignatureHelp {
         signatures: vec![SignatureItem { segments }],

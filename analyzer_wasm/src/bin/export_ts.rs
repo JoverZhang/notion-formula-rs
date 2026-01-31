@@ -4,8 +4,7 @@ use std::path::PathBuf;
 use analyzer_wasm::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
     DiagnosticKindView, DiagnosticView, DisplaySegmentView, FunctionCategoryView, LineColView,
-    SignatureItemView, SignatureHelpView, Span,
-    SpanView, TextEditView, TokenView,
+    SignatureHelpView, SignatureItemView, Span, SpanView, TextEditView, TokenView,
 };
 use ts_rs::TS;
 
