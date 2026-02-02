@@ -35,12 +35,21 @@ pub enum BinOpKind {
 pub type BinOp = Spanned<BinOpKind>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnOpKind {
+pub enum UnOp {
+    /// `!`
     Not,
+    /// `-`
     Neg,
 }
 
-pub type UnOp = Spanned<UnOpKind>;
+impl UnOp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UnOp::Not => "!",
+            UnOp::Neg => "-",
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expr {

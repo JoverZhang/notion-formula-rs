@@ -3,7 +3,7 @@
 //! Best-effort inference: returns [`Ty::Unknown`] when it can’t determine a type. Emits no
 //! diagnostics.
 
-use crate::ast::{Expr, ExprKind};
+use crate::ast::{Expr, ExprKind, UnOp};
 use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
@@ -275,12 +275,12 @@ fn infer_expr_inner(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
         }
         ExprKind::Unary { op, expr } => {
             let inner_ty = infer_expr_with_map(expr, ctx, map);
-            match op.node {
-                crate::ast::UnOpKind::Not => match inner_ty {
+            match op {
+                UnOp::Not => match inner_ty {
                     Ty::Boolean => Ty::Boolean,
                     _ => Ty::Unknown,
                 },
-                crate::ast::UnOpKind::Neg => match inner_ty {
+                UnOp::Neg => match inner_ty {
                     Ty::Number => Ty::Number,
                     _ => Ty::Unknown,
                 },

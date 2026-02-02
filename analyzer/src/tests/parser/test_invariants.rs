@@ -99,7 +99,7 @@ fn test_span_and_tokenrange_invariants() {
         let tokens = output.tokens;
         let token_cursor = TokenCursor::new(input, tokens.clone());
         let mut parser = Parser::new(token_cursor);
-        let output = parser.parse_expr();
+        let output = parser.parse();
         assert!(
             output.diagnostics.is_empty(),
             "expected no parse errors for {input:?}, got {:?}",

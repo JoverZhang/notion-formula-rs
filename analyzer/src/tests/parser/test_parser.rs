@@ -56,3 +56,93 @@ fn test_ternary_parse_shape() {
     assert_lit_num!(then, 4);
     assert_lit_num!(otherwise, 5);
 }
+
+#[test]
+fn test_caret_is_right_associative() {
+    let parsed = analyze("2 ^ 3 ^ 2").unwrap();
+    assert!(parsed.diagnostics.is_empty());
+    let ast = parsed.expr;
+
+    let (left, right) = assert_bin!(ast, BinOpKind::Caret);
+    assert_lit_num!(left, 2);
+    let (left, right) = assert_bin!(right, BinOpKind::Caret);
+    assert_lit_num!(left, 3);
+    assert_lit_num!(right, 2);
+}
+
+#[test]
+fn test_ternary_binds_lower_than_or_and_comparisons() {
+    let parsed = analyze("1 > 2 || 3 > 4 ? \"x\" : \"y\"").unwrap();
+    assert!(parsed.diagnostics.is_empty());
+    let ast = parsed.expr;
+
+    let (cond, then, otherwise) = assert_ternary!(ast);
+    let (left, right) = assert_bin!(cond, BinOpKind::OrOr);
+    let (_l, _r) = assert_bin!(left, BinOpKind::Gt);
+    let (_l, _r) = assert_bin!(right, BinOpKind::Gt);
+    assert_lit_str!(then, "x");
+    assert_lit_str!(otherwise, "y");
+}
+
+#[test]
+fn test_ternary_missing_colon_recovers_to_colon() {
+    let parsed = analyze("1 ? 2 foo : 3").unwrap();
+    assert_eq!(parsed.diagnostics.len(), 1);
+    assert!(parsed.diagnostics[0].message.starts_with("expected ':'"));
+
+    let ast = parsed.expr;
+    let (cond, then, otherwise) = assert_ternary!(ast);
+    assert_lit_num!(cond, 1);
+    assert_lit_num!(then, 2);
+    assert_lit_num!(otherwise, 3);
+}
+
+#[test]
+fn test_ternary_is_right_associative_with_idents() {
+    let parsed = analyze("a ? b : c ? d : e").unwrap();
+    assert!(parsed.diagnostics.is_empty());
+    let ast = parsed.expr;
+
+    let (_cond, _then, otherwise) = assert_ternary!(ast);
+    let (_c, _d, _e) = assert_ternary!(otherwise);
+}
+
+#[test]
+fn test_postfix_binds_tighter_than_infix() {
+    let parsed = analyze("a.if(b,c) + d").unwrap();
+    assert!(parsed.diagnostics.is_empty());
+    let ast = parsed.expr;
+
+    let (lhs, rhs) = assert_bin!(ast, BinOpKind::Plus);
+    let ExprKind::MemberCall {
+        receiver,
+        method,
+        args,
+    } = &lhs.kind
+    else {
+        panic!("expected member-call on LHS, got {:?}", lhs.kind);
+    };
+    assert!(matches!(&receiver.kind, ExprKind::Ident(sym) if sym.text == "a"));
+    assert_eq!(method.text, "if");
+    assert_eq!(args.len(), 2);
+    assert!(matches!(&args[0].kind, ExprKind::Ident(sym) if sym.text == "b"));
+    assert!(matches!(&args[1].kind, ExprKind::Ident(sym) if sym.text == "c"));
+
+    assert!(matches!(&rhs.kind, ExprKind::Ident(sym) if sym.text == "d"));
+}
+
+#[test]
+fn test_unary_applies_to_postfix_completed_expression() {
+    let parsed = analyze("-f(1) * 2").unwrap();
+    assert!(parsed.diagnostics.is_empty());
+    let ast = parsed.expr;
+
+    let (lhs, rhs) = assert_bin!(ast, BinOpKind::Star);
+    let ExprKind::Unary { op, expr } = &lhs.kind else {
+        panic!("expected unary on LHS, got {:?}", lhs.kind);
+    };
+    assert!(matches!(op, crate::ast::UnOp::Neg));
+    let (_callee, args) = assert_call!(expr.as_ref(), "f", 1);
+    assert_lit_num!(&args[0], 1);
+    assert_lit_num!(rhs, 2);
+}

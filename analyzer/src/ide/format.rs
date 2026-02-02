@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{BinOpKind, Expr, ExprKind, UnOpKind};
+use crate::ast::{BinOpKind, Expr, ExprKind, UnOp};
 use crate::lexer::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
 use crate::parser::TokenQuery;
 use crate::parser::{infix_binding_power, prefix_binding_power};
@@ -165,9 +165,8 @@ fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
         }
 
         ExprKind::Unary { op, expr: inner } => {
-            let op_str = unop_str(op.node);
-            let inner = format_expr_one_line_with_prec(inner, prefix_binding_power(op.node));
-            format!("{}{}", op_str, inner)
+            let inner = format_expr_one_line_with_prec(inner, prefix_binding_power(*op));
+            format!("{}{}", op.as_str(), inner)
         }
 
         ExprKind::Binary { op, left, right } => {
@@ -285,7 +284,7 @@ impl<'a> Formatter<'a> {
                 args,
             } => self.format_member_call(expr, indent, parent_prec, receiver, &method.text, args),
             ExprKind::Unary { op, expr: inner } => {
-                self.format_unary(expr, indent, parent_prec, op.node, inner)
+                self.format_unary(expr, indent, parent_prec, *op, inner)
             }
             ExprKind::Binary { op, left, right } => {
                 self.format_binary(expr, indent, parent_prec, op.node, left, right)
@@ -380,11 +379,11 @@ impl<'a> Formatter<'a> {
         expr: &Expr,
         indent: usize,
         _parent_prec: u8,
-        op: UnOpKind,
+        op: UnOp,
         inner: &Expr,
     ) -> Rendered {
         let bp = prefix_binding_power(op);
-        let op_str = unop_str(op);
+        let op_str = op.as_str();
 
         let has_newline = self.expr_has_newline(expr);
 
@@ -904,13 +903,6 @@ fn binop_str(op: BinOpKind) -> &'static str {
         Slash => "/",
         Percent => "%",
         Caret => "^",
-    }
-}
-
-fn unop_str(op: UnOpKind) -> &'static str {
-    match op {
-        UnOpKind::Not => "!",
-        UnOpKind::Neg => "-",
     }
 }
 

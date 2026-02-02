@@ -112,6 +112,29 @@ fn test_parser_spans_call_with_comments() {
 }
 
 #[test]
+fn test_parser_spans_unary_call_with_comments() {
+    let src = "-f(a/*c*/,b)";
+    let out = analyze(src).unwrap();
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+
+    let expr = &out.expr;
+    assert_tree_invariants(expr);
+
+    let ExprKind::Unary { expr: inner, .. } = &expr.kind else {
+        panic!("expected unary");
+    };
+    assert_span(expr, 0, 12);
+
+    let ExprKind::Call { args, .. } = &inner.kind else {
+        panic!("expected call under unary");
+    };
+    assert_eq!(args.len(), 2);
+    assert_span(inner, 1, 12);
+    assert_span(&args[0], 3, 4);
+    assert_span(&args[1], 10, 11);
+}
+
+#[test]
 fn test_parser_spans_member_call_with_newline_and_comment() {
     let src = "a\n/*c*/.if(b,c)";
     let out = analyze(src).unwrap();

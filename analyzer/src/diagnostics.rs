@@ -27,7 +27,7 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
-    pub fn emit_error(&mut self, span: Span, message: impl Into<String>) {
+    pub fn emit_err(&mut self, span: Span, message: impl Into<String>) {
         self.emit_error_with_labels(span, message, vec![]);
     }
 

@@ -10,8 +10,8 @@
 use crate::diagnostics::{Diagnostic, Diagnostics};
 
 pub mod ast;
-use crate::lexer::{LitKind, NodeId, Span, Token, TokenKind};
-use ast::{BinOpKind, Expr, ExprKind, UnOpKind};
+use crate::lexer::{NodeId, Span, Token, TokenKind};
+use ast::{BinOpKind, Expr, ExprKind, UnOp};
 mod expr;
 mod tokenstream;
 pub use tokenstream::{TokenCursor, TokenQuery};
@@ -54,17 +54,9 @@ impl<'a> Parser<'a> {
         id
     }
 
-    fn cur(&self) -> &Token {
+    fn cur(&self) -> Token {
         let idx = self.next_nontrivia_idx(self.token_cursor.pos);
-        &self.token_cursor.tokens[idx]
-    }
-
-    fn cur_kind(&self) -> &TokenKind {
-        &self.cur().kind
-    }
-
-    fn cur_idx(&self) -> u32 {
-        self.next_nontrivia_idx(self.token_cursor.pos) as u32
+        self.token_cursor.tokens[idx].clone()
     }
 
     fn bump(&mut self) -> Token {
@@ -94,7 +86,7 @@ impl<'a> Parser<'a> {
 
     #[allow(unused)]
     fn eat(&mut self, kind: TokenKind) -> bool {
-        if self.same_kind(self.cur_kind(), &kind) {
+        if self.same_kind(&self.cur().kind, &kind) {
             self.bump();
             true
         } else {
@@ -104,7 +96,7 @@ impl<'a> Parser<'a> {
 
     /// punctuation
     fn expect_punct(&mut self, kind: TokenKind, expected: &'static str) -> Result<Token, ()> {
-        if self.same_kind(self.cur_kind(), &kind) {
+        if self.same_kind(&self.cur().kind, &kind) {
             Ok(self.bump())
         } else {
             let tok = self.cur().clone();
@@ -114,22 +106,11 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_ident(&mut self) -> Result<Token, ()> {
-        match self.cur_kind() {
+        match self.cur().kind {
             TokenKind::Ident(..) => Ok(self.bump()),
             _ => {
                 let tok = self.cur().clone();
                 self.emit_unexpected("identifier", tok.kind.clone(), tok.span);
-                Err(())
-            }
-        }
-    }
-
-    fn expect_literal_kind(&mut self, k: LitKind) -> Result<Token, ()> {
-        match self.cur_kind() {
-            TokenKind::Literal(lit) if lit.kind == k => Ok(self.bump()),
-            _ => {
-                let tok = self.cur().clone();
-                self.emit_unexpected(&format!("{:?} literal", k), tok.kind.clone(), tok.span);
                 Err(())
             }
         }
@@ -185,13 +166,13 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn is_trivia(kind: &TokenKind) -> bool {
+    fn is_trivia(kind: TokenKind) -> bool {
         kind.is_trivia()
     }
 
     fn next_nontrivia_idx(&self, mut idx: usize) -> usize {
         while idx < self.token_cursor.tokens.len() {
-            if Self::is_trivia(&self.token_cursor.tokens[idx].kind) {
+            if Self::is_trivia(self.token_cursor.tokens[idx].clone().kind) {
                 idx += 1;
                 continue;
             }
@@ -208,17 +189,16 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn finish(&mut self, expr: Expr) -> ParseOutput {
-        ParseOutput {
-            expr,
-            diagnostics: std::mem::take(&mut self.diagnostics.diags),
-            tokens: self.token_cursor.tokens.clone(),
+    fn mk_expr_sp(&self, lhs_sp: Span, rhs_sp: Span) -> Span {
+        Span {
+            start: lhs_sp.start,
+            end: rhs_sp.end,
         }
     }
 
     fn emit_unexpected(&mut self, expected: &str, found: TokenKind, span: Span) {
         self.diagnostics
-            .emit_error(span, format!("expected {}, found {:?}", expected, found));
+            .emit_err(span, format!("expected {}, found {:?}", expected, found));
     }
 }
 
@@ -245,8 +225,10 @@ pub fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
     match op {
         OrOr => (1, 2),
         AndAnd => (3, 4),
+
         EqEq | Ne => (5, 6),
         Lt | Le | Ge | Gt => (7, 8),
+
         Plus | Minus => (9, 10),
         Star | Slash | Percent => (11, 12),
         Caret => (13, 13),
@@ -256,9 +238,9 @@ pub fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
 /// Returns the Pratt binding power for a prefix operator.
 ///
 /// Prefix operators handled by the expression parser: `!` and unary `-`.
-pub fn prefix_binding_power(op: UnOpKind) -> u8 {
+pub fn prefix_binding_power(op: UnOp) -> u8 {
     match op {
-        UnOpKind::Not => 14,
-        UnOpKind::Neg => 14,
+        UnOp::Not => 14,
+        UnOp::Neg => 14,
     }
 }

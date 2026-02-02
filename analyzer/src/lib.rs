@@ -19,7 +19,7 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
     let lex_output = lex(text);
     let token_cursor = parser::TokenCursor::new(text, lex_output.tokens);
     let mut parser = Parser::new(token_cursor);
-    let mut output = parser.parse_expr();
+    let mut output = parser.parse();
     output.diagnostics.extend(lex_output.diagnostics);
     Ok(output)
 }
