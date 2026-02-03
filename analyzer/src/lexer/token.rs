@@ -146,12 +146,12 @@ impl Token {
     pub fn can_begin_expr(&self) -> bool {
         matches!(
             self.kind,
-            TokenKind::Ident(..)
+            TokenKind::Bang
+                | TokenKind::Minus
+                | TokenKind::Ident(..)
+                | TokenKind::Literal(..)
                 | TokenKind::OpenParen
                 | TokenKind::OpenBracket
-                | TokenKind::Literal(..)
-                | TokenKind::Bang
-                | TokenKind::Minus
         )
     }
 

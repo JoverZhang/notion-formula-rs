@@ -5,6 +5,7 @@
 
 use super::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp};
 use super::{ParseOutput, Parser, infix_binding_power, prefix_binding_power};
+use crate::Token;
 use crate::diagnostics::Label;
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
@@ -68,72 +69,58 @@ impl<'a> Parser<'a> {
         let mut lhs = lhs;
 
         loop {
-            if self.cur().kind == TokenKind::Question {
-                let (l_bp, r_bp) = Self::ternary_binding_power();
-                if l_bp < min_bp {
-                    break;
-                }
-
-                let q_tok = self.bump(); // '?'
-                lhs = self.parse_ternary_suffix(lhs, q_tok.span, r_bp);
-                continue;
-            }
-
-            let Some(op) = self.peek_binop_kind() else {
-                break;
-            };
-
-            let (l_bp, r_bp) = infix_binding_power(op);
-            if l_bp < min_bp {
-                break;
-            }
-
-            let op_tok = self.bump();
-            let rhs = if self.cur().can_begin_expr() {
-                self.parse_expr_assoc_with(r_bp)
-            } else {
-                self.diagnostics
-                    .emit_err(op_tok.span, format!("expected expression after '{:?}'", op));
-                let err_span = if self.cur().kind == TokenKind::Eof {
-                    Span {
-                        start: op_tok.span.end,
-                        end: op_tok.span.end,
+            match self.cur().kind {
+                // Ternary expression: `cond(lhs) ? then : otherwise`
+                TokenKind::Question => {
+                    let (l_bp, r_bp) = Self::ternary_binding_power();
+                    if l_bp < min_bp {
+                        break;
                     }
-                } else {
-                    self.cur().span
-                };
-                let sync = [
-                    TokenKind::Comma,
-                    TokenKind::CloseBracket,
-                    TokenKind::CloseParen,
-                    TokenKind::Colon,
-                    TokenKind::Eof,
-                ];
-                if !sync.iter().any(|k| self.cur().kind == *k) && self.cur().kind != TokenKind::Eof
-                {
-                    self.bump();
-                    self.recover_to(&sync);
-                }
-                self.error_expr_at(err_span)
-            };
 
-            let span = self.mk_expr_sp(lhs.span, rhs.span);
-            lhs = self.mk_expr(
-                span,
-                ExprKind::Binary {
-                    op: BinOp {
-                        node: op,
-                        span: op_tok.span,
-                    },
-                    left: Box::new(lhs),
-                    right: Box::new(rhs),
-                },
-            );
+                    let q_tok = self.bump(); // '?'
+                    lhs = self.parse_ternary_suffix(lhs, q_tok.span, r_bp);
+                }
+
+                // Binary expression: `lhs op rhs`
+                _ => {
+                    let Some(op) = self.peek_binop_kind() else {
+                        break;
+                    };
+
+                    let (l_bp, r_bp) = infix_binding_power(op);
+                    if l_bp < min_bp {
+                        break;
+                    }
+
+                    let op_tok = self.bump(); // operator token
+
+                    let rhs = if self.cur().can_begin_expr() {
+                        self.parse_expr_assoc_with(r_bp)
+                    } else {
+                        self.recover_from_infix(op_tok.clone())
+                    };
+
+                    let span = self.mk_expr_sp(lhs.span, rhs.span);
+                    lhs = self.mk_expr(
+                        span,
+                        ExprKind::Binary {
+                            op: BinOp {
+                                node: op,
+                                span: op_tok.span,
+                            },
+                            left: Box::new(lhs),
+                            right: Box::new(rhs),
+                        },
+                    );
+                }
+            }
         }
 
         lhs
     }
 
+    /// Parses a prefix-unary-operator expr.
+    /// Note: when adding new unary operators, don't forget to adjust [`Token::can_begin_expr()`]
     fn parse_expr_prefix(&mut self) -> Expr {
         match self.cur().kind {
             // `!expr`
@@ -164,7 +151,7 @@ impl<'a> Parser<'a> {
     fn parse_expr_dot_or_call(&mut self, mut expr: Expr) -> Expr {
         loop {
             if self.cur().kind == TokenKind::OpenParen {
-                let lparen = self.bump(); // '('
+                let lparen = self.cur(); // '('
                 let (args, end) = self.parse_paren_arg_list();
 
                 // Only Ident can call
@@ -223,7 +210,6 @@ impl<'a> Parser<'a> {
                     break;
                 }
 
-                self.bump(); // '('
                 let (args, end) = self.parse_paren_arg_list();
 
                 let receiver = expr;
@@ -249,6 +235,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_paren_arg_list(&mut self) -> (Vec<Expr>, u32) {
+        self.bump(); // '('
+
         let mut args = Vec::new();
         if self.cur().kind != TokenKind::CloseParen {
             args.push(self.parse_expr_assoc_with(0));
@@ -285,16 +273,13 @@ impl<'a> Parser<'a> {
                 self.bump();
             } else {
                 let insertion = then_expr.span.end;
-                let span = Span {
+                let else_expr = self.error_expr_at(Span {
                     start: insertion,
                     end: insertion,
-                };
-                let else_expr = self.error_expr_at(span);
+                });
+                let span = self.mk_expr_sp(lhs.span, else_expr.span);
                 return self.mk_expr(
-                    Span {
-                        start: lhs.span.start,
-                        end: else_expr.span.end,
-                    },
+                    span,
                     ExprKind::Ternary {
                         cond: Box::new(lhs),
                         then: Box::new(then_expr),
@@ -305,11 +290,7 @@ impl<'a> Parser<'a> {
         }
 
         let else_expr = self.parse_expr_assoc_with(else_min_bp);
-
-        let span = Span {
-            start: lhs.span.start,
-            end: else_expr.span.end,
-        };
+        let span = self.mk_expr_sp(lhs.span, else_expr.span);
         self.mk_expr(
             span,
             ExprKind::Ternary {
@@ -603,5 +584,32 @@ impl<'a> Parser<'a> {
         // Lower precedence than `||` so `a || b ? c : d` parses as `(a || b) ? c : d`.
         // Right-associative: `a ? b : c ? d : e` parses as `a ? b : (c ? d : e)`.
         (0, 0)
+    }
+
+    fn recover_from_infix(&mut self, op_tok: Token) -> Expr {
+        self.diagnostics.emit_err(
+            op_tok.span,
+            format!("expected expression after '{:?}'", op_tok.kind),
+        );
+        let err_span = if self.cur().kind == TokenKind::Eof {
+            Span {
+                start: op_tok.span.end,
+                end: op_tok.span.end,
+            }
+        } else {
+            self.cur().span
+        };
+        let sync = [
+            TokenKind::Comma,
+            TokenKind::CloseBracket,
+            TokenKind::CloseParen,
+            TokenKind::Colon,
+            TokenKind::Eof,
+        ];
+        if !sync.iter().any(|k| self.cur().kind == *k) && self.cur().kind != TokenKind::Eof {
+            self.bump();
+            self.recover_to(&sync);
+        }
+        self.error_expr_at(err_span)
     }
 }
