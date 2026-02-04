@@ -111,7 +111,7 @@ Expression forms (AST):
 
 Known gaps:
 
-- boolean literals (`true` / `false`) lex as identifiers (the lexer does not emit `LitKind::Bool` today)
+- boolean literals (`true` / `false`) lex as identifiers (the lexer does not emit `LitKind::Bool` today), but semantic inference treats them as `boolean`
 - `not` is suggested by completion but is not a lexer/parser operator today
 - completion operator list does not include every parsed operator
 
@@ -136,6 +136,9 @@ Semantic analysis (`analyzer/src/analysis/mod.rs`):
 - `FunctionSig` can declare `generics: Vec<GenericParam>`; a `GenericParam` is `{ id: GenericId, kind: GenericParamKind }` (no display name; UI renders `T0`, `T1`, ...).
 - Semantic analysis is inference-first:
   - `infer_expr_with_map(expr, ctx, &mut TypeMap)` computes a `TypeMap` of `ExprId`/`NodeId -> Ty`.
+  - Ternary inference (`cond ? then : otherwise`) joins branch types:
+    - if either branch is `Unknown`, the ternary type is `Unknown`
+    - otherwise, the ternary type is a deterministic union of both branch types (`normalize_union`)
   - `analyze_expr` returns the inferred root type and emits diagnostics by comparing inferred argument types to builtin signatures (arity + expected types).
     - Validation is arity/shape-first: if a call has an arity/shape error, the analyzer emits that single diagnostic and **does not** emit additional per-argument type mismatch diagnostics for the same call.
   - Type acceptance (`ty_accepts` in `analyzer/src/analysis/mod.rs`):

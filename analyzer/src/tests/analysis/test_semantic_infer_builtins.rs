@@ -59,6 +59,13 @@ fn semantic_if_variant_generic_propagates_unknown() {
 }
 
 #[test]
+fn semantic_ternary_inferrs_union_on_conflict() {
+    let ctx = builtins_ctx();
+    let ty = infer_ok("4 == 4 ? true : \"false\"", &ctx);
+    assert_eq!(ty, Ty::Union(vec![Ty::Boolean, Ty::String]));
+}
+
+#[test]
 fn semantic_ifs_variant_generic_inferrs_union_across_repeat_groups() {
     let ctx = builtins_ctx();
     let ty = infer_ok("ifs(true, 1, false, 2, \"a\")", &ctx);

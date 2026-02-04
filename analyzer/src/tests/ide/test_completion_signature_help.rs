@@ -207,6 +207,16 @@ fn signature_help_if_propagates_unknown() {
 }
 
 #[test]
+fn signature_help_if_ternary_branch_inferrs_union() {
+    let c = ctx().prop("Title", crate::semantic::Ty::String).build();
+    t(r#"if(true, prop("Title"), 4 == 4 ? true : "false"$0)"#)
+        .ctx(c)
+        .expect_sig_label(
+            "if(condition: boolean, then: string, else: boolean | string) -> boolean | string",
+        );
+}
+
+#[test]
 fn signature_help_ifs_shows_instantiated_union_return_type() {
     let c = ctx().build();
     t("ifs(true, 1, false, 2, \"a\"$0)")

@@ -247,7 +247,13 @@ fn infer_expr_inner(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
             LitKind::String => Ty::String,
             LitKind::Bool => Ty::Boolean,
         },
-        ExprKind::Ident(_) => Ty::Unknown,
+        ExprKind::Ident(sym) => match sym.text.as_str() {
+            // NOTE: `true`/`false` currently lex as identifiers (the lexer does not emit
+            // `LitKind::Bool` yet). Treat them as booleans for inference/instantiation so ternary
+            // joins and builtin validation behave sensibly.
+            "true" | "false" => Ty::Boolean,
+            _ => Ty::Unknown,
+        },
         ExprKind::Group { inner } => infer_expr_with_map(inner, ctx, map),
         ExprKind::List { items } => {
             fn contains_unknown(ty: &Ty) -> bool {
@@ -415,9 +421,7 @@ fn infer_call(
 fn join_types(a: Ty, b: Ty) -> Ty {
     if a == Ty::Unknown || b == Ty::Unknown {
         Ty::Unknown
-    } else if a == b {
-        a
     } else {
-        Ty::Unknown
+        normalize_union([a, b])
     }
 }
