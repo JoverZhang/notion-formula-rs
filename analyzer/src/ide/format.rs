@@ -4,10 +4,9 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{BinOpKind, Expr, ExprKind, UnOp};
+use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp};
 use crate::lexer::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
 use crate::parser::TokenQuery;
-use crate::parser::{infix_binding_power, prefix_binding_power};
 use crate::source_map::SourceMap;
 
 const INDENT: usize = 2;
@@ -165,12 +164,12 @@ fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
         }
 
         ExprKind::Unary { op, expr: inner } => {
-            let inner = format_expr_one_line_with_prec(inner, prefix_binding_power(*op));
+            let inner = format_expr_one_line_with_prec(inner, op.prefix_binding_power());
             format!("{}{}", op.as_str(), inner)
         }
 
         ExprKind::Binary { op, left, right } => {
-            let (l_bp, r_bp) = infix_binding_power(op.node);
+            let (l_bp, r_bp) = op.infix_binding_power();
             let this_prec = l_bp;
 
             let l = format_expr_one_line_with_prec(left, l_bp);
@@ -287,7 +286,7 @@ impl<'a> Formatter<'a> {
                 self.format_unary(expr, indent, parent_prec, *op, inner)
             }
             ExprKind::Binary { op, left, right } => {
-                self.format_binary(expr, indent, parent_prec, op.node, left, right)
+                self.format_binary(expr, indent, parent_prec, *op, left, right)
             }
             ExprKind::Ternary {
                 cond,
@@ -382,7 +381,7 @@ impl<'a> Formatter<'a> {
         op: UnOp,
         inner: &Expr,
     ) -> Rendered {
-        let bp = prefix_binding_power(op);
+        let bp = op.prefix_binding_power();
         let op_str = op.as_str();
 
         let has_newline = self.expr_has_newline(expr);
@@ -413,12 +412,12 @@ impl<'a> Formatter<'a> {
         expr: &Expr,
         indent: usize,
         _parent_prec: u8,
-        op: BinOpKind,
+        op: BinOp,
         left: &Expr,
         right: &Expr,
     ) -> Rendered {
-        let (l_bp, r_bp) = infix_binding_power(op);
-        let op_str = binop_str(op);
+        let (l_bp, r_bp) = op.infix_binding_power();
+        let op_str = binop_str(op.node);
         let has_newline = self.expr_has_newline(expr);
         let trailing_line_comment = self
             .available_trailing_comment(expr)

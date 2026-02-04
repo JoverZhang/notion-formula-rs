@@ -11,7 +11,7 @@ use crate::diagnostics::{Diagnostic, Diagnostics};
 
 pub mod ast;
 use crate::lexer::{NodeId, Span, Token, TokenKind};
-use ast::{BinOpKind, Expr, ExprKind, UnOp};
+use ast::{Expr, ExprKind};
 mod expr;
 mod tokenstream;
 pub use tokenstream::{TokenCursor, TokenQuery};
@@ -61,9 +61,8 @@ impl<'a> Parser<'a> {
 
     fn bump(&mut self) -> Token {
         let idx = self.next_nontrivia_idx(self.token_cursor.pos);
-        self.token_cursor.pos = idx;
-        let tok = self.token_cursor.tokens[self.token_cursor.pos].clone();
-        self.token_cursor.pos += 1;
+        let tok = self.token_cursor.tokens[idx].clone();
+        self.token_cursor.pos = idx + 1;
         tok
     }
 
@@ -199,48 +198,5 @@ impl<'a> Parser<'a> {
     fn emit_unexpected(&mut self, expected: &str, found: TokenKind, span: Span) {
         self.diagnostics
             .emit_err(span, format!("expected {}, found {:?}", expected, found));
-    }
-}
-
-/// Returns the Pratt binding power for an infix operator.
-///
-/// Larger numbers bind tighter.
-///
-/// Operator set handled by the expression parser:
-/// - Logical: `||`, `&&`
-/// - Equality: `==`, `!=`
-/// - Comparison: `<`, `<=`, `>=`, `>`
-/// - Arithmetic: `+`, `-`, `*`, `/`, `%`, `^`
-///
-/// Associativity:
-/// - Most operators are left-associative (e.g. `a - b - c` parses as `(a - b) - c`).
-/// - `^` (power-like) is right-associative (e.g. `2 ^ 2 ^ 3` parses as `2 ^ (2 ^ 3)`).
-pub fn infix_binding_power(op: BinOpKind) -> (u8, u8) {
-    use BinOpKind::*;
-
-    // Return (left_bp, right_bp)
-    // Right-associative: (p, p) or (p, p-1)
-    // Left-associative: (p, p+1)
-    // Here we use the classic Pratt parser:
-    match op {
-        OrOr => (1, 2),
-        AndAnd => (3, 4),
-
-        EqEq | Ne => (5, 6),
-        Lt | Le | Ge | Gt => (7, 8),
-
-        Plus | Minus => (9, 10),
-        Star | Slash | Percent => (11, 12),
-        Caret => (13, 13),
-    }
-}
-
-/// Returns the Pratt binding power for a prefix operator.
-///
-/// Prefix operators handled by the expression parser: `!` and unary `-`.
-pub fn prefix_binding_power(op: UnOp) -> u8 {
-    match op {
-        UnOp::Not => 14,
-        UnOp::Neg => 14,
     }
 }
