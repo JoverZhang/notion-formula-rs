@@ -10,12 +10,6 @@ use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SeqContext {
-    CallArgList,
-    ListLiteral,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Delimiter {
     Paren,
     Bracket,
@@ -234,13 +228,17 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr_dot_or_call(&mut self, mut expr: Expr) -> Expr {
-        loop {
+        'postfix: loop {
             match self.cur().kind {
                 // Call expression: `expr(arg1, ...)`
                 TokenKind::OpenParen => {
                     let lparen = self.cur(); // '('
                     let (args, end) = self.parse_paren_arg_list();
 
+                    let span = Span {
+                        start: expr.span.start,
+                        end,
+                    };
                     // Only Ident can call
                     let callee = match expr.kind {
                         ExprKind::Ident(sym) => sym,
@@ -250,19 +248,11 @@ impl<'a> Parser<'a> {
                                 lparen.span,
                                 "expected call callee (identifier)",
                             );
-                            let span = Span {
-                                start: expr.span.start,
-                                end,
-                            };
                             expr = self.mk_expr(span, ExprKind::Error);
                             break;
                         }
                     };
 
-                    let span = Span {
-                        start: expr.span.start,
-                        end,
-                    };
                     expr = self.mk_expr(span, ExprKind::Call { callee, args });
                 }
 
@@ -272,7 +262,7 @@ impl<'a> Parser<'a> {
 
                     let method_tok = loop {
                         match self.cur().kind {
-                            TokenKind::Ident(..) => break Ok(self.bump()),
+                            TokenKind::Ident(..) => break self.bump(),
                             // `a..if(...)`: recover by skipping extra dots.
                             TokenKind::Dot => {
                                 let extra = self.bump();
@@ -282,19 +272,14 @@ impl<'a> Parser<'a> {
                                     "unexpected '.' in member call",
                                 );
                             }
-                            _ => break Err(()),
-                        }
-                    };
-
-                    let method_tok = match method_tok {
-                        Ok(tok) => tok,
-                        Err(()) => {
-                            let span = Span {
-                                start: expr.span.start,
-                                end: self.last_bumped_end(),
-                            };
-                            expr = self.mk_expr(span, ExprKind::Error);
-                            break;
+                            _ => {
+                                let span = Span {
+                                    start: expr.span.start,
+                                    end: self.last_bumped_end(),
+                                };
+                                expr = self.mk_expr(span, ExprKind::Error);
+                                break 'postfix;
+                            }
                         }
                     };
 
@@ -342,7 +327,7 @@ impl<'a> Parser<'a> {
 
     fn parse_paren_arg_list(&mut self) -> (Vec<Expr>, u32) {
         let (_lparen, args) = self.parse_delimited(Delimiter::Paren, |p| {
-            p.parse_seq_to_before_tokens(&[TokenKind::CloseParen], SeqContext::CallArgList)
+            p.parse_seq_to_before_tokens(&[TokenKind::CloseParen], TokenKind::Comma)
         });
         (args, self.last_bumped_end())
     }
@@ -556,18 +541,16 @@ impl<'a> Parser<'a> {
 
     /// Parse a list literal: `[expr, expr, ...]`.
     ///
-    /// Trailing comma (`[1, 2,]`) is rejected with a dedicated diagnostic:
-    /// `trailing comma in list literal is not supported`.
+    /// Trailing comma (`[1, 2,]`) is rejected with a dedicated diagnostic.
     ///
-    /// After a comma, the parser expects an expression and emits:
-    /// `expected expression after ',' in list literal`.
+    /// After a comma, the parser expects an expression and emits a diagnostic when it's missing.
     ///
     /// ```text
-    /// "[1,2,]" -> "trailing comma in list literal is not supported"
+    /// "[1,2,]" -> "trailing comma is not supported"
     /// ```
     fn parse_list_literal(&mut self) -> Expr {
         let (lbrack, items) = self.parse_delimited(Delimiter::Bracket, |p| {
-            p.parse_seq_to_before_tokens(&[TokenKind::CloseBracket], SeqContext::ListLiteral)
+            p.parse_seq_to_before_tokens(&[TokenKind::CloseBracket], TokenKind::Comma)
         });
 
         let span = Span {
@@ -595,129 +578,108 @@ impl<'a> Parser<'a> {
 
     fn parse_seq_to_before_tokens(
         &mut self,
-        end_tokens: &[TokenKind],
-        ctx: SeqContext,
+        closes_expected: &[TokenKind],
+        sep: TokenKind,
     ) -> Vec<Expr> {
         debug_assert!(
-            !end_tokens.is_empty(),
-            "seq parsing needs at least one end token"
+            !closes_expected.is_empty(),
+            "seq parsing needs at least one close token"
         );
 
         let mut items = Vec::new();
         let mut expecting_item = true;
-        let mut after_comma = false;
+        let mut after_sep = false;
+
+        let sep_expected = sep
+            .to_str()
+            .map(|s| format!("'{s}'"))
+            .unwrap_or_else(|| "<token>".to_string());
+        let close_expected = Self::expected_closes(closes_expected);
 
         loop {
             let kind = self.cur().kind;
 
-            if kind == TokenKind::Eof {
-                if expecting_item && after_comma {
-                    // `...,` then end-of-input: avoid calling into expression parsing so we don't
-                    // consume would-be delimiters or cascade errors.
-                    let insertion = self.cur().span.start;
-                    let span = Span {
-                        start: insertion,
-                        end: insertion,
-                    };
-                    self.diagnostics.emit(
-                        DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
-                        span,
-                        match ctx {
-                            SeqContext::CallArgList => {
-                                "expected expression after ',' in argument list"
-                            }
-                            SeqContext::ListLiteral => {
-                                "expected expression after ',' in list literal"
-                            }
-                        },
-                    );
-                }
-                break;
-            }
-
-            if end_tokens.iter().any(|t| kind == *t) {
+            if kind == TokenKind::Eof
+                || is_closing_delim(&kind)
+                || Self::is_close(closes_expected, &kind)
+            {
                 break;
             }
 
             if expecting_item {
-                if kind == TokenKind::Comma {
-                    // `f(,a)` / `[1,,2]`: missing item before the comma.
-                    let comma = self.bump();
+                if kind == sep {
+                    // `f(,a)` / `[1,,2]`: missing item before the separator.
+                    let sep_tok = self.bump();
                     self.diagnostics.emit(
                         DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
-                        comma.span,
-                        match ctx {
-                            SeqContext::CallArgList => {
-                                "expected expression before ',' in argument list"
-                            }
-                            SeqContext::ListLiteral => {
-                                "expected expression before ',' in list literal"
-                            }
-                        },
+                        sep_tok.span,
+                        format!("expected expression before {}", Self::describe_token(&sep)),
                     );
-                    items.push(self.error_expr_at(comma.span));
-                    after_comma = true;
+                    items.push(self.error_expr_at(sep_tok.span));
+                    after_sep = true;
                     continue;
                 }
 
-                if !self.cur().can_begin_expr() {
-                    let found = self.cur().clone();
-                    self.diagnostics.emit(
-                        DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
-                        found.span,
-                        match (ctx, after_comma) {
-                            (SeqContext::CallArgList, true) => {
-                                "expected expression after ',' in argument list"
-                            }
-                            (SeqContext::ListLiteral, true) => {
-                                "expected expression after ',' in list literal"
-                            }
-                            (SeqContext::CallArgList, false) => {
-                                "expected expression in argument list"
-                            }
-                            (SeqContext::ListLiteral, false) => {
-                                "expected expression in list literal"
-                            }
-                        },
-                    );
-                    if found.kind != TokenKind::Eof {
-                        self.bump();
-                    }
-                    self.recover_seq_to_comma_or_tokens(end_tokens);
-                    after_comma = false;
+                if self.cur().can_begin_expr() {
+                    items.push(self.parse_expr_assoc_with(0));
+                    expecting_item = false;
+                    after_sep = false;
                     continue;
                 }
 
-                after_comma = false;
-                items.push(self.parse_expr_assoc_with(0));
+                // Missing / malformed item.
+                let found = self.cur().clone();
+                let msg = if after_sep {
+                    format!(
+                        "expected expression after {}, found {}",
+                        Self::describe_token(&sep),
+                        Self::describe_token(&found.kind)
+                    )
+                } else {
+                    format!(
+                        "expected expression, found {}",
+                        Self::describe_token(&found.kind)
+                    )
+                };
+                self.diagnostics.emit(
+                    DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                    found.span,
+                    msg,
+                );
+                if found.kind != TokenKind::Eof {
+                    self.bump();
+                }
+                self.recover_seq_to_sep_or_closes(closes_expected, &sep);
+                items.push(self.error_expr_at(found.span));
                 expecting_item = false;
+                after_sep = false;
                 continue;
             }
 
-            // expecting `,` or the closing delimiter
-            if kind == TokenKind::Comma {
-                let comma = self.bump();
-                after_comma = true;
+            // Expecting `sep` or the closing delimiter.
+            if kind == sep {
+                let sep_tok = self.bump();
                 expecting_item = true;
+                after_sep = true;
 
-                if end_tokens.iter().any(|t| self.cur().kind == *t) {
-                    let msg = match ctx {
-                        SeqContext::CallArgList => {
-                            "trailing comma in argument list is not supported"
-                        }
-                        SeqContext::ListLiteral => {
-                            "trailing comma in list literal is not supported"
-                        }
-                    };
+                // Trailing separator: `f(1,)` / `[1,2,]`.
+                let next = self.cur().kind;
+                if Self::is_close(closes_expected, &next) {
                     self.diagnostics.emit_with_labels(
                         DiagnosticCode::Parse(ParseDiagnostic::TrailingComma),
-                        comma.span,
-                        msg,
+                        sep_tok.span,
+                        "trailing comma is not supported",
                         vec![Label {
-                            span: comma.span,
+                            span: sep_tok.span,
                             message: Some("remove this comma".into()),
                         }],
                     );
+                    break;
+                }
+
+                // If we hit EOF or a mismatched closing delimiter after the separator,
+                // prefer the delimiter diagnostic (and avoid cascading sequence noise).
+                if next == TokenKind::Eof || is_closing_delim(&next) {
                     break;
                 }
 
@@ -725,9 +687,8 @@ impl<'a> Parser<'a> {
             }
 
             if self.cur().can_begin_expr() {
-                // Likely a missing comma: `f(a b)` / `[1 2]`.
+                // Likely a missing separator: `f(a b)` / `[1 2]`.
                 let found = self.cur().clone();
-                let close_expected = Self::expected_seq_end(end_tokens);
                 let insertion = Span {
                     start: found.span.start,
                     end: found.span.start,
@@ -736,45 +697,44 @@ impl<'a> Parser<'a> {
                     DiagnosticCode::Parse(ParseDiagnostic::MissingComma),
                     found.span,
                     format!(
-                        "expected ',' or {close_expected}, found {}",
+                        "expected {sep_expected} or {close_expected}, found {}",
                         Self::describe_token(&found.kind)
                     ),
                     vec![Label {
                         span: insertion,
-                        message: Some("insert ','".into()),
+                        message: Some(format!("insert {sep_expected}")),
                     }],
                 );
                 expecting_item = true;
-                after_comma = false;
+                after_sep = false;
                 continue;
             }
 
             // Unexpected token between items; skip forward to a plausible boundary.
             let found = self.cur().clone();
-            let close_expected = Self::expected_seq_end(end_tokens);
             self.diagnostics.emit(
                 DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
                 found.span,
                 format!(
-                    "expected ',' or {close_expected}, found {}",
+                    "expected {sep_expected} or {close_expected}, found {}",
                     Self::describe_token(&found.kind)
                 ),
             );
             if found.kind != TokenKind::Eof {
                 self.bump();
             }
-            self.recover_seq_to_comma_or_tokens(end_tokens);
+            self.recover_seq_to_sep_or_closes(closes_expected, &sep);
         }
 
         items
     }
 
-    fn recover_seq_to_comma_or_tokens(&mut self, end_tokens: &[TokenKind]) {
+    fn recover_seq_to_sep_or_closes(&mut self, closes_expected: &[TokenKind], sep: &TokenKind) {
         let _ = self.recover_scan(|kind, depth| {
             if depth.at_top_level()
-                && (kind == TokenKind::Comma
+                && (kind == *sep
                     || is_closing_delim(&kind)
-                    || end_tokens.iter().any(|t| kind == *t))
+                    || Self::is_close(closes_expected, &kind))
             {
                 RecoverScanDecision::Stop
             } else {
@@ -783,13 +743,23 @@ impl<'a> Parser<'a> {
         });
     }
 
-    fn expected_seq_end(end_tokens: &[TokenKind]) -> &'static str {
-        match end_tokens.first() {
-            Some(TokenKind::CloseParen) => "')'",
-            Some(TokenKind::CloseBracket) => "']'",
-            Some(TokenKind::Eof) | None => "end of input",
-            _ => "<end>",
+    fn is_close(closes_expected: &[TokenKind], kind: &TokenKind) -> bool {
+        closes_expected.iter().any(|p| kind == p)
+    }
+
+    fn expected_closes(closes_expected: &[TokenKind]) -> String {
+        let mut out = String::new();
+        for (i, kind) in closes_expected.iter().enumerate() {
+            if i > 0 {
+                out.push_str(" or ");
+            }
+            let expected = kind
+                .to_str()
+                .map(|s| format!("'{s}'"))
+                .unwrap_or_else(|| "<token>".to_string());
+            out.push_str(&expected);
         }
+        out
     }
 
     fn expect_closing_delimiter(

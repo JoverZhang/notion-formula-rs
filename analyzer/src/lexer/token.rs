@@ -177,6 +177,47 @@ impl TokenKind {
             TokenKind::LineComment(_) | TokenKind::BlockComment(_) | TokenKind::DocComment(..)
         )
     }
+
+    pub fn to_str(&self) -> Option<&'static str> {
+        use TokenKind::*;
+        Some(match self {
+            // Relational operators
+            Lt => "<",
+            Le => "<=",
+            EqEq => "==",
+            Ne => "!=",
+            Ge => ">=",
+            Gt => ">",
+
+            // Logical operators
+            AndAnd => "&&",
+            OrOr => "||",
+            Bang => "!",
+
+            // Arithmetic operators
+            Plus => "+",
+            Minus => "-",
+            Star => "*",
+            Slash => "/",
+            Percent => "%",
+            Caret => "^",
+
+            // Punctuation
+            Dot => ".",
+            Comma => ",",
+            Colon => ":",
+            Pound => "#",
+            Question => "?",
+
+            // Delimiters
+            OpenParen => "(",
+            CloseParen => ")",
+            OpenBracket => "[",
+            CloseBracket => "]",
+
+            _ => return None,
+        })
+    }
 }
 
 /// Returns the token-index range `[lo, hi)` covered by `span`.

@@ -206,7 +206,7 @@ impl<'a> Parser<'a> {
     }
 
     fn describe_token(kind: &TokenKind) -> String {
-        if let Some(spelling) = Self::token_spelling(kind) {
+        if let Some(spelling) = kind.to_str() {
             return format!("`{spelling}`");
         }
 
@@ -220,46 +220,5 @@ impl<'a> Parser<'a> {
             TokenKind::Eof => "end of input".into(),
             other => format!("{other:?}"),
         }
-    }
-
-    fn token_spelling(kind: &TokenKind) -> Option<&'static str> {
-        use TokenKind::*;
-        Some(match kind {
-            // Relational operators
-            Lt => "<",
-            Le => "<=",
-            EqEq => "==",
-            Ne => "!=",
-            Ge => ">=",
-            Gt => ">",
-
-            // Logical operators
-            AndAnd => "&&",
-            OrOr => "||",
-            Bang => "!",
-
-            // Arithmetic operators
-            Plus => "+",
-            Minus => "-",
-            Star => "*",
-            Slash => "/",
-            Percent => "%",
-            Caret => "^",
-
-            // Punctuation
-            Dot => ".",
-            Comma => ",",
-            Colon => ":",
-            Pound => "#",
-            Question => "?",
-
-            // Delimiters
-            OpenParen => "(",
-            CloseParen => ")",
-            OpenBracket => "[",
-            CloseBracket => "]",
-
-            _ => return None,
-        })
     }
 }

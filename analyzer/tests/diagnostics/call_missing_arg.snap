@@ -1,5 +1,5 @@
 === INPUT ===
 f(1, , 2)
 === OUTPUT ===
-error: expected expression before ',' in argument list
+error: expected expression before `,`
   --> <input>:1:6 [5..6]
