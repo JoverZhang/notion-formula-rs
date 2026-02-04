@@ -622,6 +622,35 @@ impl CompletionTestBuilder {
         self
     }
 
+    pub fn expect_sig_active_param_name(mut self, expected: &str) -> Self {
+        let out = self.ensure_run();
+        let sig = out
+            .signature_help
+            .as_ref()
+            .expect("expected signature help");
+        let active_sig = sig
+            .signatures
+            .get(sig.active_signature)
+            .or_else(|| sig.signatures.first())
+            .expect("expected at least one signature");
+
+        let active = active_sig
+            .segments
+            .iter()
+            .find_map(|seg| match seg {
+                crate::ide::display::DisplaySegment::Param {
+                    name,
+                    param_index: Some(i),
+                    ..
+                } if (*i as usize) == sig.active_parameter => Some(name.as_str()),
+                _ => None,
+            })
+            .expect("expected active parameter segment");
+
+        assert_eq!(active, expected);
+        self
+    }
+
     pub fn expect_sig_label(mut self, label: &str) -> Self {
         let out = self.ensure_run();
         let sig = out

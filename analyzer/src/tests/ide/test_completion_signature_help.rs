@@ -131,6 +131,30 @@ fn signature_help_postfix_ifs_uses_method_style_and_boolean_receiver() {
 }
 
 #[test]
+fn signature_help_postfix_ifs_third_condition_highlights_condition3() {
+    let c = ctx()
+        .prop("Number", crate::semantic::Ty::Number)
+        .prop("Title", crate::semantic::Ty::String)
+        .prop("Date", crate::semantic::Ty::Date)
+        .build();
+
+    t(
+        r#"
+(prop("Number") < 1).ifs(
+  prop("Title"),
+  prop("Number") < 2,
+  [prop("Number")],
+  prop("Number") < 3$0,
+  prop("Date"),
+  4
+)"#,
+    )
+    .ctx(c)
+    .expect_sig_active(3)
+    .expect_sig_active_param_name("condition3");
+}
+
+#[test]
 fn signature_help_postfix_if_active_param_then_else() {
     let c = ctx().build();
 
@@ -235,11 +259,11 @@ fn signature_help_ifs_total_5_highlights_default() {
 }
 
 #[test]
-fn signature_help_ifs_long_call_clamps_repeat_cycle_preserving_position() {
+fn signature_help_ifs_long_call_highlights_repeat_cycle_preserving_position() {
     let c = ctx().build();
     t("ifs(true, \"a\", false, \"b\", true, $0)")
         .ctx(c)
-        .expect_sig_active(3);
+        .expect_sig_active(5);
 }
 
 #[test]
@@ -255,7 +279,7 @@ fn signature_help_ifs_active_param_repeat_value_highlights_value() {
     let c = ctx().build();
     t("ifs(true, \"123\", true, \"123\", true, $0)")
         .ctx(c)
-        .expect_sig_active(3);
+        .expect_sig_active(5);
 }
 
 #[test]

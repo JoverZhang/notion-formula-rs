@@ -110,6 +110,6 @@ describe("WASM signature help (instantiated types)", () => {
 
   it("ifs(..., true, <empty>) highlights value in repeat pair", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", true, )');
-    expect(sig.active_parameter).toBe(3);
+    expect(sig.active_parameter).toBe(5);
   });
 });

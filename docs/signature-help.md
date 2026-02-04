@@ -63,8 +63,7 @@ Return type: the instantiated return type.
 For repeat-group signatures, the UI display order is:
 
 - `[head...]`, then
-- repeat group #1 (numbered names, e.g. `condition1`, `value1`)
-- repeat group #2 (numbered names, e.g. `condition2`, `value2`) **only if entered**
+- repeat groups `#1..#repeat_groups` (numbered names, e.g. `condition1`, `value1`, `condition2`, `value2`, ...)
 - `...`
 - `[tail...]`
 
@@ -85,7 +84,7 @@ Then:
 - If it maps into `tail` (per `total'`), highlight the corresponding tail slot.
 - Otherwise it maps into `repeat`:
   - compute `(cycle, pos)` within the repeat group
-  - if `cycle >= 2`, clamp to cycle #2 but preserve `pos` within the group
+  - highlight the corresponding numbered slot within the entered repeat groups
 - Never highlight `...`.
 
 ## Canonical examples
@@ -135,6 +134,10 @@ NOTE: Each variadic slot accepts either a scalar `number` or a `number[]`.
 
 - `ifs(true, "42", false, 7, $0)` (total=5)
   - `active_parameter`: `4` (default)
+
+- `ifs(true, "a", false, "b", true, $0)` (invalid total=6)
+  - guides completion toward `value3`
+  - `active_parameter`: `5`
 
 ## Postfix form (presentation-only)
 

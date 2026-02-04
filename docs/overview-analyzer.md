@@ -198,7 +198,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
     - receiver segments have `param_index = None` and are never highlighted
   - Repeat-group shapes (a `ParamShape` with non-empty `repeat`) are pretty-printed as a pattern (see `docs/signature-help.md` for the spec):
     - head params once
-    - repeat params **up to twice** (numbered: `condition1/value1`, `condition2/value2`), but the second repeat group is only shown once the call has entered it (or when the call is completed to the next valid shape for guidance)
+    - repeat params for each entered repeat group (numbered: `condition1/value1`, `condition2/value2`, `condition3/value3`, ...)
     - `...`
     - tail params once
     - Example: `ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: number) -> number`

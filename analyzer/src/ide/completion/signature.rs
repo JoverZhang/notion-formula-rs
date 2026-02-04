@@ -17,6 +17,23 @@ pub(super) struct CallContext {
     pub(super) arg_index: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RepeatShapeInfo {
+    repeat_groups: usize,
+    tail_start: usize,
+}
+
+fn repeat_shape_info(
+    sig: &semantic::FunctionSig,
+    total_args_for_shape: usize,
+) -> Option<RepeatShapeInfo> {
+    let shape = semantic::complete_repeat_shape(&sig.params, total_args_for_shape)?;
+    Some(RepeatShapeInfo {
+        repeat_groups: shape.repeat_groups.max(1),
+        tail_start: shape.tail_start,
+    })
+}
+
 fn ty_contains_generic(ty: &semantic::Ty) -> bool {
     match ty {
         semantic::Ty::Generic(_) => true,
@@ -113,13 +130,12 @@ fn render_signature(
         );
     }
 
-    // Show the repeat pattern twice with numbering, then an ellipsis, then the tail.
+    // Show the repeat pattern for each entered repeat group (numbered), then an ellipsis, then the tail.
     let repeat_start = sig.params.head.len();
     let repeat_len = sig.params.repeat.len();
 
-    let shape = semantic::complete_repeat_shape(&sig.params, total_args_for_shape);
-    let repeat_groups = shape.map(|s| s.repeat_groups).unwrap_or(1).max(1);
-    let repeat_groups_displayed = repeat_groups.min(2);
+    let shape = repeat_shape_info(sig, total_args_for_shape);
+    let repeat_groups_displayed = shape.map(|s| s.repeat_groups).unwrap_or(1);
     let tail_start = shape.map(|s| s.tail_start).unwrap_or(usize::MAX);
 
     for n in 1..=repeat_groups_displayed {
@@ -377,13 +393,13 @@ fn active_param_index(
         return 0;
     }
 
-    let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape) else {
+    let Some(shape) = repeat_shape_info(sig, total_args_for_shape) else {
         return 0;
     };
     let tail_start = shape.tail_start;
-    let repeat_groups_displayed = shape.repeat_groups.clamp(1, 2);
+    let repeat_groups_displayed = shape.repeat_groups;
 
-    // Display shape: head, repeat x{1..2}, "...", tail
+    // Display shape: head, repeat groups, "...", tail
     let ellipsis_idx = head_len + repeat_len * repeat_groups_displayed;
     let tail_display_start = ellipsis_idx + 1;
 
@@ -400,9 +416,7 @@ fn active_param_index(
     let idx_in_repeat = call_ctx.arg_index.saturating_sub(head_len);
     let repeat_pos = idx_in_repeat % repeat_len;
 
-    // Map all cycles >= 2 to the second displayed cycle so we can still highlight
-    // condition vs value within the repeat pair.
-    let cycle = (idx_in_repeat / repeat_len).min(repeat_groups_displayed.saturating_sub(1));
+    let cycle = idx_in_repeat / repeat_len;
     head_len + cycle * repeat_len + repeat_pos
 }
 
