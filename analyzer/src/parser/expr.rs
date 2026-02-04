@@ -228,7 +228,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr_dot_or_call(&mut self, mut expr: Expr) -> Expr {
-        'postfix: loop {
+        loop {
             match self.cur().kind {
                 // Call expression: `expr(arg1, ...)`
                 TokenKind::OpenParen => {
@@ -277,8 +277,7 @@ impl<'a> Parser<'a> {
                                     start: expr.span.start,
                                     end: self.last_bumped_end(),
                                 };
-                                expr = self.mk_expr(span, ExprKind::Error);
-                                break 'postfix;
+                                return self.mk_expr(span, ExprKind::Error);
                             }
                         }
                     };
