@@ -52,7 +52,9 @@ Do **not** invent argument types for arguments that do not exist in source.
 
 For each displayed parameter slot, pick the type to render using:
 
-1) the best-effort inferred *actual* type of the corresponding call-site argument **if the argument expression is non-empty**
+1) the best-effort inferred *actual* type of the corresponding call-site argument **if the argument expression is non-empty** and either:
+   - the parameter’s declared type contains generics (show call-site instantiation), or
+   - the instantiated expected type is a `Union(...)` and the actual type is a compatible non-`unknown` member (narrow per-slot unions like `number | number[]`)
 2) else the instantiated expected type (after generic unification/substitution)
 3) else `unknown`
 
@@ -98,19 +100,19 @@ NOTE: Each variadic slot accepts either a scalar `number` or a `number[]`.
    - `active_parameter`: `0`
 
 2) `sum(42$0)`
-   - label: `sum(values1: number | number[], ...) -> number`
+   - label: `sum(values1: number, ...) -> number`
    - `active_parameter`: `0`
 
 3) `sum([1,2,3]$0)`
-   - label: `sum(values1: number | number[], ...) -> number`
+   - label: `sum(values1: number[], ...) -> number`
    - `active_parameter`: `0`
 
 4) `sum(42, $0)`
-   - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
+   - label: `sum(values1: number, values2: number | number[], ...) -> number`
    - `active_parameter`: `1`
 
 5) `sum(42, 42$0)`
-   - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
+   - label: `sum(values1: number, values2: number, ...) -> number`
    - `active_parameter`: `1`
 
 ### IF

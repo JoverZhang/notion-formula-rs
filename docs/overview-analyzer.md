@@ -188,7 +188,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
     - it instantiates the `FunctionSig` using the same unification/substitution logic as semantic inference (`instantiate_sig` in `analyzer/src/analysis/infer.rs`)
     - type strings are formatted via `analyzer/src/ide/display.rs` (`format_ty(...)`); `List(Union(...))` renders as `(A | B)[]`
     - instantiated `Unknown` is rendered as `unknown` (including unconstrained generics)
-    - parameters prefer per-argument inferred (actual) types when the argument expression is non-empty; empty argument slots fall back to instantiated expected types
+    - parameters prefer per-argument inferred (actual) types when the argument expression is non-empty **and** the inferred type is helpful/compatible (e.g. for generic and union-typed slots); empty argument slots fall back to instantiated expected types
   - Signature help output is structured (no frontend parsing):
     - `signatures[n].segments`: `DisplaySegment[]` (punctuation split into its own segments; params carry `param_index`)
     - `active_signature`: selected overload index (currently always `0`)

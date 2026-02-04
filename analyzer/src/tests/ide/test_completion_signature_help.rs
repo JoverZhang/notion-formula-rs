@@ -59,7 +59,7 @@ fn signature_help_sum_variadic_number_only_case_2_single_number() {
     t("sum(42$0)")
         .ctx(c)
         .expect_sig_active(0)
-        .expect_sig_label("sum(values1: number | number[], ...) -> number");
+        .expect_sig_label("sum(values1: number, ...) -> number");
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn signature_help_sum_variadic_number_only_case_2_list_literal() {
     t("sum([1,2,3]$0)")
         .ctx(c)
         .expect_sig_active(0)
-        .expect_sig_label("sum(values1: number | number[], ...) -> number");
+        .expect_sig_label("sum(values1: number[], ...) -> number");
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn signature_help_sum_variadic_number_only_case_3_second_arg_empty() {
         .ctx(c)
         .expect_sig_active(1)
         .expect_sig_label(
-            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+            "sum(values1: number, values2: number | number[], ...) -> number",
         );
 }
 
@@ -89,8 +89,16 @@ fn signature_help_sum_variadic_number_only_case_4_two_numbers() {
         .ctx(c)
         .expect_sig_active(1)
         .expect_sig_label(
-            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+            "sum(values1: number, values2: number, ...) -> number",
         );
+}
+
+#[test]
+fn signature_help_sum_prefers_known_actual_types_for_union_slots() {
+    let c = ctx().prop("Number", crate::semantic::Ty::Number).build();
+    t(r#"sum(prop("Number"), [1, 2, 3]$0)"#)
+        .ctx(c)
+        .expect_sig_label("sum(values1: number, values2: number[], ...) -> number");
 }
 
 #[test]

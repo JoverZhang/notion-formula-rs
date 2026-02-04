@@ -56,10 +56,31 @@ fn choose_display_ty<'a>(
     declared_template: &'a semantic::Ty,
     instantiated_expected: &'a semantic::Ty,
 ) -> &'a semantic::Ty {
-    if !ty_contains_generic(declared_template) {
+    // If the declared parameter includes generics, prefer the inferred actual type when the
+    // argument expression is non-empty. This helps show instantiated generics (incl `unknown`)
+    // at the call site.
+    if ty_contains_generic(declared_template) {
+        return actual.unwrap_or(instantiated_expected);
+    }
+
+    let Some(actual) = actual else {
+        return instantiated_expected;
+    };
+
+    // Avoid "unknown" overriding useful expected types (especially for hard-constrained params).
+    if matches!(actual, semantic::Ty::Unknown) {
         return instantiated_expected;
     }
-    actual.unwrap_or(instantiated_expected)
+
+    // For union-typed params (e.g. `number | number[]`), the actual argument type is often more
+    // helpful than repeating the full union at every slot.
+    if matches!(instantiated_expected, semantic::Ty::Union(_))
+        && semantic::ty_accepts(instantiated_expected, actual)
+    {
+        return actual;
+    }
+
+    instantiated_expected
 }
 
 fn render_signature(
