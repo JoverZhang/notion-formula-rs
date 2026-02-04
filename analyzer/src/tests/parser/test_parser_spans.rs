@@ -165,13 +165,14 @@ fn test_parser_spans_error_recovery_in_call_arg_list() {
     let ExprKind::Call { args, .. } = &expr.kind else {
         panic!("expected call");
     };
-    assert_eq!(args.len(), 1);
+    assert_eq!(args.len(), 2);
     assert_span(expr, 0, 5);
     assert_span(&args[0], 2, 3);
     assert!(
         matches!(args[0].kind, ExprKind::Error),
         "expected recovery to produce an error expression for the missing argument before ','"
     );
+    assert_span(&args[1], 3, 4);
 }
 
 #[test]

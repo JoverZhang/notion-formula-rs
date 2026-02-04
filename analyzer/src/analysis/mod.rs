@@ -4,7 +4,7 @@
 //! [`FunctionSig`]s plus the special-cased `prop("Name")` form.
 
 use crate::ast::{Expr, ExprKind};
-use crate::diagnostics::{Diagnostic, DiagnosticKind};
+use crate::diagnostics::{Diagnostic, DiagnosticCode, DiagnosticKind};
 use crate::{LitKind, Span};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -500,6 +500,7 @@ pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Opt
 fn emit_error(diags: &mut Vec<Diagnostic>, span: Span, message: impl Into<String>) {
     diags.push(Diagnostic {
         kind: DiagnosticKind::Error,
+        code: DiagnosticCode::SemanticError,
         message: message.into(),
         span,
         labels: vec![],

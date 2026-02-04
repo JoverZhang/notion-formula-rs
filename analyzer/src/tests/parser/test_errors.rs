@@ -28,17 +28,108 @@ fn test_multiple_errors_collected() {
 #[test]
 fn diagnostics_list_trailing_comma_recovers() {
     let result = analyze("[1,2,]").unwrap();
+    let trailing = result
+        .diagnostics
+        .iter()
+        .find(|d| d.kind == DiagnosticKind::Error && d.message.contains("trailing comma"))
+        .unwrap_or_else(|| panic!("unexpected diagnostics: {:?}", result.diagnostics));
     assert!(
-        result
-            .diagnostics
+        trailing
+            .labels
             .iter()
-            .any(|d| d.kind == DiagnosticKind::Error && d.message.contains("trailing comma")),
-        "unexpected diagnostics: {:?}",
-        result.diagnostics
+            .any(|l| l.message.as_deref() == Some("remove this comma")),
+        "expected trailing-comma diagnostic to include a removal hint label, got {:?}",
+        trailing
     );
 
     match &result.expr.kind {
         ExprKind::List { items } => assert_eq!(items.len(), 2),
         other => panic!("expected List, got {:?}", other),
     }
+}
+
+#[test]
+fn diagnostics_call_missing_close_paren_has_insert_label() {
+    let result = analyze("f(1").unwrap();
+    let diag = result
+        .diagnostics
+        .iter()
+        .find(|d| d.message.starts_with("expected ')',"))
+        .unwrap_or_else(|| panic!("unexpected diagnostics: {:?}", result.diagnostics));
+
+    assert!(
+        diag.labels
+            .iter()
+            .any(|l| l.message.as_deref() == Some("this '(' is not closed")),
+        "expected missing-close-paren diagnostic to label the opening delimiter, got {:?}",
+        diag
+    );
+    assert!(
+        diag.labels
+            .iter()
+            .any(|l| l.message.as_deref() == Some("insert ')'")),
+        "expected missing-close-paren diagnostic to include an insertion hint, got {:?}",
+        diag
+    );
+}
+
+#[test]
+fn diagnostics_missing_comma_between_call_args_has_insert_label() {
+    let result = analyze("f(1 2)").unwrap();
+    let diag = result
+        .diagnostics
+        .iter()
+        .find(|d| d.labels.iter().any(|l| l.message.as_deref() == Some("insert ','")))
+        .unwrap_or_else(|| panic!("unexpected diagnostics: {:?}", result.diagnostics));
+    assert!(
+        diag.message.contains("expected ','"),
+        "expected missing-comma diagnostic message, got {:?}",
+        diag
+    );
+}
+
+#[test]
+fn diagnostics_eof_deconflict_prefers_missing_close_delimiter() {
+    // `f(1,` can lead to both "missing expr after comma" and "missing ')'" at EOF.
+    // Ensure we only emit the delimiter diagnostic at that insertion point.
+    let result = analyze("f(1,").unwrap();
+    assert_eq!(
+        result.diagnostics.len(),
+        1,
+        "expected a single EOF diagnostic, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics[0].message.starts_with("expected ')',"),
+        "unexpected message: {:?}",
+        result.diagnostics[0]
+    );
+}
+
+#[test]
+fn diagnostics_mismatched_delimiter_suggests_replacement() {
+    let result = analyze("(1]").unwrap();
+    assert_eq!(
+        result.diagnostics.len(),
+        1,
+        "expected a single mismatched-delimiter diagnostic, got {:?}",
+        result.diagnostics
+    );
+    let diag = &result.diagnostics[0];
+    assert!(
+        diag.message.starts_with("expected ')',"),
+        "unexpected message: {diag:?}"
+    );
+    assert!(
+        diag.labels
+            .iter()
+            .any(|l| l.message.as_deref() == Some("this '(' is not closed")),
+        "expected opening delimiter label, got {diag:?}"
+    );
+    assert!(
+        diag.labels
+            .iter()
+            .any(|l| l.message.as_deref() == Some("replace `]` with ')'")),
+        "expected replacement suggestion label, got {diag:?}"
+    );
 }

@@ -1,5 +1,5 @@
 === INPUT ===
 )
 === OUTPUT ===
-error: expected primary expression, found CloseParen
+error: expected expression, found `)`
   --> <input>:1:1 [0..1]

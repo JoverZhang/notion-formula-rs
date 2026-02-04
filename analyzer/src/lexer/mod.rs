@@ -1,4 +1,4 @@
-use crate::diagnostics::{Diagnostic, DiagnosticKind};
+use crate::diagnostics::{Diagnostic, DiagnosticCode, DiagnosticKind};
 
 mod token;
 
@@ -368,6 +368,7 @@ fn is_ident_continue(c: char) -> bool {
 fn make_error(span: Span, message: String) -> Diagnostic {
     Diagnostic {
         kind: DiagnosticKind::Error,
+        code: DiagnosticCode::LexError,
         message,
         span,
         labels: vec![],

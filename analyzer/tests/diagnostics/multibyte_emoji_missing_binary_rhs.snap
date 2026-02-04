@@ -1,5 +1,5 @@
 === INPUT ===
 😀 + 1 *
 === OUTPUT ===
-error: expected expression after 'Star'
+error: expected expression after `*`
   --> <input>:1:7 [9..10]

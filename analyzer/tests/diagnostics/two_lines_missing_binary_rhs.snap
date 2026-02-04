@@ -2,5 +2,5 @@
 1 +
 2 *
 === OUTPUT ===
-error: expected expression after 'Star'
+error: expected expression after `*`
   --> <input>:2:3 [6..7]

@@ -35,7 +35,7 @@ Core modules:
 - `analyzer/src/parser/tokenstream.rs`: `TokenCursor` (parser) + `TokenQuery` (span/token/trivia scanning)
 - `analyzer/src/ide/display.rs`: canonical UI display formatting (e.g. `format_ty(...)` used by signature help)
 - `analyzer/src/ide/format.rs`: formatter for `Expr` using tokens/source for comment attachment; enforces width/indent rules; uses `TokenQuery`
-- `analyzer/src/diagnostics.rs`: `Diagnostic` model + stable `format_diagnostics(...)` output (sorted by span/message)
+- `analyzer/src/diagnostics.rs`: `Diagnostic { code, message, span, labels }` model + stable `format_diagnostics(...)` output (sorted by span, then priority, then message; deconflicts diagnostics with identical spans)
 - `analyzer/src/analysis/mod.rs`: minimal type checking driven by `Context { properties, functions }`
 - `analyzer/src/ide/completion/mod.rs`: byte-offset completion + signature help for editor integrations (pipeline/position/items/signature + ranking/matchers)
 - `analyzer/src/source_map.rs`: byte offset → `(line,col)`
@@ -114,6 +114,17 @@ Known gaps:
 - boolean literals (`true` / `false`) lex as identifiers (the lexer does not emit `LitKind::Bool` today)
 - `not` is suggested by completion but is not a lexer/parser operator today
 - completion operator list does not include every parsed operator
+
+Parser error recovery (high-level):
+
+- The parser is best-effort: it emits diagnostics and produces an AST with `ExprKind::Error` placeholders to avoid cascading errors.
+- Diagnostics are deconflicted by span using a priority order (so “missing closing delimiter” at EOF suppresses secondary “missing expression” errors at the same insertion point).
+- Delimited comma-separated sequences (call args `(...)` and list literals `[...]`) share a single recovery routine (`analyzer/src/parser/expr.rs`):
+  - missing commas between items emit `expected ',' or ...` and parsing continues as if a comma was inserted
+  - missing items around commas (e.g. `f(,a)`, `f(1, ,2)`) produce `ExprKind::Error` entries in the sequence
+  - missing/mismatched closing delimiters emit a label on the opening delimiter plus a fix-it label (`insert ')'` / `insert ']'` at EOF; `replace ...` when a different closing delimiter is present)
+- Ternary recovery handles missing `then`/`else` expressions without consuming closing delimiters (so surrounding `)`/`]` parsing can still succeed).
+- Member-call recovery skips redundant dots (e.g. `a..if(b,c)`), emitting a diagnostic but still parsing the call.
 
 ---
 

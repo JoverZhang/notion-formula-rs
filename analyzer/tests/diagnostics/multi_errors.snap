@@ -1,7 +1,7 @@
 === INPUT ===
 (1 + ) *
 === OUTPUT ===
-error: expected expression after 'Plus'
+error: expected expression after `+`
   --> <input>:1:4 [3..4]
-error: expected expression after 'Star'
+error: expected expression after `*`
   --> <input>:1:8 [7..8]

@@ -1,5 +1,5 @@
 === INPUT ===
 一 + 二 *
 === OUTPUT ===
-error: expected expression after 'Star'
+error: expected expression after `*`
   --> <input>:1:7 [10..11]

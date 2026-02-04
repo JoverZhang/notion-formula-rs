@@ -6,19 +6,91 @@
 use super::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp};
 use super::{ParseOutput, Parser};
 use crate::Token;
-use crate::diagnostics::Label;
+use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
-const SYNC_EXPR_BOUNDARY: [TokenKind; 5] = [
-    TokenKind::Comma,
-    TokenKind::CloseBracket,
-    TokenKind::CloseParen,
-    TokenKind::Colon,
-    TokenKind::Eof,
-];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SeqContext {
+    CallArgList,
+    ListLiteral,
+}
 
-const SYNC_CALL_ARG_LIST: [TokenKind; 3] =
-    [TokenKind::CloseParen, TokenKind::Comma, TokenKind::Eof];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Delimiter {
+    Paren,
+    Bracket,
+}
+
+impl Delimiter {
+    fn close(self) -> TokenKind {
+        match self {
+            Delimiter::Paren => TokenKind::CloseParen,
+            Delimiter::Bracket => TokenKind::CloseBracket,
+        }
+    }
+
+    fn close_expected(self) -> &'static str {
+        match self {
+            Delimiter::Paren => "')'",
+            Delimiter::Bracket => "']'",
+        }
+    }
+
+    fn unclosed_label(self) -> &'static str {
+        match self {
+            Delimiter::Paren => "this '(' is not closed",
+            Delimiter::Bracket => "this '[' is not closed",
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct DelimDepth {
+    paren: u32,
+    bracket: u32,
+}
+
+impl DelimDepth {
+    fn at_top_level(self) -> bool {
+        self.paren == 0 && self.bracket == 0
+    }
+
+    fn consume(&mut self, kind: TokenKind) {
+        match kind {
+            TokenKind::OpenParen => self.paren = self.paren.saturating_add(1),
+            TokenKind::OpenBracket => self.bracket = self.bracket.saturating_add(1),
+            TokenKind::CloseParen => {
+                if self.paren > 0 {
+                    self.paren -= 1;
+                }
+            }
+            TokenKind::CloseBracket => {
+                if self.bracket > 0 {
+                    self.bracket -= 1;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn is_closing_delim(kind: &TokenKind) -> bool {
+    matches!(kind, TokenKind::CloseParen | TokenKind::CloseBracket)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecoverScanDecision {
+    Continue,
+    Stop,
+    ConsumeAndStop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecoverScanResult {
+    HitEof,
+    Stopped,
+    Consumed,
+}
 
 impl<'a> Parser<'a> {
     /// Parser's entry point
@@ -51,9 +123,14 @@ impl<'a> Parser<'a> {
         let expr = self.parse_expr();
 
         if self.cur().kind != TokenKind::Eof {
-            self.diagnostics.emit_err(
+            let tok = self.cur();
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
                 self.cur().span,
-                format!("unexpected token {:?} after expression", self.cur().kind),
+                format!(
+                    "unexpected token {} after expression",
+                    Self::describe_token(&tok.kind)
+                ),
             );
         }
         ParseOutput {
@@ -168,8 +245,11 @@ impl<'a> Parser<'a> {
                     let callee = match expr.kind {
                         ExprKind::Ident(sym) => sym,
                         _ => {
-                            self.diagnostics
-                                .emit_err(lparen.span, "expected call callee (identifier)");
+                            self.diagnostics.emit(
+                                DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+                                lparen.span,
+                                "expected call callee (identifier)",
+                            );
                             let span = Span {
                                 start: expr.span.start,
                                 end,
@@ -190,7 +270,23 @@ impl<'a> Parser<'a> {
                 TokenKind::Dot => {
                     self.bump(); // '.'
 
-                    let method_tok = match self.expect_ident() {
+                    let method_tok = loop {
+                        match self.cur().kind {
+                            TokenKind::Ident(..) => break Ok(self.bump()),
+                            // `a..if(...)`: recover by skipping extra dots.
+                            TokenKind::Dot => {
+                                let extra = self.bump();
+                                self.diagnostics.emit(
+                                    DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+                                    extra.span,
+                                    "unexpected '.' in member call",
+                                );
+                            }
+                            _ => break Err(()),
+                        }
+                    };
+
+                    let method_tok = match method_tok {
                         Ok(tok) => tok,
                         Err(()) => {
                             let span = Span {
@@ -208,7 +304,8 @@ impl<'a> Parser<'a> {
                     };
 
                     if self.cur().kind != TokenKind::OpenParen {
-                        self.diagnostics.emit_err(
+                        self.diagnostics.emit(
+                            DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
                             method_tok.span,
                             "expected '(' after member name (member access is not supported yet)",
                         );
@@ -244,31 +341,34 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_paren_arg_list(&mut self) -> (Vec<Expr>, u32) {
-        self.bump(); // '('
-
-        let mut args = Vec::new();
-        if self.cur().kind != TokenKind::CloseParen {
-            args.push(self.parse_expr_assoc_with(0));
-            while self.cur().kind == TokenKind::Comma {
-                self.bump(); // ','
-                args.push(self.parse_expr_assoc_with(0));
-            }
-        }
-
-        if let Err(()) = self.expect_punct(TokenKind::CloseParen, "')'") {
-            self.recover_to_and_eat(TokenKind::CloseParen, &SYNC_CALL_ARG_LIST);
-        }
-
+        let (_lparen, args) = self.parse_delimited(Delimiter::Paren, |p| {
+            p.parse_seq_to_before_tokens(&[TokenKind::CloseParen], SeqContext::CallArgList)
+        });
         (args, self.last_bumped_end())
     }
 
-    fn parse_ternary_suffix(&mut self, lhs: Expr, _q_span: Span, else_min_bp: u8) -> Expr {
-        let then_expr = self.parse_expr_assoc_with(0);
+    fn parse_ternary_suffix(&mut self, lhs: Expr, q_span: Span, else_min_bp: u8) -> Expr {
+        let then_expr = if self.cur().can_begin_expr() {
+            self.parse_expr_assoc_with(0)
+        } else {
+            // `cond ? : else` / `cond ?` at end-of-input
+            let insertion = q_span.end;
+            let span = Span {
+                start: insertion,
+                end: insertion,
+            };
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                span,
+                "expected expression after '?' in ternary expression",
+            );
+            self.error_expr_at(span)
+        };
 
         if let Err(()) = self.expect_punct(TokenKind::Colon, "':'") {
             // Missing ':' in `cond ? then : else`.
             // Recover to the next plausible boundary; if we find ':', consume it and continue.
-            if !self.recover_to_and_eat(TokenKind::Colon, &SYNC_EXPR_BOUNDARY) {
+            if !self.recover_to_punct_or_expr_boundary(TokenKind::Colon) {
                 let insertion = then_expr.span.end;
                 let else_expr = self.error_expr_at(Span {
                     start: insertion,
@@ -286,7 +386,36 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let else_expr = self.parse_expr_assoc_with(else_min_bp);
+        let else_expr = if self.cur().can_begin_expr() {
+            self.parse_expr_assoc_with(else_min_bp)
+        } else {
+            // `cond ? then : )` / `cond ? then :` at end-of-input
+            let found = self.cur().clone();
+            let insertion = self.last_bumped_end();
+            let span = if found.kind == TokenKind::Eof {
+                Span {
+                    start: insertion,
+                    end: insertion,
+                }
+            } else {
+                found.span
+            };
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                span,
+                "expected expression after ':' in ternary expression",
+            );
+
+            if !matches!(
+                found.kind,
+                TokenKind::Comma | TokenKind::CloseBracket | TokenKind::CloseParen | TokenKind::Eof
+            ) {
+                self.bump();
+                self.recover_to_expr_boundary();
+            }
+
+            self.error_expr_at(span)
+        };
         let span = self.mk_expr_sp(lhs.span, else_expr.span);
         self.mk_expr(
             span,
@@ -333,15 +462,19 @@ impl<'a> Parser<'a> {
                 LitKind::String => self.parse_string_literal(),
             },
 
-            TokenKind::OpenParen => self.parse_expr_tuple_parens(),
+            TokenKind::OpenParen => self.parse_paren_expr(),
 
             TokenKind::OpenBracket => self.parse_list_literal(),
 
             _ => {
                 let tok = self.cur();
-                self.diagnostics.emit_err(
+                self.diagnostics.emit(
+                    DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
                     tok.span,
-                    format!("expected primary expression, found {:?}", tok.kind),
+                    format!(
+                        "expected expression, found {}",
+                        Self::describe_token(&tok.kind)
+                    ),
                 );
                 self.error_expr_bump()
             }
@@ -405,32 +538,9 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_expr_tuple_parens(&mut self) -> Expr {
-        let lparen = self.bump(); // '('
-        let inner = self.parse_expr_assoc_with(0);
-        if self.cur().kind == TokenKind::CloseParen {
-            self.bump();
-        } else {
-            let found = self.cur().clone();
-            let labels = vec![Label {
-                span: lparen.span,
-                message: Some("this '(' is not closed".into()),
-            }];
-            let primary_span = if found.kind == TokenKind::Eof {
-                Span {
-                    start: found.span.start,
-                    end: found.span.start,
-                }
-            } else {
-                found.span
-            };
-            self.diagnostics.emit_error_with_labels(
-                primary_span,
-                format!("expected ')', found {:?}", found.kind),
-                labels,
-            );
-            self.recover_to_and_eat(TokenKind::CloseParen, &SYNC_EXPR_BOUNDARY);
-        }
+    fn parse_paren_expr(&mut self) -> Expr {
+        let (lparen, inner) =
+            self.parse_delimited(Delimiter::Paren, |p| p.parse_expr_assoc_with(0));
 
         let span = Span {
             start: lparen.span.start,
@@ -456,66 +566,302 @@ impl<'a> Parser<'a> {
     /// "[1,2,]" -> "trailing comma in list literal is not supported"
     /// ```
     fn parse_list_literal(&mut self) -> Expr {
-        let lbrack = self.bump(); // '['
-        let mut items = Vec::new();
-
-        if self.cur().kind != TokenKind::CloseBracket {
-            items.push(self.parse_expr_assoc_with(0));
-            while self.cur().kind == TokenKind::Comma {
-                let comma = self.bump(); // ','
-
-                if self.cur().kind == TokenKind::CloseBracket {
-                    self.diagnostics.emit_err(
-                        comma.span,
-                        "trailing comma in list literal is not supported",
-                    );
-                    break;
-                }
-
-                if !self.cur().can_begin_expr() {
-                    let found = self.cur().clone();
-                    self.diagnostics
-                        .emit_err(found.span, "expected expression after ',' in list literal");
-                    if found.kind != TokenKind::Eof {
-                        self.bump();
-                    }
-                    self.recover_to(&SYNC_EXPR_BOUNDARY);
-                    if !self.cur().can_begin_expr() {
-                        continue;
-                    }
-                }
-
-                items.push(self.parse_expr_assoc_with(0));
-            }
-        }
-
-        if let Err(()) = self.expect_punct(TokenKind::CloseBracket, "']'") {
-            let found = self.cur().clone();
-            let labels = vec![Label {
-                span: lbrack.span,
-                message: Some("this '[' is not closed".into()),
-            }];
-            let primary_span = if found.kind == TokenKind::Eof {
-                Span {
-                    start: found.span.start,
-                    end: found.span.start,
-                }
-            } else {
-                found.span
-            };
-            self.diagnostics.emit_error_with_labels(
-                primary_span,
-                format!("expected ']', found {:?}", found.kind),
-                labels,
-            );
-            self.recover_to_and_eat(TokenKind::CloseBracket, &SYNC_EXPR_BOUNDARY);
-        }
+        let (lbrack, items) = self.parse_delimited(Delimiter::Bracket, |p| {
+            p.parse_seq_to_before_tokens(&[TokenKind::CloseBracket], SeqContext::ListLiteral)
+        });
 
         let span = Span {
             start: lbrack.span.start,
             end: self.last_bumped_end(),
         };
         self.mk_expr(span, ExprKind::List { items })
+    }
+
+    fn parse_delimited<T>(
+        &mut self,
+        delim: Delimiter,
+        parse_contents: impl FnOnce(&mut Self) -> T,
+    ) -> (Token, T) {
+        let open = self.bump(); // assumes the caller has checked `cur().kind`
+        let value = parse_contents(self);
+        self.expect_closing_delimiter(
+            delim.close(),
+            delim.close_expected(),
+            open.span,
+            delim.unclosed_label(),
+        );
+        (open, value)
+    }
+
+    fn parse_seq_to_before_tokens(
+        &mut self,
+        end_tokens: &[TokenKind],
+        ctx: SeqContext,
+    ) -> Vec<Expr> {
+        debug_assert!(
+            !end_tokens.is_empty(),
+            "seq parsing needs at least one end token"
+        );
+
+        let mut items = Vec::new();
+        let mut expecting_item = true;
+        let mut after_comma = false;
+
+        loop {
+            let kind = self.cur().kind;
+
+            if kind == TokenKind::Eof {
+                if expecting_item && after_comma {
+                    // `...,` then end-of-input: avoid calling into expression parsing so we don't
+                    // consume would-be delimiters or cascade errors.
+                    let insertion = self.cur().span.start;
+                    let span = Span {
+                        start: insertion,
+                        end: insertion,
+                    };
+                    self.diagnostics.emit(
+                        DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                        span,
+                        match ctx {
+                            SeqContext::CallArgList => {
+                                "expected expression after ',' in argument list"
+                            }
+                            SeqContext::ListLiteral => {
+                                "expected expression after ',' in list literal"
+                            }
+                        },
+                    );
+                }
+                break;
+            }
+
+            if end_tokens.iter().any(|t| kind == *t) {
+                break;
+            }
+
+            if expecting_item {
+                if kind == TokenKind::Comma {
+                    // `f(,a)` / `[1,,2]`: missing item before the comma.
+                    let comma = self.bump();
+                    self.diagnostics.emit(
+                        DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                        comma.span,
+                        match ctx {
+                            SeqContext::CallArgList => {
+                                "expected expression before ',' in argument list"
+                            }
+                            SeqContext::ListLiteral => {
+                                "expected expression before ',' in list literal"
+                            }
+                        },
+                    );
+                    items.push(self.error_expr_at(comma.span));
+                    after_comma = true;
+                    continue;
+                }
+
+                if !self.cur().can_begin_expr() {
+                    let found = self.cur().clone();
+                    self.diagnostics.emit(
+                        DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                        found.span,
+                        match (ctx, after_comma) {
+                            (SeqContext::CallArgList, true) => {
+                                "expected expression after ',' in argument list"
+                            }
+                            (SeqContext::ListLiteral, true) => {
+                                "expected expression after ',' in list literal"
+                            }
+                            (SeqContext::CallArgList, false) => {
+                                "expected expression in argument list"
+                            }
+                            (SeqContext::ListLiteral, false) => {
+                                "expected expression in list literal"
+                            }
+                        },
+                    );
+                    if found.kind != TokenKind::Eof {
+                        self.bump();
+                    }
+                    self.recover_seq_to_comma_or_tokens(end_tokens);
+                    after_comma = false;
+                    continue;
+                }
+
+                after_comma = false;
+                items.push(self.parse_expr_assoc_with(0));
+                expecting_item = false;
+                continue;
+            }
+
+            // expecting `,` or the closing delimiter
+            if kind == TokenKind::Comma {
+                let comma = self.bump();
+                after_comma = true;
+                expecting_item = true;
+
+                if end_tokens.iter().any(|t| self.cur().kind == *t) {
+                    let msg = match ctx {
+                        SeqContext::CallArgList => {
+                            "trailing comma in argument list is not supported"
+                        }
+                        SeqContext::ListLiteral => {
+                            "trailing comma in list literal is not supported"
+                        }
+                    };
+                    self.diagnostics.emit_with_labels(
+                        DiagnosticCode::Parse(ParseDiagnostic::TrailingComma),
+                        comma.span,
+                        msg,
+                        vec![Label {
+                            span: comma.span,
+                            message: Some("remove this comma".into()),
+                        }],
+                    );
+                    break;
+                }
+
+                continue;
+            }
+
+            if self.cur().can_begin_expr() {
+                // Likely a missing comma: `f(a b)` / `[1 2]`.
+                let found = self.cur().clone();
+                let close_expected = Self::expected_seq_end(end_tokens);
+                let insertion = Span {
+                    start: found.span.start,
+                    end: found.span.start,
+                };
+                self.diagnostics.emit_with_labels(
+                    DiagnosticCode::Parse(ParseDiagnostic::MissingComma),
+                    found.span,
+                    format!(
+                        "expected ',' or {close_expected}, found {}",
+                        Self::describe_token(&found.kind)
+                    ),
+                    vec![Label {
+                        span: insertion,
+                        message: Some("insert ','".into()),
+                    }],
+                );
+                expecting_item = true;
+                after_comma = false;
+                continue;
+            }
+
+            // Unexpected token between items; skip forward to a plausible boundary.
+            let found = self.cur().clone();
+            let close_expected = Self::expected_seq_end(end_tokens);
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+                found.span,
+                format!(
+                    "expected ',' or {close_expected}, found {}",
+                    Self::describe_token(&found.kind)
+                ),
+            );
+            if found.kind != TokenKind::Eof {
+                self.bump();
+            }
+            self.recover_seq_to_comma_or_tokens(end_tokens);
+        }
+
+        items
+    }
+
+    fn recover_seq_to_comma_or_tokens(&mut self, end_tokens: &[TokenKind]) {
+        let _ = self.recover_scan(|kind, depth| {
+            if depth.at_top_level()
+                && (kind == TokenKind::Comma
+                    || is_closing_delim(&kind)
+                    || end_tokens.iter().any(|t| kind == *t))
+            {
+                RecoverScanDecision::Stop
+            } else {
+                RecoverScanDecision::Continue
+            }
+        });
+    }
+
+    fn expected_seq_end(end_tokens: &[TokenKind]) -> &'static str {
+        match end_tokens.first() {
+            Some(TokenKind::CloseParen) => "')'",
+            Some(TokenKind::CloseBracket) => "']'",
+            Some(TokenKind::Eof) | None => "end of input",
+            _ => "<end>",
+        }
+    }
+
+    fn expect_closing_delimiter(
+        &mut self,
+        close: TokenKind,
+        expected: &'static str,
+        open_span: Span,
+        open_label: &'static str,
+    ) -> bool {
+        if self.cur().kind == close {
+            self.bump();
+            return true;
+        }
+
+        let found = self.cur().clone();
+        let is_mismatched_closing = found.kind != TokenKind::Eof && is_closing_delim(&found.kind);
+        let primary_span = if found.kind == TokenKind::Eof {
+            Span {
+                start: found.span.start,
+                end: found.span.start,
+            }
+        } else {
+            found.span
+        };
+        let insertion = Span {
+            start: primary_span.start,
+            end: primary_span.start,
+        };
+
+        let (code, labels) = if is_mismatched_closing {
+            (
+                DiagnosticCode::Parse(ParseDiagnostic::MismatchedDelimiter),
+                vec![
+                    Label {
+                        span: open_span,
+                        message: Some(open_label.into()),
+                    },
+                    Label {
+                        span: found.span,
+                        message: Some(format!(
+                            "replace {} with {expected}",
+                            Self::describe_token(&found.kind)
+                        )),
+                    },
+                ],
+            )
+        } else {
+            (
+                DiagnosticCode::Parse(ParseDiagnostic::UnclosedDelimiter),
+                vec![
+                    Label {
+                        span: open_span,
+                        message: Some(open_label.into()),
+                    },
+                    Label {
+                        span: insertion,
+                        message: Some(format!("insert {expected}")),
+                    },
+                ],
+            )
+        };
+        self.diagnostics.emit_with_labels(
+            code,
+            primary_span,
+            format!(
+                "expected {expected}, found {}",
+                Self::describe_token(&found.kind)
+            ),
+            labels,
+        );
+
+        self.recover_to_close_delimiter(close)
     }
 
     fn error_expr_at(&mut self, span: Span) -> Expr {
@@ -530,41 +876,85 @@ impl<'a> Parser<'a> {
         self.mk_expr(tok.span, ExprKind::Error)
     }
 
-    /// Skip tokens until reaching a synchronization token.
-    ///
-    /// This is used after emitting a diagnostic to avoid cascading errors.
-    /// Typical sync sets in this parser include `,`, `)`, `]`, `:`, and `Eof`.
-    ///
-    /// Error nodes produced during recovery are [`ExprKind::Error`] and usually carry:
-    /// - the span of the unexpected token, or
-    /// - an empty span at end-of-input (an insertion point).
-    ///
-    /// ```text
-    /// source: "(a + b"
-    /// parsing: expects ')', finds Eof
-    /// recovery: recover_to([CloseParen, Comma, Eof]) stops at Eof; an Error expr may use an empty span
-    ///
-    /// source: "a + )"
-    /// parsing: expects an expression after '+', finds ')'
-    /// recovery: sync includes ')', so an Error expr often uses the ')' token span
-    /// ```
-    fn recover_to(&mut self, sync: &[TokenKind]) {
-        while !sync.iter().any(|k| self.cur().kind == *k) {
-            if self.cur().kind == TokenKind::Eof {
-                return;
+    fn recover_scan(
+        &mut self,
+        mut decide: impl FnMut(TokenKind, DelimDepth) -> RecoverScanDecision,
+    ) -> RecoverScanResult {
+        let mut depth = DelimDepth::default();
+        loop {
+            let kind = self.cur().kind;
+            if kind == TokenKind::Eof {
+                return RecoverScanResult::HitEof;
             }
-            self.bump();
+
+            match decide(kind, depth) {
+                RecoverScanDecision::Continue => {}
+                RecoverScanDecision::Stop => return RecoverScanResult::Stopped,
+                RecoverScanDecision::ConsumeAndStop => {
+                    let tok = self.bump();
+                    depth.consume(tok.kind);
+                    return RecoverScanResult::Consumed;
+                }
+            }
+
+            let tok = self.bump();
+            depth.consume(tok.kind);
         }
     }
 
-    fn recover_to_and_eat(&mut self, kind: TokenKind, sync: &[TokenKind]) -> bool {
-        self.recover_to(sync);
-        if self.cur().kind == kind {
-            self.bump();
-            true
-        } else {
-            false
-        }
+    fn recover_to_expr_boundary(&mut self) {
+        let _ = self.recover_scan(|kind, depth| {
+            if depth.at_top_level()
+                && (kind == TokenKind::Comma || kind == TokenKind::Colon || is_closing_delim(&kind))
+            {
+                RecoverScanDecision::Stop
+            } else {
+                RecoverScanDecision::Continue
+            }
+        });
+    }
+
+    fn recover_to_punct_or_expr_boundary(&mut self, punct: TokenKind) -> bool {
+        matches!(
+            self.recover_scan(|kind, depth| {
+                if !depth.at_top_level() {
+                    return RecoverScanDecision::Continue;
+                }
+
+                if kind == punct {
+                    return RecoverScanDecision::ConsumeAndStop;
+                }
+
+                if kind == TokenKind::Comma || kind == TokenKind::Colon || is_closing_delim(&kind) {
+                    return RecoverScanDecision::Stop;
+                }
+
+                RecoverScanDecision::Continue
+            }),
+            RecoverScanResult::Consumed
+        )
+    }
+
+    fn recover_to_close_delimiter(&mut self, close: TokenKind) -> bool {
+        matches!(
+            self.recover_scan(|kind, depth| {
+                if !depth.at_top_level() {
+                    return RecoverScanDecision::Continue;
+                }
+
+                if kind == close {
+                    return RecoverScanDecision::ConsumeAndStop;
+                }
+
+                if is_closing_delim(&kind) {
+                    // A mismatched closing delimiter likely belongs to an outer context.
+                    return RecoverScanDecision::Stop;
+                }
+
+                RecoverScanDecision::Continue
+            }),
+            RecoverScanResult::Consumed
+        )
     }
 
     fn ternary_binding_power() -> (u8, u8) {
@@ -574,9 +964,13 @@ impl<'a> Parser<'a> {
     }
 
     fn recover_from_infix(&mut self, op_tok: Token) -> Expr {
-        self.diagnostics.emit_err(
+        self.diagnostics.emit(
+            DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
             op_tok.span,
-            format!("expected expression after '{:?}'", op_tok.kind),
+            format!(
+                "expected expression after {}",
+                Self::describe_token(&op_tok.kind)
+            ),
         );
         let err_span = if self.cur().kind == TokenKind::Eof {
             Span {
@@ -586,11 +980,16 @@ impl<'a> Parser<'a> {
         } else {
             self.cur().span
         };
-        if !SYNC_EXPR_BOUNDARY.iter().any(|k| self.cur().kind == *k)
-            && self.cur().kind != TokenKind::Eof
-        {
+        if !matches!(
+            self.cur().kind,
+            TokenKind::Comma
+                | TokenKind::CloseBracket
+                | TokenKind::CloseParen
+                | TokenKind::Colon
+                | TokenKind::Eof
+        ) {
             self.bump();
-            self.recover_to(&SYNC_EXPR_BOUNDARY);
+            self.recover_to_expr_boundary();
         }
         self.error_expr_at(err_span)
     }

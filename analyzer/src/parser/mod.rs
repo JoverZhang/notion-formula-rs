@@ -7,7 +7,7 @@
 //! Responsibility: build the AST plus parse diagnostics only. Semantic analysis is handled
 //! separately in `analysis`.
 
-use crate::diagnostics::{Diagnostic, Diagnostics};
+use crate::diagnostics::{Diagnostic, DiagnosticCode, Diagnostics, ParseDiagnostic};
 
 pub mod ast;
 use crate::lexer::{NodeId, Span, Token, TokenKind};
@@ -104,6 +104,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(unused)]
     fn expect_ident(&mut self) -> Result<Token, ()> {
         match self.cur().kind {
             TokenKind::Ident(..) => Ok(self.bump()),
@@ -196,7 +197,69 @@ impl<'a> Parser<'a> {
     }
 
     fn emit_unexpected(&mut self, expected: &str, found: TokenKind, span: Span) {
-        self.diagnostics
-            .emit_err(span, format!("expected {}, found {:?}", expected, found));
+        let found = Self::describe_token(&found);
+        self.diagnostics.emit(
+            DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+            span,
+            format!("expected {expected}, found {found}"),
+        );
+    }
+
+    fn describe_token(kind: &TokenKind) -> String {
+        if let Some(spelling) = Self::token_spelling(kind) {
+            return format!("`{spelling}`");
+        }
+
+        match kind {
+            TokenKind::Ident(..) => "identifier".into(),
+            TokenKind::Literal(lit) => match lit.kind {
+                crate::lexer::LitKind::Bool => "boolean".into(),
+                crate::lexer::LitKind::Number => "number".into(),
+                crate::lexer::LitKind::String => "string literal".into(),
+            },
+            TokenKind::Eof => "end of input".into(),
+            other => format!("{other:?}"),
+        }
+    }
+
+    fn token_spelling(kind: &TokenKind) -> Option<&'static str> {
+        use TokenKind::*;
+        Some(match kind {
+            // Relational operators
+            Lt => "<",
+            Le => "<=",
+            EqEq => "==",
+            Ne => "!=",
+            Ge => ">=",
+            Gt => ">",
+
+            // Logical operators
+            AndAnd => "&&",
+            OrOr => "||",
+            Bang => "!",
+
+            // Arithmetic operators
+            Plus => "+",
+            Minus => "-",
+            Star => "*",
+            Slash => "/",
+            Percent => "%",
+            Caret => "^",
+
+            // Punctuation
+            Dot => ".",
+            Comma => ",",
+            Colon => ":",
+            Pound => "#",
+            Question => "?",
+
+            // Delimiters
+            OpenParen => "(",
+            CloseParen => ")",
+            OpenBracket => "[",
+            CloseBracket => "]",
+
+            _ => return None,
+        })
     }
 }

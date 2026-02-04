@@ -146,3 +146,75 @@ fn test_unary_applies_to_postfix_completed_expression() {
     assert_lit_num!(&args[0], 1);
     assert_lit_num!(rhs, 2);
 }
+
+#[test]
+fn test_call_arg_list_missing_comma_recovers_as_two_args() {
+    let parsed = analyze("f(1 2)").unwrap();
+    assert_eq!(parsed.diagnostics.len(), 1, "diags: {:?}", parsed.diagnostics);
+
+    let ast = parsed.expr;
+    let (_callee, args) = assert_call!(ast, "f", 2);
+    assert_lit_num!(&args[0], 1);
+    assert_lit_num!(&args[1], 2);
+}
+
+#[test]
+fn test_list_literal_missing_comma_recovers_as_two_items() {
+    let parsed = analyze("[1 2]").unwrap();
+    assert_eq!(parsed.diagnostics.len(), 1, "diags: {:?}", parsed.diagnostics);
+
+    let ast = parsed.expr;
+    let items = assert_list!(ast, 2);
+    assert_lit_num!(&items[0], 1);
+    assert_lit_num!(&items[1], 2);
+}
+
+#[test]
+fn test_ternary_missing_then_expr_recovers() {
+    let parsed = analyze("1 ? : 3").unwrap();
+    assert!(!parsed.diagnostics.is_empty(), "diags: {:?}", parsed.diagnostics);
+
+    let ast = parsed.expr;
+    let (cond, then, otherwise) = assert_ternary!(ast);
+    assert_lit_num!(cond, 1);
+    assert!(matches!(then.kind, ExprKind::Error));
+    assert_lit_num!(otherwise, 3);
+}
+
+#[test]
+fn test_ternary_missing_else_expr_recovers_without_consuming_close_paren() {
+    let parsed = analyze("(1 ? 2 : )").unwrap();
+    assert!(!parsed.diagnostics.is_empty(), "diags: {:?}", parsed.diagnostics);
+
+    let ast = parsed.expr;
+    let ExprKind::Group { inner } = &ast.kind else {
+        panic!("expected group, got {:?}", ast.kind);
+    };
+
+    let (cond, then, otherwise) = assert_ternary!(inner.as_ref());
+    assert_lit_num!(cond, 1);
+    assert_lit_num!(then, 2);
+    assert!(matches!(otherwise.kind, ExprKind::Error));
+}
+
+#[test]
+fn test_member_call_extra_dot_recovers() {
+    let parsed = analyze("a..if(b,c)").unwrap();
+    assert!(!parsed.diagnostics.is_empty(), "diags: {:?}", parsed.diagnostics);
+
+    let ast = parsed.expr;
+    let ExprKind::MemberCall {
+        receiver,
+        method,
+        args,
+    } = &ast.kind
+    else {
+        panic!("expected member-call, got {:?}", ast.kind);
+    };
+
+    assert!(matches!(&receiver.kind, ExprKind::Ident(sym) if sym.text == "a"));
+    assert_eq!(method.text, "if");
+    assert_eq!(args.len(), 2);
+    assert!(matches!(&args[0].kind, ExprKind::Ident(sym) if sym.text == "b"));
+    assert!(matches!(&args[1].kind, ExprKind::Ident(sym) if sym.text == "c"));
+}
