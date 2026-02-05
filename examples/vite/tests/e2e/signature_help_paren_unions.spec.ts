@@ -17,7 +17,7 @@ test("signature help renders parenthesized unions inside label", async ({ page }
   expect(cursor).not.toBeNull();
 
   await page.evaluate((pos) => {
-    window.__nf_debug?.setSelectionHead("f1", pos);
+    window.__nf_debug?.setSelectionHead("f1", pos ?? 0);
   }, cursor);
   await waitForCompletionDebounce(page);
 
@@ -28,4 +28,3 @@ test("signature help renders parenthesized unions inside label", async ({ page }
   await expect(signature).toContainText("(number | string)[]");
   await expect(signature).not.toContainText("undefined");
 });
-

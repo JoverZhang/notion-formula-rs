@@ -12,7 +12,7 @@ function sigLabelAtCloseParen(source: string): string {
   const help = out.signature_help!;
   const activeSig = help.signatures[help.active_signature] ?? help.signatures[0];
   expect(activeSig).toBeTruthy();
-  return activeSig!.segments
+  return activeSig.segments
     .map((s) => {
       switch (s.kind) {
         case "Ellipsis":

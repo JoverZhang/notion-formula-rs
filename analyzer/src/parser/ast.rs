@@ -1,4 +1,35 @@
-use crate::lexer::{Lit, NodeId, Span, Spanned, Symbol};
+use crate::{
+    Token, TokenKind,
+    lexer::{Lit, NodeId, Span, Spanned, Symbol},
+};
+
+pub enum AssocOp {
+    Binary(BinOp),
+    Ternary,
+}
+
+impl AssocOp {
+    pub fn from_tok(tok: Token) -> Option<Self> {
+        use AssocOp::*;
+
+        if tok.kind == TokenKind::Question {
+            Some(Ternary)
+        } else {
+            Some(Binary(BinOp::from_tok(tok)?))
+        }
+    }
+
+    pub fn infix_binding_power(&self) -> (u8, u8) {
+        use AssocOp::*;
+
+        match self {
+            Binary(op) => op.infix_binding_power(),
+            // Lower precedence than `||` so `a || b ? c : d` parses as `(a || b) ? c : d`.
+            // Right-associative: `a ? b : c ? d : e` parses as `a ? b : (c ? d : e)`.
+            Ternary => (2, 1),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOpKind {
@@ -35,6 +66,30 @@ pub enum BinOpKind {
 pub type BinOp = Spanned<BinOpKind>;
 
 impl BinOp {
+    pub fn from_tok(tok: Token) -> Option<Self> {
+        let node = match tok.kind {
+            TokenKind::Lt => BinOpKind::Lt,
+            TokenKind::Le => BinOpKind::Le,
+            TokenKind::EqEq => BinOpKind::EqEq,
+            TokenKind::Ne => BinOpKind::Ne,
+            TokenKind::Ge => BinOpKind::Ge,
+            TokenKind::Gt => BinOpKind::Gt,
+            TokenKind::AndAnd => BinOpKind::AndAnd,
+            TokenKind::OrOr => BinOpKind::OrOr,
+            TokenKind::Plus => BinOpKind::Plus,
+            TokenKind::Minus => BinOpKind::Minus,
+            TokenKind::Star => BinOpKind::Star,
+            TokenKind::Slash => BinOpKind::Slash,
+            TokenKind::Percent => BinOpKind::Percent,
+            TokenKind::Caret => BinOpKind::Caret,
+            _ => return None,
+        };
+        Some(Self {
+            node,
+            span: tok.span,
+        })
+    }
+
     /// Returns the Pratt binding power for an infix operator.
     ///
     /// Larger numbers bind tighter.
@@ -52,19 +107,26 @@ impl BinOp {
         use BinOpKind::*;
 
         // Return (left_bp, right_bp)
-        // Right-associative: (p, p)
         // Left-associative: (p, p+1)
+        // Right-associative: (p, p-1)
         // Here we use the classic Pratt parser:
         match self.node {
+            // Logical OR
             OrOr => (3, 4),
+
+            // Logical AND
             AndAnd => (5, 6),
 
+            // Comparison
             EqEq | Ne => (7, 8),
             Lt | Le | Ge | Gt => (9, 10),
 
+            // Addition
             Plus | Minus => (11, 12),
             Star | Slash | Percent => (13, 14),
-            Caret => (15, 15),
+
+            // Multiplication
+            Caret => (16, 15),
         }
     }
 }

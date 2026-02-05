@@ -98,7 +98,9 @@ impl Diagnostics {
             return;
         }
 
-        if incoming_priority == existing_priority && self.diags[existing_idx].message == diag.message {
+        if incoming_priority == existing_priority
+            && self.diags[existing_idx].message == diag.message
+        {
             let existing = &mut self.diags[existing_idx];
             existing.labels.extend(diag.labels);
             existing.notes.extend(diag.notes);
@@ -109,16 +111,22 @@ impl Diagnostics {
 }
 
 pub fn format_diagnostics(source: &str, mut diags: Vec<Diagnostic>) -> String {
-    use std::fmt::Write;
     use std::cmp::Reverse;
+    use std::fmt::Write;
 
     diags.sort_by(|a, b| {
-        (a.span.start, a.span.end, Reverse(a.code.priority()), &a.message).cmp(&(
-            b.span.start,
-            b.span.end,
-            Reverse(b.code.priority()),
-            &b.message,
-        ))
+        (
+            a.span.start,
+            a.span.end,
+            Reverse(a.code.priority()),
+            &a.message,
+        )
+            .cmp(&(
+                b.span.start,
+                b.span.end,
+                Reverse(b.code.priority()),
+                &b.message,
+            ))
     });
     let sm = SourceMap::new(source);
 
@@ -165,7 +173,11 @@ fn dedup_labels(labels: &mut Vec<Label>) {
 
     let mut seen = HashSet::new();
     labels.retain(|l| {
-        let key = (l.span.start, l.span.end, l.message.as_deref().unwrap_or("").to_owned());
+        let key = (
+            l.span.start,
+            l.span.end,
+            l.message.as_deref().unwrap_or("").to_owned(),
+        );
         seen.insert(key)
     });
 }

@@ -83,12 +83,16 @@ fn render_signature(
     }
 
     if sig.params.repeat.is_empty() {
-        let mut idx = 0usize;
-        for p in sig.params.head.iter().chain(sig.params.tail.iter()) {
+        for (idx, p) in sig
+            .params
+            .head
+            .iter()
+            .chain(sig.params.tail.iter())
+            .enumerate()
+        {
             let instantiated_expected = inst_param_tys.get(idx).unwrap_or(&p.ty);
             let actual = arg_tys.get(idx).and_then(|t| t.as_ref());
             let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-            idx += 1;
             push_param(
                 &mut receiver,
                 &mut slots,

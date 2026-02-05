@@ -3,88 +3,12 @@
 //! Produces an AST plus parse diagnostics. Spans are UTF-8 byte offsets with half-open semantics
 //! `[start, end)`.
 
-use super::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp};
+use super::ast::{Expr, ExprKind, UnOp};
 use super::{ParseOutput, Parser};
 use crate::Token;
+use crate::ast::AssocOp;
 use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Delimiter {
-    Paren,
-    Bracket,
-}
-
-impl Delimiter {
-    fn close(self) -> TokenKind {
-        match self {
-            Delimiter::Paren => TokenKind::CloseParen,
-            Delimiter::Bracket => TokenKind::CloseBracket,
-        }
-    }
-
-    fn close_expected(self) -> &'static str {
-        match self {
-            Delimiter::Paren => "')'",
-            Delimiter::Bracket => "']'",
-        }
-    }
-
-    fn unclosed_label(self) -> &'static str {
-        match self {
-            Delimiter::Paren => "this '(' is not closed",
-            Delimiter::Bracket => "this '[' is not closed",
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-struct DelimDepth {
-    paren: u32,
-    bracket: u32,
-}
-
-impl DelimDepth {
-    fn at_top_level(self) -> bool {
-        self.paren == 0 && self.bracket == 0
-    }
-
-    fn consume(&mut self, kind: TokenKind) {
-        match kind {
-            TokenKind::OpenParen => self.paren = self.paren.saturating_add(1),
-            TokenKind::OpenBracket => self.bracket = self.bracket.saturating_add(1),
-            TokenKind::CloseParen => {
-                if self.paren > 0 {
-                    self.paren -= 1;
-                }
-            }
-            TokenKind::CloseBracket => {
-                if self.bracket > 0 {
-                    self.bracket -= 1;
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-fn is_closing_delim(kind: &TokenKind) -> bool {
-    matches!(kind, TokenKind::CloseParen | TokenKind::CloseBracket)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RecoverScanDecision {
-    Continue,
-    Stop,
-    ConsumeAndStop,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RecoverScanResult {
-    HitEof,
-    Stopped,
-    Consumed,
-}
 
 impl<'a> Parser<'a> {
     /// Parser's entry point
@@ -150,41 +74,31 @@ impl<'a> Parser<'a> {
     fn parse_expr_assoc_rest_with(&mut self, min_bp: u8, lhs: Expr) -> Expr {
         let mut lhs = lhs;
 
-        loop {
-            match self.cur().kind {
-                // Ternary expression: `cond(lhs) ? then : otherwise`
-                TokenKind::Question => {
-                    let (l_bp, r_bp) = Self::ternary_binding_power();
-                    if l_bp < min_bp {
-                        break;
-                    }
+        while let Some(op) = AssocOp::from_tok(self.cur()) {
+            let (l_bp, r_bp) = op.infix_binding_power();
 
-                    let q_tok = self.bump(); // '?'
-                    lhs = self.parse_ternary_suffix(lhs, q_tok.span, r_bp);
+            if l_bp < min_bp {
+                break;
+            }
+
+            match op {
+                // Ternary expression: `cond(lhs) ? then : otherwise`
+                AssocOp::Ternary => {
+                    lhs = self.parse_ternary_suffix(lhs, r_bp);
                 }
 
                 // Binary expression: `lhs op rhs`
-                _ => {
-                    let Some(op) = self.peek_binop_kind() else {
-                        break;
-                    };
-
-                    let (l_bp, r_bp) = op.infix_binding_power();
-                    if l_bp < min_bp {
-                        break;
-                    }
-
+                AssocOp::Binary(op) => {
                     let op_tok = self.bump(); // operator token
 
                     let rhs = if self.cur().can_begin_expr() {
                         self.parse_expr_assoc_with(r_bp)
                     } else {
-                        self.recover_from_infix(op_tok.clone())
+                        self.recover_from_infix(op_tok)
                     };
 
-                    let span = self.mk_expr_sp(lhs.span, rhs.span);
                     lhs = self.mk_expr(
-                        span,
+                        lhs.span.to(rhs.span),
                         ExprKind::Binary {
                             op,
                             left: Box::new(lhs),
@@ -225,214 +139,6 @@ impl<'a> Parser<'a> {
                 expr: Box::new(expr),
             },
         )
-    }
-
-    fn parse_expr_dot_or_call(&mut self, mut expr: Expr) -> Expr {
-        loop {
-            match self.cur().kind {
-                // Call expression: `expr(arg1, ...)`
-                TokenKind::OpenParen => {
-                    let lparen = self.cur(); // '('
-                    let (args, end) = self.parse_paren_arg_list();
-
-                    let span = Span {
-                        start: expr.span.start,
-                        end,
-                    };
-                    // Only Ident can call
-                    let callee = match expr.kind {
-                        ExprKind::Ident(sym) => sym,
-                        _ => {
-                            self.diagnostics.emit(
-                                DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
-                                lparen.span,
-                                "expected call callee (identifier)",
-                            );
-                            expr = self.mk_expr(span, ExprKind::Error);
-                            break;
-                        }
-                    };
-
-                    expr = self.mk_expr(span, ExprKind::Call { callee, args });
-                }
-
-                // Member call expression: `expr.method(arg1, ...)`
-                TokenKind::Dot => {
-                    self.bump(); // '.'
-
-                    let method_tok = loop {
-                        match self.cur().kind {
-                            TokenKind::Ident(..) => break self.bump(),
-                            // `a..if(...)`: recover by skipping extra dots.
-                            TokenKind::Dot => {
-                                let extra = self.bump();
-                                self.diagnostics.emit(
-                                    DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
-                                    extra.span,
-                                    "unexpected '.' in member call",
-                                );
-                            }
-                            _ => {
-                                let span = Span {
-                                    start: expr.span.start,
-                                    end: self.last_bumped_end(),
-                                };
-                                return self.mk_expr(span, ExprKind::Error);
-                            }
-                        }
-                    };
-
-                    let method = match method_tok.kind {
-                        TokenKind::Ident(sym) => sym,
-                        _ => unreachable!(),
-                    };
-
-                    if self.cur().kind != TokenKind::OpenParen {
-                        self.diagnostics.emit(
-                            DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
-                            method_tok.span,
-                            "expected '(' after member name (member access is not supported yet)",
-                        );
-                        let span = Span {
-                            start: expr.span.start,
-                            end: self.last_bumped_end(),
-                        };
-                        expr = self.mk_expr(span, ExprKind::Error);
-                        break;
-                    }
-
-                    let (args, end) = self.parse_paren_arg_list();
-
-                    let receiver = expr;
-                    let span = Span {
-                        start: receiver.span.start,
-                        end,
-                    };
-                    expr = self.mk_expr(
-                        span,
-                        ExprKind::MemberCall {
-                            receiver: Box::new(receiver),
-                            method,
-                            args,
-                        },
-                    );
-                }
-                _ => break,
-            }
-        }
-
-        expr
-    }
-
-    fn parse_paren_arg_list(&mut self) -> (Vec<Expr>, u32) {
-        let (_lparen, args) = self.parse_delimited(Delimiter::Paren, |p| {
-            p.parse_seq_to_before_tokens(&[TokenKind::CloseParen], TokenKind::Comma)
-        });
-        (args, self.last_bumped_end())
-    }
-
-    fn parse_ternary_suffix(&mut self, lhs: Expr, q_span: Span, else_min_bp: u8) -> Expr {
-        let then_expr = if self.cur().can_begin_expr() {
-            self.parse_expr_assoc_with(0)
-        } else {
-            // `cond ? : else` / `cond ?` at end-of-input
-            let insertion = q_span.end;
-            let span = Span {
-                start: insertion,
-                end: insertion,
-            };
-            self.diagnostics.emit(
-                DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
-                span,
-                "expected expression after '?' in ternary expression",
-            );
-            self.error_expr_at(span)
-        };
-
-        if let Err(()) = self.expect_punct(TokenKind::Colon, "':'") {
-            // Missing ':' in `cond ? then : else`.
-            // Recover to the next plausible boundary; if we find ':', consume it and continue.
-            if !self.recover_to_punct_or_expr_boundary(TokenKind::Colon) {
-                let insertion = then_expr.span.end;
-                let else_expr = self.error_expr_at(Span {
-                    start: insertion,
-                    end: insertion,
-                });
-                let span = self.mk_expr_sp(lhs.span, else_expr.span);
-                return self.mk_expr(
-                    span,
-                    ExprKind::Ternary {
-                        cond: Box::new(lhs),
-                        then: Box::new(then_expr),
-                        otherwise: Box::new(else_expr),
-                    },
-                );
-            }
-        }
-
-        let else_expr = if self.cur().can_begin_expr() {
-            self.parse_expr_assoc_with(else_min_bp)
-        } else {
-            // `cond ? then : )` / `cond ? then :` at end-of-input
-            let found = self.cur().clone();
-            let insertion = self.last_bumped_end();
-            let span = if found.kind == TokenKind::Eof {
-                Span {
-                    start: insertion,
-                    end: insertion,
-                }
-            } else {
-                found.span
-            };
-            self.diagnostics.emit(
-                DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
-                span,
-                "expected expression after ':' in ternary expression",
-            );
-
-            if !matches!(
-                found.kind,
-                TokenKind::Comma | TokenKind::CloseBracket | TokenKind::CloseParen | TokenKind::Eof
-            ) {
-                self.bump();
-                self.recover_to_expr_boundary();
-            }
-
-            self.error_expr_at(span)
-        };
-        let span = self.mk_expr_sp(lhs.span, else_expr.span);
-        self.mk_expr(
-            span,
-            ExprKind::Ternary {
-                cond: Box::new(lhs),
-                then: Box::new(then_expr),
-                otherwise: Box::new(else_expr),
-            },
-        )
-    }
-
-    fn peek_binop_kind(&self) -> Option<BinOp> {
-        let kind = match self.cur().kind {
-            TokenKind::Lt => BinOpKind::Lt,
-            TokenKind::Le => BinOpKind::Le,
-            TokenKind::EqEq => BinOpKind::EqEq,
-            TokenKind::Ne => BinOpKind::Ne,
-            TokenKind::Ge => BinOpKind::Ge,
-            TokenKind::Gt => BinOpKind::Gt,
-            TokenKind::AndAnd => BinOpKind::AndAnd,
-            TokenKind::OrOr => BinOpKind::OrOr,
-            TokenKind::Plus => BinOpKind::Plus,
-            TokenKind::Minus => BinOpKind::Minus,
-            TokenKind::Star => BinOpKind::Star,
-            TokenKind::Slash => BinOpKind::Slash,
-            TokenKind::Percent => BinOpKind::Percent,
-            TokenKind::Caret => BinOpKind::Caret,
-            _ => return None,
-        };
-        Some(BinOp {
-            node: kind,
-            span: self.cur().span,
-        })
     }
 
     /// Parses a primary expression: `a`, `1`, `"hello"`, `true`, `false`, `(expr)`, `[expr, ...]`.
@@ -564,7 +270,7 @@ impl<'a> Parser<'a> {
         delim: Delimiter,
         parse_contents: impl FnOnce(&mut Self) -> T,
     ) -> (Token, T) {
-        let open = self.bump(); // assumes the caller has checked `cur().kind`
+        let open = self.bump(); // TODO: check if the open token is the expected one
         let value = parse_contents(self);
         self.expect_closing_delimiter(
             delim.close(),
@@ -573,6 +279,201 @@ impl<'a> Parser<'a> {
             delim.unclosed_label(),
         );
         (open, value)
+    }
+
+    fn parse_expr_dot_or_call(&mut self, mut expr: Expr) -> Expr {
+        loop {
+            let e = match self.cur().kind {
+                // Call expression: `expr(arg1, ...)`
+                TokenKind::OpenParen => self.parse_expr_fn_call(expr),
+                // Member call expression: `expr.method(arg1, ...)`
+                TokenKind::Dot => self.parse_expr_member_call(expr),
+                _ => break,
+            };
+
+            match e {
+                // Continue parsing for chaining: `expr(arg1, ...).method(arg1, ...)`
+                Ok(e) => expr = e,
+                Err(e) => {
+                    expr = e;
+                    break;
+                }
+            }
+        }
+
+        expr
+    }
+
+    fn parse_expr_fn_call(&mut self, expr: Expr) -> Result<Expr, Expr> {
+        let lparen = self.cur(); // '('
+        let (args, end) = self.parse_paren_arg_list();
+
+        let span = Span {
+            start: expr.span.start,
+            end,
+        };
+        // Only Ident can call
+        match expr.kind {
+            ExprKind::Ident(sym) => {
+                let e = self.mk_expr(span, ExprKind::Call { callee: sym, args });
+                Ok(e)
+            }
+            _ => {
+                self.diagnostics.emit(
+                    DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+                    lparen.span,
+                    "expected call callee (identifier)",
+                );
+                Err(self.error_expr_at(span))
+            }
+        }
+    }
+
+    fn parse_expr_member_call(&mut self, receiver: Expr) -> Result<Expr, Expr> {
+        self.bump(); // '.'
+
+        let method_tok = loop {
+            match self.cur().kind {
+                TokenKind::Ident(..) => break self.bump(),
+                // `a..if(...)`: recover by skipping extra dots.
+                TokenKind::Dot => {
+                    let extra = self.bump();
+                    self.diagnostics.emit(
+                        DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+                        extra.span,
+                        "unexpected '.' in member call",
+                    );
+                }
+                _ => {
+                    let span = Span {
+                        start: receiver.span.start,
+                        end: self.last_bumped_end(),
+                    };
+                    return Err(self.error_expr_at(span));
+                }
+            }
+        };
+
+        let method = match method_tok.kind {
+            TokenKind::Ident(sym) => sym,
+            _ => unreachable!(),
+        };
+
+        if self.cur().kind != TokenKind::OpenParen {
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::UnexpectedToken),
+                method_tok.span,
+                "expected '(' after member name (member access is not supported yet)",
+            );
+            let span = Span {
+                start: receiver.span.start,
+                end: self.last_bumped_end(),
+            };
+            return Err(self.error_expr_at(span));
+        }
+
+        let (args, end) = self.parse_paren_arg_list();
+
+        Ok(self.mk_expr(
+            Span {
+                start: receiver.span.start,
+                end,
+            },
+            ExprKind::MemberCall {
+                receiver: Box::new(receiver),
+                method,
+                args,
+            },
+        ))
+    }
+
+    fn parse_paren_arg_list(&mut self) -> (Vec<Expr>, u32) {
+        let (_lparen, args) = self.parse_delimited(Delimiter::Paren, |p| {
+            p.parse_seq_to_before_tokens(&[TokenKind::CloseParen], TokenKind::Comma)
+        });
+        (args, self.last_bumped_end())
+    }
+
+    /// Parses the suffix of a ternary expression: `? then : otherwise`.
+    fn parse_ternary_suffix(&mut self, lhs: Expr, else_min_bp: u8) -> Expr {
+        let q_tok = self.bump(); // '?'
+
+        let then_expr = if self.cur().can_begin_expr() {
+            self.parse_expr_assoc_with(0)
+        } else {
+            // `cond ? : else` / `cond ?` at end-of-input
+            let insertion = q_tok.span.end;
+            let span = Span {
+                start: insertion,
+                end: insertion,
+            };
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                span,
+                "expected expression after '?' in ternary expression",
+            );
+            self.error_expr_at(span)
+        };
+
+        if let Err(()) = self.expect_punct(TokenKind::Colon, "':'") {
+            // Missing ':' in `cond ? then : else`.
+            // Recover to the next plausible boundary; if we find ':', consume it and continue.
+            if !self.recover_to_punct_or_expr_boundary(TokenKind::Colon) {
+                let insertion = then_expr.span.end;
+                let else_expr = self.error_expr_at(Span {
+                    start: insertion,
+                    end: insertion,
+                });
+                return self.mk_expr(
+                    lhs.span.to(else_expr.span),
+                    ExprKind::Ternary {
+                        cond: Box::new(lhs),
+                        then: Box::new(then_expr),
+                        otherwise: Box::new(else_expr),
+                    },
+                );
+            }
+        }
+
+        let else_expr = if self.cur().can_begin_expr() {
+            self.parse_expr_assoc_with(else_min_bp)
+        } else {
+            // `cond ? then : )` / `cond ? then :` at end-of-input
+            let found = self.cur().clone();
+            let insertion = self.last_bumped_end();
+            let span = if found.kind == TokenKind::Eof {
+                Span {
+                    start: insertion,
+                    end: insertion,
+                }
+            } else {
+                found.span
+            };
+            self.diagnostics.emit(
+                DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
+                span,
+                "expected expression after ':' in ternary expression",
+            );
+
+            if !matches!(
+                found.kind,
+                TokenKind::Comma | TokenKind::CloseBracket | TokenKind::CloseParen | TokenKind::Eof
+            ) {
+                self.bump();
+                self.recover_to_expr_boundary();
+            }
+
+            self.error_expr_at(span)
+        };
+
+        self.mk_expr(
+            lhs.span.to(else_expr.span),
+            ExprKind::Ternary {
+                cond: Box::new(lhs),
+                then: Box::new(then_expr),
+                otherwise: Box::new(else_expr),
+            },
+        )
     }
 
     fn parse_seq_to_before_tokens(
@@ -773,7 +674,7 @@ impl<'a> Parser<'a> {
             return true;
         }
 
-        let found = self.cur().clone();
+        let found = self.cur();
         let is_mismatched_closing = found.kind != TokenKind::Eof && is_closing_delim(&found.kind);
         let primary_span = if found.kind == TokenKind::Eof {
             Span {
@@ -926,12 +827,6 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn ternary_binding_power() -> (u8, u8) {
-        // Lower precedence than `||` so `a || b ? c : d` parses as `(a || b) ? c : d`.
-        // Right-associative: `a ? b : c ? d : e` parses as `a ? b : (c ? d : e)`.
-        (0, 0)
-    }
-
     fn recover_from_infix(&mut self, op_tok: Token) -> Expr {
         self.diagnostics.emit(
             DiagnosticCode::Parse(ParseDiagnostic::MissingExpr),
@@ -962,4 +857,81 @@ impl<'a> Parser<'a> {
         }
         self.error_expr_at(err_span)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Delimiter {
+    Paren,
+    Bracket,
+}
+
+impl Delimiter {
+    fn close(self) -> TokenKind {
+        match self {
+            Delimiter::Paren => TokenKind::CloseParen,
+            Delimiter::Bracket => TokenKind::CloseBracket,
+        }
+    }
+
+    fn close_expected(self) -> &'static str {
+        match self {
+            Delimiter::Paren => "')'",
+            Delimiter::Bracket => "']'",
+        }
+    }
+
+    fn unclosed_label(self) -> &'static str {
+        match self {
+            Delimiter::Paren => "this '(' is not closed",
+            Delimiter::Bracket => "this '[' is not closed",
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct DelimDepth {
+    paren: u32,
+    bracket: u32,
+}
+
+impl DelimDepth {
+    fn at_top_level(self) -> bool {
+        self.paren == 0 && self.bracket == 0
+    }
+
+    fn consume(&mut self, kind: TokenKind) {
+        match kind {
+            TokenKind::OpenParen => self.paren = self.paren.saturating_add(1),
+            TokenKind::OpenBracket => self.bracket = self.bracket.saturating_add(1),
+            TokenKind::CloseParen => {
+                if self.paren > 0 {
+                    self.paren -= 1;
+                }
+            }
+            TokenKind::CloseBracket => {
+                if self.bracket > 0 {
+                    self.bracket -= 1;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn is_closing_delim(kind: &TokenKind) -> bool {
+    matches!(kind, TokenKind::CloseParen | TokenKind::CloseBracket)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecoverScanDecision {
+    Continue,
+    Stop,
+    ConsumeAndStop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecoverScanResult {
+    HitEof,
+    Stopped,
+    Consumed,
 }

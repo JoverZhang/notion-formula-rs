@@ -20,6 +20,15 @@ pub struct Span {
     pub end: u32,
 }
 
+impl Span {
+    pub fn to(&self, other: Span) -> Span {
+        Span {
+            start: self.start,
+            end: other.end,
+        }
+    }
+}
+
 /// Half-open range of token indices: `[lo, hi)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TokenRange {

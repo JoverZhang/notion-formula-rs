@@ -150,7 +150,12 @@ fn test_unary_applies_to_postfix_completed_expression() {
 #[test]
 fn test_call_arg_list_missing_comma_recovers_as_two_args() {
     let parsed = analyze("f(1 2)").unwrap();
-    assert_eq!(parsed.diagnostics.len(), 1, "diags: {:?}", parsed.diagnostics);
+    assert_eq!(
+        parsed.diagnostics.len(),
+        1,
+        "diags: {:?}",
+        parsed.diagnostics
+    );
 
     let ast = parsed.expr;
     let (_callee, args) = assert_call!(ast, "f", 2);
@@ -161,7 +166,12 @@ fn test_call_arg_list_missing_comma_recovers_as_two_args() {
 #[test]
 fn test_list_literal_missing_comma_recovers_as_two_items() {
     let parsed = analyze("[1 2]").unwrap();
-    assert_eq!(parsed.diagnostics.len(), 1, "diags: {:?}", parsed.diagnostics);
+    assert_eq!(
+        parsed.diagnostics.len(),
+        1,
+        "diags: {:?}",
+        parsed.diagnostics
+    );
 
     let ast = parsed.expr;
     let items = assert_list!(ast, 2);
@@ -172,7 +182,11 @@ fn test_list_literal_missing_comma_recovers_as_two_items() {
 #[test]
 fn test_ternary_missing_then_expr_recovers() {
     let parsed = analyze("1 ? : 3").unwrap();
-    assert!(!parsed.diagnostics.is_empty(), "diags: {:?}", parsed.diagnostics);
+    assert!(
+        !parsed.diagnostics.is_empty(),
+        "diags: {:?}",
+        parsed.diagnostics
+    );
 
     let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
@@ -184,7 +198,11 @@ fn test_ternary_missing_then_expr_recovers() {
 #[test]
 fn test_ternary_missing_else_expr_recovers_without_consuming_close_paren() {
     let parsed = analyze("(1 ? 2 : )").unwrap();
-    assert!(!parsed.diagnostics.is_empty(), "diags: {:?}", parsed.diagnostics);
+    assert!(
+        !parsed.diagnostics.is_empty(),
+        "diags: {:?}",
+        parsed.diagnostics
+    );
 
     let ast = parsed.expr;
     let ExprKind::Group { inner } = &ast.kind else {
@@ -200,7 +218,11 @@ fn test_ternary_missing_else_expr_recovers_without_consuming_close_paren() {
 #[test]
 fn test_member_call_extra_dot_recovers() {
     let parsed = analyze("a..if(b,c)").unwrap();
-    assert!(!parsed.diagnostics.is_empty(), "diags: {:?}", parsed.diagnostics);
+    assert!(
+        !parsed.diagnostics.is_empty(),
+        "diags: {:?}",
+        parsed.diagnostics
+    );
 
     let ast = parsed.expr;
     let ExprKind::MemberCall {

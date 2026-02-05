@@ -79,7 +79,11 @@ fn diagnostics_missing_comma_between_call_args_has_insert_label() {
     let diag = result
         .diagnostics
         .iter()
-        .find(|d| d.labels.iter().any(|l| l.message.as_deref() == Some("insert ','")))
+        .find(|d| {
+            d.labels
+                .iter()
+                .any(|l| l.message.as_deref() == Some("insert ','"))
+        })
         .unwrap_or_else(|| panic!("unexpected diagnostics: {:?}", result.diagnostics));
     assert!(
         diag.message.contains("expected ','"),
