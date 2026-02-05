@@ -125,8 +125,6 @@ impl<'a> Parser<'a> {
             (Ident(_), Ident(_))
             | (Literal(_), Literal(_))
             | (DocComment(..), DocComment(..))
-            | (LineComment(_), LineComment(_))
-            | (BlockComment(_), BlockComment(_))
             | (Newline, Newline)
 
             // Relational operators

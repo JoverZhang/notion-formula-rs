@@ -33,7 +33,7 @@ pub use ide::completion::{
     SignatureHelp, TextEdit, complete,
 };
 pub use ide::format::format_expr;
-pub use lexer::{LitKind, Span, Token, TokenKind};
+pub use lexer::{CommentKind, LitKind, Span, Token, TokenKind};
 pub use lexer::{NodeId, Spanned, Symbol, TokenIdx, TokenRange, tokens_in_span};
 pub use parser::ast;
 pub use source_map::SourceMap;

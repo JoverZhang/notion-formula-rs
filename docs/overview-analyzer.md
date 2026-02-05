@@ -59,6 +59,13 @@ Core modules:
   - stable “insertion point” behavior for empty spans
   - trivia tokens (comments/newlines) and EOF (which has an empty span)
 
+Trivia tokens emitted by the lexer (`analyzer/src/lexer/token.rs`):
+
+- `TokenKind::DocComment(CommentKind, Symbol)`:
+  - `// ...` → `(Line, "...")`
+  - `/* ... */` → `(Block, "...")`
+- `TokenKind::Newline`
+
 ---
 
 ## TokenQuery (canonical token neighbor API)

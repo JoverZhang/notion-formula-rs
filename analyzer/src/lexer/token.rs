@@ -129,14 +129,10 @@ pub enum TokenKind {
     /// Identifier token.
     Ident(Symbol),
 
-    /// A doc comment token.
-    /// `Symbol` is the doc comment's data excluding its "quotes" (`/*`, `#`, etc)
+    /// A comment token (line or block).
+    /// `Symbol` is the comment's data excluding its "quotes" (`/*`, `//`, etc),
     /// similarly to symbols in string literal tokens.
     DocComment(CommentKind, Symbol),
-    /// A line comment token.
-    LineComment(Symbol),
-    /// A block comment token.
-    BlockComment(Symbol),
     /// Newline trivia (`\n`).
     Newline,
 
@@ -174,20 +170,11 @@ impl Token {
 
 impl TokenKind {
     pub fn is_trivia(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::LineComment(_)
-                | TokenKind::BlockComment(_)
-                | TokenKind::DocComment(..)
-                | TokenKind::Newline
-        )
+        matches!(self, TokenKind::DocComment(..) | TokenKind::Newline)
     }
 
     pub fn is_comment(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::LineComment(_) | TokenKind::BlockComment(_) | TokenKind::DocComment(..)
-        )
+        matches!(self, TokenKind::DocComment(..))
     }
 
     pub fn to_str(&self) -> Option<&'static str> {
