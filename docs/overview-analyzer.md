@@ -190,7 +190,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
   1) exact match (`label_norm == query_norm`)
   2) substring contains (`label_norm` contains `query_norm`)
   3) fuzzy subsequence match (existing subsequence scoring)
-  Within exact/contains, shorter normalized labels rank first (and for contains, earlier substring occurrence breaks ties); fuzzy ties use the subsequence score; all remaining ties are deterministic by original index. Other completion kinds are left in original relative order after matched items.
+  Within exact, shorter normalized labels rank first. Within contains, earlier substring occurrence ranks first (so prefix matches beat infix matches), then shorter normalized labels; fuzzy ties use the subsequence score; all remaining ties are deterministic by original index. Other completion kinds are left in original relative order after matched items.
 - When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
   - Type ranking is skipped when the expected argument type is `Unknown` or `Generic(_)` (wildcard-ish and not informative).
 - `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).

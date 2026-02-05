@@ -73,10 +73,9 @@ fn cmp_ranked_items(a: &RankedItem, b: &RankedItem) -> Ordering {
             .label_norm_len
             .cmp(&b.label_norm_len)
             .then_with(|| a.original_idx.cmp(&b.original_idx)),
-        (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => a
-            .label_norm_len
-            .cmp(&b.label_norm_len)
-            .then_with(|| ap.cmp(&bp))
+        (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => ap
+            .cmp(&bp)
+            .then_with(|| a.label_norm_len.cmp(&b.label_norm_len))
             .then_with(|| a.original_idx.cmp(&b.original_idx)),
         (MatchClass::Fuzzy(sa), MatchClass::Fuzzy(sb)) => fuzzy_score_cmp(sa, sb)
             .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))

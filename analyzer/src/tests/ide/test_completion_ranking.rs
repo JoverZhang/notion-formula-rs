@@ -141,6 +141,28 @@ fn completion_with_property_prefix() {
 }
 
 #[test]
+fn completion_single_char_query_prefers_prefix_prop_over_short_contains() {
+    let c = ctx().prop("Title", Ty::String).build();
+
+    t("t$0")
+        .ctx(c.clone())
+        .expect_contains_labels(&["Title", "at"])
+        .expect_order("Title", "at");
+
+    let out = complete("t", 1, Some(&c), CompletionConfig::default());
+    let top = out
+        .items
+        .iter()
+        .take(5)
+        .map(|i| i.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        top.contains(&"Title"),
+        "expected Title to be in the top 5 ranked items, got: {top:?}"
+    );
+}
+
+#[test]
 fn completion_type_ranking_number_prefers_number_props() {
     let c = ctx()
         .prop("Title", Ty::String)
