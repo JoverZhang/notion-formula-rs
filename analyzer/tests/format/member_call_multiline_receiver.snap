@@ -1,0 +1,16 @@
+=== INPUT ===
+if(
+  true,
+  1,
+  2
+).if(true,3)
+
+=== OUTPUT ===
+if(
+  true,
+  1,
+  2
+).if(
+  true,
+  3
+)

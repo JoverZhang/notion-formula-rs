@@ -104,127 +104,16 @@ impl Rendered {
     }
 }
 
-fn format_expr_one_line(expr: &Expr) -> String {
-    format_expr_one_line_with_prec(expr, 0)
-}
-
-fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
-    match &expr.kind {
-        ExprKind::Ident(sym) => sym.text.clone(),
-        ExprKind::Group { inner } => {
-            let inner = format_expr_one_line_with_prec(inner, 0);
-            format!("({})", inner)
-        }
-        ExprKind::List { items } => {
-            let mut s = String::new();
-            s.push('[');
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                s.push_str(&format_expr_one_line_with_prec(item, 0));
-            }
-            s.push(']');
-            s
-        }
-        ExprKind::Lit(lit) => render_literal(lit),
-
-        ExprKind::Call { callee, args } => {
-            let mut s = String::new();
-            s.push_str(&callee.text);
-            s.push('(');
-            for (i, a) in args.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                s.push_str(&format_expr_one_line_with_prec(a, 0));
-            }
-            s.push(')');
-            s
-        }
-
-        ExprKind::MemberCall {
-            receiver,
-            method,
-            args,
-        } => {
-            let mut s = String::new();
-            s.push_str(&format_expr_one_line_with_prec(receiver, 0));
-            s.push('.');
-            s.push_str(&method.text);
-            s.push('(');
-            for (i, a) in args.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                s.push_str(&format_expr_one_line_with_prec(a, 0));
-            }
-            s.push(')');
-            s
-        }
-
-        ExprKind::Unary { op, expr: inner } => {
-            let inner = format_expr_one_line_with_prec(inner, op.prefix_binding_power());
-            match op {
-                UnOp::Not(crate::ast::NotKind::Keyword) => format!("{} {}", op.as_str(), inner),
-                _ => format!("{}{}", op.as_str(), inner),
-            }
-        }
-
-        ExprKind::Binary { op, left, right } => {
-            let (l_bp, r_bp) = op.infix_binding_power();
-            let this_prec = l_bp;
-
-            let l = format_expr_one_line_with_prec(left, l_bp);
-            let r = format_expr_one_line_with_prec(right, r_bp);
-
-            let op_str = binop_str(op.node);
-            let combined = format!("{} {} {}", l, op_str, r);
-
-            if this_prec < parent_prec {
-                format!("({})", combined)
-            } else {
-                combined
-            }
-        }
-
-        ExprKind::Ternary {
-            cond,
-            then,
-            otherwise,
-        } => {
-            let cond = format_expr_one_line_with_prec(cond, 0);
-            let then = format_expr_one_line_with_prec(then, 0);
-            let otherwise = format_expr_one_line_with_prec(otherwise, 0);
-            format!("{} ? {} : {}", cond, then, otherwise)
-        }
-
-        ExprKind::Error => "<error>".into(),
-    }
-}
-
 /// Formats `expr` into a stable string, ending with a single trailing `\n`.
 ///
 /// `source` and `tokens` must describe the same original text.
 pub fn format_expr(expr: &Expr, source: &str, tokens: &[Token]) -> String {
     let mut fmt = Formatter::new(source, tokens);
-    let one_line = format_expr_one_line(expr);
-    let has_newline = fmt.expr_has_newline(expr);
-    let force_multiline = fmt.forces_multiline(expr) || has_newline;
-
-    if !force_multiline && !one_line.contains('\n') && fmt.fits_on_line(0, one_line.len()) {
-        let mut s = one_line;
-        if !s.ends_with('\n') {
-            s.push('\n');
-        }
-        s
-    } else {
-        let mut s = fmt.format_expr_rendered(expr, 0, 0).render();
-        if !s.ends_with('\n') {
-            s.push('\n');
-        }
-        s
+    let mut s = fmt.format_expr_rendered(expr, 0).render();
+    if !s.ends_with('\n') {
+        s.push('\n');
     }
+    s
 }
 
 impl<'a> Formatter<'a> {
@@ -243,7 +132,50 @@ impl<'a> Formatter<'a> {
         &self.token_query
     }
 
-    fn format_expr_rendered(&mut self, expr: &Expr, indent: usize, parent_prec: u8) -> Rendered {
+    /// Run an inline-layout attempt, rolling back comment attachment on failure.
+    fn try_inline<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
+        let saved = self.used_comments.clone();
+        let out = f(self);
+        if out.is_none() {
+            self.used_comments = saved;
+        }
+        out
+    }
+
+    fn format_delimited_seq(
+        &mut self,
+        mut out: Rendered,
+        indent: usize,
+        open: String,
+        open_appends_to_last: bool,
+        close: &str,
+        items: &[Expr],
+    ) -> Rendered {
+        // Member calls keep `).method(` chained on the receiver's last line.
+        if open_appends_to_last {
+            if let Some(last) = out.lines.last_mut() {
+                last.text.push_str(&open);
+            } else {
+                out.push_line(indent, open);
+            }
+        } else {
+            out.push_line(indent, open);
+        }
+
+        for (idx, item) in items.iter().enumerate() {
+            let mut item_r = self.format_expr_rendered(item, indent + 1);
+            let is_last = idx + 1 == items.len();
+            if !is_last && let Some(last) = item_r.lines.last_mut() {
+                last.text.push(',');
+            }
+            out.append(item_r);
+        }
+
+        out.push_line(indent, close);
+        out
+    }
+
+    fn format_expr_rendered(&mut self, expr: &Expr, indent: usize) -> Rendered {
         let mut out = Rendered::default();
 
         let (leading_comments, inline_block_comment) = self.take_leading_comments(expr);
@@ -252,7 +184,7 @@ impl<'a> Formatter<'a> {
             out.push_line(indent, self.render_comment(idx));
         }
 
-        let mut body = self.format_expr_kind(expr, indent, parent_prec);
+        let mut body = self.format_expr_kind(expr, indent);
 
         if let Some(idx) = inline_block_comment {
             let prefix = format!("{} ", self.render_comment(idx));
@@ -271,139 +203,109 @@ impl<'a> Formatter<'a> {
         out
     }
 
-    fn format_expr_kind(&mut self, expr: &Expr, indent: usize, parent_prec: u8) -> Rendered {
+    fn format_expr_kind(&mut self, expr: &Expr, indent: usize) -> Rendered {
         match &expr.kind {
             ExprKind::Ident(sym) => Rendered::single(indent, sym.text.clone()),
-            ExprKind::Group { inner } => self.format_group(expr, indent, parent_prec, inner),
-            ExprKind::List { items } => self.format_list(expr, indent, parent_prec, items),
+            ExprKind::Group { inner } => self.format_group(expr, indent, inner),
+            ExprKind::List { items } => self.format_list(expr, indent, items),
             ExprKind::Lit(lit) => Rendered::single(indent, render_literal(lit)),
             ExprKind::Call { callee, args } => {
-                self.format_call(expr, indent, parent_prec, &callee.text, args)
+                self.format_call(expr, indent, &callee.text, args)
             }
             ExprKind::MemberCall {
                 receiver,
                 method,
                 args,
-            } => self.format_member_call(expr, indent, parent_prec, receiver, &method.text, args),
+            } => self.format_member_call(expr, indent, receiver, &method.text, args),
             ExprKind::Unary { op, expr: inner } => {
-                self.format_unary(expr, indent, parent_prec, *op, inner)
+                self.format_unary(expr, indent, *op, inner)
             }
             ExprKind::Binary { op, left, right } => {
-                self.format_binary(expr, indent, parent_prec, *op, left, right)
+                self.format_binary(expr, indent, *op, left, right)
             }
             ExprKind::Ternary {
                 cond,
                 then,
                 otherwise,
-            } => self.format_ternary(expr, indent, parent_prec, cond, then, otherwise),
+            } => self.format_ternary(expr, indent, cond, then, otherwise),
             ExprKind::Error => Rendered::single(indent, "<error>"),
         }
     }
 
-    fn format_group(
-        &mut self,
-        expr: &Expr,
-        indent: usize,
-        _parent_prec: u8,
-        inner: &Expr,
-    ) -> Rendered {
+    fn format_group(&mut self, expr: &Expr, indent: usize, inner: &Expr) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
         if !has_newline {
-            let saved = self.used_comments.clone();
-            if let Some(inline) = self.format_expr_single_line(inner, indent, 0) {
-                let text = format!("({})", inline);
-                if self.fits_on_line(indent, text.len()) {
-                    return Rendered::single(indent, text);
-                }
+            if let Some(out) = self.try_inline(|this| {
+                let inline = this.format_expr_single_line(inner, indent)?;
+                let text = format!("({inline})");
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
-            self.used_comments = saved;
         }
 
         let mut out = Rendered::default();
         out.push_line(indent, "(");
-        let inner_rendered = self.format_expr_rendered(inner, indent + 1, 0);
+        let inner_rendered = self.format_expr_rendered(inner, indent + 1);
         out.append(inner_rendered);
         out.push_line(indent, ")");
         out
     }
 
-    fn format_list(
-        &mut self,
-        expr: &Expr,
-        indent: usize,
-        _parent_prec: u8,
-        items: &[Expr],
-    ) -> Rendered {
+    fn format_list(&mut self, expr: &Expr, indent: usize, items: &[Expr]) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
         if !has_newline {
-            let saved = self.used_comments.clone();
-            let mut parts = Vec::new();
-            let mut inline_ok = true;
-
-            for item in items {
-                if let Some(text) = self.format_expr_single_line(item, indent, 0) {
-                    parts.push(text);
-                } else {
-                    inline_ok = false;
-                    break;
+            if let Some(out) = self.try_inline(|this| {
+                let mut parts = Vec::new();
+                for item in items {
+                    parts.push(this.format_expr_single_line(item, indent)?);
                 }
-            }
-
-            if inline_ok {
                 let text = format!("[{}]", parts.join(", "));
-                let inline_len = text.len();
-                if self.fits_on_line(indent, inline_len) && inline_len <= MAX_WIDTH {
-                    return Rendered::single(indent, text);
-                }
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
-
-            self.used_comments = saved;
         }
 
-        let mut out = Rendered::default();
-        out.push_line(indent, "[");
-        for (idx, item) in items.iter().enumerate() {
-            let mut item_r = self.format_expr_rendered(item, indent + 1, 0);
-            let is_last = idx + 1 == items.len();
-            if !is_last && let Some(last) = item_r.lines.last_mut() {
-                last.text.push(',');
-            }
-            out.append(item_r);
-        }
-        out.push_line(indent, "]");
-        out
+        self.format_delimited_seq(
+            Rendered::default(),
+            indent,
+            "[".to_string(),
+            false,
+            "]",
+            items,
+        )
     }
 
     fn format_unary(
         &mut self,
         expr: &Expr,
         indent: usize,
-        _parent_prec: u8,
         op: UnOp,
         inner: &Expr,
     ) -> Rendered {
-        let bp = op.prefix_binding_power();
         let op_str = op.as_str();
         let needs_space = matches!(op, UnOp::Not(crate::ast::NotKind::Keyword));
 
         let has_newline = self.expr_has_newline(expr);
 
         if !has_newline {
-            let saved = self.used_comments.clone();
-            if let Some(inline) = self.format_expr_single_line(inner, indent, bp) {
-                let mut text = String::new();
-                text.push_str(op_str);
-                if needs_space {
-                    text.push(' ');
-                }
-                text.push_str(&inline);
-                if self.fits_on_line(indent, text.len()) {
-                    return Rendered::single(indent, text);
-                }
+            if let Some(out) = self.try_inline(|this| {
+                let inline = this.format_expr_single_line(inner, indent)?;
+                let text = if needs_space {
+                    format!("{op_str} {inline}")
+                } else {
+                    format!("{op_str}{inline}")
+                };
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
-            self.used_comments = saved;
         }
 
         let mut out = Rendered::default();
@@ -413,7 +315,7 @@ impl<'a> Formatter<'a> {
             format!("{op_str}(")
         };
         out.push_line(indent, lparen);
-        let inner_rendered = self.format_expr_rendered(inner, indent + 1, bp);
+        let inner_rendered = self.format_expr_rendered(inner, indent + 1);
         out.append(inner_rendered);
         out.push_line(indent, ")");
         out
@@ -423,12 +325,10 @@ impl<'a> Formatter<'a> {
         &mut self,
         expr: &Expr,
         indent: usize,
-        _parent_prec: u8,
         op: BinOp,
         left: &Expr,
         right: &Expr,
     ) -> Rendered {
-        let (l_bp, r_bp) = op.infix_binding_power();
         let op_str = binop_str(op.node);
         let has_newline = self.expr_has_newline(expr);
         let trailing_line_comment = self
@@ -438,21 +338,20 @@ impl<'a> Formatter<'a> {
             .unwrap_or(false);
 
         if !has_newline || trailing_line_comment {
-            let saved = self.used_comments.clone();
-            if let Some(lhs) = self.format_expr_single_line(left, indent, l_bp)
-                && let Some(rhs) = self.format_expr_single_line(right, indent, r_bp)
-            {
-                let text = format!("{} {} {}", lhs, op_str, rhs);
-                if self.fits_on_line(indent, text.len()) {
-                    return Rendered::single(indent, text);
-                }
+            if let Some(out) = self.try_inline(|this| {
+                let lhs = this.format_expr_single_line(left, indent)?;
+                let rhs = this.format_expr_single_line(right, indent)?;
+                let text = format!("{lhs} {op_str} {rhs}");
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
-            self.used_comments = saved;
         }
 
         let mut out = Rendered::default();
-        let left_rendered = self.format_expr_rendered(left, indent, l_bp);
-        let mut right_rendered = self.format_expr_rendered(right, indent + 1, r_bp);
+        let left_rendered = self.format_expr_rendered(left, indent);
+        let mut right_rendered = self.format_expr_rendered(right, indent + 1);
 
         if left_rendered.lines.len() == 1
             && !left_rendered
@@ -496,33 +395,29 @@ impl<'a> Formatter<'a> {
         &mut self,
         expr: &Expr,
         indent: usize,
-        _parent_prec: u8,
         cond: &Expr,
         then: &Expr,
         otherwise: &Expr,
     ) -> Rendered {
-        let ternary_prec = 2;
         let has_newline = self.expr_has_newline(expr);
 
         if !has_newline {
-            let saved = self.used_comments.clone();
-            if let (Some(c), Some(t), Some(o)) = (
-                self.format_expr_single_line(cond, indent, ternary_prec),
-                self.format_expr_single_line(then, indent, ternary_prec),
-                self.format_expr_single_line(otherwise, indent, ternary_prec),
-            ) {
-                let text = format!("{} ? {} : {}", c, t, o);
-                if self.fits_on_line(indent, text.len()) {
-                    return Rendered::single(indent, text);
-                }
+            if let Some(out) = self.try_inline(|this| {
+                let c = this.format_expr_single_line(cond, indent)?;
+                let t = this.format_expr_single_line(then, indent)?;
+                let o = this.format_expr_single_line(otherwise, indent)?;
+                let text = format!("{c} ? {t} : {o}");
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
-            self.used_comments = saved;
         }
 
         let mut out = Rendered::default();
-        let cond_r = self.format_expr_rendered(cond, indent, 0);
-        let mut then_r = self.format_expr_rendered(then, indent + 1, 0);
-        let mut else_r = self.format_expr_rendered(otherwise, indent + 1, 0);
+        let cond_r = self.format_expr_rendered(cond, indent);
+        let mut then_r = self.format_expr_rendered(then, indent + 1);
+        let mut else_r = self.format_expr_rendered(otherwise, indent + 1);
 
         if let Some(first) = then_r.lines.first_mut() {
             first.text = format!("? {}", first.text);
@@ -547,62 +442,39 @@ impl<'a> Formatter<'a> {
         &mut self,
         expr: &Expr,
         indent: usize,
-        _parent_prec: u8,
         callee: &str,
         args: &[Expr],
     ) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
-        let mut inline_text = None;
 
         if !has_newline {
-            let saved = self.used_comments.clone();
-            let mut parts = Vec::new();
-            let mut inline_ok = true;
-            for arg in args {
-                if let Some(text) = self.format_expr_single_line(arg, indent, 0) {
-                    parts.push(text);
-                } else {
-                    inline_ok = false;
-                    break;
+            if let Some(out) = self.try_inline(|this| {
+                let mut parts = Vec::new();
+                for arg in args {
+                    parts.push(this.format_expr_single_line(arg, indent)?);
                 }
-            }
-
-            if inline_ok {
-                let text = format!("{}({})", callee, parts.join(", "));
-                let inline_len = text.len();
-                if self.fits_on_line(indent, inline_len) && inline_len <= MAX_WIDTH {
-                    inline_text = Some(text);
-                } else {
-                    self.used_comments = saved;
-                }
-            } else {
-                self.used_comments = saved;
+                let text = format!("{callee}({})", parts.join(", "));
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
         }
 
-        if let Some(text) = inline_text {
-            return Rendered::single(indent, text);
-        }
-
-        let mut out = Rendered::default();
-        out.push_line(indent, format!("{}(", callee));
-        for (idx, arg) in args.iter().enumerate() {
-            let mut arg_r = self.format_expr_rendered(arg, indent + 1, 0);
-            let is_last = idx + 1 == args.len();
-            if !is_last && let Some(last) = arg_r.lines.last_mut() {
-                last.text.push(',');
-            }
-            out.append(arg_r);
-        }
-        out.push_line(indent, ")");
-        out
+        self.format_delimited_seq(
+            Rendered::default(),
+            indent,
+            format!("{callee}("),
+            false,
+            ")",
+            args,
+        )
     }
 
     fn format_member_call(
         &mut self,
         expr: &Expr,
         indent: usize,
-        _parent_prec: u8,
         receiver: &Expr,
         method: &str,
         args: &[Expr],
@@ -610,60 +482,37 @@ impl<'a> Formatter<'a> {
         let has_newline = self.expr_has_newline(expr);
 
         if !has_newline {
-            let saved = self.used_comments.clone();
-
-            if let Some(receiver_inline) = self.format_expr_single_line(receiver, indent, 0) {
+            if let Some(out) = self.try_inline(|this| {
+                let receiver_inline = this.format_expr_single_line(receiver, indent)?;
                 let mut parts = Vec::new();
-                let mut inline_ok = true;
                 for arg in args {
-                    if let Some(text) = self.format_expr_single_line(arg, indent, 0) {
-                        parts.push(text);
-                    } else {
-                        inline_ok = false;
-                        break;
-                    }
+                    parts.push(this.format_expr_single_line(arg, indent)?);
                 }
-
-                if inline_ok {
-                    let text = format!("{}.{}({})", receiver_inline, method, parts.join(", "));
-                    let inline_len = text.len();
-                    if self.fits_on_line(indent, inline_len) && inline_len <= MAX_WIDTH {
-                        return Rendered::single(indent, text);
-                    }
-                }
+                let text = format!("{receiver_inline}.{method}({})", parts.join(", "));
+                this.fits_on_line(indent, text.len())
+                    .then_some(Rendered::single(indent, text))
+            }) {
+                return out;
             }
-
-            self.used_comments = saved;
         }
 
-        let mut out = Rendered::default();
-        let receiver_r = self.format_expr_rendered(receiver, indent, 0);
-        out.append(receiver_r);
-        if let Some(last) = out.lines.last_mut() {
-            last.text.push_str(&format!(".{}(", method));
-        } else {
-            out.push_line(indent, format!(".{}(", method));
-        }
-
-        for (idx, arg) in args.iter().enumerate() {
-            let mut arg_r = self.format_expr_rendered(arg, indent + 1, 0);
-            let is_last = idx + 1 == args.len();
-            if !is_last && let Some(last) = arg_r.lines.last_mut() {
-                last.text.push(',');
-            }
-            out.append(arg_r);
-        }
-        out.push_line(indent, ")");
-        out
+        let receiver_r = self.format_expr_rendered(receiver, indent);
+        self.format_delimited_seq(
+            receiver_r,
+            indent,
+            format!(".{method}("),
+            true,
+            ")",
+            args,
+        )
     }
 
     fn format_expr_single_line(
         &mut self,
         expr: &Expr,
         indent: usize,
-        parent_prec: u8,
     ) -> Option<String> {
-        let rendered = self.format_expr_rendered(expr, indent, parent_prec);
+        let rendered = self.format_expr_rendered(expr, indent);
         if rendered.lines.len() == 1 {
             Some(rendered.lines[0].text.clone())
         } else {
@@ -675,10 +524,6 @@ impl<'a> Formatter<'a> {
         indent * INDENT + text_len <= MAX_WIDTH
     }
 
-    fn forces_multiline(&self, expr: &Expr) -> bool {
-        self.expr_has_comments(expr)
-    }
-
     /// Returns a token index range for an expression using its `Span`.
     ///
     /// This is used by comment attachment logic. The range is intersection-based and therefore
@@ -687,33 +532,6 @@ impl<'a> Formatter<'a> {
         self.token_query().range_for_span(expr.span)
     }
 
-    fn expr_has_comments(&self, expr: &Expr) -> bool {
-        if self.has_attached_comments(expr) {
-            return true;
-        }
-        match &expr.kind {
-            ExprKind::Group { inner } => self.expr_has_comments(inner),
-            ExprKind::List { items } => items.iter().any(|a| self.expr_has_comments(a)),
-            ExprKind::Call { args, .. } => args.iter().any(|a| self.expr_has_comments(a)),
-            ExprKind::MemberCall { receiver, args, .. } => {
-                self.expr_has_comments(receiver) || args.iter().any(|a| self.expr_has_comments(a))
-            }
-            ExprKind::Unary { expr, .. } => self.expr_has_comments(expr),
-            ExprKind::Binary { left, right, .. } => {
-                self.expr_has_comments(left) || self.expr_has_comments(right)
-            }
-            ExprKind::Ternary {
-                cond,
-                then,
-                otherwise,
-            } => {
-                self.expr_has_comments(cond)
-                    || self.expr_has_comments(then)
-                    || self.expr_has_comments(otherwise)
-            }
-            _ => false,
-        }
-    }
 
     fn expr_span_from_tokens(&self, expr: &Expr) -> Option<Span> {
         match &expr.kind {
@@ -876,11 +694,6 @@ impl<'a> Formatter<'a> {
             },
             _ => String::new(),
         }
-    }
-
-    fn has_attached_comments(&self, expr: &Expr) -> bool {
-        !self.available_leading_comments(expr).is_empty()
-            || self.available_trailing_comment(expr).is_some()
     }
 
     fn slice_has_newline(&self, start: u32, end: u32) -> bool {
