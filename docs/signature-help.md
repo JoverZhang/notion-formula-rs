@@ -52,7 +52,9 @@ Do **not** invent argument types for arguments that do not exist in source.
 
 For each displayed parameter slot, pick the type to render using:
 
-1) the best-effort inferred *actual* type of the corresponding call-site argument **if the argument expression is non-empty**
+1) the best-effort inferred *actual* type of the corresponding call-site argument **if the argument expression is non-empty** and either:
+   - the parameter’s declared type contains generics (show call-site instantiation), or
+   - the instantiated expected type is a `Union(...)` and the actual type is a compatible non-`unknown` member (narrow per-slot unions like `number | number[]`)
 2) else the instantiated expected type (after generic unification/substitution)
 3) else `unknown`
 
@@ -63,8 +65,7 @@ Return type: the instantiated return type.
 For repeat-group signatures, the UI display order is:
 
 - `[head...]`, then
-- repeat group #1 (numbered names, e.g. `condition1`, `value1`)
-- repeat group #2 (numbered names, e.g. `condition2`, `value2`) **only if entered**
+- repeat groups `#1..#repeat_groups` (numbered names, e.g. `condition1`, `value1`, `condition2`, `value2`, ...)
 - `...`
 - `[tail...]`
 
@@ -85,7 +86,7 @@ Then:
 - If it maps into `tail` (per `total'`), highlight the corresponding tail slot.
 - Otherwise it maps into `repeat`:
   - compute `(cycle, pos)` within the repeat group
-  - if `cycle >= 2`, clamp to cycle #2 but preserve `pos` within the group
+  - highlight the corresponding numbered slot within the entered repeat groups
 - Never highlight `...`.
 
 ## Canonical examples
@@ -99,19 +100,19 @@ NOTE: Each variadic slot accepts either a scalar `number` or a `number[]`.
    - `active_parameter`: `0`
 
 2) `sum(42$0)`
-   - label: `sum(values1: number | number[], ...) -> number`
+   - label: `sum(values1: number, ...) -> number`
    - `active_parameter`: `0`
 
 3) `sum([1,2,3]$0)`
-   - label: `sum(values1: number | number[], ...) -> number`
+   - label: `sum(values1: number[], ...) -> number`
    - `active_parameter`: `0`
 
 4) `sum(42, $0)`
-   - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
+   - label: `sum(values1: number, values2: number | number[], ...) -> number`
    - `active_parameter`: `1`
 
 5) `sum(42, 42$0)`
-   - label: `sum(values1: number | number[], values2: number | number[], ...) -> number`
+   - label: `sum(values1: number, values2: number, ...) -> number`
    - `active_parameter`: `1`
 
 ### IF
@@ -135,6 +136,10 @@ NOTE: Each variadic slot accepts either a scalar `number` or a `number[]`.
 
 - `ifs(true, "42", false, 7, $0)` (total=5)
   - `active_parameter`: `4` (default)
+
+- `ifs(true, "a", false, "b", true, $0)` (invalid total=6)
+  - guides completion toward `value3`
+  - `active_parameter`: `5`
 
 ## Postfix form (presentation-only)
 

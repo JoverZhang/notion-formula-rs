@@ -39,3 +39,23 @@ fn test_format_idempotence_cases() {
         assert_format_idempotent(input);
     }
 }
+
+#[test]
+fn format_preserves_not_and_bang_notation() {
+    let cases = [
+        ("not not a", "not not a\n"),
+        ("!!a", "!!a\n"),
+        ("not !a", "not !a\n"),
+    ];
+
+    for (input, expected) in cases {
+        let out = analyze(input).unwrap();
+        assert!(
+            out.diagnostics.is_empty(),
+            "expected no parse errors for input {input}, got {:?}",
+            out.diagnostics
+        );
+        let formatted = format_expr(&out.expr, input, &out.tokens);
+        assert_eq!(formatted, expected, "input: {input}");
+    }
+}

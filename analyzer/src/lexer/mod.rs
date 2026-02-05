@@ -301,8 +301,18 @@ pub fn lex(input: &str) -> LexOutput {
                     }
                 }
 
+                let kind = match ident.as_str() {
+                    // Reserved keywords.
+                    "not" => TokenKind::Not,
+                    "true" | "false" => TokenKind::Literal(Lit {
+                        kind: LitKind::Bool,
+                        symbol: Symbol { text: ident },
+                    }),
+                    _ => TokenKind::Ident(Symbol { text: ident }),
+                };
+
                 tokens.push(Token {
-                    kind: TokenKind::Ident(Symbol { text: ident }),
+                    kind,
                     span: Span {
                         start: start as u32,
                         end: end as u32,

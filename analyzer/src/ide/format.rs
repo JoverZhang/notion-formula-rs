@@ -165,7 +165,10 @@ fn format_expr_one_line_with_prec(expr: &Expr, parent_prec: u8) -> String {
 
         ExprKind::Unary { op, expr: inner } => {
             let inner = format_expr_one_line_with_prec(inner, op.prefix_binding_power());
-            format!("{}{}", op.as_str(), inner)
+            match op {
+                UnOp::Not(crate::ast::NotKind::Keyword) => format!("{} {}", op.as_str(), inner),
+                _ => format!("{}{}", op.as_str(), inner),
+            }
         }
 
         ExprKind::Binary { op, left, right } => {
@@ -383,6 +386,7 @@ impl<'a> Formatter<'a> {
     ) -> Rendered {
         let bp = op.prefix_binding_power();
         let op_str = op.as_str();
+        let needs_space = matches!(op, UnOp::Not(crate::ast::NotKind::Keyword));
 
         let has_newline = self.expr_has_newline(expr);
 
@@ -391,6 +395,9 @@ impl<'a> Formatter<'a> {
             if let Some(inline) = self.format_expr_single_line(inner, indent, bp) {
                 let mut text = String::new();
                 text.push_str(op_str);
+                if needs_space {
+                    text.push(' ');
+                }
                 text.push_str(&inline);
                 if self.fits_on_line(indent, text.len()) {
                     return Rendered::single(indent, text);
@@ -400,7 +407,12 @@ impl<'a> Formatter<'a> {
         }
 
         let mut out = Rendered::default();
-        out.push_line(indent, format!("{}(", op_str));
+        let lparen = if needs_space {
+            format!("{op_str} (")
+        } else {
+            format!("{op_str}(")
+        };
+        out.push_line(indent, lparen);
         let inner_rendered = self.format_expr_rendered(inner, indent + 1, bp);
         out.append(inner_rendered);
         out.push_line(indent, ")");

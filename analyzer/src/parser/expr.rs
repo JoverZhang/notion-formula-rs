@@ -3,10 +3,9 @@
 //! Produces an AST plus parse diagnostics. Spans are UTF-8 byte offsets with half-open semantics
 //! `[start, end)`.
 
-use super::ast::{Expr, ExprKind, UnOp};
 use super::{ParseOutput, Parser};
 use crate::Token;
-use crate::ast::AssocOp;
+use crate::ast::{AssocOp, Expr, ExprKind, NotKind, UnOp};
 use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
@@ -117,7 +116,9 @@ impl<'a> Parser<'a> {
     fn parse_expr_prefix(&mut self) -> Expr {
         match self.cur().kind {
             // `!expr`
-            TokenKind::Bang => self.parse_expr_unary(UnOp::Not),
+            TokenKind::Bang => self.parse_expr_unary(UnOp::Not(NotKind::Bang)),
+            // `not expr`
+            TokenKind::Not => self.parse_expr_unary(UnOp::Not(NotKind::Keyword)),
             // `-expr`
             TokenKind::Minus => self.parse_expr_unary(UnOp::Neg),
             // Parses `a.b()` or `a(13)` or just `a`.

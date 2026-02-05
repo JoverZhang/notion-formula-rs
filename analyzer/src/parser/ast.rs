@@ -132,9 +132,16 @@ impl BinOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnOp {
+pub enum NotKind {
     /// `!`
-    Not,
+    Bang,
+    /// `not`
+    Keyword,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnOp {
+    Not(NotKind),
     /// `-`
     Neg,
 }
@@ -142,7 +149,8 @@ pub enum UnOp {
 impl UnOp {
     pub fn as_str(&self) -> &'static str {
         match self {
-            UnOp::Not => "!",
+            UnOp::Not(NotKind::Bang) => "!",
+            UnOp::Not(NotKind::Keyword) => "not",
             UnOp::Neg => "-",
         }
     }
@@ -150,7 +158,7 @@ impl UnOp {
     /// Returns the Pratt binding power for a prefix operator.
     pub fn prefix_binding_power(&self) -> u8 {
         match self {
-            UnOp::Not => 14,
+            UnOp::Not(_) => 14,
             UnOp::Neg => 14,
         }
     }

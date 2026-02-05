@@ -59,7 +59,7 @@ fn signature_help_sum_variadic_number_only_case_2_single_number() {
     t("sum(42$0)")
         .ctx(c)
         .expect_sig_active(0)
-        .expect_sig_label("sum(values1: number | number[], ...) -> number");
+        .expect_sig_label("sum(values1: number, ...) -> number");
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn signature_help_sum_variadic_number_only_case_2_list_literal() {
     t("sum([1,2,3]$0)")
         .ctx(c)
         .expect_sig_active(0)
-        .expect_sig_label("sum(values1: number | number[], ...) -> number");
+        .expect_sig_label("sum(values1: number[], ...) -> number");
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn signature_help_sum_variadic_number_only_case_3_second_arg_empty() {
         .ctx(c)
         .expect_sig_active(1)
         .expect_sig_label(
-            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+            "sum(values1: number, values2: number | number[], ...) -> number",
         );
 }
 
@@ -89,8 +89,16 @@ fn signature_help_sum_variadic_number_only_case_4_two_numbers() {
         .ctx(c)
         .expect_sig_active(1)
         .expect_sig_label(
-            "sum(values1: number | number[], values2: number | number[], ...) -> number",
+            "sum(values1: number, values2: number, ...) -> number",
         );
+}
+
+#[test]
+fn signature_help_sum_prefers_known_actual_types_for_union_slots() {
+    let c = ctx().prop("Number", crate::semantic::Ty::Number).build();
+    t(r#"sum(prop("Number"), [1, 2, 3]$0)"#)
+        .ctx(c)
+        .expect_sig_label("sum(values1: number, values2: number[], ...) -> number");
 }
 
 #[test]
@@ -128,6 +136,30 @@ fn signature_help_postfix_ifs_uses_method_style_and_boolean_receiver() {
     t("(1).ifs(42, \"42\"$0)").ctx(c).expect_sig_label(
         "(condition1: boolean).ifs(value1: number, ..., default: string) -> number | string",
     );
+}
+
+#[test]
+fn signature_help_postfix_ifs_third_condition_highlights_condition3() {
+    let c = ctx()
+        .prop("Number", crate::semantic::Ty::Number)
+        .prop("Title", crate::semantic::Ty::String)
+        .prop("Date", crate::semantic::Ty::Date)
+        .build();
+
+    t(
+        r#"
+(prop("Number") < 1).ifs(
+  prop("Title"),
+  prop("Number") < 2,
+  [prop("Number")],
+  prop("Number") < 3$0,
+  prop("Date"),
+  4
+)"#,
+    )
+    .ctx(c)
+    .expect_sig_active(3)
+    .expect_sig_active_param_name("condition3");
 }
 
 #[test]
@@ -172,6 +204,16 @@ fn signature_help_if_propagates_unknown() {
         .ctx(c)
         .expect_sig_active(2)
         .expect_sig_label("if(condition: boolean, then: unknown, else: number) -> unknown");
+}
+
+#[test]
+fn signature_help_if_ternary_branch_inferrs_union() {
+    let c = ctx().prop("Title", crate::semantic::Ty::String).build();
+    t(r#"if(true, prop("Title"), 4 == 4 ? true : "false"$0)"#)
+        .ctx(c)
+        .expect_sig_label(
+            "if(condition: boolean, then: string, else: boolean | string) -> boolean | string",
+        );
 }
 
 #[test]
@@ -235,11 +277,11 @@ fn signature_help_ifs_total_5_highlights_default() {
 }
 
 #[test]
-fn signature_help_ifs_long_call_clamps_repeat_cycle_preserving_position() {
+fn signature_help_ifs_long_call_highlights_repeat_cycle_preserving_position() {
     let c = ctx().build();
     t("ifs(true, \"a\", false, \"b\", true, $0)")
         .ctx(c)
-        .expect_sig_active(3);
+        .expect_sig_active(5);
 }
 
 #[test]
@@ -255,7 +297,7 @@ fn signature_help_ifs_active_param_repeat_value_highlights_value() {
     let c = ctx().build();
     t("ifs(true, \"123\", true, \"123\", true, $0)")
         .ctx(c)
-        .expect_sig_active(3);
+        .expect_sig_active(5);
 }
 
 #[test]

@@ -91,9 +91,13 @@ fn is_strictly_inside_ident(tokens: &[Token], cursor: u32) -> bool {
     let Some((_, token)) = token_containing_cursor(tokens, cursor) else {
         return false;
     };
-    matches!(token.kind, TokenKind::Ident(_))
-        && token.span.start < cursor
-        && cursor < token.span.end
+    let token_is_ident_like = match &token.kind {
+        TokenKind::Ident(_) | TokenKind::Not => true,
+        TokenKind::Literal(lit) if lit.kind == LitKind::Bool => true,
+        _ => false,
+    };
+
+    token_is_ident_like && token.span.start < cursor && cursor < token.span.end
 }
 
 pub(super) fn cursor_strictly_inside_string_literal(tokens: &[Token], cursor: u32) -> bool {

@@ -98,7 +98,7 @@ Literals and identifiers:
 
 Expression forms (AST):
 
-- unary: `!expr`, `-expr`
+- unary: `!expr`, `not expr`, `-expr`
 - binary: `< <= == != >= > && || + - * / % ^`
 - ternary: `cond ? then : otherwise`
 - grouping: `(expr)` preserved as `ExprKind::Group`
@@ -111,8 +111,6 @@ Expression forms (AST):
 
 Known gaps:
 
-- boolean literals (`true` / `false`) lex as identifiers (the lexer does not emit `LitKind::Bool` today)
-- `not` is suggested by completion but is not a lexer/parser operator today
 - completion operator list does not include every parsed operator
 
 Parser error recovery (high-level):
@@ -147,6 +145,9 @@ Semantic analysis (`analyzer/src/analysis/mod.rs`):
 - `FunctionSig` can declare `generics: Vec<GenericParam>`; a `GenericParam` is `{ id: GenericId, kind: GenericParamKind }` (no display name; UI renders `T0`, `T1`, ...).
 - Semantic analysis is inference-first:
   - `infer_expr_with_map(expr, ctx, &mut TypeMap)` computes a `TypeMap` of `ExprId`/`NodeId -> Ty`.
+  - Ternary inference (`cond ? then : otherwise`) joins branch types:
+    - if either branch is `Unknown`, the ternary type is `Unknown`
+    - otherwise, the ternary type is a deterministic union of both branch types (`normalize_union`)
   - `analyze_expr` returns the inferred root type and emits diagnostics by comparing inferred argument types to builtin signatures (arity + expected types).
     - Validation is arity/shape-first: if a call has an arity/shape error, the analyzer emits that single diagnostic and **does not** emit additional per-argument type mismatch diagnostics for the same call.
   - Type acceptance (`ty_accepts` in `analyzer/src/analysis/mod.rs`):
@@ -176,7 +177,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
 - Public entrypoint: `completion::complete(text: &str, cursor: usize, ctx: Option<&semantic::Context>, config: CompletionConfig) -> CompletionOutput`.
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
-- Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
+- Builtin completion items include the reserved keywords `true`, `false`, `not` (`not` is a unary operator; `true`/`false` are boolean literals).
 - Postfix completion is driven by a single builtin-derived allowlist (`postfix_capable_builtin_names()` in `analyzer/src/analysis/mod.rs`), defined as builtins with a **flat parameter list** that has more than one parameter (so there is at least one non-receiver argument):
   - after an atom: `.if()` is offered (inserts the leading `.`)
   - after `.` with a receiver atom: `.if` is offered and inserts `if()` (the `.` is already in the source)
@@ -199,7 +200,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
     - it instantiates the `FunctionSig` using the same unification/substitution logic as semantic inference (`instantiate_sig` in `analyzer/src/analysis/infer.rs`)
     - type strings are formatted via `analyzer/src/ide/display.rs` (`format_ty(...)`); `List(Union(...))` renders as `(A | B)[]`
     - instantiated `Unknown` is rendered as `unknown` (including unconstrained generics)
-    - parameters prefer per-argument inferred (actual) types when the argument expression is non-empty; empty argument slots fall back to instantiated expected types
+    - parameters prefer per-argument inferred (actual) types when the argument expression is non-empty **and** the inferred type is helpful/compatible (e.g. for generic and union-typed slots); empty argument slots fall back to instantiated expected types
   - Signature help output is structured (no frontend parsing):
     - `signatures[n].segments`: `DisplaySegment[]` (punctuation split into its own segments; params carry `param_index`)
     - `active_signature`: selected overload index (currently always `0`)
@@ -209,7 +210,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
     - receiver segments have `param_index = None` and are never highlighted
   - Repeat-group shapes (a `ParamShape` with non-empty `repeat`) are pretty-printed as a pattern (see `docs/signature-help.md` for the spec):
     - head params once
-    - repeat params **up to twice** (numbered: `condition1/value1`, `condition2/value2`), but the second repeat group is only shown once the call has entered it (or when the call is completed to the next valid shape for guidance)
+    - repeat params for each entered repeat group (numbered: `condition1/value1`, `condition2/value2`, `condition3/value3`, ...)
     - `...`
     - tail params once
     - Example: `ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: number) -> number`

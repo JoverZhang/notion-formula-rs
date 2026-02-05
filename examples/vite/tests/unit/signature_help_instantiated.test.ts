@@ -48,14 +48,14 @@ describe("WASM signature help (instantiated types)", () => {
 
   it("sum(42) highlights first arg", () => {
     const sig = sigAtCloseParen("sum(42)");
-    expect(sigLabelAtCloseParen("sum(42)")).toBe("sum(values1: number | number[], ...) -> number");
+    expect(sigLabelAtCloseParen("sum(42)")).toBe("sum(values1: number, ...) -> number");
     expect(sig.active_parameter).toBe(0);
   });
 
   it("sum(42, <empty>) highlights second arg", () => {
     const sig = sigAtCloseParen("sum(42, )");
     expect(sigLabelAtCloseParen("sum(42, )")).toBe(
-      "sum(values1: number | number[], values2: number | number[], ...) -> number",
+      "sum(values1: number, values2: number | number[], ...) -> number",
     );
     expect(sig.active_parameter).toBe(1);
   });
@@ -63,7 +63,7 @@ describe("WASM signature help (instantiated types)", () => {
   it("sum(42, 42) highlights second arg", () => {
     const sig = sigAtCloseParen("sum(42, 42)");
     expect(sigLabelAtCloseParen("sum(42, 42)")).toBe(
-      "sum(values1: number | number[], values2: number | number[], ...) -> number",
+      "sum(values1: number, values2: number, ...) -> number",
     );
     expect(sig.active_parameter).toBe(1);
   });
@@ -110,6 +110,6 @@ describe("WASM signature help (instantiated types)", () => {
 
   it("ifs(..., true, <empty>) highlights value in repeat pair", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", true, )');
-    expect(sig.active_parameter).toBe(3);
+    expect(sig.active_parameter).toBe(5);
   });
 });
