@@ -40,6 +40,15 @@ fn string_lit(text: &str) -> TokenKind {
     })
 }
 
+fn bool_lit(text: &str) -> TokenKind {
+    TokenKind::Literal(Lit {
+        kind: LitKind::Bool,
+        symbol: Symbol {
+            text: text.to_string(),
+        },
+    })
+}
+
 fn line_comment(text: &str) -> TokenKind {
     TokenKind::LineComment(Symbol {
         text: text.to_string(),
@@ -125,6 +134,19 @@ fn test_mixed_expression_kinds() {
 fn test_identifiers() {
     let input = "_a a1 A_B9";
     let expected = vec![ident("_a"), ident("a1"), ident("A_B9"), TokenKind::Eof];
+    assert_eq!(kinds(input), expected);
+}
+
+#[test]
+fn test_keywords_true_false_not() {
+    let input = "true false not x";
+    let expected = vec![
+        bool_lit("true"),
+        bool_lit("false"),
+        TokenKind::Not,
+        ident("x"),
+        TokenKind::Eof,
+    ];
     assert_eq!(kinds(input), expected);
 }
 

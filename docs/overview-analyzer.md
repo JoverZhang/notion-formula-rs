@@ -98,7 +98,7 @@ Literals and identifiers:
 
 Expression forms (AST):
 
-- unary: `!expr`, `-expr`
+- unary: `!expr`, `not expr`, `-expr`
 - binary: `< <= == != >= > && || + - * / % ^`
 - ternary: `cond ? then : otherwise`
 - grouping: `(expr)` preserved as `ExprKind::Group`
@@ -111,8 +111,6 @@ Expression forms (AST):
 
 Known gaps:
 
-- boolean literals (`true` / `false`) lex as identifiers (the lexer does not emit `LitKind::Bool` today), but semantic inference treats them as `boolean`
-- `not` is suggested by completion but is not a lexer/parser operator today
 - completion operator list does not include every parsed operator
 
 ---
@@ -168,7 +166,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
 - Public entrypoint: `completion::complete(text: &str, cursor: usize, ctx: Option<&semantic::Context>, config: CompletionConfig) -> CompletionOutput`.
 - Cursor and `replace` spans are **byte offsets** in the core analyzer.
 - Completion item kinds: `Function`, `Builtin`, `Property`, `Operator`.
-- Builtin completion items include `true`, `false`, `not` (note: today these still lex/parse as identifiers; `not` is not an operator).
+- Builtin completion items include the reserved keywords `true`, `false`, `not` (`not` is a unary operator; `true`/`false` are boolean literals).
 - Postfix completion is driven by a single builtin-derived allowlist (`postfix_capable_builtin_names()` in `analyzer/src/analysis/mod.rs`), defined as builtins with a **flat parameter list** that has more than one parameter (so there is at least one non-receiver argument):
   - after an atom: `.if()` is offered (inserts the leading `.`)
   - after `.` with a receiver atom: `.if` is offered and inserts `if()` (the `.` is already in the source)

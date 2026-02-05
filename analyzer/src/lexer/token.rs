@@ -79,6 +79,8 @@ pub enum TokenKind {
     OrOr,
     /// `!`
     Bang,
+    /// `not`
+    Not,
     /// `+`
     Plus,
     /// `-`
@@ -147,6 +149,7 @@ impl Token {
         matches!(
             self.kind,
             TokenKind::Bang
+                | TokenKind::Not
                 | TokenKind::Minus
                 | TokenKind::Ident(..)
                 | TokenKind::Literal(..)

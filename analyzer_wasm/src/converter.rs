@@ -334,6 +334,7 @@ fn token_kind_string(kind: &TokenKind) -> &'static str {
         AndAnd => "AndAnd",
         OrOr => "OrOr",
         Bang => "Bang",
+        Not => "Not",
         Plus => "Plus",
         Minus => "Minus",
         Star => "Star",
