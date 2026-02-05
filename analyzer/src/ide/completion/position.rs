@@ -109,7 +109,7 @@ fn has_extending_ident_prefix(
     cursor: u32,
     ctx: Option<&semantic::Context>,
 ) -> bool {
-    let Some((_, token)) = prev_non_trivia(tokens, cursor) else {
+    let Some((_, token)) = prev_non_trivia_insertion(tokens, cursor) else {
         return false;
     };
     if token.span.end != cursor {
@@ -155,10 +155,6 @@ fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>
     }
 
     false
-}
-
-pub(super) fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
-    prev_non_trivia_impl(tokens, cursor, CursorBoundary::Containing)
 }
 
 /// Like `prev_non_trivia`, but treats `cursor == token.span.start` as “before the token”.
@@ -253,7 +249,7 @@ pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span
         // Strictly inside an identifier: treat as prefix editing.
         return tokens[idx].span;
     }
-    if let Some((_, token)) = prev_non_trivia(tokens, cursor)
+    if let Some((_, token)) = prev_non_trivia_insertion(tokens, cursor)
         && matches!(token.kind, TokenKind::Ident(_))
         && token.span.end == cursor
     {
@@ -267,7 +263,7 @@ pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span
 
 #[cfg(test)]
 mod tests {
-    use super::{prev_non_trivia, prev_non_trivia_insertion};
+    use super::prev_non_trivia_insertion;
     use crate::lexer::{TokenKind, lex};
 
     #[test]
@@ -277,7 +273,12 @@ mod tests {
 
         // Cursor is at the start of `)`.
         let cursor = 1;
-        let (_, containing) = prev_non_trivia(&tokens, cursor).unwrap();
+        let (_, containing) = super::prev_non_trivia_impl(
+            &tokens,
+            cursor,
+            super::CursorBoundary::Containing,
+        )
+        .unwrap();
         assert!(matches!(&containing.kind, TokenKind::CloseParen));
 
         let (_, insertion) = prev_non_trivia_insertion(&tokens, cursor).unwrap();

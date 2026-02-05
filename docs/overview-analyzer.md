@@ -182,7 +182,7 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
   - after an atom: `.if()` is offered (inserts the leading `.`)
   - after `.` with a receiver atom: `.if` is offered and inserts `if()` (the `.` is already in the source)
 - Property completion items insert `prop("Name")` and can be disabled via `Property.disabled_reason` (disabled items have no `primary_edit`/cursor).
-- At an identifier boundary (cursor at the end of an identifier token), the analyzer treats completion as “prefix editing” only if the prefix can be extended by something in-scope:
+- At an identifier boundary (cursor at the end of an identifier token — including when the cursor is at the start of a following delimiter like `)`), the analyzer treats completion as “prefix editing” only if the prefix can be extended by something in-scope:
   - builtins `true`/`false`/`not` via case-insensitive prefix match
   - context functions/properties via case-insensitive prefix match (excluding exact matches)
 - When `CompletionOutput.replace` is non-empty, the analyzer derives a “query” from the source substring covered by the replace span. If the substring contains any non-identifier characters (identifier-like = ASCII alnum + `_` + whitespace), no fuzzy ranking is applied and `preferred_indices` is `[]`. Otherwise the query is normalized (lowercased; whitespace/underscores removed); if the normalized query is empty, fuzzy ranking is also skipped.

@@ -1,5 +1,6 @@
 use crate::semantic::Ty;
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
+use crate::{CompletionConfig, Span};
 
 #[test]
 fn completion_when_expecting_separator_in_call_shows_after_atom_operators() {
@@ -96,6 +97,31 @@ fn completion_inside_call_arg_ident_end_prefix_allows_completions() {
         .expect_not_empty()
         .expect_contains_builtins(&[Builtin::False])
         .expect_replace_contains_cursor();
+}
+
+#[test]
+fn completion_ident_end_before_close_paren_treats_ident_as_query() {
+    let c = ctx().prop("Date", Ty::Date).build();
+
+    let source = "if(d)";
+    let cursor = source.find(')').unwrap();
+    let out = crate::complete(source, cursor, Some(&c), CompletionConfig::default());
+
+    assert_eq!(
+        out.replace,
+        Span { start: 3, end: 4 },
+        "expected replace span to cover the identifier prefix"
+    );
+
+    let labels: Vec<&str> = out.items.iter().map(|i| i.label.as_str()).collect();
+    assert!(
+        labels.contains(&"Date"),
+        "expected property completion for Date\nactual labels: {labels:?}"
+    );
+    assert!(
+        labels.contains(&"date"),
+        "expected function completion for date\nactual labels: {labels:?}"
+    );
 }
 
 #[test]
