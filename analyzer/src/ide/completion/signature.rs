@@ -17,23 +17,6 @@ pub(super) struct CallContext {
     pub(super) arg_index: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct RepeatShapeInfo {
-    repeat_groups: usize,
-    tail_start: usize,
-}
-
-fn repeat_shape_info(
-    sig: &semantic::FunctionSig,
-    total_args_for_shape: usize,
-) -> Option<RepeatShapeInfo> {
-    let shape = semantic::complete_repeat_shape(&sig.params, total_args_for_shape)?;
-    Some(RepeatShapeInfo {
-        repeat_groups: shape.repeat_groups.max(1),
-        tail_start: shape.tail_start,
-    })
-}
-
 fn ty_contains_generic(ty: &semantic::Ty) -> bool {
     match ty {
         semantic::Ty::Generic(_) => true,
@@ -159,9 +142,10 @@ fn render_signature(
     let repeat_start = sig.params.head.len();
     let repeat_len = sig.params.repeat.len();
 
-    let shape = repeat_shape_info(sig, total_args_for_shape);
-    let repeat_groups_displayed = shape.map(|s| s.repeat_groups).unwrap_or(1);
-    let tail_start = shape.map(|s| s.tail_start).unwrap_or(usize::MAX);
+    let (repeat_groups_displayed, tail_start) =
+        semantic::complete_repeat_shape(&sig.params, total_args_for_shape)
+            .map(|s| (s.repeat_groups, s.tail_start))
+            .unwrap_or((1, usize::MAX));
 
     for n in 1..=repeat_groups_displayed {
         for (r_idx, p) in sig.params.repeat.iter().enumerate() {
@@ -397,74 +381,54 @@ fn infer_call_arg_tys_best_effort(
     arg_tys
 }
 
-fn active_param_index(
+fn active_parameter_for_call(
     sig: &semantic::FunctionSig,
-    call_ctx: &CallContext,
+    arg_index_full: usize,
     total_args_for_shape: usize,
+    is_method_style: bool,
 ) -> usize {
-    if sig.params.repeat.is_empty() {
+    let idx = if sig.params.repeat.is_empty() {
         let total_params = sig.params.head.len() + sig.params.tail.len();
         if total_params == 0 {
+            0
+        } else {
+            arg_index_full.min(total_params - 1)
+        }
+    } else {
+        let head_len = sig.params.head.len();
+        let repeat_len = sig.params.repeat.len();
+        let tail_len = sig.params.tail.len();
+
+        if repeat_len == 0 {
             return 0;
         }
-        return call_ctx.arg_index.min(total_params - 1);
-    }
 
-    let head_len = sig.params.head.len();
-    let repeat_len = sig.params.repeat.len();
-    let tail_len = sig.params.tail.len();
+        let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape)
+        else {
+            return 0;
+        };
 
-    if repeat_len == 0 {
-        return 0;
-    }
+        if arg_index_full < head_len {
+            arg_index_full
+        } else if arg_index_full >= shape.tail_start {
+            let tail_idx = arg_index_full.saturating_sub(shape.tail_start);
+            let max_tail = tail_len.saturating_sub(1);
+            let tail_idx = tail_idx.min(max_tail);
+            head_len + repeat_len * shape.repeat_groups + tail_idx
+        } else {
+            let idx_in_repeat = arg_index_full.saturating_sub(head_len);
+            let repeat_pos = idx_in_repeat % repeat_len;
 
-    let Some(shape) = repeat_shape_info(sig, total_args_for_shape) else {
-        return 0;
-    };
-    let tail_start = shape.tail_start;
-    let repeat_groups_displayed = shape.repeat_groups;
-
-    // Display shape: head, repeat groups, "...", tail
-    let ellipsis_idx = head_len + repeat_len * repeat_groups_displayed;
-    let tail_display_start = ellipsis_idx + 1;
-
-    if call_ctx.arg_index < head_len {
-        return call_ctx.arg_index;
-    }
-
-    if call_ctx.arg_index >= tail_start {
-        let tail_idx = call_ctx.arg_index.saturating_sub(tail_start);
-        let max_tail = tail_len.saturating_sub(1);
-        return tail_display_start + tail_idx.min(max_tail);
-    }
-
-    let idx_in_repeat = call_ctx.arg_index.saturating_sub(head_len);
-    let repeat_pos = idx_in_repeat % repeat_len;
-
-    let cycle = idx_in_repeat / repeat_len;
-    head_len + cycle * repeat_len + repeat_pos
-}
-
-fn nearest_param_index(slots: &[ParamSlot], slot_idx: usize) -> usize {
-    let get = |i: usize| match slots.get(i) {
-        Some(ParamSlot::Param { param_index, .. }) => Some(*param_index as usize),
-        _ => None,
+            let cycle = idx_in_repeat / repeat_len;
+            head_len + cycle * repeat_len + repeat_pos
+        }
     };
 
-    if let Some(idx) = get(slot_idx) {
-        return idx;
+    if is_method_style {
+        idx.saturating_sub(1)
+    } else {
+        idx
     }
-    for i in (0..slot_idx).rev() {
-        if let Some(idx) = get(i) {
-            return idx;
-        }
-    }
-    for i in (slot_idx + 1)..slots.len() {
-        if let Some(idx) = get(i) {
-            return idx;
-        }
-    }
-    0
 }
 
 /// Computes signature help when the cursor is inside a call argument list.
@@ -493,9 +457,9 @@ pub(super) fn compute_signature_help_if_in_call(
 
     let is_postfix_call = || {
         let (callee_idx, callee_token) = prev_non_trivia_before(tokens, call_ctx.lparen_idx)?;
-        let TokenKind::Ident(_) = callee_token.kind else {
+        if !matches!(callee_token.kind, TokenKind::Ident(_)) {
             return None;
-        };
+        }
         let (dot_idx, dot_token) = prev_non_trivia_before(tokens, callee_idx)?;
         if !matches!(dot_token.kind, TokenKind::Dot) {
             return None;
@@ -516,13 +480,9 @@ pub(super) fn compute_signature_help_if_in_call(
     let arg_tys = infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
     let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
 
-    let mut full_call_ctx = call_ctx.clone();
-    if is_method_style {
-        // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
-        full_call_ctx.arg_index = full_call_ctx.arg_index.saturating_add(1);
-    }
-
-    let total_args_for_shape = arg_tys.len().max(full_call_ctx.arg_index + 1);
+    // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
+    let arg_index_full = call_ctx.arg_index.saturating_add(is_method_style as usize);
+    let total_args_for_shape = arg_tys.len().max(arg_index_full + 1);
     let rendered = render_signature(
         func,
         arg_tys.as_slice(),
@@ -531,19 +491,8 @@ pub(super) fn compute_signature_help_if_in_call(
         is_method_style,
     );
 
-    let active_slot = if rendered.slots.is_empty() {
-        0
-    } else {
-        let full_slot = active_param_index(func, &full_call_ctx, total_args_for_shape);
-        let slot = if is_method_style {
-            full_slot.saturating_sub(1)
-        } else {
-            full_slot
-        };
-        slot.min(rendered.slots.len().saturating_sub(1))
-    };
-
-    let active_parameter = nearest_param_index(rendered.slots.as_slice(), active_slot);
+    let active_parameter =
+        active_parameter_for_call(func, arg_index_full, total_args_for_shape, is_method_style);
     let segments =
         build_signature_segments(func.name.as_str(), &rendered, &inst_ret, is_method_style);
 
@@ -634,29 +583,5 @@ pub(super) fn expected_call_arg_ty(
     match ty {
         semantic::Ty::Unknown | semantic::Ty::Generic(_) => None,
         other => Some(other),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::nearest_param_index;
-    use crate::ide::display::ParamSlot;
-
-    #[test]
-    fn active_parameter_uses_nearest_param_index_when_on_ellipsis() {
-        let slots = vec![
-            ParamSlot::Param {
-                name: "a".into(),
-                ty: "number".into(),
-                param_index: 3,
-            },
-            ParamSlot::Ellipsis,
-            ParamSlot::Param {
-                name: "b".into(),
-                ty: "string".into(),
-                param_index: 4,
-            },
-        ];
-        assert_eq!(nearest_param_index(&slots, 1), 3);
     }
 }

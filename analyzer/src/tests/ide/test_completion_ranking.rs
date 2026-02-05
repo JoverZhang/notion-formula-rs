@@ -1,4 +1,4 @@
-use crate::completion::CompletionData;
+use crate::completion::{CompletionConfig, CompletionData, complete};
 use crate::semantic::Ty;
 use crate::semantic::{Context, builtins_functions};
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
@@ -40,6 +40,35 @@ fn completion_inside_call_arg_empty_does_not_apply_fuzzy_ranking() {
         .ctx(c)
         .expect_preferred_indices_empty()
         .expect_items_kinds_labels(&start);
+}
+
+#[test]
+fn completion_non_ascii_query_disables_ranking_and_preserves_order() {
+    let c = ctx().build();
+
+    let baseline = complete("", 0, Some(&c), CompletionConfig::default());
+    let baseline_items = baseline
+        .items
+        .iter()
+        .map(|i| (i.kind, i.label.clone()))
+        .collect::<Vec<_>>();
+
+    // Cursor is inside the identifier, so the replace span is non-empty. Query ranking should be
+    // disabled because the replace text contains non-ASCII characters.
+    let source = "αβ";
+    let cursor = "α".len();
+    let out = complete(source, cursor, Some(&c), CompletionConfig::default());
+
+    assert_eq!(out.replace.start, 0);
+    assert_eq!(out.replace.end, u32::try_from(source.len()).unwrap());
+    assert!(out.preferred_indices.is_empty());
+    assert_eq!(
+        out.items
+            .iter()
+            .map(|i| (i.kind, i.label.clone()))
+            .collect::<Vec<_>>(),
+        baseline_items
+    );
 }
 
 #[test]

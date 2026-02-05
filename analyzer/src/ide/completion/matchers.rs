@@ -1,8 +1,24 @@
 //! Query normalization and fuzzy matching for completion labels.
-//! Matching is ASCII-case-insensitive and treats `_` as insignificant.
+//!
+//! Core idea: subsequence match (not substring).
+//! - `query` matches `label` if every query character appears in `label` in order.
+//! - Matching is ASCII-case-insensitive.
+//!
+//! The score is not a single number; it is a set of heuristics used for ranking.
+//! See `fuzzy_score_cmp` for the exact priority order.
 
 use std::cmp::Ordering;
 
+/// Heuristic metrics for ranking a subsequence match.
+///
+/// Interpretation (better = ranks earlier):
+/// - `is_prefix`: `label` starts with `query` (strong signal).
+/// - `gap_sum`: total number of skipped characters between matched characters
+///   (smaller is better).
+/// - `max_run`: length of the longest consecutive run of matched characters
+///   (larger is better; prefers contiguous-looking matches).
+/// - `first_pos`: index of the first matched character in `label` (smaller is better).
+/// - `label_len`: total length of `label` in chars (smaller is a mild tie-breaker).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct FuzzyScore {
     pub(super) is_prefix: bool,
@@ -12,8 +28,24 @@ pub(super) struct FuzzyScore {
     pub(super) label_len: usize,
 }
 
-/// Returns a fuzzy match score for `query` in `label`, or `None` if it does not match.
+/// Computes a fuzzy match score for `query` against `label`.
+///
+/// Matching:
+/// - ASCII-case-insensitive.
+/// - Subsequence match: `query` chars must appear in `label` in order (not necessarily contiguous).
+///
+/// If no match exists, returns `None`.
+///
+/// Scoring details:
+/// - We record the matched character positions in `label`.
+/// - From these positions we derive `gap_sum`, `max_run`, and `first_pos`.
+/// - `is_prefix` is computed as a separate strong signal.
+///
+/// NOTE: This function currently does NOT ignore '_'.
+/// If callers want '_' to be insignificant, they should normalize inputs first
+/// (e.g., via `normalize_for_match`) and/or define how positions should be interpreted.
 pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
+    // Lowercase ASCII for stable matching.
     let query_chars: Vec<char> = query.chars().map(|c| c.to_ascii_lowercase()).collect();
     if query_chars.is_empty() {
         return None;
@@ -24,6 +56,8 @@ pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
         return None;
     }
 
+    // Greedy subsequence match:
+    // For each query char, find the earliest next occurrence in label after the previous match.
     let mut positions = Vec::with_capacity(query_chars.len());
     let mut j = 0usize;
     for &qc in &query_chars {
@@ -40,6 +74,9 @@ pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
     let first_pos = *positions.first().unwrap_or(&0);
     let label_len = label_chars.len();
 
+    // Derive "compactness" signals from matched positions.
+    // - `gap_sum`: total skipped chars between matches (prefers compact matches).
+    // - `max_run`: longest consecutive run (prefers contiguous-looking matches).
     let mut gap_sum = 0usize;
     let mut max_run = 1usize;
     let mut current_run = 1usize;
@@ -55,6 +92,8 @@ pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
         }
     }
 
+    // Strong signal: exact prefix match (case-insensitive).
+    // (This is computed separately from subsequence match.)
     let label_lower: String = label_chars.iter().collect();
     let query_lower: String = query_chars.iter().collect();
     let is_prefix = label_lower.starts_with(&query_lower);
@@ -68,7 +107,14 @@ pub(super) fn fuzzy_score(query: &str, label: &str) -> Option<FuzzyScore> {
     })
 }
 
-/// Ordering for `FuzzyScore` (better scores sort first).
+/// Orders fuzzy scores from best to worst.
+///
+/// Priority (earlier is better):
+/// 1) prefix match
+/// 2) smaller gaps between matched chars
+/// 3) larger contiguous run
+/// 4) earlier first match position
+/// 5) shorter label (tie-break)
 pub(super) fn fuzzy_score_cmp(a: FuzzyScore, b: FuzzyScore) -> Ordering {
     b.is_prefix
         .cmp(&a.is_prefix)

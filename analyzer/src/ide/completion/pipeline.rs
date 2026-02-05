@@ -15,19 +15,14 @@ pub(super) fn complete(
     config: CompletionConfig,
 ) -> CompletionOutput {
     let cursor_u32 = u32::try_from(cursor).unwrap_or(u32::MAX);
-    let lex_output = lex(text);
-    let tokens = lex_output.tokens;
+    let tokens = lex(text).tokens;
 
     let default_replace = Span {
         start: cursor_u32,
         end: cursor_u32,
     };
 
-    if tokens.is_empty()
-        || tokens
-            .iter()
-            .all(|token| matches!(token.kind, TokenKind::Eof))
-    {
+    if tokens.iter().all(|token| matches!(token.kind, TokenKind::Eof)) {
         let items = if cursor == 0 {
             super::items::expr_start_items(ctx)
         } else {
@@ -47,30 +42,24 @@ pub(super) fn complete(
     }
 
     let call_ctx = super::signature::detect_call_context(tokens.as_slice(), cursor_u32);
-
-    let compute = |tokens: &[Token]| {
-        let signature_help = super::signature::compute_signature_help_if_in_call(
-            text,
-            tokens,
-            cursor_u32,
-            ctx,
-            call_ctx.as_ref(),
-        );
-        let in_string = super::position::cursor_strictly_inside_string_literal(tokens, cursor_u32);
-        let position_kind = if in_string {
+    let signature_help = super::signature::compute_signature_help_if_in_call(
+        text,
+        tokens.as_slice(),
+        cursor_u32,
+        ctx,
+        call_ctx.as_ref(),
+    );
+    let position_kind =
+        if super::position::cursor_strictly_inside_string_literal(tokens.as_slice(), cursor_u32) {
             PositionKind::None
         } else {
-            super::position::detect_position_kind(tokens, cursor_u32, ctx, call_ctx.as_ref())
+            super::position::detect_position_kind(tokens.as_slice(), cursor_u32, ctx)
         };
 
-        let mut output =
-            complete_for_position(position_kind, ctx, tokens, cursor_u32, call_ctx.as_ref());
-        output.signature_help = signature_help;
-
-        super::rank::finalize_output(text, output, config, position_kind)
-    };
-
-    compute(tokens.as_slice())
+    let mut output =
+        complete_for_position(position_kind, ctx, tokens.as_slice(), cursor_u32, call_ctx.as_ref());
+    output.signature_help = signature_help;
+    super::rank::finalize_output(text, output, config, position_kind)
 }
 
 fn complete_for_position(

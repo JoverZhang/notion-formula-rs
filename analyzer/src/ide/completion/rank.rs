@@ -2,6 +2,8 @@
 //! Ranking uses an ASCII-ish normalized query (lowercased; `_` removed).
 //! Spans/cursors are UTF-8 byte offsets; ranges are half-open `[start, end)`.
 
+use std::cmp::Ordering;
+
 use super::matchers::{FuzzyScore, fuzzy_score, fuzzy_score_cmp, normalize_for_match};
 use super::position::PositionKind;
 use super::{
@@ -19,6 +21,109 @@ fn kind_priority(kind: CompletionKind) -> u8 {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MatchClass {
+    Exact,
+    Contains { pos: usize },
+    Fuzzy(FuzzyScore),
+    None,
+}
+
+impl MatchClass {
+    fn rank(self) -> u8 {
+        match self {
+            MatchClass::Exact => 0,
+            MatchClass::Contains { .. } => 1,
+            MatchClass::Fuzzy(_) => 2,
+            MatchClass::None => 3,
+        }
+    }
+}
+
+fn match_class_for_norm_label(query_norm: &str, label_norm: &str) -> MatchClass {
+    if label_norm == query_norm {
+        return MatchClass::Exact;
+    }
+    if let Some(pos) = label_norm.find(query_norm) {
+        return MatchClass::Contains { pos };
+    }
+    if let Some(score) = fuzzy_score(query_norm, label_norm) {
+        return MatchClass::Fuzzy(score);
+    }
+    MatchClass::None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RankMode {
+    Normal,
+    Postfix,
+}
+
+#[derive(Debug)]
+struct RankedItem {
+    original_idx: usize,
+    label_norm_len: usize,
+    class: MatchClass,
+    item: CompletionItem,
+}
+
+fn cmp_ranked_items(a: &RankedItem, b: &RankedItem) -> Ordering {
+    a.class.rank().cmp(&b.class.rank()).then_with(|| match (a.class, b.class) {
+        (MatchClass::Exact, MatchClass::Exact) => a
+            .label_norm_len
+            .cmp(&b.label_norm_len)
+            .then_with(|| a.original_idx.cmp(&b.original_idx)),
+        (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => a
+            .label_norm_len
+            .cmp(&b.label_norm_len)
+            .then_with(|| ap.cmp(&bp))
+            .then_with(|| a.original_idx.cmp(&b.original_idx)),
+        (MatchClass::Fuzzy(sa), MatchClass::Fuzzy(sb)) => fuzzy_score_cmp(sa, sb)
+            .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
+            .then_with(|| a.original_idx.cmp(&b.original_idx)),
+        (MatchClass::None, MatchClass::None) => a.original_idx.cmp(&b.original_idx),
+        _ => a.original_idx.cmp(&b.original_idx),
+    })
+}
+
+fn apply_query_ranking(query_norm: &str, items: &mut Vec<CompletionItem>, mode: RankMode) {
+    let mut ranked: Vec<RankedItem> = items
+        .drain(..)
+        .enumerate()
+        .map(|(idx, item)| {
+            let label = match mode {
+                RankMode::Normal => item.label.as_str(),
+                RankMode::Postfix => item.label.trim_start_matches('.'),
+            };
+            let label_norm = normalize_for_match(label);
+            let label_norm_len = label_norm.chars().count();
+
+            let class = match mode {
+                RankMode::Normal
+                    if !matches!(
+                        item.kind,
+                        CompletionKind::Function | CompletionKind::Property
+                    ) =>
+                {
+                    MatchClass::None
+                }
+                _ => match_class_for_norm_label(query_norm, &label_norm),
+            };
+
+            RankedItem {
+                original_idx: idx,
+                label_norm_len,
+                class,
+                item,
+            }
+        })
+        .filter(|r| mode != RankMode::Postfix || r.class != MatchClass::None)
+        .collect();
+
+    ranked.sort_by(cmp_ranked_items);
+    *items = ranked.into_iter().map(|r| r.item).collect();
+}
+
 pub(super) fn finalize_output(
     text: &str,
     mut output: CompletionOutput,
@@ -32,13 +137,15 @@ pub(super) fn finalize_output(
         return output;
     };
 
-    if matches!(position_kind, PositionKind::AfterDot) {
-        fuzzy_filter_and_rank_postfix_items(&query, &mut output.items);
+    let query_norm = normalize_for_match(&query);
+    let mode = if matches!(position_kind, PositionKind::AfterDot) {
+        RankMode::Postfix
     } else {
-        fuzzy_rank_items(&query, &mut output.items);
-    }
+        RankMode::Normal
+    };
+    apply_query_ranking(&query_norm, &mut output.items, mode);
     output.preferred_indices =
-        preferred_indices_for_items(&output.items, &query, config.preferred_limit);
+        preferred_indices_for_items(&output.items, &query_norm, config.preferred_limit);
     output
 }
 
@@ -118,204 +225,14 @@ fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
     }
 }
 
-/// Ranks items by query match quality, with deterministic tie-breaks.
-pub(super) fn fuzzy_rank_items(query: &str, items: &mut Vec<CompletionItem>) {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum MatchClass {
-        Exact,
-        Contains { pos: usize },
-        Fuzzy(FuzzyScore),
-        None,
-    }
-
-    fn match_class_for_item(query_norm: &str, item: &CompletionItem) -> MatchClass {
-        if !matches!(
-            item.kind,
-            CompletionKind::Function | CompletionKind::Property
-        ) {
-            return MatchClass::None;
-        }
-
-        let label_norm = normalize_for_match(&item.label);
-        if label_norm == query_norm {
-            return MatchClass::Exact;
-        }
-        if let Some(pos) = label_norm.find(query_norm) {
-            return MatchClass::Contains { pos };
-        }
-        if let Some(score) = fuzzy_score(query_norm, &label_norm) {
-            return MatchClass::Fuzzy(score);
-        }
-        MatchClass::None
-    }
-
-    fn match_class_rank(class: MatchClass) -> u8 {
-        match class {
-            MatchClass::Exact => 0,
-            MatchClass::Contains { .. } => 1,
-            MatchClass::Fuzzy(_) => 2,
-            MatchClass::None => 3,
-        }
-    }
-
-    #[derive(Debug)]
-    struct Ranked {
-        original_idx: usize,
-        label_norm_len: usize,
-        class: MatchClass,
-        item: CompletionItem,
-    }
-
-    let query_norm = normalize_for_match(query);
-
-    let mut ranked: Vec<Ranked> = items
-        .drain(..)
-        .enumerate()
-        .map(|(idx, item)| {
-            let label_norm_len = normalize_for_match(&item.label).chars().count();
-            let class = match_class_for_item(&query_norm, &item);
-            Ranked {
-                original_idx: idx,
-                label_norm_len,
-                class,
-                item,
-            }
-        })
-        .collect();
-
-    ranked.sort_by(|a, b| {
-        let ar = match_class_rank(a.class);
-        let br = match_class_rank(b.class);
-        ar.cmp(&br).then_with(|| match (a.class, b.class) {
-            (MatchClass::Exact, MatchClass::Exact) => a
-                .label_norm_len
-                .cmp(&b.label_norm_len)
-                .then_with(|| a.original_idx.cmp(&b.original_idx)),
-            (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => a
-                .label_norm_len
-                .cmp(&b.label_norm_len)
-                .then_with(|| ap.cmp(&bp))
-                .then_with(|| a.original_idx.cmp(&b.original_idx)),
-            (MatchClass::Fuzzy(sa), MatchClass::Fuzzy(sb)) => fuzzy_score_cmp(sa, sb)
-                .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
-                .then_with(|| a.original_idx.cmp(&b.original_idx)),
-            (MatchClass::None, MatchClass::None) => a.original_idx.cmp(&b.original_idx),
-            _ => a.original_idx.cmp(&b.original_idx),
-        })
-    });
-
-    *items = ranked.into_iter().map(|r| r.item).collect();
-}
-
-/// Filters postfix-method items to matches, then ranks them (label match ignores the leading `.`).
-pub(super) fn fuzzy_filter_and_rank_postfix_items(query: &str, items: &mut Vec<CompletionItem>) {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum MatchClass {
-        Exact,
-        Contains { pos: usize },
-        Fuzzy(FuzzyScore),
-        None,
-    }
-
-    fn match_class_for_label(query_norm: &str, label: &str) -> MatchClass {
-        let label_norm = normalize_for_match(label.trim_start_matches('.'));
-        if label_norm.is_empty() {
-            return MatchClass::None;
-        }
-        if label_norm == query_norm {
-            return MatchClass::Exact;
-        }
-        if let Some(pos) = label_norm.find(query_norm) {
-            return MatchClass::Contains { pos };
-        }
-        if let Some(score) = fuzzy_score(query_norm, &label_norm) {
-            return MatchClass::Fuzzy(score);
-        }
-        MatchClass::None
-    }
-
-    fn match_class_rank(class: MatchClass) -> u8 {
-        match class {
-            MatchClass::Exact => 0,
-            MatchClass::Contains { .. } => 1,
-            MatchClass::Fuzzy(_) => 2,
-            MatchClass::None => 3,
-        }
-    }
-
-    #[derive(Debug)]
-    struct Ranked {
-        original_idx: usize,
-        label_norm_len: usize,
-        class: MatchClass,
-        item: CompletionItem,
-    }
-
-    let query_norm = normalize_for_match(query);
-
-    let mut ranked: Vec<Ranked> = items
-        .drain(..)
-        .enumerate()
-        .map(|(idx, item)| {
-            let label_norm_len = normalize_for_match(item.label.trim_start_matches('.'))
-                .chars()
-                .count();
-            let class = match_class_for_label(&query_norm, &item.label);
-            Ranked {
-                original_idx: idx,
-                label_norm_len,
-                class,
-                item,
-            }
-        })
-        .filter(|r| r.class != MatchClass::None)
-        .collect();
-
-    ranked.sort_by(|a, b| {
-        let ar = match_class_rank(a.class);
-        let br = match_class_rank(b.class);
-        ar.cmp(&br).then_with(|| match (a.class, b.class) {
-            (MatchClass::Exact, MatchClass::Exact) => a
-                .label_norm_len
-                .cmp(&b.label_norm_len)
-                .then_with(|| a.original_idx.cmp(&b.original_idx)),
-            (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => a
-                .label_norm_len
-                .cmp(&b.label_norm_len)
-                .then_with(|| ap.cmp(&bp))
-                .then_with(|| a.original_idx.cmp(&b.original_idx)),
-            (MatchClass::Fuzzy(sa), MatchClass::Fuzzy(sb)) => fuzzy_score_cmp(sa, sb)
-                .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
-                .then_with(|| a.original_idx.cmp(&b.original_idx)),
-            _ => a.original_idx.cmp(&b.original_idx),
-        })
-    });
-
-    *items = ranked.into_iter().map(|r| r.item).collect();
-}
-
 /// Picks “smart” item indices that match the query, up to `preferred_limit`.
 pub(super) fn preferred_indices_for_items(
     items: &[CompletionItem],
-    query: &str,
+    query_norm: &str,
     preferred_limit: usize,
 ) -> Vec<usize> {
     if preferred_limit == 0 {
         return Vec::new();
-    }
-    let query_norm = normalize_for_match(query);
-
-    fn matches_query(query_norm: &str, item: &CompletionItem) -> bool {
-        if !matches!(
-            item.kind,
-            CompletionKind::Function | CompletionKind::Property
-        ) {
-            return false;
-        }
-        let label_norm = normalize_for_match(&item.label);
-        label_norm == query_norm
-            || label_norm.contains(query_norm)
-            || fuzzy_score(query_norm, &label_norm).is_some()
     }
 
     let mut out = Vec::with_capacity(preferred_limit);
@@ -326,7 +243,12 @@ pub(super) fn preferred_indices_for_items(
         if item.is_disabled {
             continue;
         }
-        if matches_query(&query_norm, item) {
+        if matches!(
+            item.kind,
+            CompletionKind::Function | CompletionKind::Property
+        ) && match_class_for_norm_label(query_norm, &normalize_for_match(&item.label))
+            != MatchClass::None
+        {
             out.push(idx);
         }
     }

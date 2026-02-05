@@ -1,7 +1,6 @@
 //! Cursor/position helpers for completion.
 //! All `cursor` values are UTF-8 byte offsets into the original source text.
 
-use super::signature::CallContext;
 use crate::lexer::{LitKind, Span, Token, TokenKind};
 use crate::semantic;
 
@@ -19,7 +18,6 @@ pub(super) fn detect_position_kind(
     tokens: &[Token],
     cursor: u32,
     ctx: Option<&semantic::Context>,
-    call_ctx: Option<&CallContext>,
 ) -> PositionKind {
     if is_postfix_member_access_position(tokens, cursor) {
         return PositionKind::AfterDot;
@@ -37,10 +35,6 @@ pub(super) fn detect_position_kind(
     if is_expr_start_position(prev) {
         return PositionKind::NeedExpr;
     }
-
-    // AfterAtom only makes sense if we're in an expression (either top-level or inside a call).
-    // Call context is computed separately; we treat both cases the same for completion contents.
-    let _ = call_ctx;
 
     match prev.map(|token| &token.kind) {
         Some(TokenKind::Ident(_)) | Some(TokenKind::Literal(_)) | Some(TokenKind::CloseParen) => {
@@ -164,35 +158,33 @@ fn has_extending_completion_prefix(prefix: &str, ctx: Option<&semantic::Context>
 }
 
 pub(super) fn prev_non_trivia(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
-    if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
-        && !token.is_trivia()
-        && !matches!(token.kind, TokenKind::Eof)
-    {
-        return Some((idx, token));
-    }
-
-    let mut prev = None;
-    for (idx, token) in tokens.iter().enumerate() {
-        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
-            continue;
-        }
-        if token.span.end <= cursor {
-            prev = Some((idx, token));
-        } else {
-            break;
-        }
-    }
-    prev
+    prev_non_trivia_impl(tokens, cursor, CursorBoundary::Containing)
 }
 
 /// Like `prev_non_trivia`, but treats `cursor == token.span.start` as “before the token”.
 ///
 /// This makes completion before `)` behave like insertion, not “after `)`”.
 pub(super) fn prev_non_trivia_insertion(tokens: &[Token], cursor: u32) -> Option<(usize, &Token)> {
+    prev_non_trivia_impl(tokens, cursor, CursorBoundary::Insertion)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CursorBoundary {
+    /// Treat `cursor == token.span.start` as inside the token.
+    Containing,
+    /// Treat `cursor == token.span.start` as before the token.
+    Insertion,
+}
+
+fn prev_non_trivia_impl(
+    tokens: &[Token],
+    cursor: u32,
+    boundary: CursorBoundary,
+) -> Option<(usize, &Token)> {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
-        && token.span.start < cursor
         && !token.is_trivia()
         && !matches!(token.kind, TokenKind::Eof)
+        && (boundary == CursorBoundary::Containing || token.span.start < cursor)
     {
         return Some((idx, token));
     }
@@ -270,5 +262,25 @@ pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span
     Span {
         start: cursor,
         end: cursor,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{prev_non_trivia, prev_non_trivia_insertion};
+    use crate::lexer::{TokenKind, lex};
+
+    #[test]
+    fn prev_non_trivia_insertion_treats_cursor_at_token_start_as_before() {
+        let source = "a)";
+        let tokens = lex(source).tokens;
+
+        // Cursor is at the start of `)`.
+        let cursor = 1;
+        let (_, containing) = prev_non_trivia(&tokens, cursor).unwrap();
+        assert!(matches!(&containing.kind, TokenKind::CloseParen));
+
+        let (_, insertion) = prev_non_trivia_insertion(&tokens, cursor).unwrap();
+        assert!(matches!(&insertion.kind, TokenKind::Ident(_)));
     }
 }

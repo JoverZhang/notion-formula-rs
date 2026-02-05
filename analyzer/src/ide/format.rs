@@ -209,17 +209,13 @@ impl<'a> Formatter<'a> {
             ExprKind::Group { inner } => self.format_group(expr, indent, inner),
             ExprKind::List { items } => self.format_list(expr, indent, items),
             ExprKind::Lit(lit) => Rendered::single(indent, render_literal(lit)),
-            ExprKind::Call { callee, args } => {
-                self.format_call(expr, indent, &callee.text, args)
-            }
+            ExprKind::Call { callee, args } => self.format_call(expr, indent, &callee.text, args),
             ExprKind::MemberCall {
                 receiver,
                 method,
                 args,
             } => self.format_member_call(expr, indent, receiver, &method.text, args),
-            ExprKind::Unary { op, expr: inner } => {
-                self.format_unary(expr, indent, *op, inner)
-            }
+            ExprKind::Unary { op, expr: inner } => self.format_unary(expr, indent, *op, inner),
             ExprKind::Binary { op, left, right } => {
                 self.format_binary(expr, indent, *op, left, right)
             }
@@ -281,13 +277,7 @@ impl<'a> Formatter<'a> {
         )
     }
 
-    fn format_unary(
-        &mut self,
-        expr: &Expr,
-        indent: usize,
-        op: UnOp,
-        inner: &Expr,
-    ) -> Rendered {
+    fn format_unary(&mut self, expr: &Expr, indent: usize, op: UnOp, inner: &Expr) -> Rendered {
         let op_str = op.as_str();
         let needs_space = matches!(op, UnOp::Not(crate::ast::NotKind::Keyword));
 
@@ -438,13 +428,7 @@ impl<'a> Formatter<'a> {
         out
     }
 
-    fn format_call(
-        &mut self,
-        expr: &Expr,
-        indent: usize,
-        callee: &str,
-        args: &[Expr],
-    ) -> Rendered {
+    fn format_call(&mut self, expr: &Expr, indent: usize, callee: &str, args: &[Expr]) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
         if !has_newline {
@@ -497,21 +481,10 @@ impl<'a> Formatter<'a> {
         }
 
         let receiver_r = self.format_expr_rendered(receiver, indent);
-        self.format_delimited_seq(
-            receiver_r,
-            indent,
-            format!(".{method}("),
-            true,
-            ")",
-            args,
-        )
+        self.format_delimited_seq(receiver_r, indent, format!(".{method}("), true, ")", args)
     }
 
-    fn format_expr_single_line(
-        &mut self,
-        expr: &Expr,
-        indent: usize,
-    ) -> Option<String> {
+    fn format_expr_single_line(&mut self, expr: &Expr, indent: usize) -> Option<String> {
         let rendered = self.format_expr_rendered(expr, indent);
         if rendered.lines.len() == 1 {
             Some(rendered.lines[0].text.clone())
@@ -531,7 +504,6 @@ impl<'a> Formatter<'a> {
     fn expr_token_range(&self, expr: &Expr) -> TokenRange {
         self.token_query().range_for_span(expr.span)
     }
-
 
     fn expr_span_from_tokens(&self, expr: &Expr) -> Option<Span> {
         match &expr.kind {
