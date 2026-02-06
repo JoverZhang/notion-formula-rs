@@ -1,5 +1,5 @@
 use crate::lexer::lex;
-use crate::lexer::{Span, TokenKind, tokens_in_span};
+use crate::lexer::{CommentKind, Span, TokenKind, tokens_in_span};
 
 #[test]
 fn test_tokens_in_span() {
@@ -49,13 +49,13 @@ fn test_tokens_in_span() {
 
     let r = tokens_in_span(&tokens, span(0, 8)); // whole expression
     assert_eq!((r.lo, r.hi), (0, 4)); // excludes EOF
-    assert!(matches!(tokens[1].kind, TokenKind::BlockComment(_)));
+    assert!(matches!(tokens[1].kind, TokenKind::DocComment(CommentKind::Block, _)));
 
     let r = tokens_in_span(&tokens, span(1, 6)); // "/*c*/"
     assert_eq!((r.lo, r.hi), (1, 2));
     assert!(matches!(
         tokens[r.lo as usize].kind,
-        TokenKind::BlockComment(_)
+        TokenKind::DocComment(CommentKind::Block, _)
     ));
 
     // Span covering only trivia.
@@ -67,7 +67,7 @@ fn test_tokens_in_span() {
     assert_eq!((r.lo, r.hi), (1, 2));
     assert!(matches!(
         tokens[r.lo as usize].kind,
-        TokenKind::BlockComment(_)
+        TokenKind::DocComment(CommentKind::Block, _)
     ));
 
     // Span covering newline + comment + token.
@@ -78,7 +78,10 @@ fn test_tokens_in_span() {
     let r = tokens_in_span(&tokens, span(1, 8));
     assert_eq!((r.lo, r.hi), (1, 4));
     assert!(matches!(tokens[1].kind, TokenKind::Newline));
-    assert!(matches!(tokens[2].kind, TokenKind::BlockComment(_)));
+    assert!(matches!(
+        tokens[2].kind,
+        TokenKind::DocComment(CommentKind::Block, _)
+    ));
     assert!(matches!(tokens[3].kind, TokenKind::Ident(_)));
 
     // Empty span: always empty result.

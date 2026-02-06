@@ -1,4 +1,4 @@
-use crate::lexer::TokenKind;
+use crate::lexer::{CommentKind, TokenKind};
 use crate::lexer::lex;
 use crate::parser::TokenQuery;
 
@@ -8,9 +8,12 @@ fn test_token_query_prev_next_nontrivia_around_trivia_and_eof() {
     let tokens = lex(src).tokens;
     let q = TokenQuery::new(&tokens);
 
-    // token sequence: Ident(a), LineComment, Newline, Ident(b), Eof
+    // token sequence: Ident(a), Comment(line), Newline, Ident(b), Eof
     assert!(matches!(tokens[0].kind, TokenKind::Ident(_)));
-    assert!(matches!(tokens[1].kind, TokenKind::LineComment(_)));
+    assert!(matches!(
+        tokens[1].kind,
+        TokenKind::DocComment(CommentKind::Line, _)
+    ));
     assert!(matches!(tokens[2].kind, TokenKind::Newline));
     assert!(matches!(tokens[3].kind, TokenKind::Ident(_)));
     assert!(matches!(tokens[4].kind, TokenKind::Eof));

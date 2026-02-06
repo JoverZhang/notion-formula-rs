@@ -324,7 +324,7 @@ impl<'a> Formatter<'a> {
         let trailing_line_comment = self
             .available_trailing_comment(expr)
             .and_then(|idx| self.tokens.get(idx))
-            .map(|tok| matches!(tok.kind, TokenKind::LineComment(_)))
+            .map(|tok| matches!(tok.kind, TokenKind::DocComment(CommentKind::Line, _)))
             .unwrap_or(false);
 
         if !has_newline || trailing_line_comment {
@@ -586,7 +586,8 @@ impl<'a> Formatter<'a> {
 
         for idx in comments {
             let tok = &self.tokens[idx];
-            let is_inline_block = matches!(tok.kind, TokenKind::BlockComment(_))
+            let is_inline_block =
+                matches!(tok.kind, TokenKind::DocComment(CommentKind::Block, _))
                 && self.sm.line_col(tok.span.end.saturating_sub(1)).0 == expr_line
                 && !self.slice_has_newline(tok.span.end, expr.span.start);
 
@@ -615,7 +616,7 @@ impl<'a> Formatter<'a> {
         for idx in q.trailing_trivia_until_newline_or_nontrivia(hi) {
             let tok = &self.tokens[idx];
             match &tok.kind {
-                TokenKind::LineComment(_) | TokenKind::DocComment(CommentKind::Line, _) => {
+                TokenKind::DocComment(CommentKind::Line, _) => {
                     if self.used_comments.contains(&idx) {
                         return None;
                     }
@@ -626,7 +627,7 @@ impl<'a> Formatter<'a> {
                         break;
                     }
                 }
-                TokenKind::BlockComment(_) => {
+                TokenKind::DocComment(CommentKind::Block, _) => {
                     if self.used_comments.contains(&idx) {
                         return None;
                     }
@@ -658,11 +659,9 @@ impl<'a> Formatter<'a> {
 
     fn render_comment(&self, idx: usize) -> String {
         match &self.tokens[idx].kind {
-            TokenKind::LineComment(sym) => format!("//{}", sym.text),
-            TokenKind::BlockComment(sym) => format!("/*{}*/", sym.text),
             TokenKind::DocComment(kind, sym) => match kind {
-                CommentKind::Line => format!("##{}", sym.text),
-                CommentKind::Block => format!("/**{}*/", sym.text),
+                CommentKind::Line => format!("//{}", sym.text),
+                CommentKind::Block => format!("/*{}*/", sym.text),
             },
             _ => String::new(),
         }

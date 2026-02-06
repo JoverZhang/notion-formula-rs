@@ -50,20 +50,17 @@ fn bool_lit(text: &str) -> TokenKind {
 }
 
 fn line_comment(text: &str) -> TokenKind {
-    TokenKind::LineComment(Symbol {
-        text: text.to_string(),
-    })
+    TokenKind::DocComment(
+        CommentKind::Line,
+        Symbol {
+            text: text.to_string(),
+        },
+    )
 }
 
 fn block_comment(text: &str) -> TokenKind {
-    TokenKind::BlockComment(Symbol {
-        text: text.to_string(),
-    })
-}
-
-fn doc_comment(text: &str) -> TokenKind {
     TokenKind::DocComment(
-        CommentKind::Line,
+        CommentKind::Block,
         Symbol {
             text: text.to_string(),
         },
@@ -244,7 +241,7 @@ fn test_unterminated_string_error() {
 
 #[test]
 fn test_comment_tokens() {
-    let input = "// guard\n1 /*mid*/ + /*mid2*/ 2\n## docs\n3";
+    let input = "// guard\n1 /*mid*/ + /*mid2*/ 2\n3";
     let ks = kinds(input);
     assert_eq!(
         ks,
@@ -256,8 +253,6 @@ fn test_comment_tokens() {
             TokenKind::Plus,
             block_comment("mid2"),
             number("2"),
-            TokenKind::Newline,
-            doc_comment(" docs"),
             TokenKind::Newline,
             number("3"),
             TokenKind::Eof

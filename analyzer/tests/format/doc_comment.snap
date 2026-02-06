@@ -1,6 +1,6 @@
 === INPUT ===
-## about value
+// about value
 value + 1
 === OUTPUT ===
-## about value
+// about value
 value + 1

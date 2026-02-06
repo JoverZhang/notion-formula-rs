@@ -356,9 +356,10 @@ fn token_kind_string(kind: &TokenKind) -> &'static str {
             LitKind::String => "String",
         },
         Ident(_) => "Ident",
-        DocComment(..) => "DocComment",
-        LineComment(_) => "LineComment",
-        BlockComment(_) => "BlockComment",
+        DocComment(kind, _) => match kind {
+            analyzer::CommentKind::Line => "LineComment",
+            analyzer::CommentKind::Block => "BlockComment",
+        },
         Newline => "Newline",
         Eof => "Eof",
     }

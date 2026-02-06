@@ -42,34 +42,7 @@ pub fn lex(input: &str) -> LexOutput {
         // Two-char operators first
         let kind = match ch {
             '#' => {
-                if matches!(iter.peek(), Some((_, '#'))) {
-                    let (_, _) = iter.next().unwrap();
-
-                    let mut end = start + 2;
-                    while let Some(&(i, c2)) = iter.peek() {
-                        if c2 == '\n' {
-                            break;
-                        }
-                        iter.next();
-                        end = i + c2.len_utf8();
-                    }
-
-                    tokens.push(Token {
-                        kind: TokenKind::DocComment(
-                            CommentKind::Line,
-                            Symbol {
-                                text: String::from(&input[start + 2..end]),
-                            },
-                        ),
-                        span: Span {
-                            start: start as u32,
-                            end: end as u32,
-                        },
-                    });
-                    continue;
-                } else {
-                    TokenKind::Pound
-                }
+                TokenKind::Pound
             }
             '<' => {
                 if matches!(iter.peek(), Some((_, '='))) {
@@ -158,9 +131,12 @@ pub fn lex(input: &str) -> LexOutput {
                     }
 
                     tokens.push(Token {
-                        kind: TokenKind::LineComment(Symbol {
-                            text: String::from(&input[start + 2..end]),
-                        }),
+                        kind: TokenKind::DocComment(
+                            CommentKind::Line,
+                            Symbol {
+                                text: String::from(&input[start + 2..end]),
+                            },
+                        ),
                         span: Span {
                             start: start as u32,
                             end: end as u32,
@@ -169,6 +145,7 @@ pub fn lex(input: &str) -> LexOutput {
                     continue;
                 } else if matches!(iter.peek(), Some((_, '*'))) {
                     let (_, _) = iter.next().unwrap();
+                    let content_start = start + 2;
 
                     let mut end = start + 2;
                     let mut terminated = false;
@@ -195,9 +172,12 @@ pub fn lex(input: &str) -> LexOutput {
                     }
 
                     tokens.push(Token {
-                        kind: TokenKind::BlockComment(Symbol {
-                            text: String::from(&input[start + 2..end - 2]),
-                        }),
+                        kind: TokenKind::DocComment(
+                            CommentKind::Block,
+                            Symbol {
+                                text: String::from(&input[content_start..end - 2]),
+                            },
+                        ),
                         span: Span {
                             start: start as u32,
                             end: end as u32,
