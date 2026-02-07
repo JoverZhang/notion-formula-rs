@@ -50,6 +50,23 @@ function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
   return isValidPropName(chip.argValue);
 }
 
+type ActiveFormulaPanelUi = {
+  show(): void;
+  hide(): void;
+};
+
+const activeFormulaPanelUiById = new Map<FormulaId, ActiveFormulaPanelUi>();
+let activeFormulaPanelId: FormulaId | null = null;
+
+function setActiveFormulaPanel(id: FormulaId) {
+  if (activeFormulaPanelId === id) return;
+  if (activeFormulaPanelId) {
+    activeFormulaPanelUiById.get(activeFormulaPanelId)?.hide();
+  }
+  activeFormulaPanelId = id;
+  activeFormulaPanelUiById.get(id)?.show();
+}
+
 const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
 const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
   create() {
@@ -279,11 +296,21 @@ export function createFormulaPanelView(opts: {
   warningEl.textContent = "Token spans overlap or exceed the document length.";
   leftCol.appendChild(warningEl);
 
+  const editorWrap = document.createElement("div");
+  editorWrap.className = "formula-editor-wrap";
+  leftCol.appendChild(editorWrap);
+
+  const signatureEl = document.createElement("div");
+  signatureEl.className = "completion-signature hidden";
+  signatureEl.setAttribute("data-testid", "suggestion-signature");
+  signatureEl.setAttribute("data-formula-id", opts.id);
+  editorWrap.appendChild(signatureEl);
+
   const editorEl = document.createElement("div");
   editorEl.className = "editor";
   editorEl.setAttribute("data-testid", "formula-editor");
   editorEl.setAttribute("data-formula-id", opts.id);
-  leftCol.appendChild(editorEl);
+  editorWrap.appendChild(editorEl);
 
   const actionsRow = document.createElement("div");
   actionsRow.className = "formula-actions";
@@ -303,30 +330,6 @@ export function createFormulaPanelView(opts: {
   formatStatus.setAttribute("data-formula-id", opts.id);
   actionsRow.appendChild(formatStatus);
 
-  const completionPanel = document.createElement("div");
-  completionPanel.className = "completion-panel";
-  completionPanel.setAttribute("data-testid", "completion-panel");
-  completionPanel.setAttribute("data-formula-id", opts.id);
-  leftCol.appendChild(completionPanel);
-
-  const completionHeader = document.createElement("div");
-  completionHeader.className = "completion-header";
-  completionHeader.textContent = "Suggestions";
-  completionPanel.appendChild(completionHeader);
-
-  const signatureEl = document.createElement("div");
-  signatureEl.className = "completion-signature hidden";
-  completionPanel.appendChild(signatureEl);
-
-  const itemsEl = document.createElement("ul");
-  itemsEl.className = "completion-items";
-  completionPanel.appendChild(itemsEl);
-
-  const emptyEl = document.createElement("div");
-  emptyEl.className = "completion-empty";
-  emptyEl.textContent = "No suggestions";
-  completionPanel.appendChild(emptyEl);
-
   const diagTitle = document.createElement("div");
   diagTitle.className = "diagnostics-title";
   diagTitle.textContent = "Diagnostics";
@@ -338,8 +341,29 @@ export function createFormulaPanelView(opts: {
   diagnosticsEl.setAttribute("data-formula-id", opts.id);
   leftCol.appendChild(diagnosticsEl);
 
+  const completionPanel = document.createElement("div");
+  completionPanel.className = "completion-panel hidden";
+  completionPanel.setAttribute("data-testid", "completion-panel");
+  completionPanel.setAttribute("data-formula-id", opts.id);
+  leftCol.appendChild(completionPanel);
+
+  const completionHeader = document.createElement("div");
+  completionHeader.className = "completion-header";
+  completionHeader.textContent = "Completions";
+  completionPanel.appendChild(completionHeader);
+
+  const itemsEl = document.createElement("ul");
+  itemsEl.className = "completion-items";
+  completionPanel.appendChild(itemsEl);
+
+  const emptyEl = document.createElement("div");
+  emptyEl.className = "completion-empty";
+  emptyEl.textContent = "No suggestions";
+  completionPanel.appendChild(emptyEl);
+
   panel.appendChild(leftCol);
 
+  let isUiActive = false;
   let completionItems: CompletionItem[] = [];
   let signatureHelp: SignatureHelp | null = null;
   let preferredCompletionIndices: number[] = [];
@@ -526,39 +550,170 @@ export function createFormulaPanelView(opts: {
     }, 2200);
   }
 
-  function renderSignature(sig: SignatureHelp | null) {
-    if (!sig) {
-      signatureEl.classList.add("hidden");
-      signatureEl.textContent = "";
+  type SignatureWrapMode = "unwrapped" | "wrapped";
+  let signatureWrapRaf: number | null = null;
+  let signatureWrapObservedWidth = -1;
+  const signatureWrapObserver =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver((entries) => {
+          const entry = entries[0];
+          const width = Math.floor(entry?.contentRect.width ?? 0);
+          if (width === signatureWrapObservedWidth) return;
+          signatureWrapObservedWidth = width;
+          renderSignature(signatureHelp);
+        });
+  signatureWrapObserver?.observe(signatureEl);
+
+  const SIG_POPOVER_GAP_PX = 12;
+  const SIG_POPOVER_MIN_W_PX = 240;
+  const SIG_POPOVER_MAX_W_PX = 360;
+  const SIG_POPOVER_PREF_VW = 0.28;
+  function updateSignaturePopoverSide() {
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth || 0;
+    const wrapRect = editorWrap.getBoundingClientRect();
+    const leftSpace = wrapRect.left - SIG_POPOVER_GAP_PX;
+    const rightSpace = viewportWidth - wrapRect.right - SIG_POPOVER_GAP_PX;
+    const popoverWidth = clamp(viewportWidth * SIG_POPOVER_PREF_VW, SIG_POPOVER_MIN_W_PX, SIG_POPOVER_MAX_W_PX);
+    const canFitLeft = leftSpace >= popoverWidth;
+    const canFitRight = rightSpace >= popoverWidth;
+    if (canFitLeft) {
+      signatureEl.dataset.side = "left";
       return;
     }
+    if (canFitRight) {
+      signatureEl.dataset.side = "right";
+      return;
+    }
+    signatureEl.dataset.side = rightSpace > leftSpace ? "right" : "left";
+  }
+
+  function signatureSegText(seg: NonNullable<SignatureHelp>["signatures"][number]["segments"][number]) {
+    switch (seg.kind) {
+      case "Ellipsis":
+        return "...";
+      case "Param":
+        return `${seg.name}: ${seg.ty}`;
+      default:
+        return seg.text;
+    }
+  }
+
+  function createSigSegEl(
+    seg: NonNullable<SignatureHelp>["signatures"][number]["segments"][number],
+    activeParam: number,
+  ): HTMLElement {
+    const segEl = document.createElement("span");
+    segEl.className = `completion-signature-seg completion-signature-seg--${seg.kind}`;
+    if (seg.kind === "Param" && seg.param_index === activeParam) {
+      segEl.classList.add("is-active");
+    }
+    segEl.textContent = signatureSegText(seg);
+    return segEl;
+  }
+
+  function splitArgSegments(
+    segments: NonNullable<SignatureHelp>["signatures"][number]["segments"],
+  ): Array<NonNullable<SignatureHelp>["signatures"][number]["segments"]> {
+    const args: Array<NonNullable<SignatureHelp>["signatures"][number]["segments"]> = [];
+    let current: NonNullable<SignatureHelp>["signatures"][number]["segments"] = [];
+    for (const seg of segments) {
+      const isComma =
+        (seg.kind === "Punct" && seg.text === ",") ||
+        (seg.kind === "Separator" && seg.text.includes(","));
+      if (isComma) {
+        if (current.length) args.push(current);
+        current = [];
+        continue;
+      }
+      current.push(seg);
+    }
+    if (current.length) args.push(current);
+    return args.map((arg) => {
+      let start = 0;
+      let end = arg.length;
+      while (start < end && signatureSegText(arg[start])?.trim() === "") start++;
+      while (end > start && signatureSegText(arg[end - 1])?.trim() === "") end--;
+      return arg.slice(start, end);
+    });
+  }
+
+  function renderSignatureMode(sig: SignatureHelp, mode: SignatureWrapMode) {
     const activeSig = sig.signatures[sig.active_signature] ?? sig.signatures[0];
     if (!activeSig) {
       signatureEl.classList.add("hidden");
       signatureEl.textContent = "";
       return;
     }
+
     signatureEl.classList.remove("hidden");
     signatureEl.replaceChildren();
+    signatureEl.dataset.wrap = mode;
 
-    for (const seg of activeSig.segments) {
-      const segEl = document.createElement("span");
-      segEl.className = `completion-signature-seg completion-signature-seg--${seg.kind}`;
-      if (seg.kind === "Param" && seg.param_index === sig.active_parameter) {
-        segEl.classList.add("is-active");
-      }
-      switch (seg.kind) {
-        case "Ellipsis":
-          segEl.textContent = "...";
-          break;
-        case "Param":
-          segEl.textContent = `${seg.name}: ${seg.ty}`;
-          break;
-        default:
-          segEl.textContent = seg.text;
-      }
-      signatureEl.append(segEl);
+    const arrowIndex = activeSig.segments.findIndex((seg) => seg.kind === "Arrow");
+    const beforeArrow = arrowIndex === -1 ? activeSig.segments.length : arrowIndex;
+    const openIndex = [...activeSig.segments]
+      .map((seg, idx) => ({ seg, idx }))
+      .reverse()
+      .find(({ seg, idx }) => idx < beforeArrow && seg.kind === "Punct" && seg.text === "(")?.idx;
+    const closeIndex =
+      typeof openIndex === "number"
+        ? activeSig.segments.findIndex(
+            (seg, idx) => idx > openIndex && idx < beforeArrow && seg.kind === "Punct" && seg.text === ")",
+          )
+        : -1;
+
+    if (mode === "wrapped" && typeof openIndex === "number" && closeIndex !== -1) {
+      const prefix = activeSig.segments.slice(0, openIndex + 1);
+      const argSegs = activeSig.segments.slice(openIndex + 1, closeIndex);
+      const suffix = activeSig.segments.slice(closeIndex);
+      const args = splitArgSegments(argSegs);
+
+      prefix.forEach((seg) => signatureEl.append(createSigSegEl(seg, sig.active_parameter)));
+      signatureEl.append(document.createElement("br"));
+
+      args.forEach((arg, idx) => {
+        signatureEl.append("  ");
+        arg.forEach((seg) => signatureEl.append(createSigSegEl(seg, sig.active_parameter)));
+        if (idx < args.length - 1) {
+          signatureEl.append(createSigSegEl({ kind: "Punct", text: "," }, sig.active_parameter));
+        }
+        signatureEl.append(document.createElement("br"));
+      });
+
+      suffix.forEach((seg) => signatureEl.append(createSigSegEl(seg, sig.active_parameter)));
+      return;
     }
+
+    activeSig.segments.forEach((seg) => signatureEl.append(createSigSegEl(seg, sig.active_parameter)));
+  }
+
+  function renderSignature(sig: SignatureHelp | null) {
+    if (!isUiActive) {
+      signatureEl.classList.add("hidden");
+      signatureEl.textContent = "";
+      delete signatureEl.dataset.wrap;
+      return;
+    }
+    updateSignaturePopoverSide();
+    if (!sig) {
+      signatureEl.classList.add("hidden");
+      signatureEl.textContent = "";
+      delete signatureEl.dataset.wrap;
+      return;
+    }
+    renderSignatureMode(sig, "unwrapped");
+    if (signatureWrapRaf !== null) cancelAnimationFrame(signatureWrapRaf);
+    signatureWrapRaf = requestAnimationFrame(() => {
+      signatureWrapRaf = null;
+      if (!isUiActive) return;
+      if (signatureEl.classList.contains("hidden")) return;
+      if (signatureEl.clientWidth === 0) return;
+      const overflows = signatureEl.scrollWidth > signatureEl.clientWidth + 1;
+      if (overflows) {
+        renderSignatureMode(sig, "wrapped");
+      }
+    });
   }
 
   function renderItems() {
@@ -635,7 +790,13 @@ export function createFormulaPanelView(opts: {
   }
 
   function rerenderCompletions() {
-    renderSignature(signatureHelp);
+    if (isUiActive) {
+      renderSignature(signatureHelp);
+    } else {
+      signatureEl.classList.add("hidden");
+      signatureEl.textContent = "";
+      delete signatureEl.dataset.wrap;
+    }
     completionRows = buildCompletionRows(completionItems, preferredCompletionIndices);
     const preferredTop = preferredCompletionIndices[0];
     if (typeof preferredTop === "number") {
@@ -750,6 +911,7 @@ export function createFormulaPanelView(opts: {
           {
             key: "ArrowDown",
             run: () => {
+              if (!isUiActive) return false;
               if (!completionItems.length) return false;
               selectNext(1);
               return true;
@@ -758,6 +920,7 @@ export function createFormulaPanelView(opts: {
           {
             key: "ArrowUp",
             run: () => {
+              if (!isUiActive) return false;
               if (!completionItems.length) return false;
               selectNext(-1);
               return true;
@@ -766,6 +929,7 @@ export function createFormulaPanelView(opts: {
           {
             key: "Escape",
             run: () => {
+              if (!isUiActive) return false;
               if (selectedRowIndex < 0) return false;
               selectedRowIndex = -1;
               renderItems();
@@ -775,6 +939,7 @@ export function createFormulaPanelView(opts: {
           {
             key: "Enter",
             run: () => {
+              if (!isUiActive) return false;
               const itemIndex = getSelectedItemIndex();
               if (typeof itemIndex !== "number") return false;
               return applyCompletionItem(itemIndex);
@@ -783,6 +948,7 @@ export function createFormulaPanelView(opts: {
           {
             key: "Tab",
             run: () => {
+              if (!isUiActive) return false;
               const itemIndex = getSelectedItemIndex();
               if (typeof itemIndex !== "number") return false;
               return applyCompletionItem(itemIndex);
@@ -810,6 +976,31 @@ export function createFormulaPanelView(opts: {
       ],
     }),
     parent: editorEl,
+  });
+
+  activeFormulaPanelUiById.set(opts.id, {
+    show() {
+      isUiActive = true;
+      completionPanel.classList.remove("hidden");
+      requestCompletions(editorView);
+      rerenderCompletions();
+    },
+    hide() {
+      isUiActive = false;
+      completionPanel.classList.add("hidden");
+      signatureEl.classList.add("hidden");
+      signatureEl.textContent = "";
+      delete signatureEl.dataset.wrap;
+    },
+  });
+
+  editorView.dom.addEventListener("focusin", () => {
+    setActiveFormulaPanel(opts.id);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!isUiActive) return;
+    updateSignaturePopoverSide();
   });
 
   let lastDiagnostics: AnalyzerDiagnostic[] = [];

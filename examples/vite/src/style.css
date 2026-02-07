@@ -265,6 +265,10 @@ body {
   gap: 6px;
 }
 
+.formula-editor-wrap {
+  position: relative;
+}
+
 .formula-label {
   font-size: 11px;
   text-transform: uppercase;
@@ -415,8 +419,31 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 8px;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+}
+
+.formula-editor-wrap > .completion-signature {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 12px);
+  width: clamp(240px, 28vw, 360px);
+  z-index: 10;
+  box-shadow: var(--shadow);
+}
+
+.formula-editor-wrap > .completion-signature[data-side="right"] {
+  left: calc(100% + 12px);
+  right: auto;
+}
+
+.completion-signature[data-wrap="unwrapped"] {
+  white-space: nowrap;
+  overflow-x: hidden;
+}
+
+.completion-signature[data-wrap="wrapped"] {
+  white-space: pre;
+  overflow-x: auto;
 }
 
 .completion-signature-seg {
