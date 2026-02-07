@@ -1,0 +1,11 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+build:
+  mkdir -p build
+  clang++ $(cat compile_flags.txt) prototype.cpp -o build/prototype
+
+test: build
+  ./build/prototype
+
+clean:
+  rm -rf build
