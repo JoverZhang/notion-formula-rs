@@ -21,5 +21,5 @@
   - Debug bridge presence and panel registration
   - Token highlighting regression (no “first token only”)
   - Analyzer diagnostics flowing into the UI + CodeMirror lint
-  - Chip span detection + mapping (UI chips are intentionally not rendered)
+  - Chip span detection + mapping (and chip UI rendering/interaction)
 - A screenshot baseline is not enabled yet; add one later if the page can be made fully deterministic.

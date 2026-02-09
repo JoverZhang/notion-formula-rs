@@ -1,5 +1,11 @@
 import { analyzeSource, initWasm } from "../analyzer/wasm_client";
-import type { AppState, AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
+import {
+  FORMULA_IDS,
+  type AppState,
+  type AnalyzerDiagnostic,
+  type FormulaId,
+  type FormulaState,
+} from "../app/types";
 
 const DEBOUNCE_MS = 80;
 
@@ -17,11 +23,7 @@ export class AppVM {
     this.state = {
       wasmReady: false,
       contextJson: opts.contextJson,
-      formulas: {
-        f1: this.createFormula("f1"),
-        f2: this.createFormula("f2"),
-        f3: this.createFormula("f3"),
-      },
+      formulas: this.createFormulas(),
     };
     this.onStateChange = opts.onStateChange;
   }
@@ -35,10 +37,6 @@ export class AppVM {
       }
     }
     this.onStateChange(this.state);
-  }
-
-  getState(): AppState {
-    return this.state;
   }
 
   setSource(id: FormulaId, source: string): void {
@@ -65,6 +63,13 @@ export class AppVM {
       formatted: "",
       status: "idle",
     };
+  }
+
+  private createFormulas(): Record<FormulaId, FormulaState> {
+    return Object.fromEntries(FORMULA_IDS.map((id) => [id, this.createFormula(id)])) as Record<
+      FormulaId,
+      FormulaState
+    >;
   }
 
   private scheduleAnalyze(id: FormulaId): void {

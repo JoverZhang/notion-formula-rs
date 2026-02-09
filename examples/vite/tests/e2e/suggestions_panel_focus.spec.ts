@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { FormulaId } from "../../src/app/types";
 import { gotoDebug, setEditorContent, waitForCompletionDebounce } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
@@ -6,21 +7,23 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
 });
 
-async function setCursorAfter(page: Page, formulaId: string, needle: string) {
+async function setCursorAfter(page: Page, formulaId: FormulaId, needle: string) {
   await page.evaluate(
     ({ id, needleText }) => {
       const dbg = window.__nf_debug;
       if (!dbg) throw new Error("Missing __nf_debug");
-      const source = dbg.getState(id as any).source;
+      const source = dbg.getState(id).source;
       const idx = source.indexOf(needleText);
       if (idx === -1) throw new Error(`Missing needle: ${needleText}`);
-      dbg.setSelectionHead(id as any, idx + needleText.length);
+      dbg.setSelectionHead(id, idx + needleText.length);
     },
     { id: formulaId, needleText: needle },
   );
 }
 
-test("Suggestion signature pops left and stays until another editor is focused", async ({ page }) => {
+test("Suggestion signature pops left and stays until another editor is focused", async ({
+  page,
+}) => {
   await setEditorContent(page, "f1", 'if(true, 1, "x")');
   await setCursorAfter(page, "f1", '"x"');
   const editor = page.locator('[data-testid="formula-editor"][data-formula-id="f1"]');

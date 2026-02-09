@@ -353,46 +353,52 @@ Regression coverage:
 - completion cursor placement (including UTF-16 text)
 - completion list scroll-into-view behavior
 
-### Vite demo completion UI
+### Vite demo architecture (current)
 
-The Vite demo renders completions returned by the WASM `complete(...)` export entirely on the TypeScript side.
+The example app keeps analyzer-facing behavior in a thin WASM client and leaves the rest as UI wiring.
 
 Primary files:
 
-- `examples/vite/src/analyzer/wasm_client.ts`: calls `wasm.complete(...)` via `completeSource(...)`
-- `examples/vite/src/ui/formula_panel_view.ts`: renders the completion panel and applies selected completions
+- `examples/vite/src/analyzer/wasm_client.ts`:
+  - **only** place that imports `examples/vite/src/pkg/analyzer_wasm.js`
+  - raw exports: `initWasm`, `analyzeSource`, `completeSource`, `posToLineCol`
+  - thin typed wrappers:
+    - `safeBuildCompletionState(...)`
+    - `applyCompletionItem(...)`
+- `examples/vite/src/vm/app_vm.ts`:
+  - debounced analyze loop (`DEBOUNCE_MS = 80`) for `FORMULA_IDS = ["f1", "f2"]`
+- `examples/vite/src/ui/formula_panel_view.ts`:
+  - panel orchestration, CodeMirror setup, debug bridge wiring
+- `examples/vite/src/ui/codemirror_diagnostics.ts`:
+  - Analyzer diagnostic -> CodeMirror diagnostic mapping
+- `examples/vite/src/ui/chip_ranges.ts`:
+  - chip UI range diagnostics merge
+- `examples/vite/src/ui/diagnostics_rows.ts`:
+  - diagnostics list text-row rendering (line/column + chip position labels)
+- `examples/vite/src/ui/completion_rows.ts`:
+  - pure completion list grouping/selection helpers
+- `examples/vite/src/ui/signature_popover.ts`:
+  - signature help popover rendering, side placement, wrap fallback
 
-Rendering behavior:
+UI behavior that remains intentionally TypeScript-side:
 
-- Completions are displayed as a list under the “Suggestions” panel.
-- Function completions are grouped by `category` (UI-owned grouping; no WASM changes).
-- Non-function completions are grouped by consecutive `kind` changes (UI-owned grouping).
-- Selection and navigation operate over a `completionRows` model (headers + items):
-  - Headers are not selectable.
-  - Arrow key navigation skips over header rows.
-- Applying a completion maps the selected row back to the underlying `CompletionItem` index.
-
-Styling:
-
-- Group headers use `.completion-group-header` in `examples/vite/src/style.css`.
-- Signature help is rendered from analyzer-provided segments; the UI does not parse or format signature/type strings.
-- The formula editor auto-grows with content (no fixed max-height cap) and keeps a small minimum height via
-  `.editor .cm-editor .cm-scroller`.
+- Completion list rendering under the “Completions” panel.
+- Function items grouped by `category`; non-function items grouped by contiguous `kind`.
+- Recommended section controlled by analyzer-provided `preferred_indices`.
+- Keyboard navigation across item rows only (headers are skipped).
+- Signature help uses analyzer-provided display segments directly (UI does not parse signature/type strings).
+- Formula editor auto-grows with content via `.editor .cm-editor .cm-scroller`.
 
 Editor keybindings / history:
 
-- The CodeMirror editor enables history (undo/redo) with `history()` and `historyKeymap` from
-  `@codemirror/commands` (wired in `examples/vite/src/ui/formula_panel_view.ts`).
+- CodeMirror history is enabled with `history()` and `historyKeymap` from `@codemirror/commands`.
 
-Cursor placement invariants
+Cursor placement invariants:
 
 - Analyzer core (`analyzer/`) computes completion cursors as **byte offsets**.
-- The analyzer’s optional `CompletionItem.cursor` is intended to represent the desired cursor position
-  **in the updated document after applying the primary edit** (e.g., `if()` => inside the `(`).
-- The WASM bridge (`analyzer_wasm/`) converts completion edit ranges and cursor values to **UTF-16**
-  for JS/editor usage, and accounts for shifts from `additional_edits` that occur before the primary edit.
-- The Vite demo uses `item.cursor` when present; otherwise it falls back to `primary_edit` end plus any
-  shifts from additional edits before the primary edit (`examples/vite/src/ui/formula_panel_view.ts`).
+- WASM (`analyzer_wasm`) converts completion edit ranges/cursors to **UTF-16**.
+- Vite completion application uses analyzer cursor when present; fallback cursor computation
+  (including pre-primary additional-edit offset) lives in `examples/vite/src/analyzer/wasm_client.ts`.
 
 Playwright host configuration
 
@@ -411,3 +417,4 @@ Current architectural invariants
 - Token ranges derive from spans via tokens_in_span
 - Line/column is derived lazily, not stored
 - Encoding conversion lives only in WASM
+- Vite demo UI modules do not import WASM glue directly; `examples/vite/src/analyzer/wasm_client.ts` is the only JS/WASM boundary

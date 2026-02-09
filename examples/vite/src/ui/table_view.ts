@@ -1,4 +1,4 @@
-import type { FormulaId } from "../app/types";
+import { FORMULA_IDS, type FormulaId } from "../app/types";
 
 type RelatedRow = {
   id: string;
@@ -54,8 +54,6 @@ const BASE_ROWS: BaseRow[] = [
     Relation: ["rel-1", "rel-3"],
   },
 ];
-
-const FORMULA_IDS: FormulaId[] = ["f1", "f2"];
 
 const COLUMN_LABELS = ["Text", "Number", "Select", "Date", "Relation", "Formula 1", "Formula 2"];
 
