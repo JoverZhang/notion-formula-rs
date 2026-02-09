@@ -152,7 +152,7 @@ Semantic analysis (`analyzer/src/analysis/mod.rs`):
     - Validation is arity/shape-first: if a call has an arity/shape error, the analyzer emits that single diagnostic and **does not** emit additional per-argument type mismatch diagnostics for the same call.
   - Type acceptance (`ty_accepts` in `analyzer/src/analysis/mod.rs`):
     - `Unknown` is permissive only on the **actual** side (when inference cannot determine a type, it does not produce additional mismatch noise).
-    - `Ty::Generic(_)` is only a wildcard on the **expected** side (generic *inferred actuals* do not silently pass validation).
+    - `Ty::Generic(_)` is only a wildcard on the **expected** side (generic _inferred actuals_ do not silently pass validation).
     - `Ty::Union(...)` uses containment semantics:
       - `expected = Union(E1|E2|...)` accepts `actual = Union(A1|A2|...)` iff each `Ai` is accepted by `expected`
       - `expected = T` accepts `actual = Union(A1|...)` iff `T` accepts each `Ai`
@@ -187,11 +187,11 @@ Completion (`analyzer/src/ide/completion/mod.rs`, ranking/matching in `analyzer/
   - context functions/properties via case-insensitive prefix match (excluding exact matches)
 - When `CompletionOutput.replace` is non-empty, the analyzer derives a “query” from the source substring covered by the replace span. If the substring contains any non-identifier characters (identifier-like = ASCII alnum + `_` + whitespace), no fuzzy ranking is applied and `preferred_indices` is `[]`. Otherwise the query is normalized (lowercased; whitespace/underscores removed); if the normalized query is empty, fuzzy ranking is also skipped.
 - With a non-empty query, completion ranking applies to `CompletionKind::Function` and `CompletionKind::Property` labels (the identifiers users type). In member-access (after-dot) prefix completion, postfix-method items are **filtered** to only those matching the query and then ranked using the same normalization/matching (matching is computed on the label **without** the leading `.`). Query and label are normalized by lowercasing and removing `_`. Items are ranked by:
-  1) exact match (`label_norm == query_norm`)
-  2) substring contains (`label_norm` contains `query_norm`)
-  3) fuzzy subsequence match (existing subsequence scoring)
-  Within exact/contains, shorter normalized labels rank first (and for contains, earlier substring occurrence breaks ties); fuzzy ties use the subsequence score; all remaining ties are deterministic by original index. Other completion kinds are left in original relative order after matched items.
-- When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` *before* query ranking. When query ranking applies, it may reorder across kinds.
+  1. exact match (`label_norm == query_norm`)
+  2. substring contains (`label_norm` contains `query_norm`)
+  3. fuzzy subsequence match (existing subsequence scoring)
+     Within exact/contains, shorter normalized labels rank first (and for contains, earlier substring occurrence breaks ties); fuzzy ties use the subsequence score; all remaining ties are deterministic by original index. Other completion kinds are left in original relative order after matched items.
+- When type ranking is applied (cursor at expr-start inside a call with a known expected argument type), items are grouped into contiguous runs by `CompletionKind` _before_ query ranking. When query ranking applies, it may reorder across kinds.
   - Type ranking is skipped when the expected argument type is `Unknown` or `Generic(_)` (wildcard-ish and not informative).
 - `CompletionOutput.preferred_indices` is the analyzer-provided “smart picks” for UI default selection / recommendation: indices of up to `preferred_limit` enabled items that matched the query (in the already-ranked order). `preferred_limit` defaults to `5`, is configurable via `context_json.completion.preferred_limit`, and `0` disables preferred computation (always returns `[]`).
 - Signature help is computed only when the cursor is inside a call and uses `Context.functions`.
@@ -368,25 +368,23 @@ Primary files:
 - `examples/vite/src/vm/app_vm.ts`:
   - debounced analyze loop (`DEBOUNCE_MS = 80`) for `FORMULA_IDS = ["f1", "f2"]`
 - `examples/vite/src/ui/formula_panel_view.ts`:
-  - panel orchestration, CodeMirror setup, debug bridge wiring
-- `examples/vite/src/ui/codemirror_diagnostics.ts`:
-  - Analyzer diagnostic -> CodeMirror diagnostic mapping
-- `examples/vite/src/ui/chip_ranges.ts`:
-  - chip UI range diagnostics merge
-- `examples/vite/src/ui/diagnostics_rows.ts`:
-  - diagnostics list text-row rendering (line/column + chip position labels)
-- `examples/vite/src/ui/completion_rows.ts`:
-  - pure completion list grouping/selection helpers
+  - panel orchestration, CodeMirror setup, completion rendering, and debug bridge wiring
+- `examples/vite/src/model/diagnostics.ts`:
+  - shared diagnostics helpers (Analyzer -> CodeMirror diagnostics, chip-range merge, diagnostics rows)
+- `examples/vite/src/model/completions.ts`:
+  - completion row planning + selection helpers (flat row shape with flags)
+- `examples/vite/src/model/signature.ts`:
+  - signature token planning (flat token shape) + popover side/wrap decisions
 - `examples/vite/src/ui/signature_popover.ts`:
-  - signature help popover rendering, side placement, wrap fallback
+  - signature help popover rendering from model-provided flat tokens
 
 UI behavior that remains intentionally TypeScript-side:
 
 - Completion list rendering under the “Completions” panel.
-- Function items grouped by `category`; non-function items grouped by contiguous `kind`.
+- Completion items grouped by contiguous `kind` labels.
 - Recommended section controlled by analyzer-provided `preferred_indices`.
 - Keyboard navigation across item rows only (headers are skipped).
-- Signature help uses analyzer-provided display segments directly (UI does not parse signature/type strings).
+- Signature help uses analyzer-provided display segments via model-planned flat tokens (UI does not parse type strings).
 - Formula editor auto-grows with content via `.editor .cm-editor .cm-scroller`.
 
 Editor keybindings / history:

@@ -25,28 +25,15 @@ export const formulaIdFacet = Facet.define<FormulaId, FormulaId>({
 export const setChipDecoListEffect = StateEffect.define<ChipDecorationRange[]>();
 
 class PropChipWidget extends WidgetType {
-  private readonly formulaId: FormulaId;
-  private readonly propName: string;
-  private readonly spanFrom: number;
-  private readonly hasError: boolean;
-  private readonly hasWarning: boolean;
-  private readonly message: string | undefined;
-
-  constructor(opts: {
-    formulaId: FormulaId;
-    propName: string;
-    spanFrom: number;
-    hasError?: boolean;
-    hasWarning?: boolean;
-    message?: string;
-  }) {
+  constructor(
+    private readonly formulaId: FormulaId,
+    private readonly propName: string,
+    private readonly spanFrom: number,
+    private readonly hasError = false,
+    private readonly hasWarning = false,
+    private readonly message?: string,
+  ) {
     super();
-    this.formulaId = opts.formulaId;
-    this.propName = opts.propName;
-    this.spanFrom = opts.spanFrom;
-    this.hasError = opts.hasError ?? false;
-    this.hasWarning = opts.hasWarning ?? false;
-    this.message = opts.message;
   }
 
   eq(other: PropChipWidget): boolean {
@@ -62,7 +49,7 @@ class PropChipWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const span = document.createElement("span");
-    const classes = ["nf-chip"];
+    const classes = ["nf-chip"] as string[];
     if (this.hasError) classes.push("nf-chip--error");
     if (this.hasWarning) classes.push("nf-chip--warning");
     span.className = classes.join(" ");
@@ -93,39 +80,36 @@ class ChipRangeValue extends RangeValue {}
 const chipRangeValue = new ChipRangeValue();
 const emptyChipRanges = RangeSet.empty as RangeSet<ChipRangeValue>;
 
+function normalizeRanges(ranges: ChipDecorationRange[]): ChipDecorationRange[] {
+  return ranges
+    .filter((range) => range.from < range.to)
+    .sort((a, b) => a.from - b.from || a.to - b.to);
+}
+
 function buildChipDecorationSet(
   ranges: ChipDecorationRange[],
   formulaId: FormulaId,
 ): DecorationSet {
-  if (!ranges || ranges.length === 0) {
-    return Decoration.none;
-  }
-
+  if (!ranges || ranges.length === 0) return Decoration.none;
   const builder = new RangeSetBuilder<Decoration>();
-  const sortedRanges = [...ranges].sort((a, b) => a.from - b.from || a.to - b.to);
-  for (const range of sortedRanges) {
-    if (range.from >= range.to) continue;
-    const widget = new PropChipWidget({
+  for (const range of normalizeRanges(ranges)) {
+    const widget = new PropChipWidget(
       formulaId,
-      propName: range.propName,
-      spanFrom: range.from,
-      hasError: range.hasError,
-      hasWarning: range.hasWarning,
-      message: range.message,
-    });
+      range.propName,
+      range.from,
+      range.hasError,
+      range.hasWarning,
+      range.message,
+    );
     builder.add(range.from, range.to, Decoration.replace({ widget, inclusive: false }));
   }
   return builder.finish();
 }
 
 function buildChipRangeSet(ranges: ChipDecorationRange[]): RangeSet<ChipRangeValue> {
-  if (!ranges || ranges.length === 0) {
-    return emptyChipRanges;
-  }
+  if (!ranges || ranges.length === 0) return emptyChipRanges;
   const builder = new RangeSetBuilder<ChipRangeValue>();
-  const sortedRanges = [...ranges].sort((a, b) => a.from - b.from || a.to - b.to);
-  for (const range of sortedRanges) {
-    if (range.from >= range.to) continue;
+  for (const range of normalizeRanges(ranges)) {
     builder.add(range.from, range.to, chipRangeValue);
   }
   return builder.finish();
