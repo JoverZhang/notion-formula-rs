@@ -3,6 +3,14 @@
 - Run the dev server: `pnpm dev`
 - Build WASM (if you change Rust/WASM): `pnpm wasm:build`
 
+## Integration notes
+
+- WASM client wrapper: `src/analyzer/wasm_client.ts` (`analyzeSource`, `completeSource`, `posToLineCol`).
+- wasm-pack output (JS glue + `.wasm`): `src/pkg/` (produced by `pnpm wasm:build`).
+- DTO TS types:
+  - Generated: `src/analyzer/generated/wasm_dto.ts`
+  - Generator: `cargo run -p analyzer_wasm --bin export_ts` (or `just gen-ts` from repo root)
+
 ## Debug bridge
 
 - Enable via any of:

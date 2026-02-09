@@ -37,7 +37,7 @@ A Vite + CodeMirror 6 demo is included to showcase live analysis, formatting, to
     - `if(cond, a, b)` arity + boolean condition check
     - `sum(...)` arity + number-argument checks
 - WASM bindings:
-  - `analyze(source, contextJson?)` for syntax + semantic diagnostics (omit/empty to skip context)
+  - `analyze(source, contextJson)` for syntax + semantic diagnostics (`contextJson` must be a non-empty JSON string; use `"{}"` for “no context”)
 - Web demo (Vite + CodeMirror 6):
   - live analysis (debounced)
   - token highlighting using CodeMirror decorations
@@ -67,6 +67,16 @@ A Vite + CodeMirror 6 demo is included to showcase live analysis, formatting, to
 
 - `examples/vite/`
   Vite + CodeMirror 6 web demo that calls the WASM analyzer.
+
+---
+
+## Documentation
+
+- [`docs/README.md`](docs/README.md): documentation workflow + templates
+- [`docs/design/README.md`](docs/design/README.md): stable contracts + drift tracker
+- [`analyzer/README.md`](analyzer/README.md): analyzer crate map + contracts
+- [`analyzer_wasm/README.md`](analyzer_wasm/README.md): WASM boundary + DTO v1
+- [`examples/vite/README.md`](examples/vite/README.md): demo app + tests
 
 ---
 
