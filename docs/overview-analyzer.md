@@ -368,7 +368,7 @@ Primary files:
 - `examples/vite/src/vm/app_vm.ts`:
   - debounced analyze loop (`DEBOUNCE_MS = 80`) for `FORMULA_IDS = ["f1", "f2"]`
 - `examples/vite/src/ui/formula_panel_view.ts`:
-  - panel orchestration, CodeMirror setup, completion rendering, and debug bridge wiring
+  - panel orchestration, CodeMirror setup, completion rendering, active-panel visibility, and debug bridge wiring
 - `examples/vite/src/model/diagnostics.ts`:
   - shared diagnostics helpers (Analyzer -> CodeMirror diagnostics, chip-range merge, diagnostics rows)
 - `examples/vite/src/model/completions.ts`:
@@ -383,8 +383,11 @@ UI behavior that remains intentionally TypeScript-side:
 - Completion list rendering under the “Completions” panel.
 - Completion items grouped by contiguous `kind` labels.
 - Recommended section controlled by analyzer-provided `preferred_indices`.
+- Completion/signature UI is shown for the focused formula panel and hidden for other panels.
 - Keyboard navigation across item rows only (headers are skipped).
+- Selected completion rows are scrolled into view (`nearest`) after keyboard/mouse selection updates.
 - Signature help uses analyzer-provided display segments via model-planned flat tokens (UI does not parse type strings).
+- Analyzer diagnostics are mirrored into CodeMirror lint diagnostics for in-editor lint ranges/tooltips.
 - Formula editor auto-grows with content via `.editor .cm-editor .cm-scroller`.
 
 Editor keybindings / history:

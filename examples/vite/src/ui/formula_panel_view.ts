@@ -1,5 +1,5 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
+import { linter, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, keymap } from "@codemirror/view";
 import {
@@ -55,6 +55,34 @@ type PropName = (typeof PROPERTY_SCHEMA)[number]["name"];
 
 const VALID_PROP_NAMES = new Set<PropName>(PROPERTY_SCHEMA.map((prop) => prop.name));
 const COMPLETION_DEBOUNCE_MS = 120;
+
+type ActiveFormulaPanelUi = {
+  show(): void;
+  hide(): void;
+};
+
+const activeFormulaPanelUiById = new Map<FormulaId, ActiveFormulaPanelUi>();
+let activeFormulaPanelId: FormulaId | null = null;
+
+function setActiveFormulaPanel(id: FormulaId) {
+  if (activeFormulaPanelId === id) return;
+  if (activeFormulaPanelId) activeFormulaPanelUiById.get(activeFormulaPanelId)?.hide();
+  activeFormulaPanelId = id;
+  activeFormulaPanelUiById.get(id)?.show();
+}
+
+const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
+const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
+  create() {
+    return [];
+  },
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setLintDiagnosticsEffect)) return effect.value;
+    }
+    return value;
+  },
+});
 
 function must<T extends Element>(root: ParentNode, selector: string): T {
   const node = root.querySelector(selector);
@@ -115,11 +143,16 @@ export function createFormulaPanelView(opts: {
   const editorEl = must<HTMLElement>(panel, '.editor[data-testid="formula-editor"]');
   const formatBtn = must<HTMLButtonElement>(panel, ".format-button");
   const diagnosticsEl = must<HTMLUListElement>(panel, ".diag-list");
+  const completionPanel = must<HTMLElement>(
+    panel,
+    '.completion-panel[data-testid="completion-panel"]',
+  );
   const itemsEl = must<HTMLUListElement>(panel, ".completion-items");
   const emptyEl = must<HTMLElement>(panel, ".completion-empty");
 
   labelEl.textContent = opts.label;
 
+  let isUiActive = false;
   let completionItems: CompletionItem[] = [];
   let signatureHelp: SignatureHelp | null = null;
   let preferredCompletionIndices: number[] = [];
@@ -128,6 +161,11 @@ export function createFormulaPanelView(opts: {
   let completionTimer: ReturnType<typeof setTimeout> | null = null;
 
   const signaturePopover = createSignaturePopover(signatureEl, editorWrap);
+
+  function scrollSelectedIntoView() {
+    const selected = itemsEl.querySelector(".completion-item.is-selected");
+    if (selected instanceof HTMLElement) selected.scrollIntoView({ block: "nearest" });
+  }
 
   function renderCompletionRows() {
     itemsEl.replaceChildren();
@@ -173,6 +211,7 @@ export function createFormulaPanelView(opts: {
       li.addEventListener("mouseenter", () => {
         selectedRowIndex = rowIndex;
         renderCompletionRows();
+        scrollSelectedIntoView();
       });
       li.addEventListener("mousedown", (event) => event.preventDefault());
       li.addEventListener("click", () => {
@@ -183,7 +222,7 @@ export function createFormulaPanelView(opts: {
   }
 
   function rerenderCompletions() {
-    signaturePopover.render(signatureHelp, true);
+    signaturePopover.render(signatureHelp, isUiActive);
 
     completionRows = buildCompletionRows(completionItems, preferredCompletionIndices);
     const preferredTop = preferredCompletionIndices[0];
@@ -194,6 +233,7 @@ export function createFormulaPanelView(opts: {
     }
     selectedRowIndex = normalizeSelectedRowIndex(completionRows, selectedRowIndex);
     renderCompletionRows();
+    scrollSelectedIntoView();
   }
 
   function requestCompletions(view: EditorView) {
@@ -233,24 +273,47 @@ export function createFormulaPanelView(opts: {
           {
             key: "ArrowDown",
             run: () => {
+              if (!isUiActive) return false;
               if (!completionItems.length) return false;
               selectedRowIndex = nextSelectedRowIndex(completionRows, selectedRowIndex, 1);
               renderCompletionRows();
+              scrollSelectedIntoView();
               return true;
             },
           },
           {
             key: "ArrowUp",
             run: () => {
+              if (!isUiActive) return false;
               if (!completionItems.length) return false;
               selectedRowIndex = nextSelectedRowIndex(completionRows, selectedRowIndex, -1);
+              renderCompletionRows();
+              scrollSelectedIntoView();
+              return true;
+            },
+          },
+          {
+            key: "Escape",
+            run: () => {
+              if (!isUiActive) return false;
+              if (selectedRowIndex < 0) return false;
+              selectedRowIndex = -1;
               renderCompletionRows();
               return true;
             },
           },
           {
+            key: "Tab",
+            run: () => {
+              if (!isUiActive) return false;
+              const itemIndex = getSelectedItemIndex(completionRows, selectedRowIndex);
+              return typeof itemIndex === "number" ? applySelectedCompletion(itemIndex) : false;
+            },
+          },
+          {
             key: "Enter",
             run: () => {
+              if (!isUiActive) return false;
               const itemIndex = getSelectedItemIndex(completionRows, selectedRowIndex);
               return typeof itemIndex === "number" ? applySelectedCompletion(itemIndex) : false;
             },
@@ -264,13 +327,38 @@ export function createFormulaPanelView(opts: {
         chipDecoStateField,
         chipRangesField,
         chipAtomicRangesExt,
+        lintDiagnosticsStateField,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) opts.onSourceChange(opts.id, update.state.doc.toString());
           if (update.docChanged || update.selectionSet) requestCompletions(update.view);
         }),
+        linter((view) => view.state.field(lintDiagnosticsStateField)),
       ],
     }),
     parent: editorEl,
+  });
+
+  activeFormulaPanelUiById.set(opts.id, {
+    show() {
+      isUiActive = true;
+      completionPanel.classList.remove("hidden");
+      requestCompletions(editorView);
+      rerenderCompletions();
+    },
+    hide() {
+      isUiActive = false;
+      completionPanel.classList.add("hidden");
+      signaturePopover.hide();
+    },
+  });
+
+  editorView.dom.addEventListener("focusin", () => {
+    setActiveFormulaPanel(opts.id);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!isUiActive) return;
+    signaturePopover.updateSide();
   });
 
   let lastDiagnostics: AnalyzerDiagnostic[] = [];
@@ -370,7 +458,9 @@ export function createFormulaPanelView(opts: {
         diagnosticsEl,
         buildDiagnosticTextRows(state.source, state.diagnostics, lastChipMap, lastChipSpans),
       );
-      lastCmDiagnostics = toCmDiagnostics(state.diagnostics, docLen, lastChipSpans);
+      const cmDiagnostics = toCmDiagnostics(state.diagnostics, docLen, lastChipSpans);
+      lastCmDiagnostics = cmDiagnostics;
+      editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiagnostics) });
     },
   };
 }
