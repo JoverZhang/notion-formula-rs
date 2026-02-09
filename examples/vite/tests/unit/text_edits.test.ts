@@ -1,26 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { applyCompletion, applyTextEdits, type CompletionItem } from "../../src/editor/text_edits";
+import { applyCompletionItem, type CompletionItem } from "../../src/analyzer/wasm_client";
 
-describe("applyTextEdits", () => {
-  it("applies a single replacement", () => {
-    const source = "abc";
-    const updated = applyTextEdits(source, [{ range: { start: 1, end: 2 }, new_text: "Z" }]);
-    expect(updated).toBe("aZc");
-  });
+function applyChanges(
+  source: string,
+  changes: Array<{ from: number; to: number; insert: string }>,
+): string {
+  let text = source;
+  for (const change of [...changes].sort((a, b) => b.from - a.from || b.to - a.to)) {
+    text = text.slice(0, change.from) + change.insert + text.slice(change.to);
+  }
+  return text;
+}
 
-  it("applies multiple edits in reverse order", () => {
-    const source = "abcdef";
-    const edits = [
-      { range: { start: 4, end: 6 }, new_text: "Y" },
-      { range: { start: 1, end: 3 }, new_text: "X" },
-    ];
-    const updated = applyTextEdits(source, edits);
-    expect(updated).toBe("aXdef".replace("ef", "Y"));
-    expect(updated).toBe("aXdY");
-  });
-});
-
-describe("applyCompletion", () => {
+describe("applyCompletionItem", () => {
   const baseItem: CompletionItem = {
     label: "x",
     kind: "Function",
@@ -35,22 +27,30 @@ describe("applyCompletion", () => {
   };
 
   it("uses explicit cursor when provided", () => {
-    const { newText, newCursor } = applyCompletion("hello", {
+    const result = applyCompletionItem({
       ...baseItem,
       primary_edit: { range: { start: 0, end: 5 }, new_text: "hi" },
       cursor: 1,
     });
-    expect(newText).toBe("hi");
-    expect(newCursor).toBe(1);
+    expect(result).not.toBeNull();
+    expect(result?.cursor).toBe(1);
+    expect(applyChanges("hello", result?.changes ?? [])).toBe("hi");
   });
 
-  it("falls back to after inserted text when cursor is missing", () => {
-    const { newText, newCursor } = applyCompletion("su", {
+  it("falls back to primary + pre-primary edit offset when cursor is missing", () => {
+    const result = applyCompletionItem({
       ...baseItem,
-      primary_edit: { range: { start: 0, end: 2 }, new_text: "sum()" },
+      primary_edit: { range: { start: 2, end: 4 }, new_text: "sum()" },
       cursor: null,
+      additional_edits: [{ range: { start: 0, end: 0 }, new_text: "qq" }],
     });
-    expect(newText).toBe("sum()");
-    expect(newCursor).toBe(5);
+    expect(result).not.toBeNull();
+    expect(result?.cursor).toBe(9);
+    expect(applyChanges("abxxcd", result?.changes ?? [])).toBe("qqabsum()cd");
+  });
+
+  it("returns null for disabled or edit-less items", () => {
+    expect(applyCompletionItem({ ...baseItem, is_disabled: true })).toBeNull();
+    expect(applyCompletionItem({ ...baseItem, primary_edit: null })).toBeNull();
   });
 });

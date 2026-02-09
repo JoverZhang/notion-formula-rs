@@ -1,15 +1,32 @@
 // @vitest-environment jsdom
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CompletionItemView, SignatureHelpView } from "../../src/analyzer/generated/wasm_dto";
 import { createFormulaPanelView } from "../../src/ui/formula_panel_view";
 
+type MockCompleteOutput = {
+  items: CompletionItemView[];
+  signature_help: SignatureHelpView | null;
+  preferred_indices: number[];
+  replace?: { start: number; end: number };
+};
+
 const { completeSourceMock } = vi.hoisted(() => ({
-  completeSourceMock: vi.fn(),
+  completeSourceMock:
+    vi.fn<(...args: [string, number, string]) => MockCompleteOutput | undefined>(),
 }));
 
 vi.mock("../../src/analyzer/wasm_client", () => ({
-  completeSource: completeSourceMock,
+  safeBuildCompletionState: (...args: [string, number, string]) => {
+    const out = completeSourceMock(...args);
+    return {
+      items: out?.items ?? [],
+      signatureHelp: out?.signature_help ?? null,
+      preferredIndices: out?.preferred_indices ?? [],
+    };
+  },
   posToLineCol: () => ({ line: 1, col: 1 }),
+  applyCompletionItem: () => null,
 }));
 
 beforeEach(() => {
@@ -50,7 +67,7 @@ function mountAndGetEditorView(initialSource: string): EditorView {
 }
 
 describe("recommended completions", () => {
-  const items = [
+  const items: CompletionItemView[] = [
     {
       label: "textFn",
       kind: "Function",

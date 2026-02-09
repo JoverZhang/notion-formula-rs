@@ -226,7 +226,7 @@ Related:
 | Text edits / cursor rebasing | [`docs/design/wasm-boundary.md`](wasm-boundary.md#text-edits--cursor-rebasing) | UTF-16 ranges in DTOs; rebasing rules. |
 | Tests (what exists and where) | [`docs/design/testing.md`](testing.md) | Rust + WASM + demo tests; snapshot update flow. |
 | Vite demo tests + regression coverage | [`docs/design/testing.md`](testing.md#vite-demo-tests-examplesvite) | Includes the “run wasm:build once” note and coverage list. |
-| Vite demo completion UI | [`docs/design/demo-vite.md`](demo-vite.md#completion-ui-model) + [`examples/vite/README.md`](../../examples/vite/README.md) | UI grouping/selection + integration pointers. |
+| Vite demo architecture (current) | [`examples/vite/README.md`](../../examples/vite/README.md#architecture) + [`docs/design/demo-vite.md`](demo-vite.md#where-the-integration-lives) | Demo file map + UI-owned behavior notes. |
 | Cursor placement invariants (demo) | [`docs/design/demo-vite.md`](demo-vite.md#cursor-placement-invariants) | Byte→UTF-16 conversion + cursor-after-edit rules. |
 | Playwright host configuration | [`docs/design/demo-vite.md`](demo-vite.md#playwright-host-config) | `PW_HOST` / `PW_PORT` overrides. |
 | Current architectural invariants | [`docs/design/README.md`](#key-design-decisions) + [`docs/design/README.md`](#contracts-hard-rules) | Contracts-first summary + full contract list. |

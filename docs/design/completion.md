@@ -98,7 +98,8 @@ Tie-breaking:
 
 Type ranking is a separate pass (`apply_type_ranking`) used when an expected type is available:
 
-- Skipped when `expected_ty = Unknown`.
+- Skipped when the expected type is wildcard-ish:
+  - `Unknown` and `Generic(_)` are treated as “no signal” and do not produce type ranking.
 - Groups items into kind buckets, scores each item, sorts within buckets, then reorders buckets by
   best score (ties broken by bucket priority).
 - Code: `analyzer/src/ide/completion/rank.rs` (`apply_type_ranking`)
@@ -118,6 +119,16 @@ Signature help is returned from completion when the cursor is inside a call.
 - Detection + rendering: `analyzer/src/ide/completion/signature.rs`
 - Uses semantic instantiation (`instantiate_sig`):
   - Code: `analyzer/src/analysis/infer.rs`
+
+Instantiation model (current behavior):
+
+- Signature help is call-site instantiated:
+  - best-effort infers argument expression types from the source
+  - instantiates the `FunctionSig` using the same unification/substitution logic as semantic inference
+  - type strings are formatted via `analyzer/src/ide/display.rs` (`format_ty(...)`)
+  - instantiated `Unknown` renders as `unknown` (including unconstrained generics)
+  - parameter slots prefer per-argument inferred (actual) types when the argument expression is non-empty
+    and the inferred type is helpful/compatible; empty argument slots fall back to instantiated expected types
 
 Output model:
 

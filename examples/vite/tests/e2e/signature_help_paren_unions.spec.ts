@@ -21,9 +21,7 @@ test("signature help renders parenthesized unions inside label", async ({ page }
   }, cursor);
   await waitForCompletionDebounce(page);
 
-  const signature = page.locator(
-    '[data-testid="completion-panel"][data-formula-id="f1"] .completion-signature',
-  );
+  const signature = page.locator('[data-testid="suggestion-signature"][data-formula-id="f1"]');
   await expect(signature).toBeVisible({ timeout: 5_000 });
   await expect(signature).toContainText("(number | string)[]");
   await expect(signature).not.toContainText("undefined");

@@ -5,7 +5,15 @@ Notes on the TypeScript demo consuming `analyzer_wasm`.
 ## Where the integration lives
 
 - WASM wrapper: `examples/vite/src/analyzer/wasm_client.ts`
-- Completion UI: `examples/vite/src/ui/formula_panel_view.ts`
+  - This is the only place that imports the wasm-pack glue (`examples/vite/src/pkg/analyzer_wasm.js`).
+- Panel orchestration + CodeMirror wiring: `examples/vite/src/ui/formula_panel_view.ts`
+- Shared UI models:
+  - completions: `examples/vite/src/model/completions.ts`
+  - diagnostics: `examples/vite/src/model/diagnostics.ts`
+  - signature help: `examples/vite/src/model/signature.ts`
+- Signature popover: `examples/vite/src/ui/signature_popover.ts`
+
+For the current demo file map, see `examples/vite/README.md` (“Architecture”).
 
 ## Completion UI model
 
@@ -13,13 +21,16 @@ The demo renders completions from WASM entirely in TypeScript.
 
 Behavior:
 
-- Completions render under the “Suggestions” panel.
+- Completions render under the “Completions” panel.
 - Function completions are grouped by `category` (UI-owned grouping).
 - Non-function completions are grouped by consecutive `kind` changes (UI-owned grouping).
+- A “Recommended” section is derived from analyzer-provided `preferred_indices`.
 - Navigation operates over a `completionRows` model (headers + items):
   - headers are not selectable
   - arrow keys skip header rows
 - Applying a completion maps the selected row back to the underlying `CompletionItem` index.
+- Completion and signature UI is shown for the focused formula panel and hidden for other panels.
+- Selected completion rows are scrolled into view after selection updates (`block: "nearest"`).
 
 ## Styling and rendering
 
@@ -43,7 +54,7 @@ Behavior:
   `additional_edits` that occur before the primary edit.
 - The demo uses `item.cursor` when present; otherwise it falls back to:
   - `primary_edit` end + shifts from `additional_edits` before the primary edit
-  - Code: `examples/vite/src/ui/formula_panel_view.ts`
+  - Code: `examples/vite/src/analyzer/wasm_client.ts` (`applyCompletionItem`)
 
 ## Playwright host config
 
@@ -55,4 +66,3 @@ Behavior:
 ## Tests
 
 See `docs/design/testing.md` and `examples/vite/README.md`.
-
