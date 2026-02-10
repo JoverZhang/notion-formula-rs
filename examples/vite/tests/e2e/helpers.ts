@@ -131,6 +131,16 @@ export async function applyCompletionByDomClick(page: Page, id: FormulaId, label
 }
 
 export async function expectEditorText(page: Page, id: FormulaId, expected: string | RegExp) {
-  const editor = editorContentLocator(page, id);
-  await expect(editor).toHaveText(expected, { timeout: 5_000 });
+  const source = async () =>
+    page.evaluate((formulaId) => {
+      const dbg = window.__nf_debug;
+      if (!dbg) return "";
+      return dbg.getState(formulaId).source;
+    }, id);
+
+  if (typeof expected === "string") {
+    await expect.poll(source, { timeout: 5_000 }).toBe(expected);
+    return;
+  }
+  await expect.poll(source, { timeout: 5_000 }).toMatch(expected);
 }

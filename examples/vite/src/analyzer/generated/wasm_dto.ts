@@ -36,7 +36,13 @@ export type TokenView = { kind: string, text: string,
  */
 span: SpanView, };
 
-export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<TokenView>, formatted: string, };
+export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<TokenView>, formatted: string, 
+/**
+ * Inferred root expression type rendered for UI (e.g. `"number | string"`).
+ *
+ * Never nullable. Unknown/failed inference is represented as `"unknown"`.
+ */
+output_type: string, };
 
 export type TextEditView = { 
 /**

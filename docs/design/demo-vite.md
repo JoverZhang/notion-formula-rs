@@ -23,8 +23,9 @@ Behavior:
 
 - Completions render in the “Completions” panel inside the editor wrap (under the editor action
   row).
-- The editor action row currently exposes `Format`; the right side is a reserved slot for a future
-  output-type badge (UI placeholder only).
+- The editor action row exposes `Format`; the right side shows `output: <type>` from
+  `AnalyzeResult.output_type` (non-null, unknown/error = `"unknown"`, right-aligned, truncated on
+  overflow).
 - Completions are grouped by consecutive `kind` changes (UI-owned grouping).
 - Function groups are represented directly by function-specific completion kinds
   (`FunctionGeneral`, `FunctionText`, `FunctionNumber`, `FunctionDate`, `FunctionPeople`,

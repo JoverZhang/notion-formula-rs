@@ -122,8 +122,7 @@ export function createFormulaPanelView(opts: {
         <div class="editor" data-testid="formula-editor" data-formula-id="${opts.id}"></div>
         <div class="formula-actions">
           <button class="format-button" type="button" data-testid="format-button" data-formula-id="${opts.id}">Format</button>
-          <!-- TODO: render inferred output type here once analyzer exposes output-type APIs. -->
-          <div class="formula-output-type-slot" aria-hidden="true"></div>
+          <div class="formula-output-type" data-testid="formula-output-type" data-formula-id="${opts.id}"></div>
         </div>
         <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
           <div class="completion-header">Completions</div>
@@ -144,6 +143,7 @@ export function createFormulaPanelView(opts: {
   );
   const editorEl = must<HTMLElement>(panel, '.editor[data-testid="formula-editor"]');
   const formatBtn = must<HTMLButtonElement>(panel, ".format-button");
+  const outputTypeEl = must<HTMLElement>(panel, ".formula-output-type");
   const diagnosticsEl = must<HTMLUListElement>(panel, ".diag-list");
   const completionPanel = must<HTMLElement>(
     panel,
@@ -392,6 +392,7 @@ export function createFormulaPanelView(opts: {
   let lastChipSpans: ChipSpan[] = [];
   let lastChipMap: ChipOffsetMap | null = null;
   let lastFormatted = "";
+  let lastOutputType = "unknown";
   let lastSource = opts.initialSource;
 
   renderDiagnosticList(diagnosticsEl, ["No diagnostics"]);
@@ -414,6 +415,7 @@ export function createFormulaPanelView(opts: {
     getState: () => ({
       source: lastSource,
       formatted: lastFormatted,
+      outputType: lastOutputType,
       diagnosticsCount: lastDiagnostics.length,
       tokenCount: lastTokenRanges.length,
     }),
@@ -442,6 +444,10 @@ export function createFormulaPanelView(opts: {
       lastSource = state.source;
       lastDiagnostics = state.diagnostics;
       lastFormatted = state.formatted;
+      lastOutputType = state.outputType;
+      const outputTypeLabel = `output: ${state.outputType}`;
+      outputTypeEl.textContent = outputTypeLabel;
+      outputTypeEl.title = outputTypeLabel;
 
       const docLen = state.source.length;
       const sortedTokens = sortTokens(state.tokens || []);

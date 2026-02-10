@@ -36,9 +36,12 @@ Primary files:
 
 UI behavior that is intentionally TypeScript-owned:
 
-- Completions render under the “Completions” panel.
+- Completions render in the “Completions” panel inside the editor wrap (under the action row).
 - Items are grouped by contiguous kind headers, with a “Recommended” section derived from `preferred_indices`.
 - Keyboard navigation skips headers; selection is scrolled into view.
+- The editor action row shows `Format` plus `output: <type>`
+  (`AnalyzeResult.output_type`, non-null with `"unknown"` fallback), right-aligned with overflow
+  truncation.
 - Signature help renders analyzer-provided display segments; the UI does not parse type strings.
 - Analyzer diagnostics are mirrored into CodeMirror lint diagnostics.
 - Formula editor auto-grows with content via `.editor .cm-editor .cm-scroller`.

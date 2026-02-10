@@ -80,6 +80,10 @@ pub struct AnalyzeResult {
     pub diagnostics: Vec<DiagnosticView>,
     pub tokens: Vec<TokenView>,
     pub formatted: String,
+    /// Inferred root expression type rendered for UI (e.g. `"number | string"`).
+    ///
+    /// Never nullable. Unknown/failed inference is represented as `"unknown"`.
+    pub output_type: String,
 }
 
 /// A text edit in UTF-16 coordinates.

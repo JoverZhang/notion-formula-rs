@@ -40,6 +40,8 @@ Helper APIs (WASM):
 
 Key types:
 
+- `AnalyzeResult { diagnostics, tokens, formatted, output_type }`
+  - `output_type` is non-null (`string`): unknown/error uses `"unknown"`.
 - `Span { start, end }`
 - `SpanView { range: Span }`
 - `LineColView { line, col }` (1-based; `col` is a Rust `char` count, not UTF-16)

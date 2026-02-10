@@ -61,6 +61,7 @@ export class AppVM {
       diagnostics: [],
       tokens: [],
       formatted: "",
+      outputType: "unknown",
       status: "idle",
     };
   }
@@ -97,17 +98,11 @@ export class AppVM {
 
     try {
       const result = analyzeSource(formula.source, this.state.contextJson);
-      if (!result) {
-        formula.diagnostics = [];
-        formula.tokens = [];
-        formula.formatted = "(no result)";
-        formula.status = "ok";
-      } else {
-        formula.diagnostics = result.diagnostics || [];
-        formula.tokens = result.tokens || [];
-        formula.formatted = result.formatted || "";
-        formula.status = "ok";
-      }
+      formula.diagnostics = result.diagnostics || [];
+      formula.tokens = result.tokens || [];
+      formula.formatted = result.formatted || "";
+      formula.outputType = result.output_type || "unknown";
+      formula.status = "ok";
     } catch {
       const diag: AnalyzerDiagnostic = {
         kind: "error",
@@ -117,6 +112,7 @@ export class AppVM {
       formula.diagnostics = [diag];
       formula.tokens = [];
       formula.formatted = "";
+      formula.outputType = "unknown";
       formula.status = "error";
     }
 

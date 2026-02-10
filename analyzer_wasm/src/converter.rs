@@ -101,7 +101,11 @@ impl Converter {
         }
     }
 
-    pub fn analyze_output(source: &str, output: ParseOutput) -> AnalyzeResult {
+    pub fn analyze_output(
+        source: &str,
+        output: ParseOutput,
+        output_type: String,
+    ) -> AnalyzeResult {
         let diagnostics = output
             .diagnostics
             .iter()
@@ -121,6 +125,7 @@ impl Converter {
             diagnostics,
             tokens,
             formatted,
+            output_type,
         }
     }
 
@@ -129,6 +134,7 @@ impl Converter {
             diagnostics: vec![Self::diagnostic_view(source, diag)],
             tokens: Vec::new(),
             formatted: String::new(),
+            output_type: analyzer::semantic::Ty::Unknown.to_string(),
         }
     }
 
