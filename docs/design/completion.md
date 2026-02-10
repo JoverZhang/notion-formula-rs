@@ -48,8 +48,14 @@ Property items:
 
 ## Postfix completion (after atom / after dot)
 
-- Candidate set is derived from `semantic::postfix_capable_builtin_names()`.
+- Candidate set starts from `semantic::postfix_capable_builtin_names()`.
   - Code: `analyzer/src/analysis/mod.rs`, `analyzer/src/ide/completion/items.rs`
+- After `.` (member-access mode), candidates are additionally filtered by receiver type:
+  - infer receiver type best-effort from source prefix before `.`
+  - keep methods whose postfix first parameter accepts the receiver via `semantic::ty_accepts`
+  - for `receiver = Unknown`, current behavior keeps all postfix-capable methods (TODO: narrow to
+    explicit `any`-accepting signatures once `any` exists in the type model)
+  - Code: `analyzer/src/ide/completion/pipeline.rs`, `analyzer/src/ide/completion/items.rs`
 - UI forms:
   - After an atom: inserts `.name()`
   - After `.`: inserts `name()` (the dot already exists)
@@ -63,6 +69,8 @@ Position and replace-span logic is in:
 
 Key rules:
 
+- `AfterDot` is determined by token connectivity (`receiver_atom` + `.` + optional method prefix),
+  not by fuzzy/prefix ranking.
 - Strictly inside an identifier → replace the identifier span.
 - At an identifier boundary (cursor at end of identifier token) → replace the identifier span only
   if the prefix can be extended by something in-scope (builtins/functions/properties).

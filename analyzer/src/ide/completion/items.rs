@@ -51,15 +51,18 @@ pub(super) fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<Completio
         data: None,
     }));
 
-    items.extend(postfix_method_items(ctx, true));
+    items.extend(postfix_method_items(ctx, true, &semantic::Ty::Unknown));
 
     items
 }
 
 /// Completion items right after a `.` (member-access context).
-pub(super) fn after_dot_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
+pub(super) fn after_dot_items(
+    ctx: Option<&semantic::Context>,
+    receiver_ty: &semantic::Ty,
+) -> Vec<CompletionItem> {
     // In a member-access context, the `.` already exists in the source.
-    postfix_method_items(ctx, false)
+    postfix_method_items(ctx, false, receiver_ty)
 }
 
 fn needs_trailing_space(name: &str) -> bool {
@@ -91,7 +94,34 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
         .collect()
 }
 
-fn postfix_method_items(ctx: Option<&semantic::Context>, insert_dot: bool) -> Vec<CompletionItem> {
+fn postfix_method_items(
+    ctx: Option<&semantic::Context>,
+    insert_dot: bool,
+    receiver_ty: &semantic::Ty,
+) -> Vec<CompletionItem> {
+    fn postfix_first_param(sig: &semantic::FunctionSig) -> Option<&semantic::ParamSig> {
+        if let Some(first) = sig.params.head.first() {
+            return Some(first);
+        }
+        sig.params.repeat.first()
+    }
+
+    fn receiver_matches_postfix_first_param(
+        func: &semantic::FunctionSig,
+        receiver_ty: &semantic::Ty,
+    ) -> bool {
+        // TODO(any-postfix-receiver): once an explicit `any` type exists, an unknown receiver should
+        // only match functions whose first param accepts `any`.
+        if matches!(receiver_ty, semantic::Ty::Unknown) {
+            return true;
+        }
+
+        let Some(first_param) = postfix_first_param(func) else {
+            return false;
+        };
+        semantic::ty_accepts(&first_param.ty, receiver_ty)
+    }
+
     let mut items = Vec::new();
 
     let Some(ctx) = ctx else {
@@ -100,6 +130,9 @@ fn postfix_method_items(ctx: Option<&semantic::Context>, insert_dot: bool) -> Ve
     let postfix_capable = semantic::postfix_capable_builtin_names();
     for func in &ctx.functions {
         if !postfix_capable.contains(func.name.as_str()) {
+            continue;
+        }
+        if !receiver_matches_postfix_first_param(func, receiver_ty) {
             continue;
         }
         let label = format!(".{}", func.name);

@@ -45,39 +45,43 @@ pub(super) fn detect_position_kind(
 }
 
 fn is_postfix_member_access_position(tokens: &[Token], cursor: u32) -> bool {
-    fn dot_has_receiver_atom(tokens: &[Token], dot_idx: usize) -> bool {
-        prev_non_trivia_before(tokens, dot_idx).is_some_and(|(_, token)| {
-            matches!(
-                token.kind,
-                TokenKind::Ident(_) | TokenKind::Literal(_) | TokenKind::CloseParen
-            )
-        })
-    }
+    postfix_member_access_dot_index(tokens, cursor).is_some()
+}
 
+fn dot_has_receiver_atom(tokens: &[Token], dot_idx: usize) -> bool {
+    prev_non_trivia_before(tokens, dot_idx).is_some_and(|(_, token)| {
+        matches!(
+            token.kind,
+            TokenKind::Ident(_) | TokenKind::Literal(_) | TokenKind::CloseParen
+        )
+    })
+}
+
+/// Returns the dot token index for member-access completion at `cursor`.
+///
+/// This is a token-connectivity check (receiver atom + `.` + optional method prefix).
+pub(super) fn postfix_member_access_dot_index(tokens: &[Token], cursor: u32) -> Option<usize> {
     if let Some((idx, token)) = token_containing_cursor(tokens, cursor)
         && matches!(token.kind, TokenKind::Ident(_))
         && let Some((dot_idx, dot_token)) = prev_non_trivia_before(tokens, idx)
         && matches!(dot_token.kind, TokenKind::Dot)
+        && dot_has_receiver_atom(tokens, dot_idx)
     {
-        return dot_has_receiver_atom(tokens, dot_idx);
+        return Some(dot_idx);
     }
 
-    let Some((prev_idx, prev_token)) = prev_non_trivia_insertion(tokens, cursor) else {
-        return false;
-    };
-
+    let (prev_idx, prev_token) = prev_non_trivia_insertion(tokens, cursor)?;
     match prev_token.kind {
-        TokenKind::Dot => dot_has_receiver_atom(tokens, prev_idx),
+        TokenKind::Dot if dot_has_receiver_atom(tokens, prev_idx) => Some(prev_idx),
         TokenKind::Ident(_) => {
-            if let Some((dot_idx, dot_token)) = prev_non_trivia_before(tokens, prev_idx)
-                && matches!(dot_token.kind, TokenKind::Dot)
-            {
-                dot_has_receiver_atom(tokens, dot_idx)
+            let (dot_idx, dot_token) = prev_non_trivia_before(tokens, prev_idx)?;
+            if matches!(dot_token.kind, TokenKind::Dot) && dot_has_receiver_atom(tokens, dot_idx) {
+                Some(dot_idx)
             } else {
-                false
+                None
             }
         }
-        _ => false,
+        _ => None,
     }
 }
 

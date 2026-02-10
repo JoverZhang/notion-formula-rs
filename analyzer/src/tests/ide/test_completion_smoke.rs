@@ -75,7 +75,8 @@ fn completion_after_dot_shows_postfix_methods() {
     t("sum(1,2,3).$0")
         .ctx(c)
         .expect_not_empty()
-        .expect_postfix(Func::If)
+        .expect_contains_labels(&[".add", ".round"])
+        .expect_not_postfix(Func::If)
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
             Item::Func(Func::If),
@@ -203,20 +204,20 @@ fn completion_apply_function_before_call() {
 fn completion_apply_postfix_if_inserts_parens_and_moves_cursor_inside() {
     let c = ctx().props_demo_basic().build();
 
-    t("(1+1)$0")
+    t("(1==1)$0")
         .ctx(c.clone())
         .apply(".if")
-        .expect_text("(1+1).if($0)");
+        .expect_text("(1==1).if($0)");
 
-    t("sum(1,2,3)$0")
+    t("if(true,true,false)$0")
         .ctx(c.clone())
         .apply(".if")
-        .expect_text("sum(1,2,3).if($0)");
+        .expect_text("if(true,true,false).if($0)");
 
-    t("sum(1,2,3).$0")
+    t("if(true,true,false).$0")
         .ctx(c)
         .apply(".if")
-        .expect_text("sum(1,2,3).if($0)");
+        .expect_text("if(true,true,false).if($0)");
 }
 
 #[test]

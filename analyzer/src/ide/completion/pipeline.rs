@@ -60,6 +60,7 @@ pub(super) fn complete(
         };
 
     let mut output = complete_for_position(
+        text,
         position_kind,
         ctx,
         tokens.as_slice(),
@@ -71,6 +72,7 @@ pub(super) fn complete(
 }
 
 fn complete_for_position(
+    text: &str,
     kind: PositionKind,
     ctx: Option<&semantic::Context>,
     tokens: &[Token],
@@ -102,7 +104,10 @@ fn complete_for_position(
             preferred_indices: Vec::new(),
         },
         PositionKind::AfterDot => CompletionOutput {
-            items: super::items::after_dot_items(ctx),
+            items: super::items::after_dot_items(
+                ctx,
+                &infer_postfix_receiver_ty(text, tokens, cursor, ctx),
+            ),
             replace: super::position::replace_span_for_expr_start(tokens, cursor),
             signature_help: None,
             preferred_indices: Vec::new(),
@@ -114,4 +119,40 @@ fn complete_for_position(
             preferred_indices: Vec::new(),
         },
     }
+}
+
+fn infer_postfix_receiver_ty(
+    text: &str,
+    tokens: &[Token],
+    cursor: u32,
+    ctx: Option<&semantic::Context>,
+) -> semantic::Ty {
+    let Some(ctx) = ctx else {
+        return semantic::Ty::Unknown;
+    };
+
+    let Some(dot_idx) = super::position::postfix_member_access_dot_index(tokens, cursor) else {
+        return semantic::Ty::Unknown;
+    };
+    let Some(dot_token) = tokens.get(dot_idx) else {
+        return semantic::Ty::Unknown;
+    };
+    let Ok(dot_start) = usize::try_from(dot_token.span.start) else {
+        return semantic::Ty::Unknown;
+    };
+    if dot_start > text.len() || !text.is_char_boundary(dot_start) {
+        return semantic::Ty::Unknown;
+    }
+
+    let receiver_source = text[..dot_start].trim_end();
+    if receiver_source.is_empty() {
+        return semantic::Ty::Unknown;
+    }
+
+    let Ok(parsed) = crate::analyze(receiver_source) else {
+        return semantic::Ty::Unknown;
+    };
+
+    let mut map = semantic::TypeMap::default();
+    semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map)
 }

@@ -128,6 +128,12 @@ Semantic treatment (best-effort):
 - Validation currently only applies postfix-call validation when:
   - the builtin has `flat_params()` and `flat.len() > 1`
   - Code: `analyzer/src/analysis/mod.rs` (`validate_expr` for `ExprKind::MemberCall`)
+- IDE completion (`receiver.$0` / `receiver.pre$0`) uses the same postfix-first-arg idea:
+  - start from postfix-capable builtins
+  - keep only functions where the first postfix parameter accepts receiver type (`ty_accepts`)
+  - if receiver infers to `Unknown`, current completion keeps the full postfix-capable set
+    (TODO: narrow once an explicit `any` type is modeled)
+  - Code: `analyzer/src/ide/completion/pipeline.rs`, `analyzer/src/ide/completion/items.rs`
 
 The postfix allowlist is derived from builtins:
 

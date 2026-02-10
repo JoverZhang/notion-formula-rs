@@ -17,7 +17,7 @@ fn completion_after_atom_postfix_if_requires_if_in_context() {
 fn completion_member_access_prefix_filters_to_query_matches() {
     let c = ctx().build();
 
-    t("true.rep$0")
+    t(r#""abc".rep$0"#)
         .ctx(c)
         .expect_contains_labels(&[".repeat", ".replace", ".replaceAll"])
         .expect_not_contains_labels(&[".if", ".test", ".match"]);
@@ -29,6 +29,17 @@ fn completion_member_access_filters_postfix_items_strictly() {
 
     t("true.rep$0").ctx(c.clone()).expect_not_postfix(Func::If);
     t("true.i$0").ctx(c).expect_postfix(Func::If);
+}
+
+#[test]
+fn completion_member_access_filters_by_receiver_type() {
+    let c = ctx().build();
+
+    t("true.rep$0").ctx(c.clone()).expect_empty();
+    t(r#""x".rep$0"#)
+        .ctx(c)
+        .expect_contains_labels(&[".repeat", ".replace", ".replaceAll"])
+        .expect_not_contains_labels(&[".if", ".ifs"]);
 }
 
 #[test]
@@ -243,7 +254,17 @@ fn completion_after_dot_only_offers_postfix_capable_functions() {
     t("true.$0")
         .ctx(c)
         .expect_postfix(Func::If)
+        .expect_not_contains_labels(&[".repeat", ".replace"])
         .expect_not_postfix(Func::Sum);
+}
+
+#[test]
+fn completion_after_dot_unknown_receiver_keeps_full_postfix_set_for_now() {
+    let c = ctx().build();
+    t("foo.$0")
+        .ctx(c)
+        .expect_postfix(Func::If)
+        .expect_contains_labels(&[".repeat"]);
 }
 
 #[test]
