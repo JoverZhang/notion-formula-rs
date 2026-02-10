@@ -61,7 +61,7 @@ Behavior:
 - The Playwright suite boots Vite via `webServer` in `examples/vite/playwright.config.ts`.
 - Host/port overrides:
   - `PW_HOST` (default `127.0.0.1`)
-  - `PW_PORT` (default `5173`)
+  - `PW_PORT` (optional; when unset, the config derives a stable high port from the worktree path)
 
 ## Tests
 

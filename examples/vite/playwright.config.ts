@@ -1,7 +1,13 @@
+import { createHash } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
 const HOST = process.env.PW_HOST ?? "127.0.0.1";
-const PORT = process.env.PW_PORT ?? "5173";
+const PORT =
+  process.env.PW_PORT ??
+  String(
+    20_000 +
+      (parseInt(createHash("sha1").update(process.cwd()).digest("hex").slice(0, 8), 16) % 40_000),
+  );
 const BASE_URL = `http://${HOST}:${PORT}`;
 
 export default defineConfig({

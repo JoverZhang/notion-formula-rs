@@ -57,7 +57,8 @@ UI behavior that is intentionally TypeScript-owned:
 - Install deps (from this directory): `pnpm install`
 - Run headless suite: `pnpm test:e2e`
 - Run with UI viewer: `pnpm test:e2e:ui`
-- The suite boots Vite on `127.0.0.1:5173/?debug=1` and asserts:
+- The suite boots Vite on `PW_HOST` (default `127.0.0.1`) and a workspace-derived
+  stable high port (or use `PW_PORT` to pin one), with `?debug=1`, and asserts:
   - Debug bridge presence and panel registration
   - Token highlighting regression (no “first token only”)
   - Analyzer diagnostics flowing into the UI + CodeMirror lint

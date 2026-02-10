@@ -226,5 +226,5 @@ Related:
 | Vite demo tests + regression coverage | [`docs/design/testing.md`](testing.md#vite-demo-tests-examplesvite) | Includes the “run wasm:build once” note and coverage list. |
 | Vite demo architecture (current) | [`examples/vite/README.md`](../../examples/vite/README.md#architecture) + [`docs/design/demo-vite.md`](demo-vite.md#where-the-integration-lives) | Demo file map + UI-owned behavior notes. |
 | Cursor placement invariants (demo) | [`docs/design/demo-vite.md`](demo-vite.md#cursor-placement-invariants) | Byte→UTF-16 conversion + cursor-after-edit rules. |
-| Playwright host configuration | [`docs/design/demo-vite.md`](demo-vite.md#playwright-host-config) | `PW_HOST` / `PW_PORT` overrides. |
+| Playwright host configuration | [`docs/design/demo-vite.md`](demo-vite.md#playwright-host-config) | `PW_HOST` override; `PW_PORT` optional (stable worktree-derived port when unset). |
 | Current architectural invariants | [`docs/design/README.md`](#key-design-decisions) + [`docs/design/README.md`](#contracts-hard-rules) | Contracts-first summary + full contract list. |
