@@ -247,9 +247,7 @@ fn infer_expr_inner(expr: &Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
             LitKind::String => Ty::String,
             LitKind::Bool => Ty::Boolean,
         },
-        ExprKind::Ident(sym) => match sym.text.as_str() {
-            _ => Ty::Unknown,
-        },
+        ExprKind::Ident(_) => Ty::Unknown,
         ExprKind::Group { inner } => infer_expr_with_map(inner, ctx, map),
         ExprKind::List { items } => {
             fn contains_unknown(ty: &Ty) -> bool {

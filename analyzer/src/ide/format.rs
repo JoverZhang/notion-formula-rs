@@ -231,8 +231,8 @@ impl<'a> Formatter<'a> {
     fn format_group(&mut self, expr: &Expr, indent: usize, inner: &Expr) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
-        if !has_newline {
-            if let Some(out) = self.try_inline(|this| {
+        if !has_newline
+            && let Some(out) = self.try_inline(|this| {
                 let inline = this.format_expr_single_line(inner, indent)?;
                 let text = format!("({inline})");
                 this.fits_on_line(indent, text.len())
@@ -240,7 +240,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         let mut out = Rendered::default();
         out.push_line(indent, "(");
@@ -253,8 +252,8 @@ impl<'a> Formatter<'a> {
     fn format_list(&mut self, expr: &Expr, indent: usize, items: &[Expr]) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
-        if !has_newline {
-            if let Some(out) = self.try_inline(|this| {
+        if !has_newline
+            && let Some(out) = self.try_inline(|this| {
                 let mut parts = Vec::new();
                 for item in items {
                     parts.push(this.format_expr_single_line(item, indent)?);
@@ -265,7 +264,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         self.format_delimited_seq(
             Rendered::default(),
@@ -283,8 +281,8 @@ impl<'a> Formatter<'a> {
 
         let has_newline = self.expr_has_newline(expr);
 
-        if !has_newline {
-            if let Some(out) = self.try_inline(|this| {
+        if !has_newline
+            && let Some(out) = self.try_inline(|this| {
                 let inline = this.format_expr_single_line(inner, indent)?;
                 let text = if needs_space {
                     format!("{op_str} {inline}")
@@ -296,7 +294,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         let mut out = Rendered::default();
         let lparen = if needs_space {
@@ -327,8 +324,8 @@ impl<'a> Formatter<'a> {
             .map(|tok| matches!(tok.kind, TokenKind::DocComment(CommentKind::Line, _)))
             .unwrap_or(false);
 
-        if !has_newline || trailing_line_comment {
-            if let Some(out) = self.try_inline(|this| {
+        if (!has_newline || trailing_line_comment)
+            && let Some(out) = self.try_inline(|this| {
                 let lhs = this.format_expr_single_line(left, indent)?;
                 let rhs = this.format_expr_single_line(right, indent)?;
                 let text = format!("{lhs} {op_str} {rhs}");
@@ -337,7 +334,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         let mut out = Rendered::default();
         let left_rendered = self.format_expr_rendered(left, indent);
@@ -391,8 +387,8 @@ impl<'a> Formatter<'a> {
     ) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
-        if !has_newline {
-            if let Some(out) = self.try_inline(|this| {
+        if !has_newline
+            && let Some(out) = self.try_inline(|this| {
                 let c = this.format_expr_single_line(cond, indent)?;
                 let t = this.format_expr_single_line(then, indent)?;
                 let o = this.format_expr_single_line(otherwise, indent)?;
@@ -402,7 +398,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         let mut out = Rendered::default();
         let cond_r = self.format_expr_rendered(cond, indent);
@@ -431,8 +426,8 @@ impl<'a> Formatter<'a> {
     fn format_call(&mut self, expr: &Expr, indent: usize, callee: &str, args: &[Expr]) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
-        if !has_newline {
-            if let Some(out) = self.try_inline(|this| {
+        if !has_newline
+            && let Some(out) = self.try_inline(|this| {
                 let mut parts = Vec::new();
                 for arg in args {
                     parts.push(this.format_expr_single_line(arg, indent)?);
@@ -443,7 +438,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         self.format_delimited_seq(
             Rendered::default(),
@@ -465,8 +459,8 @@ impl<'a> Formatter<'a> {
     ) -> Rendered {
         let has_newline = self.expr_has_newline(expr);
 
-        if !has_newline {
-            if let Some(out) = self.try_inline(|this| {
+        if !has_newline
+            && let Some(out) = self.try_inline(|this| {
                 let receiver_inline = this.format_expr_single_line(receiver, indent)?;
                 let mut parts = Vec::new();
                 for arg in args {
@@ -478,7 +472,6 @@ impl<'a> Formatter<'a> {
             }) {
                 return out;
             }
-        }
 
         let receiver_r = self.format_expr_rendered(receiver, indent);
         self.format_delimited_seq(receiver_r, indent, format!(".{method}("), true, ")", args)

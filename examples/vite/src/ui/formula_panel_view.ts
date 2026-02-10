@@ -30,11 +30,6 @@ import {
   type TokenDecorationRange,
 } from "../editor_decorations";
 import {
-  buildDiagnosticTextRows,
-  mergeChipRangesWithDiagnostics,
-  toCmDiagnostics,
-} from "../model/diagnostics";
-import {
   buildCompletionRows,
   getSelectedItemIndex,
   nextSelectedRowIndex,
@@ -43,6 +38,11 @@ import {
   COMPLETION_ROW_LABEL_RECOMMENDED,
   type CompletionRenderRow,
 } from "../model/completions";
+import {
+  buildDiagnosticTextRows,
+  mergeChipRangesWithDiagnostics,
+  toCmDiagnostics,
+} from "../model/diagnostics";
 import { createSignaturePopover } from "./signature_popover";
 
 type FormulaPanelView = {
@@ -174,7 +174,10 @@ export function createFormulaPanelView(opts: {
 
     const padding = 2;
     const itemTop = Math.max(0, itemRect.top - listRect.top + itemsEl.scrollTop - padding);
-    const itemBottom = Math.max(itemTop, itemRect.bottom - listRect.top + itemsEl.scrollTop + padding);
+    const itemBottom = Math.max(
+      itemTop,
+      itemRect.bottom - listRect.top + itemsEl.scrollTop + padding,
+    );
     const viewTop = itemsEl.scrollTop;
     const viewBottom = viewTop + itemsEl.clientHeight;
 

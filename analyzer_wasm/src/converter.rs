@@ -101,11 +101,7 @@ impl Converter {
         }
     }
 
-    pub fn analyze_output(
-        source: &str,
-        output: ParseOutput,
-        output_type: String,
-    ) -> AnalyzeResult {
+    pub fn analyze_output(source: &str, output: ParseOutput, output_type: String) -> AnalyzeResult {
         let diagnostics = output
             .diagnostics
             .iter()

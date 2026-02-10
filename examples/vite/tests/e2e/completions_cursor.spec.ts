@@ -13,7 +13,11 @@ import {
 
 const FORMULA_ID: FormulaId = "f1";
 
-async function expectSourceText(page: Parameters<typeof gotoDebug>[0], id: FormulaId, expected: string) {
+async function expectSourceText(
+  page: Parameters<typeof gotoDebug>[0],
+  id: FormulaId,
+  expected: string,
+) {
   await expect
     .poll(
       async () =>

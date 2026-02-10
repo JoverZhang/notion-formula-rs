@@ -48,7 +48,8 @@ function buildWrapped(sig: SignatureHelp): SignatureToken[] {
 
   let open = -1;
   for (let i = beforeArrow - 1; i >= 0; i -= 1) {
-    if (segments[i].kind === "Punct" && segments[i].text === "(") {
+    const seg = segments[i];
+    if (seg.kind === "Punct" && seg.text === "(") {
       open = i;
       break;
     }
@@ -57,7 +58,8 @@ function buildWrapped(sig: SignatureHelp): SignatureToken[] {
 
   let close = -1;
   for (let i = open + 1; i < beforeArrow; i += 1) {
-    if (segments[i].kind === "Punct" && segments[i].text === ")") {
+    const seg = segments[i];
+    if (seg.kind === "Punct" && seg.text === ")") {
       close = i;
       break;
     }
