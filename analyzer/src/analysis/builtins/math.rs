@@ -1,7 +1,9 @@
-use super::super::{FunctionCategory, FunctionSig, Ty};
+use super::super::{FunctionCategory, FunctionSig, GenericId, Ty};
 
 pub(super) fn builtins() -> Vec<FunctionSig> {
+    let t0 = GenericId(0);
     vec![
+        // TODO(spec): `formatNumber(value, format, precision)` is not modeled yet.
         func!(
             FunctionCategory::Number,
             "add(a, b)",
@@ -25,13 +27,6 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "divide(a, b)",
-            "divide",
-            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
-            Ty::Number,
-        ),
-        func!(
-            FunctionCategory::Number,
             "mod(a, b)",
             "mod",
             params!(p!("a", Ty::Number), p!("b", Ty::Number)),
@@ -46,7 +41,14 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "min(number|number[], ...)",
+            "divide(a, b)",
+            "divide",
+            params!(p!("a", Ty::Number), p!("b", Ty::Number)),
+            Ty::Number,
+        ),
+        func!(
+            FunctionCategory::Number,
+            "min(values1, values2, ...)",
             "min",
             repeat_params_with_tail!(
                 repeat!(p!(
@@ -59,7 +61,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "max(number|number[], ...)",
+            "max(values1, values2, ...)",
             "max",
             repeat_params_with_tail!(
                 repeat!(p!(
@@ -72,7 +74,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "sum(number|number[], ...)",
+            "sum(values1, values2, ...)",
             "sum",
             repeat_params_with_tail!(
                 repeat!(p!(
@@ -85,7 +87,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "median(number|number[], ...)",
+            "median(values1, values2, ...)",
             "median",
             repeat_params_with_tail!(
                 repeat!(p!(
@@ -98,7 +100,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "mean(number|number[], ...)",
+            "mean(values1, values2, ...)",
             "mean",
             repeat_params_with_tail!(
                 repeat!(p!(
@@ -111,77 +113,77 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Number,
-            "abs(number)",
+            "abs(value)",
             "abs",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "round(number, places?)",
+            "round(value, places?)",
             "round",
             params!(p!("value", Ty::Number), opt!("places", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "ceil(number)",
+            "ceil(value)",
             "ceil",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "floor(number)",
+            "floor(value)",
             "floor",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "sqrt(number)",
+            "sqrt(value)",
             "sqrt",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "cbrt(number)",
+            "cbrt(value)",
             "cbrt",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "exp(number)",
+            "exp(value)",
             "exp",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "ln(number)",
+            "ln(value)",
             "ln",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "log10(number)",
+            "log10(value)",
             "log10",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "log2(number)",
+            "log2(value)",
             "log2",
             params!(p!("value", Ty::Number)),
             Ty::Number,
         ),
         func!(
             FunctionCategory::Number,
-            "sign(number)",
+            "sign(value)",
             "sign",
             params!(p!("value", Ty::Number)),
             Ty::Number,
@@ -194,5 +196,13 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             Ty::Number,
         ),
         func!(FunctionCategory::Number, "e()", "e", params!(), Ty::Number,),
+        func_g!(
+            FunctionCategory::Number,
+            "toNumber(value)",
+            generics!(g!(0, Plain)),
+            "toNumber",
+            params!(p!("value", Ty::Generic(t0))),
+            Ty::Number,
+        ),
     ]
 }

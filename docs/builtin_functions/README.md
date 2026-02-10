@@ -10,9 +10,25 @@ This document lists the builtin functions known to the analyzer (**type signatur
   - A distinct `DateRange` type exists in the signatures below, but the analyzer does **not** currently support it (type checking, inference, and related APIs are incomplete).
 - **Rich text types are not supported**
   - `Link` and `StyledText` exist in the signatures below, but these types are **not** modeled yet.
+- **Lambda/function expression typing is not supported**
+  - Functions requiring lambda predicates/mappers (`find`/`filter`/`map`/etc.) cannot be fully supported yet.
+- **Binder/literal variable semantics are not supported**
+  - `let` / `lets` style variable-binding semantics are not modeled yet.
 - **Some APIs require “shape-level typing” that we do not model**
   - Example: `flat(list)` conceptually depends on the flattening depth (or on the element nesting level) to compute the precise return type.
   - We currently do **not** model this “depth/level” relationship. The signature is therefore intentionally approximate.
+
+### Status markers used below
+
+This document is **spec-first**. We keep target signatures in stable order and annotate known implementation gaps.
+
+- `TODO-op`: intentionally represented by operators/keywords instead of builtin call signatures.
+- `TODO-missing`: signature is in target spec, but not modeled in builtins yet.
+- `TODO-type`: blocked by missing type-model support (`DateRange`, `Link`, `StyledText`, etc.).
+- `TODO-lambda`: blocked by missing lambda/function expression typing.
+- `TODO-binder`: blocked by missing variable-binder semantics.
+- `TODO-flat`: blocked by missing depth-sensitive `flat` typing.
+- Unmarked signatures: no known model-level blocker.
 
 ### Notation and philosophy
 
@@ -72,16 +88,14 @@ For some builtins, `receiver.fn(a, b)` is analyzed like `fn(receiver, a, b)`.
 ```rust
 if<T: Variant>(condition: boolean, then: T, else: T) -> T
 
-// Repeat group: (conditionN, thenN) repeated 1+ times, followed by else.
-ifs<T: Variant>(
-  condition1: boolean, then1: T,
-  condition2: boolean, then2: T,
-  ...,
-  else: T
-) -> T
+// Repeat group: (conditionN, valueN) repeated 1+ times, followed by else.
+ifs<T: Variant>(condition1: boolean, value1: T, ..., else: T) -> T
 
+// TODO-op: currently represented by operators (`&&` / `||`) instead of builtin call signatures.
 and(condition1: boolean, ...) -> boolean
 or(condition1: boolean, ...) -> boolean
+
+// TODO-op: currently represented by prefix keyword operator `not`.
 not(condition: boolean) -> boolean
 
 empty(value?: any) -> boolean
@@ -91,18 +105,13 @@ format(value: any) -> string
 equal(a: any, b: any) -> boolean
 unequal(a: any, b: any) -> boolean
 
-// NOTE: Ident<T> is a DSL-level binder; runtime behavior is out of scope here.
+// TODO-binder: Ident/binder semantics are not modeled yet.
 let(var: Ident<any>, value: any, expr: (var: any) -> any) -> any
 
 // Repeat group: (varN, valueN) repeated 1+ times, then expr.
-// NOTE: precise per-binding typing is currently not modeled; treated as `any`.
-lets(
-  var1: Ident<any>, value1: any,
-  var2: Ident<any>, value2: any,
-  ...,
-  expr: (var1: any, var2: any, ...) -> any
-) -> any
-````
+// TODO-binder: precise binder typing is not modeled yet.
+lets(var1: Ident<any>, value1: any, var2: Ident<any>, value2: any, ..., expr: (var1: any, var2: any, ...) -> any) -> any
+```
 
 ---
 
@@ -119,16 +128,18 @@ lower(text: string) -> string
 upper(text: string) -> string
 trim(text: string) -> string
 repeat(text: string, times: number) -> string
+
+// TODO-missing
 padStart(text: string | number, length: number, pad: string) -> string
 padEnd(text: string | number, length: number, pad: string) -> string
 
-// Unsupported: `Link` type is not modeled yet.
+// TODO-type: `Link` type is not modeled yet.
 link(label: string, url: string) -> Link
 
-// Unsupported: `StyledText` type is not modeled yet.
+// TODO-type: `StyledText` type is not modeled yet.
 style(text: string, styles1: string, styles2: string, ...) -> StyledText
 
-// Partially unsupported: `StyledText` is not modeled yet.
+// TODO-type: `StyledText` is not modeled yet.
 unstyle(text: string | StyledText, styles?: string) -> string
 
 concat(lists1: any[], lists2: any[], ...) -> any[]
@@ -141,7 +152,9 @@ split(text: string, separator: string) -> string[]
 ## Number (26)
 
 ```rust
+// TODO-missing
 formatNumber(value: number, format: string, precision: number) -> string
+
 add(a: number, b: number) -> number
 subtract(a: number, b: number) -> number
 multiply(a: number, b: number) -> number
@@ -193,7 +206,7 @@ dateAdd(date: date, amount: number, unit: string) -> date
 dateSubtract(date: date, amount: number, unit: string) -> date
 dateBetween(a: date, b: date, unit: string) -> number
 
-// Unsupported: `DateRange` type is not supported yet.
+// TODO-type: `DateRange` type is not supported yet.
 dateRange(start: date, end: date) -> DateRange
 dateStart(range: DateRange) -> date
 dateEnd(range: DateRange) -> date
@@ -222,6 +235,8 @@ at(list: any[], index: number) -> any
 first(list: any[]) -> any
 last(list: any[]) -> any
 slice(list: any[], start: number, end?: number) -> any[]
+
+// TODO-missing
 splice(list: any[], startIndex: number, deleteCount: number, ...items: any[]) -> any[]
 
 sort(list: any[]) -> any[]
@@ -229,18 +244,21 @@ reverse(list: any[]) -> any[]
 unique(list: any[]) -> any[]
 includes(list: any[], value: any) -> boolean
 
+// TODO-lambda: requires lambda/function expression typing.
 find(list: any[], expr: (current: any) -> boolean) -> any
 findIndex(list: any[], expr: (current: any) -> boolean) -> number
 filter(list: any[], expr: (current: any) -> boolean) -> any[]
 some(list: any[], expr: (current: any) -> boolean) -> boolean
 every(list: any[], expr: (current: any) -> boolean) -> boolean
 
+// TODO-lambda: requires lambda/function expression typing.
 map(list: any[], expr: (current: any) -> any) -> any[]
 
 // `flat(list)` is the only supported call form.
-// NOTE: The analyzer does not model nesting-depth -> return-depth precisely, so this is intentionally approximate.
+// TODO-flat: precise nesting-depth -> return-depth typing is not modeled.
 flat(list: any[]) -> any[]
 
+// TODO-lambda: requires lambda/function expression typing.
 count(list: any[], expr: (current: any) -> boolean) -> number
 ```
 

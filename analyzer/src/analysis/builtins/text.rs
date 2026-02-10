@@ -3,17 +3,6 @@ use super::super::{FunctionCategory, FunctionSig, GenericId, Ty};
 pub(super) fn builtins() -> Vec<FunctionSig> {
     let t0 = GenericId(0);
     vec![
-        func_g!(
-            FunctionCategory::Text,
-            "length(text|any[])",
-            generics!(g!(0, Plain)),
-            "length",
-            params!(p!(
-                "value",
-                Ty::Union(vec![Ty::String, Ty::List(Box::new(Ty::Generic(t0)))])
-            )),
-            Ty::Number,
-        ),
         func!(
             FunctionCategory::Text,
             "substring(text, start, end?)",
@@ -84,42 +73,52 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Text,
+            "trim(text)",
+            "trim",
+            params!(p!("text", Ty::String)),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
             "repeat(text, times)",
             "repeat",
             params!(p!("text", Ty::String), p!("times", Ty::Number)),
             Ty::String,
         ),
-        func!(
+        // TODO(spec): `padStart(text, length, pad)` is not modeled yet.
+        // TODO(spec): `padEnd(text, length, pad)` is not modeled yet.
+        // TODO(type-model): `link(label, url) -> Link` is blocked on rich text types.
+        // TODO(type-model): `style(text, styles1, styles2, ...) -> StyledText` is blocked on rich text types.
+        // TODO(type-model): `unstyle(text, styles?) -> string` with `StyledText` input is blocked on rich text types.
+        func_g!(
             FunctionCategory::Text,
-            "link(label, url)",
-            "link",
-            params!(p!("label", Ty::String), p!("url", Ty::String)),
-            Ty::String,
-        ),
-        func!(
-            FunctionCategory::Text,
-            "style(text, styleOrColor, ...)",
-            "style",
+            "concat(lists1, lists2, ...)",
+            generics!(g!(0, Plain)),
+            "concat",
             repeat_params!(
-                head!(p!("text", Ty::String)),
-                repeat!(p!("styles", Ty::String)),
+                head!(p!("lists1", Ty::List(Box::new(Ty::Generic(t0))))),
+                repeat!(p!("listsN", Ty::List(Box::new(Ty::Generic(t0))))),
                 tail!(),
+            ),
+            Ty::List(Box::new(Ty::Generic(t0))),
+        ),
+        func_g!(
+            FunctionCategory::Text,
+            "join(list, separator)",
+            generics!(g!(0, Plain)),
+            "join",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!("separator", Ty::String)
             ),
             Ty::String,
         ),
         func!(
             FunctionCategory::Text,
-            "unstyle(text, style?)",
-            "unstyle",
-            params!(p!("text", Ty::String), opt!("styles", Ty::String)),
-            Ty::String,
-        ),
-        func!(
-            FunctionCategory::Text,
-            "trim(text)",
-            "trim",
-            params!(p!("text", Ty::String)),
-            Ty::String,
+            "split(text, separator)",
+            "split",
+            params!(p!("text", Ty::String), p!("separator", Ty::String)),
+            Ty::List(Box::new(Ty::String)),
         ),
     ]
 }

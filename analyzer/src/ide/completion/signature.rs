@@ -77,6 +77,27 @@ fn render_signature(
     let mut slots = Vec::<ParamSlot>::new();
     let mut next_param_index = 0u32;
 
+    fn repeat_name(base: &str, n: usize) -> String {
+        if let Some(prefix) = base.strip_suffix('N') {
+            return format!("{prefix}{n}");
+        }
+
+        let digits_len = base
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_digit())
+            .count();
+        if digits_len > 0 {
+            let split = base.len().saturating_sub(digits_len);
+            let (prefix, suffix) = base.split_at(split);
+            if suffix == "1" {
+                return format!("{prefix}{n}");
+            }
+        }
+
+        format!("{base}{n}")
+    }
+
     fn push_param(
         receiver: &mut Option<(String, String)>,
         slots: &mut Vec<ParamSlot>,
@@ -149,7 +170,7 @@ fn render_signature(
 
     for n in 1..=repeat_groups_displayed {
         for (r_idx, p) in sig.params.repeat.iter().enumerate() {
-            let name = format!("{}{}", p.name, n);
+            let name = repeat_name(p.name.as_str(), n);
             let cycle = n - 1;
             let actual_idx = repeat_start + cycle * repeat_len + r_idx;
             let inst_idx = repeat_start + r_idx;
@@ -403,8 +424,7 @@ fn active_parameter_for_call(
             return 0;
         }
 
-        let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape)
-        else {
+        let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape) else {
             return 0;
         };
 

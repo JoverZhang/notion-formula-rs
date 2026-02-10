@@ -130,3 +130,5 @@ Locations:
 ## Notes / known gaps
 
 - Completion operator suggestions do not cover the full parsed operator set (`analyzer/src/ide/completion/items.rs`).
+- Builtin support is still partial for some spec signatures (for example rich text/`DateRange`, lambda-based list APIs, binder semantics, and depth-sensitive `flat` typing):
+  - `docs/builtin_functions/README.md`

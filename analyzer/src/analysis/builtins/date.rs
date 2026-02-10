@@ -88,36 +88,9 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             params!(p!("a", Ty::Date), p!("b", Ty::Date), p!("unit", Ty::String)),
             Ty::Number,
         ),
-        func!(
-            FunctionCategory::Date,
-            "dateRange(start, end)",
-            "dateRange",
-            params!(p!("start", Ty::Date), p!("end", Ty::Date)),
-            // Note: if you have Ty::DateRange, use it instead of Ty::Date here.
-            Ty::Date,
-        ),
-        func!(
-            FunctionCategory::Date,
-            "dateStart(range)",
-            "dateStart",
-            params!(p!(
-                "range",
-                // Note: if you have Ty::DateRange, use it here instead of Ty::Date.
-                Ty::Date
-            )),
-            Ty::Date,
-        ),
-        func!(
-            FunctionCategory::Date,
-            "dateEnd(range)",
-            "dateEnd",
-            params!(p!(
-                "range",
-                // Note: if you have Ty::DateRange, use it here instead of Ty::Date.
-                Ty::Date
-            )),
-            Ty::Date,
-        ),
+        // TODO(type-model): `dateRange(start, end) -> DateRange` is blocked on `DateRange`.
+        // TODO(type-model): `dateStart(range: DateRange) -> date` is blocked on `DateRange`.
+        // TODO(type-model): `dateEnd(range: DateRange) -> date` is blocked on `DateRange`.
         func!(
             FunctionCategory::Date,
             "timestamp(date)",
@@ -127,7 +100,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         ),
         func!(
             FunctionCategory::Date,
-            "fromTimestamp(timestampMs)",
+            "fromTimestamp(timestamp)",
             "fromTimestamp",
             params!(p!("timestamp", Ty::Number)),
             Ty::Date,

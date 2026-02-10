@@ -42,17 +42,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             ),
             Ty::List(Box::new(Ty::Generic(t0))),
         ),
-        func_g!(
-            FunctionCategory::List,
-            "concat(list, ...)",
-            generics!(g!(0, Plain)),
-            "concat",
-            repeat_params_with_tail!(
-                repeat!(p!("lists", Ty::List(Box::new(Ty::Generic(t0))))),
-                tail!(),
-            ),
-            Ty::List(Box::new(Ty::Generic(t0))),
-        ),
+        // TODO(signature-model): `splice(list, startIndex, deleteCount, ...items)` is not modeled yet.
         func_g!(
             FunctionCategory::List,
             "sort(list)",
@@ -68,24 +58,6 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             "reverse",
             params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
             Ty::List(Box::new(Ty::Generic(t0))),
-        ),
-        func_g!(
-            FunctionCategory::List,
-            "join(list, separator)",
-            generics!(g!(0, Plain)),
-            "join",
-            params!(
-                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
-                p!("separator", Ty::String)
-            ),
-            Ty::String,
-        ),
-        func!(
-            FunctionCategory::List,
-            "split(text, separator)",
-            "split",
-            params!(p!("text", Ty::String), p!("separator", Ty::String)),
-            Ty::List(Box::new(Ty::String)),
         ),
         func_g!(
             FunctionCategory::List,
@@ -114,13 +86,7 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
         // TODO(lambda-typing): some<T>(list: T[], predicate: (current) -> boolean) -> boolean
         // TODO(lambda-typing): every<T>(list: T[], predicate: (current) -> boolean) -> boolean
         // TODO(lambda-typing): map<T, U>(list: T[], mapper: (current) -> U) -> U[]
-        func_g!(
-            FunctionCategory::List,
-            "flat(list)",
-            generics!(g!(0, Plain)),
-            "flat",
-            params!(p!("list", Ty::List(Box::new(Ty::Generic(t0))))),
-            Ty::List(Box::new(Ty::Generic(t0))),
-        ),
+        // TODO(lambda-typing): count<T>(list: T[], predicate: (current) -> boolean) -> number
+        // TODO(flat-typing): `flat(list) -> any[]` needs depth-sensitive typing.
     ]
 }

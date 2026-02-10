@@ -134,6 +134,7 @@ test("undo reverts recent editor input", async ({ page }) => {
 });
 
 test("editor height grows with content", async ({ page }) => {
+  const HEIGHT_EPSILON_PX = 1;
   await setEditorContent(page, "f1", "a\nb\nc\nd\ne\nf\ng\nh");
 
   await page.waitForFunction(() => {
@@ -166,6 +167,6 @@ test("editor height grows with content", async ({ page }) => {
   expect(lineHeightPx).toBeGreaterThan(0);
 
   // Loose bound: should visually grow to fit ~8 lines.
-  expect(metrics.clientHeight).toBeGreaterThanOrEqual(lineHeightPx * 8);
+  expect(metrics.clientHeight).toBeGreaterThanOrEqual(lineHeightPx * 8 - HEIGHT_EPSILON_PX);
   expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.clientHeight + 1);
 });

@@ -189,7 +189,7 @@ call it out as a contract change.
 Related:
 
 - Signature help spec: [`docs/signature-help.md`](../signature-help.md)
-- Builtins list (drift-tracked; not fully code-synced): [`docs/builtin_functions/README.md`](../builtin_functions/README.md)
+- Builtins spec list (doc-driven; sync-checked by tests): [`docs/builtin_functions/README.md`](../builtin_functions/README.md)
 
 ## Drift tracker / open questions
 
@@ -197,8 +197,6 @@ Related:
   - numeric grammar (decimals, formats, edge cases)
   - string escapes + exact rules
   - identifier character classes + normalization policy
-- Docs drift:
-  - `docs/builtin_functions/README.md` is not fully aligned with the current type model/builtins.
 - Repo housekeeping:
   - `rustc/` directory intent is unclear (document it with a README, or remove it).
 

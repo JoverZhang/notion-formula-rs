@@ -90,20 +90,20 @@ describe("WASM signature help (instantiated types)", () => {
 
   it('ifs(true, 1, false, 2, "a") -> number | string', () => {
     expect(sigLabelAtCloseParen('ifs(true, 1, false, 2, "a")')).toBe(
-      "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., default: string) -> number | string",
+      "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., else: string) -> number | string",
     );
   });
 
   it("ifs(true, unknown, false, 1, 2) -> unknown", () => {
     expect(sigLabelAtCloseParen("ifs(true, x, false, 1, 2)")).toBe(
-      "ifs(condition1: boolean, value1: unknown, condition2: boolean, value2: number, ..., default: number) -> unknown",
+      "ifs(condition1: boolean, value1: unknown, condition2: boolean, value2: number, ..., else: number) -> unknown",
     );
   });
 
-  it("ifs(..., <empty>) highlights default (tail)", () => {
+  it("ifs(..., <empty>) highlights else (tail)", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", )');
     expect(sigLabelAtCloseParen('ifs(true, "123", true, "123", )')).toBe(
-      "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., default: string) -> string",
+      "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., else: string) -> string",
     );
     expect(sig.active_parameter).toBe(4);
   });

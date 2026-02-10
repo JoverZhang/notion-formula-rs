@@ -102,12 +102,12 @@ fn variant_generic_accumulates_union_when_no_unknown() {
         properties: vec![],
         functions: vec![FunctionSig::new(
             FunctionCategory::General,
-            "ifs(condition, value, ..., default)",
+            "ifs(condition1, value1, ..., else)",
             "ifs",
             ParamShape::new(
                 vec![],
-                vec![p("condition", Ty::Unknown), p("value", Ty::Generic(t))],
-                vec![p("default", Ty::Generic(t))],
+                vec![p("condition1", Ty::Unknown), p("value1", Ty::Generic(t))],
+                vec![p("else", Ty::Generic(t))],
             ),
             Ty::Generic(t),
             vec![GenericParam {
@@ -128,12 +128,12 @@ fn variant_generic_propagates_unknown() {
         properties: vec![],
         functions: vec![FunctionSig::new(
             FunctionCategory::General,
-            "ifs(condition, value, ..., default)",
+            "ifs(condition1, value1, ..., else)",
             "ifs",
             ParamShape::new(
                 vec![],
-                vec![p("condition", Ty::Unknown), p("value", Ty::Generic(t))],
-                vec![p("default", Ty::Generic(t))],
+                vec![p("condition1", Ty::Unknown), p("value1", Ty::Generic(t))],
+                vec![p("else", Ty::Generic(t))],
             ),
             Ty::Generic(t),
             vec![GenericParam {

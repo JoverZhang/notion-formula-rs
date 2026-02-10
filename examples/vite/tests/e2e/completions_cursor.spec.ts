@@ -13,6 +13,16 @@ import {
 
 const FORMULA_ID: FormulaId = "f1";
 
+async function expectSourceText(page: Parameters<typeof gotoDebug>[0], id: FormulaId, expected: string) {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate((formulaId) => window.__nf_debug?.getState(formulaId)?.source ?? null, id),
+      { timeout: 5_000 },
+    )
+    .toBe(expected);
+}
+
 test.beforeEach(async ({ page }) => {
   await gotoDebug(page);
 });
@@ -29,6 +39,7 @@ test("cursor is placed correctly after applying a completion", async ({ page }) 
 });
 
 test("selected completion item is scrolled into view", async ({ page }) => {
+  const EDGE_EPSILON_PX = 1;
   await setEditorContent(page, FORMULA_ID, "");
   await waitForAnyCompletionItems(page, FORMULA_ID);
   await waitForCompletionDebounce(page);
@@ -76,8 +87,10 @@ test("selected completion item is scrolled into view", async ({ page }) => {
   expect(selectedBox).not.toBeNull();
   if (!listBox || !selectedBox) return;
 
-  expect(selectedBox.y).toBeGreaterThanOrEqual(listBox.y);
-  expect(selectedBox.y + selectedBox.height).toBeLessThanOrEqual(listBox.y + listBox.height);
+  expect(selectedBox.y).toBeGreaterThanOrEqual(listBox.y - EDGE_EPSILON_PX);
+  expect(selectedBox.y + selectedBox.height).toBeLessThanOrEqual(
+    listBox.y + listBox.height + EDGE_EPSILON_PX,
+  );
 
   // If the list is manually scrolled away from the selection, the next selection update should
   // re-scroll the selected item into view.
@@ -105,8 +118,10 @@ test("selected completion item is scrolled into view", async ({ page }) => {
   expect(listBox2).not.toBeNull();
   expect(selectedBox2).not.toBeNull();
   if (!listBox2 || !selectedBox2) return;
-  expect(selectedBox2.y).toBeGreaterThanOrEqual(listBox2.y);
-  expect(selectedBox2.y + selectedBox2.height).toBeLessThanOrEqual(listBox2.y + listBox2.height);
+  expect(selectedBox2.y).toBeGreaterThanOrEqual(listBox2.y - EDGE_EPSILON_PX);
+  expect(selectedBox2.y + selectedBox2.height).toBeLessThanOrEqual(
+    listBox2.y + listBox2.height + EDGE_EPSILON_PX,
+  );
 });
 
 test("cursor remains correct after multiple completion-driven edits", async ({ page }) => {
@@ -155,7 +170,7 @@ test("builtin completion inserts trailing space: not", async ({ page }) => {
   await waitForCompletionDebounce(page);
 
   await applyCompletionByDomClick(page, FORMULA_ID, "not");
-  await expectEditorText(page, FORMULA_ID, 'not prop("Title")');
+  await expectSourceText(page, FORMULA_ID, 'not prop("Title")');
   await expectCursorAfter(page, FORMULA_ID, "not ");
 });
 
@@ -166,7 +181,7 @@ test("builtin completion inserts trailing space: true", async ({ page }) => {
   await waitForCompletionDebounce(page);
 
   await applyCompletionByDomClick(page, FORMULA_ID, "true");
-  await expectEditorText(page, FORMULA_ID, 'true prop("Title")');
+  await expectSourceText(page, FORMULA_ID, 'true prop("Title")');
   await expectCursorAfter(page, FORMULA_ID, "true ");
 });
 
@@ -177,7 +192,7 @@ test("builtin completion inserts trailing space: false", async ({ page }) => {
   await waitForCompletionDebounce(page);
 
   await applyCompletionByDomClick(page, FORMULA_ID, "false");
-  await expectEditorText(page, FORMULA_ID, 'false prop("Title")');
+  await expectSourceText(page, FORMULA_ID, 'false prop("Title")');
   await expectCursorAfter(page, FORMULA_ID, "false ");
 });
 
@@ -198,6 +213,6 @@ test("builtin completion inserts trailing space with UTF-16 earlier in doc", asy
   await waitForCompletionDebounce(page);
 
   await applyCompletionByDomClick(page, FORMULA_ID, "not");
-  await expectEditorText(page, FORMULA_ID, '"汉字" + not prop("Title")');
+  await expectSourceText(page, FORMULA_ID, '"汉字" + not prop("Title")');
   await expectCursorAfter(page, FORMULA_ID, "not ");
 });

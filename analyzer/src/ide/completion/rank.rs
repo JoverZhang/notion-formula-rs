@@ -68,21 +68,24 @@ struct RankedItem {
 }
 
 fn cmp_ranked_items(a: &RankedItem, b: &RankedItem) -> Ordering {
-    a.class.rank().cmp(&b.class.rank()).then_with(|| match (a.class, b.class) {
-        (MatchClass::Exact, MatchClass::Exact) => a
-            .label_norm_len
-            .cmp(&b.label_norm_len)
-            .then_with(|| a.original_idx.cmp(&b.original_idx)),
-        (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => ap
-            .cmp(&bp)
-            .then_with(|| a.label_norm_len.cmp(&b.label_norm_len))
-            .then_with(|| a.original_idx.cmp(&b.original_idx)),
-        (MatchClass::Fuzzy(sa), MatchClass::Fuzzy(sb)) => fuzzy_score_cmp(sa, sb)
-            .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
-            .then_with(|| a.original_idx.cmp(&b.original_idx)),
-        (MatchClass::None, MatchClass::None) => a.original_idx.cmp(&b.original_idx),
-        _ => a.original_idx.cmp(&b.original_idx),
-    })
+    a.class
+        .rank()
+        .cmp(&b.class.rank())
+        .then_with(|| match (a.class, b.class) {
+            (MatchClass::Exact, MatchClass::Exact) => a
+                .label_norm_len
+                .cmp(&b.label_norm_len)
+                .then_with(|| a.original_idx.cmp(&b.original_idx)),
+            (MatchClass::Contains { pos: ap }, MatchClass::Contains { pos: bp }) => ap
+                .cmp(&bp)
+                .then_with(|| a.label_norm_len.cmp(&b.label_norm_len))
+                .then_with(|| a.original_idx.cmp(&b.original_idx)),
+            (MatchClass::Fuzzy(sa), MatchClass::Fuzzy(sb)) => fuzzy_score_cmp(sa, sb)
+                .then_with(|| kind_priority(a.item.kind).cmp(&kind_priority(b.item.kind)))
+                .then_with(|| a.original_idx.cmp(&b.original_idx)),
+            (MatchClass::None, MatchClass::None) => a.original_idx.cmp(&b.original_idx),
+            _ => a.original_idx.cmp(&b.original_idx),
+        })
 }
 
 fn apply_query_ranking(query_norm: &str, items: &mut Vec<CompletionItem>, mode: RankMode) {

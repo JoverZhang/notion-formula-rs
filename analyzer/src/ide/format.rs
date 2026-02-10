@@ -586,8 +586,7 @@ impl<'a> Formatter<'a> {
 
         for idx in comments {
             let tok = &self.tokens[idx];
-            let is_inline_block =
-                matches!(tok.kind, TokenKind::DocComment(CommentKind::Block, _))
+            let is_inline_block = matches!(tok.kind, TokenKind::DocComment(CommentKind::Block, _))
                 && self.sm.line_col(tok.span.end.saturating_sub(1)).0 == expr_line
                 && !self.slice_has_newline(tok.span.end, expr.span.start);
 
