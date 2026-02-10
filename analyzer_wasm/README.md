@@ -37,8 +37,13 @@ Notes:
   - `diagnostics`: `DiagnosticView[]`
   - `tokens`: `TokenView[]` (non-trivia tokens only; trivia is filtered out in the converter)
   - `formatted`: `string`
+  - `output_type`: `string` (semantic root type rendered by Rust, e.g. `"number | string"`)
+    - never nullable; unknown/error uses `"unknown"`
 - `CompletionOutputView`:
   - `items`: `CompletionItemView[]`
+    - `CompletionItemView.kind` is function-specific for builtins:
+      `FunctionGeneral | FunctionText | FunctionNumber | FunctionDate | FunctionPeople | FunctionList | FunctionSpecial`
+    - `CompletionItemView` no longer carries a separate `category` field.
   - `replace`: `Span` (original doc, UTF-16)
   - `signature_help`: optional structured segments
   - `preferred_indices`: `number[]`

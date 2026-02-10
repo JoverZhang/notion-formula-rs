@@ -12,6 +12,7 @@ export type FormulaState = {
   diagnostics: AnalyzerDiagnostic[];
   tokens: Token[];
   formatted: string;
+  outputType: string;
   status: "idle" | "wasm-not-ready" | "analyzing" | "ok" | "error";
 };
 

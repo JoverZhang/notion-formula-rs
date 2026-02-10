@@ -57,7 +57,6 @@ pub struct TextEdit {
 pub struct CompletionItem {
     pub label: String,
     pub kind: CompletionKind,
-    pub category: Option<semantic::FunctionCategory>,
     pub insert_text: String,
     pub primary_edit: Option<TextEdit>,
     pub cursor: Option<u32>,
@@ -71,10 +70,45 @@ pub struct CompletionItem {
 /// High-level bucket for UI grouping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompletionKind {
-    Function,
+    FunctionGeneral,
+    FunctionText,
+    FunctionNumber,
+    FunctionDate,
+    FunctionPeople,
+    FunctionList,
+    FunctionSpecial,
     Builtin,
     Property,
     Operator,
+}
+
+impl CompletionKind {
+    pub fn is_function(self) -> bool {
+        matches!(
+            self,
+            Self::FunctionGeneral
+                | Self::FunctionText
+                | Self::FunctionNumber
+                | Self::FunctionDate
+                | Self::FunctionPeople
+                | Self::FunctionList
+                | Self::FunctionSpecial
+        )
+    }
+}
+
+impl From<semantic::FunctionCategory> for CompletionKind {
+    fn from(value: semantic::FunctionCategory) -> Self {
+        match value {
+            semantic::FunctionCategory::General => Self::FunctionGeneral,
+            semantic::FunctionCategory::Text => Self::FunctionText,
+            semantic::FunctionCategory::Number => Self::FunctionNumber,
+            semantic::FunctionCategory::Date => Self::FunctionDate,
+            semantic::FunctionCategory::People => Self::FunctionPeople,
+            semantic::FunctionCategory::List => Self::FunctionList,
+            semantic::FunctionCategory::Special => Self::FunctionSpecial,
+        }
+    }
 }
 
 /// Extra metadata used for cursor placement and type ranking.

@@ -40,10 +40,17 @@ Helper APIs (WASM):
 
 Key types:
 
+- `AnalyzeResult { diagnostics, tokens, formatted, output_type }`
+  - `output_type` is non-null (`string`): unknown/error uses `"unknown"`.
 - `Span { start, end }`
 - `SpanView { range: Span }`
 - `LineColView { line, col }` (1-based; `col` is a Rust `char` count, not UTF-16)
 - `TextEditView { range: Span, new_text }`
+- `CompletionItemView { label, kind, insert_text, primary_edit, cursor, additional_edits, detail, is_disabled, disabled_reason }`
+- `CompletionItemKind` includes function-specific kinds:
+  - `FunctionGeneral`, `FunctionText`, `FunctionNumber`, `FunctionDate`, `FunctionPeople`,
+    `FunctionList`, `FunctionSpecial`
+  - plus `Builtin`, `Property`, `Operator`
 - `CompletionOutputView { items, replace, signature_help, preferred_indices }`
 
 ## context_json contract

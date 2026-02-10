@@ -14,10 +14,16 @@ use crate::semantic;
 
 fn kind_priority(kind: CompletionKind) -> u8 {
     match kind {
-        CompletionKind::Function => 0,
-        CompletionKind::Builtin => 1,
-        CompletionKind::Property => 2,
-        CompletionKind::Operator => 3,
+        CompletionKind::FunctionGeneral => 0,
+        CompletionKind::FunctionText => 1,
+        CompletionKind::FunctionNumber => 2,
+        CompletionKind::FunctionDate => 3,
+        CompletionKind::FunctionPeople => 4,
+        CompletionKind::FunctionList => 5,
+        CompletionKind::FunctionSpecial => 6,
+        CompletionKind::Builtin => 7,
+        CompletionKind::Property => 8,
+        CompletionKind::Operator => 9,
     }
 }
 
@@ -102,10 +108,7 @@ fn apply_query_ranking(query_norm: &str, items: &mut Vec<CompletionItem>, mode: 
 
             let class = match mode {
                 RankMode::Normal
-                    if !matches!(
-                        item.kind,
-                        CompletionKind::Function | CompletionKind::Property
-                    ) =>
+                    if !(item.kind.is_function() || item.kind == CompletionKind::Property) =>
                 {
                     MatchClass::None
                 }
@@ -245,11 +248,9 @@ pub(super) fn preferred_indices_for_items(
         if item.is_disabled {
             continue;
         }
-        if matches!(
-            item.kind,
-            CompletionKind::Function | CompletionKind::Property
-        ) && match_class_for_norm_label(query_norm, &normalize_for_match(&item.label))
-            != MatchClass::None
+        if (item.kind == CompletionKind::Property || item.kind.is_function())
+            && match_class_for_norm_label(query_norm, &normalize_for_match(&item.label))
+                != MatchClass::None
         {
             out.push(idx);
         }
@@ -273,10 +274,16 @@ pub(super) fn apply_type_ranking(
 
     fn kind_index(kind: CompletionKind) -> usize {
         match kind {
-            CompletionKind::Builtin => 0,
-            CompletionKind::Property => 1,
-            CompletionKind::Function => 2,
-            CompletionKind::Operator => 3,
+            CompletionKind::FunctionGeneral => 0,
+            CompletionKind::FunctionText => 1,
+            CompletionKind::FunctionNumber => 2,
+            CompletionKind::FunctionDate => 3,
+            CompletionKind::FunctionPeople => 4,
+            CompletionKind::FunctionList => 5,
+            CompletionKind::FunctionSpecial => 6,
+            CompletionKind::Builtin => 7,
+            CompletionKind::Property => 8,
+            CompletionKind::Operator => 9,
         }
     }
 
@@ -284,8 +291,14 @@ pub(super) fn apply_type_ranking(
         match kind {
             CompletionKind::Builtin => 0,
             CompletionKind::Property => 1,
-            CompletionKind::Function => 2,
-            CompletionKind::Operator => 3,
+            CompletionKind::FunctionGeneral => 2,
+            CompletionKind::FunctionText => 3,
+            CompletionKind::FunctionNumber => 4,
+            CompletionKind::FunctionDate => 5,
+            CompletionKind::FunctionPeople => 6,
+            CompletionKind::FunctionList => 7,
+            CompletionKind::FunctionSpecial => 8,
+            CompletionKind::Operator => 9,
         }
     }
 
@@ -296,8 +309,8 @@ pub(super) fn apply_type_ranking(
         item: CompletionItem,
     }
 
-    let mut buckets: [Vec<ScoredItem>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
-    let mut best_score: [i32; 4] = [i32::MIN, i32::MIN, i32::MIN, i32::MIN];
+    let mut buckets: [Vec<ScoredItem>; 10] = std::array::from_fn(|_| Vec::new());
+    let mut best_score: [i32; 10] = [i32::MIN; 10];
 
     for (idx, item) in items.drain(..).enumerate() {
         let actual = item_result_ty(&item, ctx);
@@ -319,7 +332,7 @@ pub(super) fn apply_type_ranking(
         });
     }
 
-    let mut order: Vec<usize> = (0..4).filter(|&i| !buckets[i].is_empty()).collect();
+    let mut order: Vec<usize> = (0..10).filter(|&i| !buckets[i].is_empty()).collect();
     order.sort_by(|&a, &b| {
         (-best_score[a]).cmp(&(-best_score[b])).then_with(|| {
             let a_kind = buckets[a][0].item.kind;

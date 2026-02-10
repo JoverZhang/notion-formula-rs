@@ -62,13 +62,16 @@ test("Suggestion signature pops left and stays until another editor is focused",
   // Popover doesn't change the editor width.
   expect(Math.abs(editorBoxBefore.width - editorBoxAfter.width)).toBeLessThan(1);
 
-  const diagList = page.locator('[data-testid="formula-diagnostics"][data-formula-id="f1"]');
-  const diagBox = await diagList.boundingBox();
+  const editorWrap = page.locator(
+    '[data-testid="formula-panel"][data-formula-id="f1"] .formula-editor-wrap',
+  );
+  const editorWrapBox = await editorWrap.boundingBox();
   const completionBox = await completionPanel.boundingBox();
-  expect(diagBox).not.toBeNull();
+  expect(editorWrapBox).not.toBeNull();
   expect(completionBox).not.toBeNull();
-  if (!diagBox || !completionBox) return;
-  expect(completionBox.y).toBeGreaterThan(diagBox.y + diagBox.height - 1);
+  if (!editorWrapBox || !completionBox) return;
+  expect(completionBox.y).toBeGreaterThan(editorWrapBox.y);
+  expect(completionBox.y).toBeLessThan(editorWrapBox.y + editorWrapBox.height + 1);
 
   await page.locator('[data-testid="theme-toggle"]').click();
   await expect(signature).toBeVisible({ timeout: 5_000 });

@@ -70,8 +70,7 @@ describe("recommended completions", () => {
   const items: CompletionItemView[] = [
     {
       label: "textFn",
-      kind: "Function",
-      category: "Text",
+      kind: "FunctionText",
       insert_text: "textFn()",
       primary_edit: null,
       cursor: null,
@@ -82,8 +81,7 @@ describe("recommended completions", () => {
     },
     {
       label: "generalFn",
-      kind: "Function",
-      category: "General",
+      kind: "FunctionGeneral",
       insert_text: "generalFn()",
       primary_edit: null,
       cursor: null,

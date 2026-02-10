@@ -29,10 +29,10 @@ pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue>
     let result: AnalyzeResult = match analyzer::analyze(&source) {
         Ok(mut output) => {
             // Analyze the expression and append the diagnostics.
-            let (_, diags) = analyzer::semantic::analyze_expr(&output.expr, &parsed.ctx);
+            let (ty, diags) = analyzer::semantic::analyze_expr(&output.expr, &parsed.ctx);
             output.diagnostics.extend(diags);
             // Convert the output to the desired DTO format.
-            Converter::analyze_output(&source, output)
+            Converter::analyze_output(&source, output, ty.to_string())
         }
         Err(diag) => {
             // If an error occurs, convert the error into a DTO.

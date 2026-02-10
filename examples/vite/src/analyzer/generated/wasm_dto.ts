@@ -36,7 +36,13 @@ export type TokenView = { kind: string, text: string,
  */
 span: SpanView, };
 
-export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<TokenView>, formatted: string, };
+export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<TokenView>, formatted: string, 
+/**
+ * Inferred root expression type rendered for UI (e.g. `"number | string"`).
+ *
+ * Never nullable. Unknown/failed inference is represented as `"unknown"`.
+ */
+output_type: string, };
 
 export type TextEditView = { 
 /**
@@ -54,11 +60,9 @@ export type SignatureItemView = { segments: Array<DisplaySegmentView>, };
 
 export type SignatureHelpView = { signatures: Array<SignatureItemView>, active_signature: number, active_parameter: number, };
 
-export type CompletionItemKind = "Function" | "Builtin" | "Property" | "Operator";
+export type CompletionItemKind = "FunctionGeneral" | "FunctionText" | "FunctionNumber" | "FunctionDate" | "FunctionPeople" | "FunctionList" | "FunctionSpecial" | "Builtin" | "Property" | "Operator";
 
-export type FunctionCategoryView = "General" | "Text" | "Number" | "Date" | "People" | "List" | "Special";
-
-export type CompletionItemView = { label: string, kind: CompletionItemKind, category: FunctionCategoryView | null, insert_text: string, 
+export type CompletionItemView = { label: string, kind: CompletionItemKind, insert_text: string, 
 /**
  * Primary edit to apply in the original document (UTF-16), if available.
  */

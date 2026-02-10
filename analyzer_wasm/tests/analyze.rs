@@ -6,6 +6,7 @@ struct AnalyzeResult {
     diagnostics: Vec<Diagnostic>,
     tokens: Vec<TokenView>,
     formatted: String,
+    output_type: String,
 }
 
 #[derive(Deserialize)]
@@ -74,6 +75,7 @@ fn analyze_ascii_spans_and_format() {
     let result = analyze_value(source);
 
     assert!(!result.formatted.is_empty());
+    assert_eq!(result.output_type, "number");
 
     let kinds: Vec<&str> = result.tokens.iter().map(|t| t.kind.as_str()).collect();
     assert_eq!(kinds, vec!["Number", "Plus", "Number", "Eof"]);
@@ -145,6 +147,7 @@ fn analyze_emoji_spans_and_diagnostics() {
     let error_source = "1 +";
     let error_result = analyze_value(error_source);
     assert!(!error_result.diagnostics.is_empty());
+    assert_eq!(error_result.output_type, "unknown");
 
     let diag = &error_result.diagnostics[0];
     assert_eq!(diag.kind, "error");

@@ -12,7 +12,13 @@ export type CompletionRenderRow = {
 };
 
 function kindLabel(kind: CompletionItem["kind"]): string {
-  if (kind === "Function") return "Functions";
+  if (kind === "FunctionGeneral") return "General Functions";
+  if (kind === "FunctionText") return "Text Functions";
+  if (kind === "FunctionNumber") return "Number Functions";
+  if (kind === "FunctionDate") return "Date Functions";
+  if (kind === "FunctionPeople") return "People Functions";
+  if (kind === "FunctionList") return "List Functions";
+  if (kind === "FunctionSpecial") return "Special Functions";
   if (kind === "Builtin") return "Built-ins";
   if (kind === "Property") return "Properties";
   if (kind === "Operator") return "Operators";

@@ -110,6 +110,8 @@ These are the “hard edges” that other code relies on:
 - **Determinism**: diagnostics formatting + deconfliction must be deterministic (stable ordering and priority rules).
 - **Signature help is structured**: UIs render `DisplaySegment[]`; they do not parse signature/type strings.
 - **`context_json` is strict**: it must be non-empty JSON, and unknown top-level fields are rejected.
+- **Semantic payloads are explicit, not nullable**: when meaning is “unknown”, encode it as an
+  explicit domain value (for types: `Ty::Unknown` / `"unknown"`), not `Option`/`null`.
 
 ## Contracts (hard rules)
 

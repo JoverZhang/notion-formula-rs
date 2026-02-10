@@ -15,8 +15,7 @@ function applyChanges(
 describe("applyCompletionItem", () => {
   const baseItem: CompletionItem = {
     label: "x",
-    kind: "Function",
-    category: "General",
+    kind: "FunctionGeneral",
     insert_text: "x",
     primary_edit: { range: { start: 0, end: 0 }, new_text: "x" },
     cursor: null,

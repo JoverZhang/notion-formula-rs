@@ -18,22 +18,16 @@ pub struct Span {
 /// Completion item kind.
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionItemKind {
-    Function,
+    FunctionGeneral,
+    FunctionText,
+    FunctionNumber,
+    FunctionDate,
+    FunctionPeople,
+    FunctionList,
+    FunctionSpecial,
     Builtin,
     Property,
     Operator,
-}
-
-/// Function category.
-#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FunctionCategoryView {
-    General,
-    Text,
-    Number,
-    Date,
-    People,
-    List,
-    Special,
 }
 
 /// Diagnostic severity/kind.
@@ -86,6 +80,10 @@ pub struct AnalyzeResult {
     pub diagnostics: Vec<DiagnosticView>,
     pub tokens: Vec<TokenView>,
     pub formatted: String,
+    /// Inferred root expression type rendered for UI (e.g. `"number | string"`).
+    ///
+    /// Never nullable. Unknown/failed inference is represented as `"unknown"`.
+    pub output_type: String,
 }
 
 /// A text edit in UTF-16 coordinates.
@@ -142,7 +140,6 @@ pub enum DisplaySegmentView {
 pub struct CompletionItemView {
     pub label: String,
     pub kind: CompletionItemKind,
-    pub category: Option<FunctionCategoryView>,
     pub insert_text: String,
     /// Primary edit to apply in the original document (UTF-16), if available.
     pub primary_edit: Option<TextEditView>,
