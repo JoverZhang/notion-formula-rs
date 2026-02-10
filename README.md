@@ -1,164 +1,265 @@
 # notion-formula-rs
 
-A Rust-based implementation of the Notion Formula language, designed as a high-performance, embeddable engine with a WASM-friendly analyzer for interactive formula editors.
+`notion-formula-rs` is a Rust workspace for Notion-style formula tooling.
 
-This repository is structured as a compiler-like toolchain:
+If you are building an editor, this repo gives you a practical core:
 
-- **analyzer**: lexer → parser → AST → diagnostics → formatter (+ basic semantic checks)
-- **evaluator**: runtime execution engine (present, but not the current focus)
+- lexing and parsing
+- diagnostics with stable spans
+- formatting
+- semantic checks
+- completion and signature help
+- a WASM boundary for browser apps
 
-A Vite + CodeMirror 6 demo is included to showcase live analysis, formatting, token highlighting, and diagnostics via WASM.
+## What Works Today
 
----
-
-## Project Goals
-
-- Provide a clean, modular, strongly-typed implementation of a Notion-like formula language in Rust.
-- Make the analyzer **fast**, **embeddable**, and **WASM-friendly** for editor integrations.
-- Produce **high-quality diagnostics** (span-based, rustc-like) suitable for IDE/editor UX.
-- Keep analyzer (frontend) and evaluator (backend) cleanly separated so hosts can:
-  - reuse parsing/formatting/diagnostics without evaluation
-  - plug in their own data model and function implementations for evaluation
-
----
-
-## Status
-
-### Implemented
-
-- Analyzer frontend:
-  - Lexing with spans
-  - Pratt-style expression parsing
-  - Span ↔ line/col mapping (WASM uses UTF-16 offsets)
-  - Diagnostics collection (multi-error)
-  - Formatter / pretty printer (width-aware, stable output)
-  - **Basic semantic diagnostics with context**:
-    - `prop("Name")` property existence + argument checks
-    - `if(cond, a, b)` arity + boolean condition check
-    - `sum(...)` arity + number-argument checks
-- WASM bindings:
-  - `analyze(source, contextJson)` for syntax + semantic diagnostics (`contextJson` must be a non-empty JSON string; use `"{}"` for “no context”)
-- Web demo (Vite + CodeMirror 6):
-  - live analysis (debounced)
-  - token highlighting using CodeMirror decorations
-  - diagnostics list + editor lints
-  - formatted output rendering
-  - utility code for chip span/mapping experiments (UI replacement is not implemented)
-
-### Not yet implemented (planned)
-
-- A full rust-analyzer-style `AnalysisHost` API
-- Richer type inference and more builtin functions/operators
-- A production-grade evaluator with pluggable host context
-- Notion-like formula editor UX (chips/widgets, advanced cursor mapping)
-
----
-
-## Repository Layout
-
-- `analyzer/`
-  The frontend: lexing, parsing, AST, diagnostics, formatting, semantic pass.
-
-- `analyzer_wasm/`
-  WASM bindings for the analyzer (exports `analyze`).
-
-- `evaluator/`
-  Runtime backend (present but currently secondary to analyzer work).
-
+- `analyzer/` (Rust core)
+  - parser pipeline (lexer -> parser -> AST -> diagnostics)
+  - formatter
+  - semantic validation with context-aware checks
+  - completion + structured signature help
+- `analyzer_wasm/` (WASM bridge)
+  - `analyze(source, context_json)`
+  - `complete(source, cursor_utf16, context_json)`
+  - `pos_to_line_col(source, pos_utf16)`
+  - DTO export for TypeScript
 - `examples/vite/`
-  Vite + CodeMirror 6 web demo that calls the WASM analyzer.
+  - Vite + CodeMirror demo for live analysis/completion UX
+  - Vitest + Playwright coverage for core editor flows
 
----
+## Current Limits
 
-## Documentation
+- `evaluator/` is a TODO right now (coming soon).
+- Language and type coverage are still expanding.
+- Some spec areas are intentionally tracked as TODOs in design docs (for example full numeric/string grammar details).
 
-- [`docs/README.md`](docs/README.md): documentation workflow + templates
-- [`docs/design/README.md`](docs/design/README.md): stable contracts + drift tracker
-- [`analyzer/README.md`](analyzer/README.md): analyzer crate map + contracts
-- [`analyzer_wasm/README.md`](analyzer_wasm/README.md): WASM boundary + DTO v1
-- [`examples/vite/README.md`](examples/vite/README.md): demo app + tests
+## Prerequisites
 
----
+- Rust (stable)
+- Node.js `>=20`
+- pnpm `^10`
+- `wasm-pack` (needed when building the WASM demo package)
 
 ## Quick Start
 
-### Prerequisites
+Run from repository root.
 
-- Rust toolchain (stable)
-- Node.js (for the Vite demo)
-
----
-
-## Build & Test (Rust)
-
-From the repository root:
+### 1) Run Rust tests
 
 ```bash
-cargo test
+# just
+just test-analyzer
+just test-analyzer_wasm
+
+# manual
+cargo test -p analyzer
+cargo test -p analyzer_wasm
 ```
 
-This runs:
-
-- analyzer unit tests (lexer/parser/pretty/etc.)
-- golden snapshot tests for diagnostics and formatting
-
-## Updating golden snapshots
-
-The analyzer uses a custom golden test harness (not insta). To update snapshots after intentional changes:
+### 2) Run demo tests (unit + E2E)
 
 ```bash
-BLESS=1 cargo test
+# just
+just test-example-vite
+
+# manual
+cd examples/vite && pnpm -s run wasm:build && pnpm -s run test && pnpm -s run test:e2e
 ```
 
-## Design Notes
+### 3) Run the demo app
 
-### Spans and UTF-16 correctness
+```bash
+# just
+pnpm -C examples/vite install   # first time only
+just run-example-vite
 
-- Internally, the analyzer uses byte offsets for spans (Rust-native).
-- The WASM layer converts spans to UTF-16 offsets for browser/editor interop.
+# manual
+cd examples/vite && pnpm -s run wasm:build && npm run dev
+```
 
-- Diagnostics and tokens returned to JS use UTF-16 offsets; line/col can be derived via `pos_to_line_col(...)`.
+Open the URL printed by Vite (usually `http://127.0.0.1:5173`).
 
-### Parentheses preservation
+### 4) Run the full test suite in one command
 
-- The AST preserves explicit grouping using Group { inner } rather than flattening parentheses. This is intentional for formatting and editor tooling.
+```bash
+# just
+just test
+```
 
-### Formatting strategy
+## API Surface
 
-The formatter aims for stable, readable output:
+There is no end-user CLI compiler here. You normally integrate through Rust APIs or WASM exports.
 
-- prefers single-line output when within max width (currently 80)
-- breaks into multi-line formatting only when needed
+### Rust (`analyzer`)
 
-### Roadmap (high level)
+```rust
+// Lex + parse. Returns AST, tokens, and parse diagnostics.
+pub fn analyze(text: &str) -> Result<ParseOutput, Diagnostic>;
 
-- Expand semantic analysis:
-  - richer operator typing and inference
-  - more builtin functions and overloads
-  - better unknown propagation and error recovery
-- Introduce an editor-oriented AnalysisHost:
-  - incremental updates
-  - cursor-aware queries (token/expr at position)
-  - stable IDs for nodes and diagnostics
-- Build evaluator:
-  - value system
-  - function registry
-  - host context provider for properties/relations/rollups
-  - interpreter (and later optimization opportunities)
+// Type inference + semantic validation using your context.
+pub fn analyze_expr(expr: &ast::Expr, ctx: &semantic::Context) -> (semantic::Ty, Vec<Diagnostic>);
 
-### Contributing
+// Stable formatter output for parsed expressions.
+pub fn format_expr(expr: &ast::Expr, source: &str, tokens: &[Token]) -> String;
 
-Contributions are welcome, especially in these areas:
+// Completion items + replace span + signature help + preferred indices.
+pub fn complete(
+    text: &str,
+    cursor_byte: usize,
+    ctx: Option<&semantic::Context>,
+    config: CompletionConfig,
+) -> CompletionOutput;
 
-- semantic analysis rules and tests
-- diagnostics UX improvements and recovery
-- formatter idempotence and stability
-- web demo ergonomics (CodeMirror integration)
-- evaluator design and implementation
+// Deterministic, human-readable diagnostics rendering.
+pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
+```
 
-### Development principles
+### WASM (`analyzer_wasm`)
 
-Prefer small, incremental changes with strong tests.
+```typescript
+// TypeScript-facing API used by the demo wrapper
+// (examples/vite/src/analyzer/wasm_client.ts).
+export function analyzeSource(source: string, contextJson: string): AnalyzeResult;
+export function completeSource(
+  source: string,
+  cursor: number, // UTF-16 offset
+  contextJson: string,
+): CompletionOutputView;
+export function posToLineCol(source: string, pos: number): LineColView;
 
-- Keep analyzer and evaluator separated.
-- Avoid breaking the WASM API without a strong reason.
+// Under the hood, these call wasm-bindgen exports:
+// analyze(source, context_json) -> AnalyzeResult payload
+// complete(source, cursor_utf16, context_json) -> CompletionOutputView payload
+// pos_to_line_col(source, pos_utf16) -> LineColView payload
+```
+
+`context_json` rules are strict:
+
+- it must be a non-empty JSON string
+- unknown top-level fields are rejected
+- use `"{}"` when you have no context to pass
+
+Current schema:
+
+```json
+{
+  "properties": [
+    { "name": "Status", "type": "String", "disabled_reason": null },
+    { "name": "Score", "type": "Number", "disabled_reason": null }
+  ],
+  "completion": { "preferred_limit": 6 }
+}
+```
+
+## Important Contracts
+
+These rules are central for integrations:
+
+- In Rust core (`analyzer/`), spans are UTF-8 byte offsets.
+- At JS/WASM boundary (`analyzer_wasm/`), spans/offsets are UTF-16 code units.
+- Spans are half-open everywhere: `[start, end)`.
+- Diagnostics and formatting are designed to be deterministic.
+
+If your editor pipeline depends on coordinates, read the WASM and tokens/spans design docs first.
+
+## Testing
+
+### Rust analyzer tests
+
+```bash
+# just
+just test-analyzer
+
+# manual
+cargo test -p analyzer
+```
+
+### Rust WASM tests
+
+```bash
+# just
+just test-analyzer_wasm
+
+# manual
+cargo test -p analyzer_wasm
+```
+
+### Update golden snapshots (analyzer)
+
+```bash
+# just
+just test-analyzer-bless
+
+# manual
+BLESS=1 cargo test -p analyzer
+```
+
+### Demo unit + E2E tests
+
+```bash
+# just
+just test-example-vite
+
+# manual
+cd examples/vite && pnpm -s run wasm:build && pnpm -s run test && pnpm -s run test:e2e
+```
+
+## Common Dev Commands
+
+```bash
+# just
+just build     # build demo bundle (wasm build + install + vite build)
+just check    # cargo check + clippy + frontend checks
+just fmt      # rustfmt + frontend format
+just fix      # clippy --fix + frontend lint fixes
+just gen-ts   # export TS DTO types from analyzer_wasm
+just test     # repo test suite
+just test-analyzer
+just test-analyzer_wasm
+just test-analyzer-bless
+just test-example-vite
+just run-example-vite  # build wasm and start demo dev server
+```
+
+## Repository Layout
+
+| Path | Role |
+|---|---|
+| `analyzer/` | Core analyzer logic: lexer/parser/AST/diagnostics/semantic/IDE helpers |
+| `analyzer_wasm/` | WASM boundary, UTF-16<->UTF-8 conversions, DTO serialization |
+| `evaluator/` | Runtime evaluator TODO (coming soon) |
+| `examples/vite/` | Browser demo (CodeMirror + WASM integration) |
+| `docs/` | Contracts, architecture docs, deep dives, and changelog guidance |
+
+## Documentation Map
+
+If you only read three docs, read these first:
+
+1. [`docs/design/README.md`](docs/design/README.md) (stable architecture + contracts)
+2. [`analyzer/README.md`](analyzer/README.md) (current analyzer behavior and module map)
+3. [`analyzer_wasm/README.md`](analyzer_wasm/README.md) (WASM boundary and DTO rules)
+
+More focused docs:
+
+- [`docs/design/completion.md`](docs/design/completion.md)
+- [`docs/design/tokens-spans.md`](docs/design/tokens-spans.md)
+- [`docs/design/wasm-boundary.md`](docs/design/wasm-boundary.md)
+- [`examples/vite/README.md`](examples/vite/README.md)
+
+## Contributing
+
+Thank you for your interest in contributing to `notion-formula-rs`.
+There are many ways to contribute, and we appreciate all of them.
+
+Documentation for contributing to the analyzer, WASM layer, and demo tooling is in the
+[Guide to notion-formula-rs Development](docs/README.md).
+
+When behavior or contracts change:
+
+- update the relevant module README/docs in place
+- add or update tests
+- call out contract changes clearly in the PR description
+
+## License
+
+Apache-2.0. See `LICENSE`.
