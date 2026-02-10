@@ -60,23 +60,22 @@ pub fn build_signature_segments(
 ) -> Vec<DisplaySegment> {
     let mut out = Vec::<DisplaySegment>::new();
 
-    if is_method_style
-        && let Some((name, ty)) = &rendered.receiver {
-            out.push(DisplaySegment::Punct {
-                text: "(".to_string(),
-            });
-            out.push(DisplaySegment::Param {
-                name: name.clone(),
-                ty: ty.clone(),
-                param_index: None,
-            });
-            out.push(DisplaySegment::Punct {
-                text: ")".to_string(),
-            });
-            out.push(DisplaySegment::Punct {
-                text: ".".to_string(),
-            });
-        }
+    if is_method_style && let Some((name, ty)) = &rendered.receiver {
+        out.push(DisplaySegment::Punct {
+            text: "(".to_string(),
+        });
+        out.push(DisplaySegment::Param {
+            name: name.clone(),
+            ty: ty.clone(),
+            param_index: None,
+        });
+        out.push(DisplaySegment::Punct {
+            text: ")".to_string(),
+        });
+        out.push(DisplaySegment::Punct {
+            text: ".".to_string(),
+        });
+    }
 
     out.push(DisplaySegment::Name {
         text: func_name.to_string(),

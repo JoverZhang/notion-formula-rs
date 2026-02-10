@@ -403,8 +403,7 @@ fn active_parameter_for_call(
             return 0;
         }
 
-        let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape)
-        else {
+        let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape) else {
             return 0;
         };
 

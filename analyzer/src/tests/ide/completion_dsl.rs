@@ -42,7 +42,10 @@ impl Func {
     }
 
     pub fn kind(&self) -> CompletionKind {
-        CompletionKind::Function
+        match self {
+            Func::If => CompletionKind::FunctionGeneral,
+            Func::Sum => CompletionKind::FunctionNumber,
+        }
     }
 }
 
@@ -128,7 +131,7 @@ impl Item {
                     && item.label == prop.name()
             }
             Item::Func(func) => {
-                item.kind == CompletionKind::Function
+                item.kind == func.kind()
                     && item.data == Some(func.data())
                     && item.label == func.name()
             }
@@ -578,8 +581,8 @@ impl CompletionTestBuilder {
             panic!("missing completion item for function {name}\nactual labels: {labels:?}")
         });
         assert!(
-            item.kind == CompletionKind::Function,
-            "expected item to be Function, got {:?}",
+            item.kind.is_function(),
+            "expected item to be a function kind, got {:?}",
             item.kind
         );
         assert_eq!(

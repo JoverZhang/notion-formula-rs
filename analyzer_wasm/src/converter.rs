@@ -10,7 +10,7 @@
 
 use analyzer::SourceMap;
 use analyzer::completion::{CompletionConfig, DEFAULT_PREFERRED_LIMIT};
-use analyzer::semantic::{Context, FunctionCategory, Property, builtins_functions};
+use analyzer::semantic::{Context, Property, builtins_functions};
 use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, Span, Token, TokenKind};
 use js_sys::Error as JsError;
 use serde::Deserialize;
@@ -18,8 +18,8 @@ use wasm_bindgen::prelude::JsValue;
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, DisplaySegmentView, FunctionCategoryView, LineColView,
-    SignatureHelpView, SignatureItemView, Span as SpanDto, SpanView, TextEditView, TokenView,
+    DiagnosticKindView, DiagnosticView, DisplaySegmentView, LineColView, SignatureHelpView,
+    SignatureItemView, Span as SpanDto, SpanView, TextEditView, TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::offsets::utf16_offset_to_byte;
@@ -230,7 +230,6 @@ impl Converter {
         CompletionItemView {
             label: item.label.clone(),
             kind: completion_kind_view(item.kind),
-            category: item.category.map(function_category_view),
             insert_text: item.insert_text.clone(),
             primary_edit: primary_edit_view,
             cursor: cursor_utf16,
@@ -301,22 +300,16 @@ fn diagnostic_kind_view(kind: &DiagnosticKind) -> DiagnosticKindView {
 fn completion_kind_view(kind: analyzer::CompletionKind) -> CompletionItemKind {
     use analyzer::CompletionKind::*;
     match kind {
-        Function => CompletionItemKind::Function,
+        FunctionGeneral => CompletionItemKind::FunctionGeneral,
+        FunctionText => CompletionItemKind::FunctionText,
+        FunctionNumber => CompletionItemKind::FunctionNumber,
+        FunctionDate => CompletionItemKind::FunctionDate,
+        FunctionPeople => CompletionItemKind::FunctionPeople,
+        FunctionList => CompletionItemKind::FunctionList,
+        FunctionSpecial => CompletionItemKind::FunctionSpecial,
         Builtin => CompletionItemKind::Builtin,
         Property => CompletionItemKind::Property,
         Operator => CompletionItemKind::Operator,
-    }
-}
-
-fn function_category_view(category: FunctionCategory) -> FunctionCategoryView {
-    match category {
-        FunctionCategory::General => FunctionCategoryView::General,
-        FunctionCategory::Text => FunctionCategoryView::Text,
-        FunctionCategory::Number => FunctionCategoryView::Number,
-        FunctionCategory::Date => FunctionCategoryView::Date,
-        FunctionCategory::People => FunctionCategoryView::People,
-        FunctionCategory::List => FunctionCategoryView::List,
-        FunctionCategory::Special => FunctionCategoryView::Special,
     }
 }
 

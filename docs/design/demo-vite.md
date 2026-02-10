@@ -21,16 +21,22 @@ The demo renders completions from WASM entirely in TypeScript.
 
 Behavior:
 
-- Completions render under the “Completions” panel.
-- Function completions are grouped by `category` (UI-owned grouping).
-- Non-function completions are grouped by consecutive `kind` changes (UI-owned grouping).
+- Completions render in the “Completions” panel inside the editor wrap (under the editor action
+  row).
+- The editor action row currently exposes `Format`; the right side is a reserved slot for a future
+  output-type badge (UI placeholder only).
+- Completions are grouped by consecutive `kind` changes (UI-owned grouping).
+- Function groups are represented directly by function-specific completion kinds
+  (`FunctionGeneral`, `FunctionText`, `FunctionNumber`, `FunctionDate`, `FunctionPeople`,
+  `FunctionList`, `FunctionSpecial`).
 - A “Recommended” section is derived from analyzer-provided `preferred_indices`.
 - Navigation operates over a `completionRows` model (headers + items):
   - headers are not selectable
   - arrow keys skip header rows
 - Applying a completion maps the selected row back to the underlying `CompletionItem` index.
 - Completion and signature UI is shown for the focused formula panel and hidden for other panels.
-- Selected completion rows are scrolled into view after selection updates (`block: "nearest"`).
+- Selected completion rows are scrolled into view after selection updates with clamped `scrollTop`
+  math (list/item viewport rects + current scroll offset), not `scrollIntoView`.
 
 ## Styling and rendering
 

@@ -26,7 +26,15 @@ Edit/cursor rule:
 
 ## Completion item kinds
 
-- `Function`, `Builtin`, `Property`, `Operator`
+- Function kinds:
+  - `FunctionGeneral`
+  - `FunctionText`
+  - `FunctionNumber`
+  - `FunctionDate`
+  - `FunctionPeople`
+  - `FunctionList`
+  - `FunctionSpecial`
+- Other kinds: `Builtin`, `Property`, `Operator`
 - Builtin items include reserved keywords: `true`, `false`, `not`
   - Code: `analyzer/src/ide/completion/items.rs`
 
@@ -76,7 +84,7 @@ Query derivation:
 Ranking behavior:
 
 - Normal (expr-start) mode:
-  - query ranking applies to `Function` and `Property` only
+  - query ranking applies to function kinds and `Property` only
   - other kinds keep their relative order
 - Postfix (after-dot) mode:
   - label matching ignores the leading `.`
@@ -100,8 +108,8 @@ Type ranking is a separate pass (`apply_type_ranking`) used when an expected typ
 
 - Skipped when the expected type is wildcard-ish:
   - `Unknown` and `Generic(_)` are treated as “no signal” and do not produce type ranking.
-- Groups items into kind buckets, scores each item, sorts within buckets, then reorders buckets by
-  best score (ties broken by bucket priority).
+- Groups items into completion-kind buckets, scores each item, sorts within buckets, then reorders
+  buckets by best score (ties broken by bucket priority).
 - Code: `analyzer/src/ide/completion/rank.rs` (`apply_type_ranking`)
 
 ## preferred_indices

@@ -1,5 +1,5 @@
-use crate::lexer::{CommentKind, TokenKind};
 use crate::lexer::lex;
+use crate::lexer::{CommentKind, TokenKind};
 use crate::parser::TokenQuery;
 
 #[test]

@@ -22,7 +22,10 @@ pub(super) fn complete(
         end: cursor_u32,
     };
 
-    if tokens.iter().all(|token| matches!(token.kind, TokenKind::Eof)) {
+    if tokens
+        .iter()
+        .all(|token| matches!(token.kind, TokenKind::Eof))
+    {
         let items = if cursor == 0 {
             super::items::expr_start_items(ctx)
         } else {
@@ -56,8 +59,13 @@ pub(super) fn complete(
             super::position::detect_position_kind(tokens.as_slice(), cursor_u32, ctx)
         };
 
-    let mut output =
-        complete_for_position(position_kind, ctx, tokens.as_slice(), cursor_u32, call_ctx.as_ref());
+    let mut output = complete_for_position(
+        position_kind,
+        ctx,
+        tokens.as_slice(),
+        cursor_u32,
+        call_ctx.as_ref(),
+    );
     output.signature_help = signature_help;
     super::rank::finalize_output(text, output, config, position_kind)
 }

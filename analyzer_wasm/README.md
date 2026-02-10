@@ -39,6 +39,9 @@ Notes:
   - `formatted`: `string`
 - `CompletionOutputView`:
   - `items`: `CompletionItemView[]`
+    - `CompletionItemView.kind` is function-specific for builtins:
+      `FunctionGeneral | FunctionText | FunctionNumber | FunctionDate | FunctionPeople | FunctionList | FunctionSpecial`
+    - `CompletionItemView` no longer carries a separate `category` field.
   - `replace`: `Span` (original doc, UTF-16)
   - `signature_help`: optional structured segments
   - `preferred_indices`: `number[]`

@@ -120,17 +120,19 @@ export function createFormulaPanelView(opts: {
       <div class="formula-editor-wrap">
         <div class="completion-signature hidden" data-testid="suggestion-signature" data-formula-id="${opts.id}"></div>
         <div class="editor" data-testid="formula-editor" data-formula-id="${opts.id}"></div>
-      </div>
-      <div class="formula-actions">
-        <button class="format-button" type="button" data-testid="format-button" data-formula-id="${opts.id}">Format</button>
+        <div class="formula-actions">
+          <button class="format-button" type="button" data-testid="format-button" data-formula-id="${opts.id}">Format</button>
+          <!-- TODO: render inferred output type here once analyzer exposes output-type APIs. -->
+          <div class="formula-output-type-slot" aria-hidden="true"></div>
+        </div>
+        <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
+          <div class="completion-header">Completions</div>
+          <ul class="completion-items"></ul>
+          <div class="completion-empty">No suggestions</div>
+        </div>
       </div>
       <div class="diagnostics-title">Diagnostics</div>
       <ul class="diag-list" data-testid="formula-diagnostics" data-formula-id="${opts.id}"></ul>
-      <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
-        <div class="completion-header">Completions</div>
-        <ul class="completion-items"></ul>
-        <div class="completion-empty">No suggestions</div>
-      </div>
     </div>
   `;
 
@@ -164,7 +166,29 @@ export function createFormulaPanelView(opts: {
 
   function scrollSelectedIntoView() {
     const selected = itemsEl.querySelector(".completion-item.is-selected");
-    if (selected instanceof HTMLElement) selected.scrollIntoView({ block: "nearest" });
+    if (!(selected instanceof HTMLElement)) return;
+    if (itemsEl.clientHeight <= 0) return;
+
+    const listRect = itemsEl.getBoundingClientRect();
+    const itemRect = selected.getBoundingClientRect();
+
+    const padding = 2;
+    const itemTop = Math.max(0, itemRect.top - listRect.top + itemsEl.scrollTop - padding);
+    const itemBottom = Math.max(itemTop, itemRect.bottom - listRect.top + itemsEl.scrollTop + padding);
+    const viewTop = itemsEl.scrollTop;
+    const viewBottom = viewTop + itemsEl.clientHeight;
+
+    let nextTop = viewTop;
+    if (itemTop < viewTop) {
+      nextTop = itemTop;
+    } else if (itemBottom > viewBottom) {
+      nextTop = itemBottom - itemsEl.clientHeight;
+    } else {
+      return;
+    }
+
+    const maxTop = Math.max(0, itemsEl.scrollHeight - itemsEl.clientHeight);
+    itemsEl.scrollTop = Math.min(Math.max(0, nextTop), maxTop);
   }
 
   function renderCompletionRows() {

@@ -18,7 +18,7 @@ Semantic analysis is best-effort inference + validation against builtin signatur
   - function lists: `analyzer/src/analysis/builtins/*.rs`
 - `FunctionSig` fields:
   - `name`, `params: ParamShape`, `ret: Ty`
-  - `category: FunctionCategory` (UI grouping)
+  - `category: FunctionCategory` (mapped to function-specific completion kinds)
   - `detail: String` (completion/signature help)
   - `generics: Vec<GenericParam>`
 - Code: `analyzer/src/analysis/signature.rs`

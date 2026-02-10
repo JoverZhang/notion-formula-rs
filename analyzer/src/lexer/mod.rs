@@ -41,9 +41,7 @@ pub fn lex(input: &str) -> LexOutput {
 
         // Two-char operators first
         let kind = match ch {
-            '#' => {
-                TokenKind::Pound
-            }
+            '#' => TokenKind::Pound,
             '<' => {
                 if matches!(iter.peek(), Some((_, '='))) {
                     let (_, _) = iter.next().unwrap();

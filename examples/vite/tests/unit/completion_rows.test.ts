@@ -13,8 +13,7 @@ import {
 function makeItem(overrides: Partial<CompletionItem>): CompletionItem {
   return {
     label: "x",
-    kind: "Function",
-    category: "General",
+    kind: "FunctionGeneral",
     insert_text: "x",
     primary_edit: null,
     cursor: null,
@@ -29,9 +28,9 @@ function makeItem(overrides: Partial<CompletionItem>): CompletionItem {
 describe("completion row planning", () => {
   it("dedupes recommended indices and skips disabled recommended items", () => {
     const items: CompletionItem[] = [
-      makeItem({ label: "a", kind: "Function", category: "General" }),
-      makeItem({ label: "b", kind: "Function", category: "Text", is_disabled: true }),
-      makeItem({ label: "c", kind: "Builtin", category: null }),
+      makeItem({ label: "a", kind: "FunctionGeneral" }),
+      makeItem({ label: "b", kind: "FunctionText", is_disabled: true }),
+      makeItem({ label: "c", kind: "Builtin" }),
     ];
 
     const rows = buildCompletionRows(items, [1, 0, 1, 2]);
@@ -59,12 +58,12 @@ describe("completion row planning", () => {
 
   it("emits kind group labels and groups non-recommended items by kind order", () => {
     const items: CompletionItem[] = [
-      makeItem({ label: "textFn", kind: "Function", category: "Text" }),
-      makeItem({ label: "genFn", kind: "Function", category: "General" }),
-      makeItem({ label: "textFn2", kind: "Function", category: "Text" }),
-      makeItem({ label: "not", kind: "Builtin", category: null }),
-      makeItem({ label: "true", kind: "Builtin", category: null }),
-      makeItem({ label: "+", kind: "Operator", category: null }),
+      makeItem({ label: "textFn", kind: "FunctionText" }),
+      makeItem({ label: "genFn", kind: "FunctionGeneral" }),
+      makeItem({ label: "textFn2", kind: "FunctionText" }),
+      makeItem({ label: "not", kind: "Builtin" }),
+      makeItem({ label: "true", kind: "Builtin" }),
+      makeItem({ label: "+", kind: "Operator" }),
     ];
 
     const rows = buildCompletionRows(items, []);
@@ -72,14 +71,20 @@ describe("completion row planning", () => {
     const labels = rows
       .filter((row) => row.kind === "label" && (row.flags & COMPLETION_ROW_LABEL_GROUP) !== 0)
       .map((row) => row.label);
-    expect(labels).toEqual(["Functions", "Built-ins", "Operators"]);
+    expect(labels).toEqual([
+      "Text Functions",
+      "General Functions",
+      "Text Functions",
+      "Built-ins",
+      "Operators",
+    ]);
   });
 
   it("selection helpers skip non-items and wrap around", () => {
     const items: CompletionItem[] = [
-      makeItem({ label: "genFn", kind: "Function", category: "General" }),
-      makeItem({ label: "textFn", kind: "Function", category: "Text" }),
-      makeItem({ label: "not", kind: "Builtin", category: null }),
+      makeItem({ label: "genFn", kind: "FunctionGeneral" }),
+      makeItem({ label: "textFn", kind: "FunctionText" }),
+      makeItem({ label: "not", kind: "Builtin" }),
     ];
     const rows = buildCompletionRows(items, []);
     const itemRowIndices = rows

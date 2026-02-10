@@ -77,9 +77,7 @@ fn signature_help_sum_variadic_number_only_case_3_second_arg_empty() {
     t("sum(42, $0)")
         .ctx(c)
         .expect_sig_active(1)
-        .expect_sig_label(
-            "sum(values1: number, values2: number | number[], ...) -> number",
-        );
+        .expect_sig_label("sum(values1: number, values2: number | number[], ...) -> number");
 }
 
 #[test]
@@ -88,9 +86,7 @@ fn signature_help_sum_variadic_number_only_case_4_two_numbers() {
     t("sum(42, 42$0)")
         .ctx(c)
         .expect_sig_active(1)
-        .expect_sig_label(
-            "sum(values1: number, values2: number, ...) -> number",
-        );
+        .expect_sig_label("sum(values1: number, values2: number, ...) -> number");
 }
 
 #[test]
@@ -146,8 +142,7 @@ fn signature_help_postfix_ifs_third_condition_highlights_condition3() {
         .prop("Date", crate::semantic::Ty::Date)
         .build();
 
-    t(
-        r#"
+    t(r#"
 (prop("Number") < 1).ifs(
   prop("Title"),
   prop("Number") < 2,
@@ -155,8 +150,7 @@ fn signature_help_postfix_ifs_third_condition_highlights_condition3() {
   prop("Number") < 3$0,
   prop("Date"),
   4
-)"#,
-    )
+)"#)
     .ctx(c)
     .expect_sig_active(3)
     .expect_sig_active_param_name("condition3");

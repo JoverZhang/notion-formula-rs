@@ -273,12 +273,9 @@ mod tests {
 
         // Cursor is at the start of `)`.
         let cursor = 1;
-        let (_, containing) = super::prev_non_trivia_impl(
-            &tokens,
-            cursor,
-            super::CursorBoundary::Containing,
-        )
-        .unwrap();
+        let (_, containing) =
+            super::prev_non_trivia_impl(&tokens, cursor, super::CursorBoundary::Containing)
+                .unwrap();
         assert!(matches!(&containing.kind, TokenKind::CloseParen));
 
         let (_, insertion) = prev_non_trivia_insertion(&tokens, cursor).unwrap();

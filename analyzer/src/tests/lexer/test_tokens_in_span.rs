@@ -49,7 +49,10 @@ fn test_tokens_in_span() {
 
     let r = tokens_in_span(&tokens, span(0, 8)); // whole expression
     assert_eq!((r.lo, r.hi), (0, 4)); // excludes EOF
-    assert!(matches!(tokens[1].kind, TokenKind::DocComment(CommentKind::Block, _)));
+    assert!(matches!(
+        tokens[1].kind,
+        TokenKind::DocComment(CommentKind::Block, _)
+    ));
 
     let r = tokens_in_span(&tokens, span(1, 6)); // "/*c*/"
     assert_eq!((r.lo, r.hi), (1, 2));

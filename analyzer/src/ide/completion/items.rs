@@ -14,8 +14,7 @@ pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<Completio
             let detail = Some(func.detail.clone());
             CompletionItem {
                 label: func.name.clone(),
-                kind: CompletionKind::Function,
-                category: Some(func.category),
+                kind: CompletionKind::from(func.category),
                 insert_text: format!("{}()", func.name),
                 primary_edit: None,
                 cursor: None,
@@ -42,7 +41,6 @@ pub(super) fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<Completio
     items.extend(OPS.into_iter().map(|op| CompletionItem {
         label: op.to_string(),
         kind: CompletionKind::Operator,
-        category: None,
         insert_text: op.to_string(),
         primary_edit: None,
         cursor: None,
@@ -80,7 +78,6 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
             CompletionItem {
                 label: label.to_string(),
                 kind: CompletionKind::Builtin,
-                category: None,
                 insert_text,
                 primary_edit: None,
                 cursor: None,
@@ -114,7 +111,6 @@ fn postfix_method_items(ctx: Option<&semantic::Context>, insert_dot: bool) -> Ve
         items.push(CompletionItem {
             label,
             kind: CompletionKind::Operator,
-            category: None,
             insert_text,
             primary_edit: None,
             cursor: None,
@@ -143,7 +139,6 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
         let item = CompletionItem {
             label,
             kind: CompletionKind::Property,
-            category: None,
             insert_text,
             primary_edit: None,
             cursor: None,
