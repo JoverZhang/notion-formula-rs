@@ -75,7 +75,7 @@ fn completion_after_dot_shows_postfix_methods() {
     t("sum(1,2,3).$0")
         .ctx(c)
         .expect_not_empty()
-        .expect_contains_labels(&[".add", ".round"])
+        .expect_contains_labels(&[".add()", ".round()"])
         .expect_not_postfix(Func::If)
         .expect_not_contains(&[
             Item::Prop(Prop::Title),
@@ -96,7 +96,8 @@ fn completion_after_dot_offers_postfix_if_and_insert_text_is_if_parens() {
     t("true.$0")
         .ctx(c)
         .expect_postfix(Func::If)
-        .expect_item_insert_text(".if", "if()");
+        .expect_item_insert_text(".if()", "if()")
+        .expect_item_detail(".if()", "(condition).if(then, else)");
 }
 
 #[test]
@@ -136,13 +137,13 @@ fn completion_disabled_property_marking() {
 #[test]
 fn completion_apply_function_inserts_parens_and_moves_cursor_inside() {
     let c = ctx().build();
-    t("su$0").ctx(c).apply("sum").expect_text("sum($0)");
+    t("su$0").ctx(c).apply("sum()").expect_text("sum($0)");
 }
 
 #[test]
 fn completion_apply_function_in_call_callee_position() {
     let c = ctx().build();
-    t("$0").ctx(c).apply("if").expect_text("if($0)");
+    t("$0").ctx(c).apply("if()").expect_text("if($0)");
 }
 
 #[test]
@@ -152,12 +153,12 @@ fn completion_function_insert_text_contains_lparen() {
     t("$0")
         .ctx(c)
         .expect_item_data(
-            "if",
+            "if()",
             CompletionData::Function {
                 name: "if".to_string(),
             },
         )
-        .expect_item_cursor_after_lparen("if");
+        .expect_item_cursor_after_lparen("if()");
 }
 
 #[test]
@@ -196,7 +197,7 @@ fn completion_apply_function_before_call() {
 
     t("$0sum(1,2,3)")
         .ctx(c)
-        .apply("if")
+        .apply("if()")
         .expect_text("if($0)sum(1,2,3)");
 }
 
@@ -206,17 +207,17 @@ fn completion_apply_postfix_if_inserts_parens_and_moves_cursor_inside() {
 
     t("(1==1)$0")
         .ctx(c.clone())
-        .apply(".if")
+        .apply(".if()")
         .expect_text("(1==1).if($0)");
 
     t("if(true,true,false)$0")
         .ctx(c.clone())
-        .apply(".if")
+        .apply(".if()")
         .expect_text("if(true,true,false).if($0)");
 
     t("if(true,true,false).$0")
         .ctx(c)
-        .apply(".if")
+        .apply(".if()")
         .expect_text("if(true,true,false).if($0)");
 }
 

@@ -34,6 +34,7 @@ Edit/cursor rule:
   - `FunctionPeople`
   - `FunctionList`
   - `FunctionSpecial`
+- Function item labels render as `name()` (call shape); `insert_text` is also `name()`.
 - Other kinds: `Builtin`, `Property`, `Operator`
 - Builtin items include reserved keywords: `true`, `false`, `not`
   - Code: `analyzer/src/ide/completion/items.rs`
@@ -57,8 +58,13 @@ Property items:
     explicit `any`-accepting signatures once `any` exists in the type model)
   - Code: `analyzer/src/ide/completion/pipeline.rs`, `analyzer/src/ide/completion/items.rs`
 - UI forms:
-  - After an atom: inserts `.name()`
-  - After `.`: inserts `name()` (the dot already exists)
+  - Labels render as `.name()` (method-call shape).
+  - After an atom: inserts `.name()`.
+  - After `.`: inserts `name()` (the dot already exists in source).
+  - Postfix items use function kinds (`Function*`, from builtin `FunctionCategory`) so UI grouping
+    keeps them in function sections instead of `Operator`.
+  - `detail` is method-style (`(receiverParam).name(otherParams)`), including repeat-shape `...`
+    where applicable.
   - Code: `analyzer/src/ide/completion/items.rs` (`postfix_method_items`)
 
 ## Replace span and “prefix editing”

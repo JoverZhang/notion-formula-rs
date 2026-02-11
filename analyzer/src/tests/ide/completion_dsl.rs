@@ -35,6 +35,10 @@ impl Func {
         }
     }
 
+    pub fn label(&self) -> String {
+        format!("{}()", self.name())
+    }
+
     pub fn data(&self) -> CompletionData {
         CompletionData::Function {
             name: self.name().to_string(),
@@ -118,7 +122,7 @@ impl Item {
     pub fn label(&self) -> String {
         match self {
             Item::Prop(p) => p.name().to_string(),
-            Item::Func(f) => f.name().to_string(),
+            Item::Func(f) => f.label(),
             Item::Builtin(b) => b.label().to_string(),
         }
     }
@@ -133,7 +137,7 @@ impl Item {
             Item::Func(func) => {
                 item.kind == func.kind()
                     && item.data == Some(func.data())
-                    && item.label == func.name()
+                    && item.label == func.label()
             }
             Item::Builtin(b) => {
                 item.label == b.label() && item.kind == b.kind() && item.data.is_none()
@@ -445,6 +449,16 @@ impl CompletionTestBuilder {
         self
     }
 
+    pub fn expect_item_detail(mut self, label: &str, expected: &str) -> Self {
+        let item = { self.item(label).clone() };
+        assert_eq!(
+            item.detail.as_deref(),
+            Some(expected),
+            "unexpected detail for item {label}"
+        );
+        self
+    }
+
     pub fn expect_contains_labels(mut self, expected: &[&str]) -> Self {
         let items = self.visible_items();
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -511,11 +525,11 @@ impl CompletionTestBuilder {
 
     pub fn expect_postfix(mut self, func: Func) -> Self {
         let name = func.name();
-        let label = format!(".{name}");
+        let label = format!(".{name}()");
         let item = { self.item(&label).clone() };
         assert_eq!(
             item.kind,
-            CompletionKind::Operator,
+            func.kind(),
             "unexpected kind for postfix {label}"
         );
         assert_eq!(
@@ -530,12 +544,12 @@ impl CompletionTestBuilder {
 
     pub fn expect_not_postfix(mut self, func: Func) -> Self {
         let name = func.name();
-        let label = format!(".{name}");
+        let label = format!(".{name}()");
         let out = self.ensure_run();
         assert!(
             !out.items.iter().any(|item| {
                 item.label == label
-                    && item.kind == CompletionKind::Operator
+                    && item.kind == func.kind()
                     && item.data
                         == Some(CompletionData::PostfixMethod {
                             name: name.to_string(),
@@ -575,11 +589,15 @@ impl CompletionTestBuilder {
     }
 
     pub fn expect_func(mut self, name: &str) -> Self {
+        let label = format!("{name}()");
         let items = self.visible_items();
-        let item = items.iter().find(|i| i.label == name).unwrap_or_else(|| {
-            let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-            panic!("missing completion item for function {name}\nactual labels: {labels:?}")
-        });
+        let item = items
+            .iter()
+            .find(|i| i.label == label.as_str())
+            .unwrap_or_else(|| {
+                let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+                panic!("missing completion item for function {name}\nactual labels: {labels:?}")
+            });
         assert!(
             item.kind.is_function(),
             "expected item to be a function kind, got {:?}",

@@ -13,7 +13,7 @@ pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<Completio
         items.extend(ctx.functions.iter().map(|func| {
             let detail = Some(func.detail.clone());
             CompletionItem {
-                label: func.name.clone(),
+                label: format!("{}()", func.name),
                 kind: CompletionKind::from(func.category),
                 insert_text: format!("{}()", func.name),
                 primary_edit: None,
@@ -99,6 +99,55 @@ fn postfix_method_items(
     insert_dot: bool,
     receiver_ty: &semantic::Ty,
 ) -> Vec<CompletionItem> {
+    fn display_param_name(param: &semantic::ParamSig) -> String {
+        if param.optional {
+            format!("{}?", param.name)
+        } else {
+            param.name.clone()
+        }
+    }
+
+    fn postfix_detail(sig: &semantic::FunctionSig) -> String {
+        let mut receiver_param = None::<String>;
+        let mut call_params = Vec::<String>::new();
+
+        if let Some(first) = sig.params.head.first() {
+            receiver_param = Some(display_param_name(first));
+            for param in sig.params.head.iter().skip(1) {
+                call_params.push(display_param_name(param));
+            }
+        } else if let Some(first) = sig.params.repeat.first() {
+            receiver_param = Some(display_param_name(first));
+            for param in sig.params.repeat.iter().skip(1) {
+                call_params.push(display_param_name(param));
+            }
+        }
+
+        if receiver_param.is_none() {
+            return sig.detail.clone();
+        }
+
+        if !sig.params.repeat.is_empty() {
+            if !sig.params.head.is_empty() {
+                for param in &sig.params.repeat {
+                    call_params.push(display_param_name(param));
+                }
+            }
+            call_params.push("...".to_string());
+        }
+
+        for param in &sig.params.tail {
+            call_params.push(display_param_name(param));
+        }
+
+        let receiver_param = receiver_param.unwrap_or_default();
+        format!(
+            "({receiver_param}).{}({})",
+            sig.name,
+            call_params.join(", ")
+        )
+    }
+
     fn postfix_first_param(sig: &semantic::FunctionSig) -> Option<&semantic::ParamSig> {
         if let Some(first) = sig.params.head.first() {
             return Some(first);
@@ -135,7 +184,7 @@ fn postfix_method_items(
         if !receiver_matches_postfix_first_param(func, receiver_ty) {
             continue;
         }
-        let label = format!(".{}", func.name);
+        let label = format!(".{}()", func.name);
         let insert_text = if insert_dot {
             format!(".{}()", func.name)
         } else {
@@ -143,12 +192,12 @@ fn postfix_method_items(
         };
         items.push(CompletionItem {
             label,
-            kind: CompletionKind::Operator,
+            kind: CompletionKind::from(func.category),
             insert_text,
             primary_edit: None,
             cursor: None,
             additional_edits: Vec::new(),
-            detail: None,
+            detail: Some(postfix_detail(func)),
             is_disabled: false,
             disabled_reason: None,
             data: Some(CompletionData::PostfixMethod {

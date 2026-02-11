@@ -119,7 +119,7 @@ fn completion_ident_end_before_close_paren_treats_ident_as_query() {
         "expected property completion for Date\nactual labels: {labels:?}"
     );
     assert!(
-        labels.contains(&"date"),
+        labels.contains(&"date()"),
         "expected function completion for date\nactual labels: {labels:?}"
     );
 }

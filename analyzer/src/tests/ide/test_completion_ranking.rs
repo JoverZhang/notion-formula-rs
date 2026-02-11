@@ -19,8 +19,8 @@ fn completion_member_access_prefix_filters_to_query_matches() {
 
     t(r#""abc".rep$0"#)
         .ctx(c)
-        .expect_contains_labels(&[".repeat", ".replace", ".replaceAll"])
-        .expect_not_contains_labels(&[".if", ".test", ".match"]);
+        .expect_contains_labels(&[".repeat()", ".replace()", ".replaceAll()"])
+        .expect_not_contains_labels(&[".if()", ".test()", ".match()"]);
 }
 
 #[test]
@@ -38,8 +38,8 @@ fn completion_member_access_filters_by_receiver_type() {
     t("true.rep$0").ctx(c.clone()).expect_empty();
     t(r#""x".rep$0"#)
         .ctx(c)
-        .expect_contains_labels(&[".repeat", ".replace", ".replaceAll"])
-        .expect_not_contains_labels(&[".if", ".ifs"]);
+        .expect_contains_labels(&[".repeat()", ".replace()", ".replaceAll()"])
+        .expect_not_contains_labels(&[".if()", ".ifs()"]);
 }
 
 #[test]
@@ -89,10 +89,10 @@ fn completion_fuzzy_ranking_orders_matches_and_computes_preferred_indices() {
     t("rep$0")
         .ctx(c)
         .preferred_limit(3)
-        .expect_order("repeat", "toNumber")
-        .expect_order("replace", "toNumber")
-        .expect_order("replaceAll", "toNumber")
-        .expect_top_labels(&["repeat", "replace", "replaceAll"])
+        .expect_order("repeat()", "toNumber()")
+        .expect_order("replace()", "toNumber()")
+        .expect_order("replaceAll()", "toNumber()")
+        .expect_top_labels(&["repeat()", "replace()", "replaceAll()"])
         .expect_preferred_indices(&[0, 1, 2]);
 }
 
@@ -114,9 +114,9 @@ fn completion_ranking_contains_beats_fuzzy() {
 
     t("me$0")
         .ctx(c)
-        .expect_order("mean", "toNumber")
-        .expect_order("median", "toNumber")
-        .expect_order("name", "toNumber");
+        .expect_order("mean()", "toNumber()")
+        .expect_order("median()", "toNumber()")
+        .expect_order("name()", "toNumber()");
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn completion_ranking_exact_beats_contains() {
         functions: vec![replace_all.unwrap(), replace.unwrap()],
     };
 
-    t("replace$0").ctx(c).expect_order("replace", "replaceAll");
+    t("replace$0").ctx(c).expect_order("replace()", "replaceAll()");
 }
 
 #[test]
@@ -157,8 +157,8 @@ fn completion_single_char_query_prefers_prefix_prop_over_short_contains() {
 
     t("t$0")
         .ctx(c.clone())
-        .expect_contains_labels(&["Title", "at"])
-        .expect_order("Title", "at");
+        .expect_contains_labels(&["Title", "at()"])
+        .expect_order("Title", "at()");
 
     let out = complete("t", 1, Some(&c), CompletionConfig::default());
     let top = out
@@ -254,7 +254,7 @@ fn completion_after_dot_only_offers_postfix_capable_functions() {
     t("true.$0")
         .ctx(c)
         .expect_postfix(Func::If)
-        .expect_not_contains_labels(&[".repeat", ".replace"])
+        .expect_not_contains_labels(&[".repeat()", ".replace()"])
         .expect_not_postfix(Func::Sum);
 }
 
@@ -264,7 +264,7 @@ fn completion_after_dot_unknown_receiver_keeps_full_postfix_set_for_now() {
     t("foo.$0")
         .ctx(c)
         .expect_postfix(Func::If)
-        .expect_contains_labels(&[".repeat"]);
+        .expect_contains_labels(&[".repeat()"]);
 }
 
 #[test]

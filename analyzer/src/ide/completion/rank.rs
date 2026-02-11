@@ -94,15 +94,23 @@ fn cmp_ranked_items(a: &RankedItem, b: &RankedItem) -> Ordering {
         })
 }
 
+fn label_for_match(item: &CompletionItem, mode: RankMode) -> &str {
+    let base = match mode {
+        RankMode::Normal => item.label.as_str(),
+        RankMode::Postfix => item.label.trim_start_matches('.'),
+    };
+    if item.kind.is_function() {
+        return base.strip_suffix("()").unwrap_or(base);
+    }
+    base
+}
+
 fn apply_query_ranking(query_norm: &str, items: &mut Vec<CompletionItem>, mode: RankMode) {
     let mut ranked: Vec<RankedItem> = items
         .drain(..)
         .enumerate()
         .map(|(idx, item)| {
-            let label = match mode {
-                RankMode::Normal => item.label.as_str(),
-                RankMode::Postfix => item.label.trim_start_matches('.'),
-            };
+            let label = label_for_match(&item, mode);
             let label_norm = normalize_for_match(label);
             let label_norm_len = label_norm.chars().count();
 
@@ -248,8 +256,13 @@ pub(super) fn preferred_indices_for_items(
         if item.is_disabled {
             continue;
         }
+        let label = if item.kind.is_function() {
+            item.label.strip_suffix("()").unwrap_or(&item.label)
+        } else {
+            &item.label
+        };
         if (item.kind == CompletionKind::Property || item.kind.is_function())
-            && match_class_for_norm_label(query_norm, &normalize_for_match(&item.label))
+            && match_class_for_norm_label(query_norm, &normalize_for_match(label))
                 != MatchClass::None
         {
             out.push(idx);

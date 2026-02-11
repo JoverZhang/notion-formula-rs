@@ -36,7 +36,7 @@ test("cursor is placed correctly after applying a completion", async ({ page }) 
   await waitForAnyCompletionItems(page, FORMULA_ID);
   await waitForCompletionDebounce(page);
 
-  await applyCompletionByDomClick(page, FORMULA_ID, "if");
+  await applyCompletionByDomClick(page, FORMULA_ID, "if()");
   await expectEditorText(page, FORMULA_ID, "if()");
 
   await expectCursorAfter(page, FORMULA_ID, "if(");
@@ -64,7 +64,7 @@ test("selected completion item is scrolled into view", async ({ page }) => {
     .toBe(true);
 
   // Select a far item by dispatching a mouseenter event (avoids focus flake in headless runs).
-  const targetLabel = "replaceAll";
+  const targetLabel = "replaceAll()";
   await page.evaluate(
     ({ formulaId, label }) => {
       const panel = document.querySelector(
@@ -132,7 +132,7 @@ test("cursor remains correct after multiple completion-driven edits", async ({ p
   await setEditorContent(page, FORMULA_ID, "sub");
   await waitForAnyCompletionItems(page, FORMULA_ID);
   await waitForCompletionDebounce(page);
-  await applyCompletionByDomClick(page, FORMULA_ID, "substring");
+  await applyCompletionByDomClick(page, FORMULA_ID, "substring()");
   await expectEditorText(page, FORMULA_ID, "substring()");
   await expectCursorAfter(page, FORMULA_ID, "substring(");
 
@@ -142,7 +142,7 @@ test("cursor remains correct after multiple completion-driven edits", async ({ p
   await page.keyboard.press("ArrowLeft");
   await waitForAnyCompletionItems(page, FORMULA_ID);
   await waitForCompletionDebounce(page);
-  await applyCompletionByDomClick(page, FORMULA_ID, "replace");
+  await applyCompletionByDomClick(page, FORMULA_ID, "replace()");
   await expectEditorText(page, FORMULA_ID, /substring\(\) \+ replace\(\)/);
   await expectCursorAfter(page, FORMULA_ID, " + replace(");
 
@@ -151,7 +151,7 @@ test("cursor remains correct after multiple completion-driven edits", async ({ p
   await page.keyboard.press("ArrowLeft");
   await waitForAnyCompletionItems(page, FORMULA_ID);
   await waitForCompletionDebounce(page);
-  await applyCompletionByDomClick(page, FORMULA_ID, "substring");
+  await applyCompletionByDomClick(page, FORMULA_ID, "substring()");
   await expectEditorText(page, FORMULA_ID, /replace\(\) \+ substring\(\)/);
   await expectCursorAfter(page, FORMULA_ID, "replace() + substring(");
 });
@@ -161,7 +161,7 @@ test("cursor remains correct when formula contains UTF-16 characters", async ({ 
   await waitForAnyCompletionItems(page, FORMULA_ID);
   await waitForCompletionDebounce(page);
 
-  await applyCompletionByDomClick(page, FORMULA_ID, "if");
+  await applyCompletionByDomClick(page, FORMULA_ID, "if()");
   await expectEditorText(page, FORMULA_ID, "汉字 + if()");
 
   await expectCursorAfter(page, FORMULA_ID, "if(");
