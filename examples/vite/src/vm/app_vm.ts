@@ -61,6 +61,7 @@ export class AppVM {
       diagnostics: [],
       tokens: [],
       formatted: "",
+      quickFixes: [],
       outputType: "unknown",
       status: "idle",
     };
@@ -101,6 +102,7 @@ export class AppVM {
       formula.diagnostics = result.diagnostics || [];
       formula.tokens = result.tokens || [];
       formula.formatted = result.formatted || "";
+      formula.quickFixes = result.quick_fixes || [];
       formula.outputType = result.output_type || "unknown";
       formula.status = "ok";
     } catch {
@@ -112,6 +114,7 @@ export class AppVM {
       formula.diagnostics = [diag];
       formula.tokens = [];
       formula.formatted = "";
+      formula.quickFixes = [];
       formula.outputType = "unknown";
       formula.status = "error";
     }

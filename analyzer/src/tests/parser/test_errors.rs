@@ -41,6 +41,15 @@ fn diagnostics_list_trailing_comma_recovers() {
         "expected trailing-comma diagnostic to include a removal hint label, got {:?}",
         trailing
     );
+    assert!(
+        trailing.labels.iter().any(|l| {
+            l.quick_fix
+                .as_ref()
+                .is_some_and(|fix| fix.new_text.is_empty() && fix.title == "Remove trailing comma")
+        }),
+        "expected trailing-comma diagnostic to include structured quick-fix metadata, got {:?}",
+        trailing
+    );
 
     match &result.expr.kind {
         ExprKind::List { items } => assert_eq!(items.len(), 2),
@@ -71,6 +80,15 @@ fn diagnostics_call_missing_close_paren_has_insert_label() {
         "expected missing-close-paren diagnostic to include an insertion hint, got {:?}",
         diag
     );
+    assert!(
+        diag.labels.iter().any(|l| {
+            l.quick_fix
+                .as_ref()
+                .is_some_and(|fix| fix.new_text == ")" && fix.title == "Insert `)`")
+        }),
+        "expected missing-close-paren diagnostic to include structured quick-fix metadata, got {:?}",
+        diag
+    );
 }
 
 #[test]
@@ -88,6 +106,15 @@ fn diagnostics_missing_comma_between_call_args_has_insert_label() {
     assert!(
         diag.message.contains("expected ','"),
         "expected missing-comma diagnostic message, got {:?}",
+        diag
+    );
+    assert!(
+        diag.labels.iter().any(|l| {
+            l.quick_fix
+                .as_ref()
+                .is_some_and(|fix| fix.new_text == "," && fix.title == "Insert `,`")
+        }),
+        "expected missing-comma diagnostic to include structured quick-fix metadata, got {:?}",
         diag
     );
 }
@@ -135,5 +162,13 @@ fn diagnostics_mismatched_delimiter_suggests_replacement() {
             .iter()
             .any(|l| l.message.as_deref() == Some("replace `]` with ')'")),
         "expected replacement suggestion label, got {diag:?}"
+    );
+    assert!(
+        diag.labels.iter().any(|l| {
+            l.quick_fix
+                .as_ref()
+                .is_some_and(|fix| fix.new_text == ")" && fix.title.contains("Replace"))
+        }),
+        "expected mismatched-delimiter diagnostic to include structured replacement quick-fix metadata, got {diag:?}"
     );
 }

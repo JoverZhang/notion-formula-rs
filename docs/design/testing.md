@@ -8,6 +8,7 @@ Where the current regression coverage lives, and how snapshots are updated.
 - Coverage includes:
   - lexer
   - parser
+  - parser diagnostic quick-fix metadata + IDE quick-fix extraction
   - span invariants
   - `tokens_in_span`
   - `TokenQuery`
@@ -46,6 +47,7 @@ BLESS=1 cargo test -p analyzer
   - UTF-16 span correctness
   - token span integrity
   - diagnostics mapping
+  - quick-fix DTO conversion (including formatting gate behavior)
   - `context_json` validation rules (non-empty JSON; unknown fields rejected)
 
 Run:
@@ -74,4 +76,4 @@ Regression coverage (non-exhaustive; grep the suites for details):
 - editor auto height growth
 - completion cursor placement (including UTF-16 text)
 - completion list scroll-into-view behavior
-
+- quick-fix application behavior (first-fix-per-click in panel UI)

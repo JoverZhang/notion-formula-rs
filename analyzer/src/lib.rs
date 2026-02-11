@@ -33,6 +33,9 @@ pub use ide::completion::{
     SignatureHelp, TextEdit, complete,
 };
 pub use ide::format::format_expr;
+pub use ide::quick_fix::{
+    QuickFix, QuickFixEdit, formatted_if_syntax_valid, has_syntax_errors, quick_fixes,
+};
 pub use lexer::{CommentKind, LitKind, Span, Token, TokenKind};
 pub use lexer::{NodeId, Spanned, Symbol, TokenIdx, TokenRange, tokens_in_span};
 pub use parser::ast;

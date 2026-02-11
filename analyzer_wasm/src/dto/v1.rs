@@ -79,11 +79,24 @@ pub struct TokenView {
 pub struct AnalyzeResult {
     pub diagnostics: Vec<DiagnosticView>,
     pub tokens: Vec<TokenView>,
+    /// Canonical formatted source (with trailing newline) for syntax-valid input only.
+    ///
+    /// Empty string whenever lex/parse diagnostics exist.
     pub formatted: String,
+    /// Structured quick fixes extracted from parser diagnostics.
+    pub quick_fixes: Vec<QuickFixView>,
     /// Inferred root expression type rendered for UI (e.g. `"number | string"`).
     ///
     /// Never nullable. Unknown/failed inference is represented as `"unknown"`.
     pub output_type: String,
+}
+
+/// A single quick fix action for diagnostics.
+#[derive(Serialize, TS)]
+pub struct QuickFixView {
+    pub title: String,
+    /// Edits are in original-document coordinates (UTF-16).
+    pub edits: Vec<TextEditView>,
 }
 
 /// A text edit in UTF-16 coordinates.
