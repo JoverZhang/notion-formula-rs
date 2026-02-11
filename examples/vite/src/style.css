@@ -299,7 +299,6 @@ body {
 }
 
 .formula-label,
-.diagnostics-title,
 .completion-header,
 .completion-group-header,
 .completion-recommended-header {
@@ -314,6 +313,8 @@ body {
 
 .formula-editor-wrap {
   position: relative;
+  display: grid;
+  gap: 8px;
 }
 
 .editor {
@@ -376,10 +377,6 @@ body {
   gap: 10px;
 }
 
-.formula-editor-wrap > .formula-actions {
-  margin-top: 6px;
-}
-
 .formula-output-type {
   flex: 1;
   min-width: 0;
@@ -398,45 +395,15 @@ body {
   text-align: right;
 }
 
-.diagnostics-title {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.diag-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.diag-list li {
-  color: var(--danger);
-  font-size: 12px;
-  line-height: 1.35;
-  padding: 5px 8px;
-  border-radius: 8px;
-  background: rgba(197, 91, 76, 0.08);
-  border: 1px solid rgba(194, 58, 43, 0.18);
-}
-
-[data-theme="dark"] .diag-list li {
-  background: rgba(255, 123, 111, 0.09);
-  border-color: rgba(255, 123, 111, 0.25);
-}
-
 .completion-panel {
+  --completion-body-height: 230px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-muted);
   padding: 8px 10px;
   display: grid;
   gap: 6px;
-}
-
-.formula-editor-wrap > .completion-panel {
-  margin-top: 6px;
+  box-shadow: var(--shadow-soft);
 }
 
 .completion-header {
@@ -444,22 +411,104 @@ body {
   font-size: 10px;
 }
 
+.completion-body {
+  position: relative;
+  height: var(--completion-body-height);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
 .completion-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--muted);
   font-size: 11px;
-  padding: 3px 2px 4px;
+  padding: 10px;
+  text-align: center;
+  pointer-events: none;
 }
 
 .completion-signature {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 9px;
-  background: var(--surface);
+  background: linear-gradient(168deg, var(--surface) 0%, var(--surface-muted) 100%);
   color: var(--text);
+  display: grid;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: 11px;
-  padding: 7px 9px;
+  padding: 9px 10px;
   box-shadow: var(--shadow-soft);
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.completion-signature-main {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  padding: 6px 7px;
+  line-height: 1.4;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
+.completion-signature-main::-webkit-scrollbar {
+  height: 9px;
+}
+
+.completion-signature-main::-webkit-scrollbar-thumb {
+  background: rgba(128, 112, 86, 0.45);
+  border-radius: 999px;
+}
+
+[data-theme="dark"] .completion-signature-main::-webkit-scrollbar-thumb {
+  background: rgba(170, 157, 129, 0.4);
+}
+
+.completion-signature-diagnostics {
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+  display: grid;
+  gap: 6px;
+}
+
+.completion-signature-diag-title {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.completion-signature-diag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 116px;
+  overflow-y: auto;
+}
+
+.completion-signature-diag-list li {
+  color: var(--danger);
+  border: 1px solid rgba(194, 58, 43, 0.18);
+  border-radius: 7px;
+  background: rgba(197, 91, 76, 0.08);
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 4px 6px;
+}
+
+[data-theme="dark"] .completion-signature-diag-list li {
+  background: rgba(255, 123, 111, 0.09);
+  border-color: rgba(255, 123, 111, 0.25);
 }
 
 .formula-editor-wrap > .completion-signature {
@@ -475,14 +524,12 @@ body {
   left: calc(100% + 12px);
 }
 
-.completion-signature[data-wrap="unwrapped"] {
+.completion-signature[data-wrap="unwrapped"] .completion-signature-main {
   white-space: nowrap;
-  overflow-x: hidden;
 }
 
-.completion-signature[data-wrap="wrapped"] {
+.completion-signature[data-wrap="wrapped"] .completion-signature-main {
   white-space: pre;
-  overflow-x: auto;
 }
 
 .completion-signature-seg {
@@ -500,10 +547,11 @@ body {
 .completion-items {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 6px;
   display: grid;
   gap: 2px;
-  max-height: 240px;
+  height: 100%;
+  max-height: var(--completion-body-height);
   overflow-y: auto;
   overscroll-behavior: contain;
 }

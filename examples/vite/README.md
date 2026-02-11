@@ -37,6 +37,8 @@ Primary files:
 UI behavior that is intentionally TypeScript-owned:
 
 - Completions render in the “Completions” panel inside the editor wrap (under the action row).
+- Suggestion popover can render both signature help and diagnostics in one surface
+  (`src/ui/signature_popover.ts`).
 - Items are grouped by contiguous kind headers, with a “Recommended” section derived from `preferred_indices`.
 - Keyboard navigation skips headers; selection is scrolled into view.
 - The editor action row shows `Format` plus `output: <type>`
@@ -45,6 +47,20 @@ UI behavior that is intentionally TypeScript-owned:
 - Signature help renders analyzer-provided display segments; the UI does not parse type strings.
 - Analyzer diagnostics are mirrored into CodeMirror lint diagnostics.
 - Formula editor auto-grows with content via `.editor .cm-editor .cm-scroller`.
+
+UI implementation details that are intentionally local to the demo:
+
+- Completion panel keeps a fixed-height body (`.completion-body`) with internal scrolling in
+  `.completion-items` to avoid vertical jump/flicker when item counts change.
+- Signature popover diagnostics are rendered as
+  `ul[data-testid="formula-diagnostics"][data-formula-id="<id>"]` inside the popover container
+  so e2e checks can verify diagnostics content without depending on layout position.
+- Signature popover wrap fallback checks both signature-main overflow and popover-container
+  overflow to avoid clipping in grid/nowrap layout edge cases.
+- In wrapped mode, signature main uses preserved newlines (`white-space: pre`) with horizontal
+  scrolling for long lines to avoid ambiguous auto-wrapping inside type expressions.
+- Signature popover keeps pointer interaction enabled for native horizontal scrolling in the
+  signature main area, and it is hidden when the active editor loses focus.
 
 ## Debug bridge
 

@@ -1,6 +1,8 @@
 # Demo app (`examples/vite`)
 
 Notes on the TypeScript demo consuming `analyzer_wasm`.
+This design note focuses on behavior and constraints; local implementation details live in
+`examples/vite/README.md`.
 
 ## Where the integration lives
 
@@ -23,6 +25,7 @@ Behavior:
 
 - Completions render in the “Completions” panel inside the editor wrap (under the editor action
   row).
+- Suggestion UI uses one popover surface that can show signature help and diagnostics together.
 - The editor action row exposes `Format`; the right side shows `output: <type>` from
   `AnalyzeResult.output_type` (non-null, unknown/error = `"unknown"`, right-aligned, truncated on
   overflow).
@@ -35,17 +38,20 @@ Behavior:
   - headers are not selectable
   - arrow keys skip header rows
 - Applying a completion maps the selected row back to the underlying `CompletionItem` index.
-- Completion and signature UI is shown for the focused formula panel and hidden for other panels.
-- Selected completion rows are scrolled into view after selection updates with clamped `scrollTop`
-  math (list/item viewport rects + current scroll offset), not `scrollIntoView`.
+- Completion and signature UI is shown for the focused formula panel and hidden when focus leaves
+  that editor (or switches to another panel).
+- Keyboard navigation keeps the selected completion row visible in the completion list viewport.
 
 ## Styling and rendering
 
-- Group headers: `.completion-group-header` (`examples/vite/src/style.css`)
+- Completion list uses a fixed-height scroll region to prevent panel jump/flicker as result counts
+  change.
+- Signature and diagnostics content share one popover container for clearer suggestion context.
 - Signature help is rendered from analyzer-provided segments (UI does not parse signature/type
   strings).
-- Editor auto-grows (no fixed max-height cap); minimum height via:
-  - `.editor .cm-editor .cm-scroller`
+- Long signature labels keep explicit signature line breaks; overflowing lines are horizontally
+  scrollable in the signature box.
+- Editor auto-grows with content.
 
 ## Editor history / keybindings
 

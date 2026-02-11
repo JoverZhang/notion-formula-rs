@@ -71,6 +71,12 @@ function setActiveFormulaPanel(id: FormulaId) {
   activeFormulaPanelUiById.get(id)?.show();
 }
 
+function clearActiveFormulaPanel(id: FormulaId) {
+  if (activeFormulaPanelId !== id) return;
+  activeFormulaPanelUiById.get(id)?.hide();
+  activeFormulaPanelId = null;
+}
+
 const setLintDiagnosticsEffect = StateEffect.define<CmDiagnostic[]>();
 const lintDiagnosticsStateField = StateField.define<CmDiagnostic[]>({
   create() {
@@ -88,15 +94,6 @@ function must<T extends Element>(root: ParentNode, selector: string): T {
   const node = root.querySelector(selector);
   if (!node) throw new Error(`Missing node: ${selector}`);
   return node as T;
-}
-
-function renderDiagnosticList(listEl: HTMLUListElement, rows: string[]) {
-  listEl.replaceChildren();
-  for (const row of rows) {
-    const li = document.createElement("li");
-    li.textContent = row;
-    listEl.appendChild(li);
-  }
 }
 
 function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
@@ -126,12 +123,12 @@ export function createFormulaPanelView(opts: {
         </div>
         <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
           <div class="completion-header">Completions</div>
-          <ul class="completion-items"></ul>
-          <div class="completion-empty">No suggestions</div>
+          <div class="completion-body">
+            <ul class="completion-items"></ul>
+            <div class="completion-empty">No suggestions</div>
+          </div>
         </div>
       </div>
-      <div class="diagnostics-title">Diagnostics</div>
-      <ul class="diag-list" data-testid="formula-diagnostics" data-formula-id="${opts.id}"></ul>
     </div>
   `;
 
@@ -144,7 +141,6 @@ export function createFormulaPanelView(opts: {
   const editorEl = must<HTMLElement>(panel, '.editor[data-testid="formula-editor"]');
   const formatBtn = must<HTMLButtonElement>(panel, ".format-button");
   const outputTypeEl = must<HTMLElement>(panel, ".formula-output-type");
-  const diagnosticsEl = must<HTMLUListElement>(panel, ".diag-list");
   const completionPanel = must<HTMLElement>(
     panel,
     '.completion-panel[data-testid="completion-panel"]',
@@ -157,6 +153,7 @@ export function createFormulaPanelView(opts: {
   let isUiActive = false;
   let completionItems: CompletionItem[] = [];
   let signatureHelp: SignatureHelp | null = null;
+  let diagnosticRows: string[] = ["No diagnostics"];
   let preferredCompletionIndices: number[] = [];
   let completionRows: CompletionRenderRow[] = [];
   let selectedRowIndex = -1;
@@ -249,7 +246,7 @@ export function createFormulaPanelView(opts: {
   }
 
   function rerenderCompletions() {
-    signaturePopover.render(signatureHelp, isUiActive);
+    signaturePopover.render(signatureHelp, diagnosticRows, isUiActive);
 
     completionRows = buildCompletionRows(completionItems, preferredCompletionIndices);
     const preferredTop = preferredCompletionIndices[0];
@@ -383,6 +380,13 @@ export function createFormulaPanelView(opts: {
     setActiveFormulaPanel(opts.id);
   });
 
+  editorView.dom.addEventListener("focusout", () => {
+    requestAnimationFrame(() => {
+      if (editorView.hasFocus) return;
+      clearActiveFormulaPanel(opts.id);
+    });
+  });
+
   window.addEventListener("resize", () => {
     if (!isUiActive) return;
     signaturePopover.updateSide();
@@ -398,7 +402,6 @@ export function createFormulaPanelView(opts: {
   let lastOutputType = "unknown";
   let lastSource = opts.initialSource;
 
-  renderDiagnosticList(diagnosticsEl, ["No diagnostics"]);
   rerenderCompletions();
 
   formatBtn.addEventListener("click", () => {
@@ -487,10 +490,8 @@ export function createFormulaPanelView(opts: {
         lastChipMap = null;
       }
 
-      renderDiagnosticList(
-        diagnosticsEl,
-        buildDiagnosticTextRows(state.source, state.diagnostics, lastChipMap, lastChipSpans),
-      );
+      diagnosticRows = buildDiagnosticTextRows(state.source, state.diagnostics, lastChipMap, lastChipSpans);
+      signaturePopover.render(signatureHelp, diagnosticRows, isUiActive);
       const cmDiagnostics = toCmDiagnostics(state.diagnostics, docLen, lastChipSpans);
       lastCmDiagnostics = cmDiagnostics;
       editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiagnostics) });

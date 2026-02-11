@@ -21,7 +21,7 @@ async function setCursorAfter(page: Page, formulaId: FormulaId, needle: string) 
   );
 }
 
-test("Suggestion signature pops left and stays until another editor is focused", async ({
+test("Suggestion signature follows focus and hides on editor blur", async ({
   page,
 }) => {
   await setEditorContent(page, "f1", 'if(true, 1, "x")');
@@ -74,8 +74,8 @@ test("Suggestion signature pops left and stays until another editor is focused",
   expect(completionBox.y).toBeLessThan(editorWrapBox.y + editorWrapBox.height + 1);
 
   await page.locator('[data-testid="theme-toggle"]').click();
-  await expect(signature).toBeVisible({ timeout: 5_000 });
-  await expect(completionPanel).toBeVisible({ timeout: 5_000 });
+  await expect(signature).toBeHidden({ timeout: 5_000 });
+  await expect(completionPanel).toBeHidden({ timeout: 5_000 });
 
   await setEditorContent(page, "f2", 'if(true, 1, "x")');
   await setCursorAfter(page, "f2", '"x"');
