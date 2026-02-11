@@ -135,7 +135,9 @@ fn completion_ranking_exact_beats_contains() {
         functions: vec![replace_all.unwrap(), replace.unwrap()],
     };
 
-    t("replace$0").ctx(c).expect_order("replace()", "replaceAll()");
+    t("replace$0")
+        .ctx(c)
+        .expect_order("replace()", "replaceAll()");
 }
 
 #[test]

@@ -571,7 +571,12 @@ export function createFormulaPanelView(opts: {
         lastChipMap = null;
       }
 
-      diagnosticRows = buildDiagnosticTextRows(state.source, state.diagnostics, lastChipMap, lastChipSpans);
+      diagnosticRows = buildDiagnosticTextRows(
+        state.source,
+        state.diagnostics,
+        lastChipMap,
+        lastChipSpans,
+      );
       signaturePopover.render(signatureHelp, diagnosticRows, isUiActive);
       const cmDiagnostics = toCmDiagnostics(state.diagnostics, docLen, lastChipSpans);
       lastCmDiagnostics = cmDiagnostics;

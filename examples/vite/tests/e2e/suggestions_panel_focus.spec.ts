@@ -21,9 +21,7 @@ async function setCursorAfter(page: Page, formulaId: FormulaId, needle: string) 
   );
 }
 
-test("Suggestion signature follows focus and hides on editor blur", async ({
-  page,
-}) => {
+test("Suggestion signature follows focus and hides on editor blur", async ({ page }) => {
   await setEditorContent(page, "f1", 'if(true, 1, "x")');
   await setCursorAfter(page, "f1", '"x"');
   const editor = page.locator('[data-testid="formula-editor"][data-formula-id="f1"]');

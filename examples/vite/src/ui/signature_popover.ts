@@ -7,10 +7,7 @@ import {
   type SignatureWrapMode,
 } from "../model/signature";
 
-function buildSignatureMain(
-  signature: SignatureHelp,
-  mode: SignatureWrapMode,
-): HTMLElement | null {
+function buildSignatureMain(signature: SignatureHelp, mode: SignatureWrapMode): HTMLElement | null {
   const plan = planSignatureTokens(signature, mode);
   if (!plan.tokens.length) return null;
 
@@ -137,10 +134,7 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
         scrollWidth: signatureEl.scrollWidth,
         clientWidth: signatureEl.clientWidth,
       });
-      if (
-        hasMainOverflow ||
-        hasPopoverOverflow
-      ) {
+      if (hasMainOverflow || hasPopoverOverflow) {
         paintPopover(signatureEl, signature, diagnostics, "wrapped");
       }
     });

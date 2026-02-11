@@ -87,5 +87,4 @@ describe("signature popover render", () => {
     expect(signatureEl.classList.contains("hidden")).toBe(false);
     expect(signatureEl.querySelectorAll(".completion-signature-main br").length).toBeGreaterThan(0);
   });
-
 });
