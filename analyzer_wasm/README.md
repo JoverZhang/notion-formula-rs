@@ -1,89 +1,63 @@
 # analyzer_wasm
 
-WASM/JS boundary for `analyzer/` using `wasm-bindgen`.
+WASM/JS boundary for `analyzer`.
 
-This crate:
-- Parses `context_json` (properties + completion config).
-- Bridges UTF-16 offsets/spans (editors) ↔ UTF-8 byte offsets (Rust core).
-- Converts Rust analyzer outputs into DTOs (`dto::v1`) and serializes them to JS.
+## Responsibility
 
-## Coordinates (hard rule)
+This crate owns all UTF-16 ↔ UTF-8 byte conversion. Core analyzer stays byte-only.
 
-- Rust core (`analyzer/`) uses **UTF-8 byte offsets** (`analyzer::Span`).
-- JS/WASM boundary uses **UTF-16 code unit offsets** (`dto::v1::Span`).
-- Half-open spans everywhere: `[start, end)`.
-- Conversion is clamped/floored to valid boundaries and lives only here:
-  - `analyzer_wasm/src/offsets.rs`
-  - `analyzer_wasm/src/span.rs`
-  - tests: `analyzer_wasm/tests/analyze.rs`
-
-## WASM exports
+## Exports
 
 Defined in `analyzer_wasm/src/lib.rs`:
 
 - `analyze(source, context_json) -> AnalyzeResult`
+- `format(source, cursor_utf16) -> ApplyResultView`
+- `apply_edits(source, edits, cursor_utf16) -> ApplyResultView`
 - `complete(source, cursor_utf16, context_json) -> CompletionOutputView`
-- `pos_to_line_col(source, pos_utf16) -> LineColView`
 
-DTO definitions: `analyzer_wasm/src/dto/v1.rs`
+## DTOs (`dto::v1`)
 
-Notes:
-- `pos_to_line_col` returns 1-based `(line, col)` where `col` is a Rust `char` count (Unicode scalar values), not UTF-16.
-- `complete` takes a UTF-16 cursor offset and returns edits/spans in UTF-16.
+- `AnalyzeResult { diagnostics, tokens, output_type }`
+- `DiagnosticView { kind, message, span, line, col, actions }`
+- `CodeActionView { title, edits }`
+- `TextEditView { range, new_text }`
+- `ApplyResultView { source, cursor }`
+- `CompletionOutputView { items, replace, signature_help, preferred_indices }`
 
-### Payload shape (DTO v1)
+All spans/offsets in DTOs are UTF-16 code units and half-open `[start, end)`.
+`DiagnosticView.line`/`col` are 1-based values derived from core byte spans via
+`analyzer::SourceMap::line_col` (`col` is Unicode scalar count).
 
-- `AnalyzeResult`:
-  - `diagnostics`: `DiagnosticView[]`
-  - `tokens`: `TokenView[]` (non-trivia tokens only; trivia is filtered out in the converter)
-  - `formatted`: `string`
-    - empty string whenever lex/parse diagnostics exist
-  - `quick_fixes`: `QuickFixView[]`
-    - structured syntax-recovery edits (UTF-16 ranges) from core
-      `analyzer::quick_fixes(&diagnostics)`
-    - current fixes cover insert/replace delimiters and comma insertion/removal
-  - `output_type`: `string` (semantic root type rendered by Rust, e.g. `"number | string"`)
-    - never nullable; unknown/error uses `"unknown"`
-- `CompletionOutputView`:
-  - `items`: `CompletionItemView[]`
-    - `CompletionItemView.kind` is function-specific for builtins:
-      `FunctionGeneral | FunctionText | FunctionNumber | FunctionDate | FunctionPeople | FunctionList | FunctionSpecial`
-    - `CompletionItemView` no longer carries a separate `category` field.
-  - `replace`: `Span` (original doc, UTF-16)
-  - `signature_help`: optional structured segments
-  - `preferred_indices`: `number[]`
+## Error model
 
-Conversion happens in `analyzer_wasm/src/converter.rs`; quick-fix derivation itself lives in
-`analyzer/src/ide/quick_fix.rs`.
+- `analyze`: throws only for invalid context JSON / serialization errors.
+- `format`: throws on syntax-invalid input (`Format error`).
+- `apply_edits`: throws on invalid edits / invalid cursor / overlaps.
+- `complete`: throws on invalid context JSON / serialization errors.
 
-### Error model
+## Edit application rules
 
-- Invalid/empty/unknown-field `context_json` throws `JsValue("Invalid context JSON")`.
-- Parse/semantic issues do not throw; they are returned as diagnostics in the payload.
-  - See `analyzer_wasm/src/lib.rs`.
+`apply_edits` validation is strict:
+- UTF-16 ranges must be within the document
+- converted byte ranges must be UTF-8 char boundaries
+- edits must be sorted by `(start, end)` and non-overlapping
+
+- `apply_edits` rebases cursor through the shared byte-edit pipeline in
+  `analyzer_wasm/src/text_edit.rs`.
+- `format` validates the incoming cursor against the original source and returns a
+  UTF-16 cursor clamped to formatted output length (it does not rebase through a
+  synthetic full-document edit).
 
 ## `context_json` contract
 
-Parsed by `Converter::parse_context` (`analyzer_wasm/src/converter.rs`):
-
-- Must be a non-empty JSON string.
-- Unknown top-level fields are rejected (`deny_unknown_fields`).
-- Current schema:
+- non-empty JSON string
+- unknown top-level fields rejected
+- current schema:
   - `{ properties: Property[], completion?: { preferred_limit?: number } }`
-- `functions` are not provided by JS; they come from Rust builtins (`builtins_functions()`).
-
-Coverage: `analyzer_wasm/tests/analyze.rs`
-
-## TS DTO export
-
-`cargo run -p analyzer_wasm --bin export_ts` writes:
-
-- `examples/vite/src/analyzer/generated/wasm_dto.ts`
-
-Implementation: `analyzer_wasm/src/bin/export_ts.rs`
 
 ## Testing
 
 ```bash
 cargo test -p analyzer_wasm
+wasm-pack test --node analyzer_wasm
 ```

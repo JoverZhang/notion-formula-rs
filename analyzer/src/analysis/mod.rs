@@ -505,5 +505,6 @@ fn emit_error(diags: &mut Vec<Diagnostic>, span: Span, message: impl Into<String
         span,
         labels: vec![],
         notes: vec![],
+        actions: vec![],
     });
 }

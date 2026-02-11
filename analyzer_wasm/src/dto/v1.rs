@@ -3,11 +3,11 @@
 //! JS-facing types returned by `analyzer_wasm`.
 //! Spans and offsets use UTF-16 code units and are half-open `[start, end)`.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// A span in UTF-16 code units (half-open `[start, end)`).
-#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Span {
     /// Start offset in UTF-16 code units.
     pub start: u32,
@@ -43,17 +43,21 @@ pub struct SpanView {
     pub range: Span,
 }
 
-/// 1-based line/column location in the source text.
-///
-/// This is computed by `pos_to_line_col` using core `SourceMap` rules.
-/// It is not a UTF-16 offset pair.
-#[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct LineColView {
-    pub line: u32,
-    /// 1-based column from `SourceMap::line_col`.
-    ///
-    /// This is a Rust `char` count (Unicode scalar values). It is not UTF-16.
-    pub col: u32,
+/// A text edit in UTF-16 coordinates.
+#[derive(Serialize, Deserialize, TS)]
+pub struct TextEditView {
+    /// Replace range in the original document (UTF-16, half-open).
+    pub range: Span,
+    /// Inserted verbatim.
+    pub new_text: String,
+}
+
+/// A single diagnostic-attached code action.
+#[derive(Serialize, TS)]
+pub struct CodeActionView {
+    pub title: String,
+    /// Edits are in original-document coordinates (UTF-16).
+    pub edits: Vec<TextEditView>,
 }
 
 /// A diagnostic message tied to a source span.
@@ -63,6 +67,12 @@ pub struct DiagnosticView {
     pub message: String,
     /// Location in the source text (UTF-16 span).
     pub span: SpanView,
+    /// 1-based line number derived from source byte offsets.
+    pub line: usize,
+    /// 1-based column number as Unicode scalar (`char`) count.
+    pub col: usize,
+    /// Diagnostic-level code actions.
+    pub actions: Vec<CodeActionView>,
 }
 
 /// A token view for editor tooling.
@@ -79,33 +89,18 @@ pub struct TokenView {
 pub struct AnalyzeResult {
     pub diagnostics: Vec<DiagnosticView>,
     pub tokens: Vec<TokenView>,
-    /// Canonical formatted source (with trailing newline) for syntax-valid input only.
-    ///
-    /// Empty string whenever lex/parse diagnostics exist.
-    pub formatted: String,
-    /// Structured quick fixes extracted from parser diagnostics.
-    pub quick_fixes: Vec<QuickFixView>,
     /// Inferred root expression type rendered for UI (e.g. `"number | string"`).
     ///
     /// Never nullable. Unknown/failed inference is represented as `"unknown"`.
     pub output_type: String,
 }
 
-/// A single quick fix action for diagnostics.
+/// Result payload for `format` and `apply_edits`.
 #[derive(Serialize, TS)]
-pub struct QuickFixView {
-    pub title: String,
-    /// Edits are in original-document coordinates (UTF-16).
-    pub edits: Vec<TextEditView>,
-}
-
-/// A text edit in UTF-16 coordinates.
-#[derive(Serialize, TS)]
-pub struct TextEditView {
-    /// Replace range in the original document (UTF-16, half-open).
-    pub range: Span,
-    /// Inserted verbatim.
-    pub new_text: String,
+pub struct ApplyResultView {
+    pub source: String,
+    /// Cursor position in the updated document (UTF-16).
+    pub cursor: u32,
 }
 
 /// Signature help for a call expression.

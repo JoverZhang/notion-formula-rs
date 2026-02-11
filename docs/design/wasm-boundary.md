@@ -1,101 +1,76 @@
 # WASM boundary (`analyzer_wasm`)
 
-This layer translates between editor coordinates (UTF-16) and core analyzer coordinates (UTF-8
-bytes), and defines the JS-facing DTOs.
+This layer translates between editor coordinates (UTF-16) and core analyzer coordinates (UTF-8 bytes), and defines JS-facing DTOs.
 
 ## Exports
 
-Defined in `analyzer_wasm/src/lib.rs`:
-
 - `analyze(source, context_json) -> AnalyzeResult`
+- `format(source, cursor_utf16) -> ApplyResultView`
+- `apply_edits(source, edits, cursor_utf16) -> ApplyResultView`
 - `complete(source, cursor_utf16, context_json) -> CompletionOutputView`
-- `pos_to_line_col(source, pos_utf16) -> LineColView`
 
-Rust signatures (wasm-bindgen surface):
-
+Rust signatures (wasm-bindgen):
 - `analyze(source: String, context_json: String) -> Result<JsValue, JsValue>`
+- `format(source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
+- `apply_edits(source: String, edits: JsValue, cursor_utf16: u32) -> Result<JsValue, JsValue>`
 - `complete(source: String, cursor_utf16: usize, context_json: String) -> Result<JsValue, JsValue>`
-- `pos_to_line_col(source: String, pos_utf16: u32) -> JsValue`
 
-## Encoding boundary (hard rule)
+## Hard rules
 
-- Core analyzer (`analyzer/`): UTF-8 byte offsets.
-- JS/WASM boundary: UTF-16 code unit offsets.
-- Half-open spans everywhere: `[start, end)`.
-- Conversion lives only in WASM:
-  - `analyzer_wasm/src/offsets.rs`
-  - `analyzer_wasm/src/span.rs`
-  - `analyzer_wasm/src/converter.rs`
-
-Helper APIs (WASM):
-
-- `utf16_offset_to_byte(source, utf16_pos)`
-- `byte_offset_to_utf16_offset(source, byte_pos)`
-- `byte_span_to_utf16_span(source, span)`
+- Core (`analyzer`) uses UTF-8 byte offsets only.
+- WASM boundary is the only UTF-16 ↔ byte conversion layer.
+- JS/WASM DTO spans and edits are UTF-16 code units.
+- Half-open ranges everywhere: `[start, end)`.
 
 ## DTOs (v1)
 
-- Definitions: `analyzer_wasm/src/dto/v1.rs`
-- Spans/offsets are UTF-16 code units, half-open `[start, end)`.
+- `AnalyzeResult { diagnostics, tokens, output_type }`
+- `DiagnosticView { kind, message, span, line, col, actions }`
+- `CodeActionView { title, edits }`
+- `TextEditView { range, new_text }`
+- `ApplyResultView { source, cursor }`
 
-Key types:
+Diagnostics expose quick-fix actions directly as `actions`.
+Diagnostics include 1-based `line`/`col` for UI lists. These are
+computed from diagnostic byte offsets through `analyzer::SourceMap::line_col`.
 
-- `AnalyzeResult { diagnostics, tokens, formatted, quick_fixes, output_type }`
-  - `formatted` is empty whenever lex/parse diagnostics are present.
-  - `quick_fixes` contains structured UTF-16 edits converted from core
-    `analyzer::quick_fixes(&diagnostics)` (insert/replace delimiters, comma insertion/removal).
-  - `output_type` is non-null (`string`): unknown/error uses `"unknown"`.
-- `Span { start, end }`
-- `SpanView { range: Span }`
-- `LineColView { line, col }` (1-based; `col` is a Rust `char` count, not UTF-16)
-- `TextEditView { range: Span, new_text }`
-- `CompletionItemView { label, kind, insert_text, primary_edit, cursor, additional_edits, detail, is_disabled, disabled_reason }`
-- `CompletionItemKind` includes function-specific kinds:
-  - `FunctionGeneral`, `FunctionText`, `FunctionNumber`, `FunctionDate`, `FunctionPeople`,
-    `FunctionList`, `FunctionSpecial`
-  - plus `Builtin`, `Property`, `Operator`
-- `CompletionOutputView { items, replace, signature_help, preferred_indices }`
+## Formatting and edit application
 
-## context_json contract
+- `format(...)`:
+  - fails on any lex/parse diagnostic (`Err("Format error")`)
+  - computes canonical formatted text
+  - validates cursor against the input source
+  - returns updated source + UTF-16 cursor clamped to formatted length
 
-Parsed by `Converter::parse_context` (`analyzer_wasm/src/converter.rs`):
+- `apply_edits(...)`:
+  - accepts UTF-16 `TextEditView[]`
+  - converts to byte edits
+  - validates ranges/boundaries/overlaps
+  - applies with the shared byte-edit pipeline
+  - returns updated source + rebased cursor
 
-- Must be non-empty and valid JSON.
-- Unknown top-level fields are rejected (`deny_unknown_fields`).
-- Current schema:
-  - `{ properties: Property[], completion?: { preferred_limit?: number } }`
-- `functions` come from Rust builtins (`builtins_functions()`); JS cannot supply them.
+## Validation rules (`apply_edits`)
 
-Tests: `analyzer_wasm/tests/analyze.rs`
+- each edit range must be inside UTF-16 document bounds
+- converted byte ranges must be valid UTF-8 char boundaries
+- edits are sorted by `(start, end)`
+- overlapping edits are rejected
 
 ## Error model
 
-- Invalid/empty/unknown-field `context_json` throws `JsValue("Invalid context JSON")`.
-- Parse/semantic issues do not throw; they return diagnostics in the payload.
-  - Code: `analyzer_wasm/src/lib.rs`, `analyzer_wasm/src/converter.rs`
+- `analyze` and `complete` throw on invalid context JSON.
+- `format` and `apply_edits` throw on operation failure (not encoded in payload).
+- error messages are minimal and deterministic (`Format error`, `Invalid edits`, `Invalid edit range`, `Overlapping edits`, `Invalid cursor`).
 
-## Line/column handling
+## Context JSON contract
 
-- DTO `SpanView` does not store line/column.
-- Line/column is derived on demand via:
-  - `pos_to_line_col(source, pos_utf16) -> LineColView` (1-based)
-- `pos_to_line_col` takes a UTF-16 offset at the boundary and maps through byte offsets internally.
+- non-empty valid JSON
+- unknown top-level fields rejected
+- schema: `{ properties: Property[], completion?: { preferred_limit?: number } }`
 
-Code:
-- core mapping: `analyzer/src/source_map.rs`
-- boundary conversion: `analyzer_wasm/src/converter.rs`
+## Source pointers
 
-## Text edits / cursor rebasing
-
-- Core `TextEdit` ranges are byte offsets.
-- DTO `TextEditView` ranges are UTF-16.
-- `analyzer_wasm/src/text_edit.rs`:
-  - applies byte edits in descending start-offset order
-  - can rebase a byte cursor through edits
-- Completion DTO `cursor` (when present) is a UTF-16 offset in the updated document.
-
-JS never deals with byte offsets.
-Rust core never deals with UTF-16 offsets.
-
-Quick-fix derivation lives in core (`analyzer/src/ide/quick_fix.rs`); WASM only converts byte
-ranges to UTF-16 DTO ranges.
+- exports: `analyzer_wasm/src/lib.rs`
+- conversion helpers: `analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`
+- DTOs: `analyzer_wasm/src/dto/v1.rs`
+- shared edit pipeline: `analyzer_wasm/src/text_edit.rs`

@@ -1,32 +1,48 @@
 import { describe, expect, it } from "vitest";
-import type { QuickFixView } from "../../src/analyzer/generated/wasm_dto";
-import { firstQuickFixChanges } from "../../src/ui/formula_panel_view";
+import type { DiagnosticView } from "../../src/analyzer/generated/wasm_dto";
+import { firstDiagnosticAction } from "../../src/ui/formula_panel_view";
 
-function fix(title: string, edits: QuickFixView["edits"]): QuickFixView {
-  return { title, edits };
+function diag(actions: DiagnosticView["actions"]): DiagnosticView {
+  return {
+    kind: "error",
+    message: "msg",
+    span: { range: { start: 0, end: 1 } },
+    line: 1,
+    col: 1,
+    actions,
+  };
 }
 
-describe("firstQuickFixChanges", () => {
-  it("applies only the first quick fix per click", () => {
-    const fixes: QuickFixView[] = [
-      fix("Insert `)`", [{ range: { start: 4, end: 4 }, new_text: ")" }]),
-      fix("Insert `,`", [{ range: { start: 2, end: 2 }, new_text: "," }]),
+describe("firstDiagnosticAction", () => {
+  it("selects only the first available action", () => {
+    const diagnostics: DiagnosticView[] = [
+      diag([
+        { title: "Insert `)`", edits: [{ range: { start: 4, end: 4 }, new_text: ")" }] },
+        { title: "Insert `,`", edits: [{ range: { start: 2, end: 2 }, new_text: "," }] },
+      ]),
     ];
 
-    const changes = firstQuickFixChanges(fixes, 10);
-    expect(changes).toEqual([{ from: 4, to: 4, insert: ")" }]);
+    const action = firstDiagnosticAction(diagnostics);
+    expect(action).toEqual({
+      title: "Insert `)`",
+      edits: [{ range: { start: 4, end: 4 }, new_text: ")" }],
+    });
   });
 
-  it("drops invalid edits in the first quick fix", () => {
-    const fixes: QuickFixView[] = [
-      fix("bad", [
-        { range: { start: -1, end: 1 }, new_text: "x" },
-        { range: { start: 5, end: 4 }, new_text: "x" },
+  it("filters invalid edits in first action", () => {
+    const diagnostics: DiagnosticView[] = [
+      diag([
+        {
+          title: "bad",
+          edits: [
+            { range: { start: -1, end: 1 }, new_text: "x" },
+            { range: { start: 5, end: 4 }, new_text: "x" },
+          ],
+        },
       ]),
-      fix("Insert `)`", [{ range: { start: 3, end: 3 }, new_text: ")" }]),
     ];
 
-    const changes = firstQuickFixChanges(fixes, 4);
-    expect(changes).toEqual([]);
+    const action = firstDiagnosticAction(diagnostics);
+    expect(action).toBeNull();
   });
 });

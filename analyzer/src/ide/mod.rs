@@ -6,4 +6,3 @@
 pub mod completion;
 pub mod display;
 pub mod format;
-pub mod quick_fix;

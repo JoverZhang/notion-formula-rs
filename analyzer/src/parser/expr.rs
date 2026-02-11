@@ -6,7 +6,7 @@
 use super::{ParseOutput, Parser};
 use crate::Token;
 use crate::ast::{AssocOp, Expr, ExprKind, NotKind, UnOp};
-use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic, QuickFix};
+use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
 impl<'a> Parser<'a> {
@@ -566,18 +566,19 @@ impl<'a> Parser<'a> {
                 // Trailing separator: `f(1,)` / `[1,2,]`.
                 let next = self.cur().kind;
                 if Self::is_close(closes_expected, &next) {
-                    self.diagnostics.emit_with_labels(
+                    let actions = self
+                        .quick_fix_action("Remove trailing comma", sep_tok.span, "")
+                        .into_iter()
+                        .collect();
+                    self.diagnostics.emit_with_labels_and_actions(
                         DiagnosticCode::Parse(ParseDiagnostic::TrailingComma),
                         sep_tok.span,
                         "trailing comma is not supported",
                         vec![Label {
                             span: sep_tok.span,
                             message: Some("remove this comma".into()),
-                            quick_fix: Some(QuickFix {
-                                title: "Remove trailing comma".into(),
-                                new_text: String::new(),
-                            }),
                         }],
+                        actions,
                     );
                     break;
                 }
@@ -598,7 +599,11 @@ impl<'a> Parser<'a> {
                     start: found.span.start,
                     end: found.span.start,
                 };
-                self.diagnostics.emit_with_labels(
+                let actions = self
+                    .quick_fix_action("Insert `,`", insertion, ",")
+                    .into_iter()
+                    .collect();
+                self.diagnostics.emit_with_labels_and_actions(
                     DiagnosticCode::Parse(ParseDiagnostic::MissingComma),
                     found.span,
                     format!(
@@ -608,11 +613,8 @@ impl<'a> Parser<'a> {
                     vec![Label {
                         span: insertion,
                         message: Some(format!("insert {sep_expected}")),
-                        quick_fix: Some(QuickFix {
-                            title: "Insert `,`".into(),
-                            new_text: ",".into(),
-                        }),
                     }],
+                    actions,
                 );
                 expecting_item = true;
                 after_sep = false;
@@ -698,14 +700,26 @@ impl<'a> Parser<'a> {
             end: primary_span.start,
         };
 
-        let (code, labels) = if is_mismatched_closing {
+        let (code, labels, actions) = if is_mismatched_closing {
+            let replacement = close.to_str().unwrap_or_default().to_string();
+            let actions = self
+                .quick_fix_action(
+                    format!(
+                        "Replace {} with `{}`",
+                        Self::describe_token(&found.kind),
+                        close.to_str().unwrap_or_default()
+                    ),
+                    found.span,
+                    replacement,
+                )
+                .into_iter()
+                .collect::<Vec<_>>();
             (
                 DiagnosticCode::Parse(ParseDiagnostic::MismatchedDelimiter),
                 vec![
                     Label {
                         span: open_span,
                         message: Some(open_label.into()),
-                        quick_fix: None,
                     },
                     Label {
                         span: found.span,
@@ -713,38 +727,36 @@ impl<'a> Parser<'a> {
                             "replace {} with {expected}",
                             Self::describe_token(&found.kind)
                         )),
-                        quick_fix: Some(QuickFix {
-                            title: format!(
-                                "Replace {} with `{}`",
-                                Self::describe_token(&found.kind),
-                                close.to_str().unwrap_or_default()
-                            ),
-                            new_text: close.to_str().unwrap_or_default().to_string(),
-                        }),
                     },
                 ],
+                actions,
             )
         } else {
+            let replacement = close.to_str().unwrap_or_default().to_string();
+            let actions = self
+                .quick_fix_action(
+                    format!("Insert `{}`", close.to_str().unwrap_or_default()),
+                    insertion,
+                    replacement,
+                )
+                .into_iter()
+                .collect::<Vec<_>>();
             (
                 DiagnosticCode::Parse(ParseDiagnostic::UnclosedDelimiter),
                 vec![
                     Label {
                         span: open_span,
                         message: Some(open_label.into()),
-                        quick_fix: None,
                     },
                     Label {
                         span: insertion,
                         message: Some(format!("insert {expected}")),
-                        quick_fix: Some(QuickFix {
-                            title: format!("Insert `{}`", close.to_str().unwrap_or_default()),
-                            new_text: close.to_str().unwrap_or_default().to_string(),
-                        }),
                     },
                 ],
+                actions,
             )
         };
-        self.diagnostics.emit_with_labels(
+        self.diagnostics.emit_with_labels_and_actions(
             code,
             primary_span,
             format!(
@@ -752,6 +764,7 @@ impl<'a> Parser<'a> {
                 Self::describe_token(&found.kind)
             ),
             labels,
+            actions,
         );
 
         self.recover_to_close_delimiter(close)

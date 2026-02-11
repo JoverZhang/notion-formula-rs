@@ -1,16 +1,22 @@
-use serde::Deserialize;
+use js_sys::Reflect;
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[derive(Deserialize)]
 struct AnalyzeResult {
     diagnostics: Vec<Diagnostic>,
     tokens: Vec<TokenView>,
-    formatted: String,
-    quick_fixes: Vec<QuickFixView>,
     output_type: String,
 }
 
 #[derive(Deserialize)]
+struct ApplyResultView {
+    source: String,
+    cursor: u32,
+}
+
+#[derive(Deserialize, Serialize, Clone, Copy)]
 struct Span {
     start: u32,
     end: u32,
@@ -24,8 +30,18 @@ struct SpanView {
 #[derive(Deserialize)]
 struct Diagnostic {
     kind: String,
-    _message: String,
+    #[allow(dead_code)]
+    message: String,
     span: SpanView,
+    line: usize,
+    col: usize,
+    actions: Vec<CodeActionView>,
+}
+
+#[derive(Deserialize)]
+struct CodeActionView {
+    title: String,
+    edits: Vec<TextEditView>,
 }
 
 #[derive(Deserialize)]
@@ -35,13 +51,7 @@ struct TokenView {
     span: SpanView,
 }
 
-#[derive(Deserialize)]
-struct QuickFixView {
-    _title: String,
-    edits: Vec<TextEditView>,
-}
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 struct TextEditView {
     range: Span,
     new_text: String,
@@ -51,6 +61,26 @@ fn analyze_value(source: &str) -> AnalyzeResult {
     let value = analyzer_wasm::analyze(source.to_string(), r#"{}"#.to_string())
         .expect("expected analyze() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
+}
+
+fn format_value(source: &str, cursor_utf16: u32) -> ApplyResultView {
+    let value =
+        analyzer_wasm::format(source.to_string(), cursor_utf16).expect("expected format() Ok");
+    serde_wasm_bindgen::from_value(value).expect("expected ApplyResultView")
+}
+
+fn edit(start: u32, end: u32, new_text: &str) -> TextEditView {
+    TextEditView {
+        range: Span { start, end },
+        new_text: new_text.to_string(),
+    }
+}
+
+fn apply_edits_value(source: &str, edits: &[TextEditView], cursor_utf16: u32) -> ApplyResultView {
+    let edits: JsValue = serde_wasm_bindgen::to_value(edits).expect("expected edits JsValue");
+    let value = analyzer_wasm::apply_edits(source.to_string(), edits, cursor_utf16)
+        .expect("expected apply_edits() Ok");
+    serde_wasm_bindgen::from_value(value).expect("expected ApplyResultView")
 }
 
 fn utf16_slice(source: &str, start: usize, end: usize) -> String {
@@ -82,12 +112,24 @@ fn utf16_slice(source: &str, start: usize, end: usize) -> String {
     source[start_byte..end_byte].to_string()
 }
 
+fn utf16_len(source: &str) -> u32 {
+    source.encode_utf16().count() as u32
+}
+
+fn error_message(err: JsValue) -> Option<String> {
+    if let Some(message) = err.as_string() {
+        return Some(message);
+    }
+    Reflect::get(&err, &JsValue::from_str("message"))
+        .ok()
+        .and_then(|v| v.as_string())
+}
+
 #[wasm_bindgen_test]
-fn analyze_ascii_spans_and_format() {
+fn analyze_ascii_spans_and_output_type() {
     let source = "1+2";
     let result = analyze_value(source);
 
-    assert!(!result.formatted.is_empty());
     assert_eq!(result.output_type, "number");
 
     let kinds: Vec<&str> = result.tokens.iter().map(|t| t.kind.as_str()).collect();
@@ -169,117 +211,114 @@ fn analyze_emoji_spans_and_diagnostics() {
 }
 
 #[wasm_bindgen_test]
-fn analyze_trailing_tokens_disables_formatted_output() {
-    let source = r#"123 "456""#;
-    let result = analyze_value(source);
-
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(result.quick_fixes.is_empty());
-}
-
-#[wasm_bindgen_test]
-fn analyze_semantic_error_still_returns_formatted_output() {
-    let source = r#"prop("Missing")"#;
-    let result = analyze_value(source);
-
-    assert!(!result.diagnostics.is_empty());
-    assert!(!result.formatted.is_empty());
-    assert!(result.quick_fixes.is_empty());
-}
-
-#[wasm_bindgen_test]
-fn analyze_missing_close_paren_returns_quick_fix() {
-    let source = "(123";
-    let result = analyze_value(source);
-
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(
-        result
-            .quick_fixes
-            .iter()
-            .flat_map(|f| f.edits.iter())
-            .any(|e| e.range.start == source.len() as u32
-                && e.range.end == source.len() as u32
-                && e.new_text == ")")
-    );
-}
-
-#[wasm_bindgen_test]
-fn analyze_missing_nested_delimiters_returns_quick_fix() {
-    let source = "([123";
-    let result = analyze_value(source);
-
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(
-        result
-            .quick_fixes
-            .iter()
-            .flat_map(|f| f.edits.iter())
-            .any(|e| {
-                e.range.start == source.len() as u32 && e.range.end == source.len() as u32
-            })
-    );
-}
-
-#[wasm_bindgen_test]
-fn analyze_missing_call_comma_returns_quick_fix() {
+fn analyze_diagnostics_include_actions() {
     let source = "f(1 2)";
     let result = analyze_value(source);
+    let with_actions = result
+        .diagnostics
+        .iter()
+        .find(|diag| !diag.actions.is_empty())
+        .expect("expected diagnostic with action");
 
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(
-        result
-            .quick_fixes
-            .iter()
-            .flat_map(|f| f.edits.iter())
-            .any(|e| e.range.start == 4 && e.range.end == 4 && e.new_text == ",")
-    );
+    assert!(with_actions.actions.iter().any(|action| {
+        action.title == "Insert `,`"
+            && action
+                .edits
+                .iter()
+                .any(|e| e.range.start == 4 && e.range.end == 4 && e.new_text == ",")
+    }));
 }
 
 #[wasm_bindgen_test]
-fn analyze_trailing_comma_returns_quick_fix() {
-    let source = "[1,2,]";
+fn analyze_diagnostics_include_line_col_multiline() {
+    let source = "1 +\n2 *";
     let result = analyze_value(source);
+    let diag = result
+        .diagnostics
+        .first()
+        .expect("expected diagnostic for incomplete expression");
 
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(
-        result
-            .quick_fixes
-            .iter()
-            .flat_map(|f| f.edits.iter())
-            .any(|e| e.range.start == 4 && e.range.end == 5 && e.new_text.is_empty())
-    );
+    assert_eq!(diag.kind, "error");
+    assert_eq!(diag.span.range.start, 6);
+    assert_eq!(diag.span.range.end, 7);
+    assert_eq!(diag.line, 2);
+    assert_eq!(diag.col, 3);
 }
 
 #[wasm_bindgen_test]
-fn analyze_group_with_trailing_string_returns_insert_paren_fix() {
-    let source = r#"(123 "456""#;
-    let result = analyze_value(source);
+fn format_success_returns_source_and_cursor() {
+    let source = "1+2";
+    let cursor = 2;
+    let out = format_value(source, cursor);
 
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(
-        result
-            .quick_fixes
-            .iter()
-            .flat_map(|f| f.edits.iter())
-            .any(|e| e.range.start == 5 && e.range.end == 5 && e.new_text == ")")
-    );
+    assert!(!out.source.is_empty());
+    assert!(out.cursor <= utf16_len(&out.source));
 }
 
 #[wasm_bindgen_test]
-fn analyze_lex_error_disables_formatted_output() {
+fn format_preserves_mid_document_cursor() {
+    let source = "1+2";
+    let out = format_value(source, 1);
+    assert_eq!(out.cursor, 1);
+}
+
+#[wasm_bindgen_test]
+fn format_parse_error_returns_err() {
+    let source = "1 +";
+    let err = analyzer_wasm::format(source.to_string(), 0).expect_err("expected format() Err");
+    assert_eq!(error_message(err).as_deref(), Some("Format error"));
+}
+
+#[wasm_bindgen_test]
+fn format_lex_error_returns_err() {
     let source = "1 @";
-    let result = analyze_value(source);
+    let err = analyzer_wasm::format(source.to_string(), 0).expect_err("expected format() Err");
+    assert_eq!(error_message(err).as_deref(), Some("Format error"));
+}
 
-    assert!(!result.diagnostics.is_empty());
-    assert_eq!(result.formatted, "");
-    assert!(result.quick_fixes.is_empty());
+#[wasm_bindgen_test]
+fn apply_edits_changes_source_and_returns_cursor() {
+    let source = "abc";
+    let out = apply_edits_value(source, &[edit(1, 2, "X")], 2);
+
+    assert_eq!(out.source, "aXc");
+    assert!(out.cursor <= utf16_len(&out.source));
+}
+
+#[wasm_bindgen_test]
+fn apply_edits_overlapping_returns_err() {
+    let source = "abcd";
+    let edits: JsValue = serde_wasm_bindgen::to_value(&vec![edit(1, 3, "X"), edit(2, 4, "Y")])
+        .expect("edits to JsValue");
+
+    let err = analyzer_wasm::apply_edits(source.to_string(), edits, 0)
+        .expect_err("expected overlapping edits Err");
+    assert_eq!(error_message(err).as_deref(), Some("Overlapping edits"));
+}
+
+#[wasm_bindgen_test]
+fn apply_edits_invalid_range_returns_err() {
+    let source = "abcd";
+    let edits: JsValue =
+        serde_wasm_bindgen::to_value(&vec![edit(5, 5, "X")]).expect("edits to JsValue");
+
+    let err = analyzer_wasm::apply_edits(source.to_string(), edits, 0)
+        .expect_err("expected invalid range Err");
+    assert_eq!(error_message(err).as_deref(), Some("Invalid edit range"));
+}
+
+#[wasm_bindgen_test]
+fn apply_edits_emoji_utf16_conversion_is_correct() {
+    let source = "😀a";
+    let edits: JsValue =
+        serde_wasm_bindgen::to_value(&vec![edit(2, 3, "Z")]).expect("edits to JsValue");
+
+    let out = analyzer_wasm::apply_edits(source.to_string(), edits, 2)
+        .expect("expected apply_edits() Ok");
+    let out: ApplyResultView = serde_wasm_bindgen::from_value(out).expect("ApplyResultView");
+
+    assert_eq!(out.source, "😀Z");
+    assert_eq!(out.cursor, 2);
 }
 
 #[wasm_bindgen_test]
@@ -287,7 +326,7 @@ fn analyze_invalid_context_errors() {
     let source = "1+2";
     let err = analyzer_wasm::analyze(source.to_string(), "{".to_string())
         .expect_err("expected analyze() Err on invalid context JSON");
-    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
 }
 
 #[wasm_bindgen_test]
@@ -295,7 +334,7 @@ fn analyze_empty_context_errors() {
     let source = "1+2";
     let err = analyzer_wasm::analyze(source.to_string(), "   ".to_string())
         .expect_err("expected analyze() Err on empty context JSON");
-    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
 }
 
 #[wasm_bindgen_test]
@@ -303,7 +342,7 @@ fn analyze_rejects_functions_in_context_json() {
     let source = "1+2";
     let err = analyzer_wasm::analyze(source.to_string(), r#"{"functions":[]}"#.to_string())
         .expect_err("expected analyze() Err on unknown context JSON fields");
-    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
 }
 
 #[wasm_bindgen_test]
@@ -311,7 +350,7 @@ fn analyze_rejects_invalid_properties_structure() {
     let source = "1+2";
     let err = analyzer_wasm::analyze(source.to_string(), r#"{"properties":{}}"#.to_string())
         .expect_err("expected analyze() Err on invalid context JSON structure");
-    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
 }
 
 #[wasm_bindgen_test]
@@ -319,5 +358,5 @@ fn complete_invalid_context_errors() {
     let source = "1+2";
     let err = analyzer_wasm::complete(source.to_string(), 0, "{".to_string())
         .expect_err("expected complete() Err on invalid context JSON");
-    assert_eq!(err.as_string().as_deref(), Some("Invalid context JSON"));
+    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
 }

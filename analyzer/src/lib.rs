@@ -12,6 +12,7 @@ mod lexer;
 mod parser;
 mod source_map;
 mod tests;
+mod text_edit;
 
 pub use parser::ParseOutput;
 
@@ -26,17 +27,17 @@ pub fn analyze(text: &str) -> Result<ParseOutput, diagnostics::Diagnostic> {
 
 pub use analysis as semantic;
 pub use diagnostics::format_diagnostics;
-pub use diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
+pub use diagnostics::{
+    CodeAction, Diagnostic, DiagnosticCode, DiagnosticKind, Diagnostics, ParseDiagnostic,
+};
 pub use ide::completion;
 pub use ide::completion::{
     CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput,
-    SignatureHelp, TextEdit, complete,
+    SignatureHelp, complete,
 };
 pub use ide::format::format_expr;
-pub use ide::quick_fix::{
-    QuickFix, QuickFixEdit, formatted_if_syntax_valid, has_syntax_errors, quick_fixes,
-};
 pub use lexer::{CommentKind, LitKind, Span, Token, TokenKind};
 pub use lexer::{NodeId, Spanned, Symbol, TokenIdx, TokenRange, tokens_in_span};
 pub use parser::ast;
 pub use source_map::SourceMap;
+pub use text_edit::TextEdit;

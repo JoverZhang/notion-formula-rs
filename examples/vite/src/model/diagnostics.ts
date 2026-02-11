@@ -1,5 +1,4 @@
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
-import { posToLineCol } from "../analyzer/wasm_client";
 import type { AnalyzerDiagnostic } from "../app/types";
 import type { ChipOffsetMap, ChipSpan } from "../chip_spans";
 
@@ -114,7 +113,7 @@ function chipPosLabel(
 }
 
 export function buildDiagnosticTextRows(
-  source: string,
+  _source: string,
   diagnostics: AnalyzerDiagnostic[],
   chipMap: ChipOffsetMap | null,
   chipSpans: ChipSpan[],
@@ -122,21 +121,10 @@ export function buildDiagnosticTextRows(
   if (!diagnostics.length) return ["No diagnostics"];
   return diagnostics.map((diag) => {
     const kind = diag.kind || "error";
-    const start = diag.span?.range?.start;
-    let line = 0;
-    let col = 0;
-    if (typeof start === "number") {
-      try {
-        const lc = posToLineCol(source, start);
-        line = lc.line;
-        col = lc.col;
-      } catch {
-        line = 0;
-        col = 0;
-      }
-    }
+    const lineColLabel = ` ${diag.line}:${diag.col}`;
     const chipLabel = chipPosLabel(diag, chipMap, chipSpans);
-    const pos = chipLabel ? `${chipLabel} line=${line} col=${col}` : `line=${line} col=${col}`;
-    return `${kind}: ${diag.message} ${pos}`;
+    return chipLabel
+      ? `${kind}${lineColLabel}: ${diag.message} ${chipLabel}`
+      : `${kind}${lineColLabel}: ${diag.message}`;
   });
 }

@@ -8,6 +8,8 @@
 //! separately in `analysis`.
 
 use crate::diagnostics::{Diagnostic, DiagnosticCode, Diagnostics, ParseDiagnostic};
+use crate::text_edit::TextEdit;
+use std::collections::HashSet;
 
 pub mod ast;
 use crate::lexer::{NodeId, Span, Token, TokenKind};
@@ -16,20 +18,11 @@ mod expr;
 mod tokenstream;
 pub use tokenstream::{TokenCursor, TokenQuery};
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub enum ParseError {
-    UnexpectedToken {
-        expected: String,
-        found: TokenKind,
-        span: Span,
-    },
-    LexError(String),
-}
 pub struct Parser<'a> {
     token_cursor: TokenCursor<'a>,
     next_id: NodeId,
     diagnostics: Diagnostics,
+    quick_fix_seen: HashSet<(u32, u32, String)>,
 }
 
 #[derive(Debug)]
@@ -45,6 +38,7 @@ impl<'a> Parser<'a> {
             token_cursor,
             next_id: 0,
             diagnostics: Diagnostics::default(),
+            quick_fix_seen: HashSet::new(),
         }
     }
 
@@ -83,16 +77,6 @@ impl<'a> Parser<'a> {
         &self.token_cursor.source[span.start as usize..span.end as usize]
     }
 
-    #[allow(unused)]
-    fn eat(&mut self, kind: TokenKind) -> bool {
-        if self.same_kind(&self.cur().kind, &kind) {
-            self.bump();
-            true
-        } else {
-            false
-        }
-    }
-
     /// punctuation
     fn expect_punct(&mut self, kind: TokenKind, expected: &'static str) -> Result<Token, ()> {
         if self.same_kind(&self.cur().kind, &kind) {
@@ -101,18 +85,6 @@ impl<'a> Parser<'a> {
             let tok = self.cur().clone();
             self.emit_unexpected(expected, tok.kind.clone(), tok.span);
             Err(())
-        }
-    }
-
-    #[allow(unused)]
-    fn expect_ident(&mut self) -> Result<Token, ()> {
-        match self.cur().kind {
-            TokenKind::Ident(..) => Ok(self.bump()),
-            _ => {
-                let tok = self.cur().clone();
-                self.emit_unexpected("identifier", tok.kind.clone(), tok.span);
-                Err(())
-            }
         }
     }
 
@@ -218,5 +190,25 @@ impl<'a> Parser<'a> {
             TokenKind::Eof => "end of input".into(),
             other => format!("{other:?}"),
         }
+    }
+
+    fn quick_fix_action(
+        &mut self,
+        title: impl Into<String>,
+        range: Span,
+        new_text: impl Into<String>,
+    ) -> Option<crate::diagnostics::CodeAction> {
+        let new_text = new_text.into();
+        if !self
+            .quick_fix_seen
+            .insert((range.start, range.end, new_text.clone()))
+        {
+            return None;
+        }
+
+        Some(crate::diagnostics::CodeAction {
+            title: title.into(),
+            edits: vec![TextEdit { range, new_text }],
+        })
     }
 }

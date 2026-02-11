@@ -1,13 +1,12 @@
 //! Apply byte-based text edits and rebase a byte cursor.
 //!
-//! Edits are applied from back to front, and invalid ranges are skipped.
+//! The caller must provide non-overlapping edits sorted by `(start, end)`.
 
 use analyzer::TextEdit;
 
 /// Applies byte-offset text edits and rebases a byte cursor through them.
 ///
 /// Edits are applied in descending order to avoid shifting later offsets.
-/// An edit is skipped if it is out of bounds or not on UTF-8 char boundaries.
 ///
 /// Cursor rules: edits before the cursor shift it by the byte delta; a cursor inside a replaced
 /// range snaps to `start`.
@@ -16,29 +15,14 @@ pub fn apply_text_edits_bytes_with_cursor(
     edits: &[TextEdit],
     cursor: u32,
 ) -> (String, u32) {
-    let mut sorted = edits.to_vec();
-    sorted.sort_by(|a, b| {
-        b.range
-            .start
-            .cmp(&a.range.start)
-            .then(b.range.end.cmp(&a.range.end))
-    });
-
     let mut updated = source.to_string();
     let mut cursor = cursor;
 
-    for edit in sorted {
+    for edit in edits.iter().rev() {
         let start_u32 = edit.range.start;
         let end_u32 = edit.range.end;
         let start = start_u32 as usize;
         let end = end_u32 as usize;
-
-        if start_u32 > end_u32 || end > updated.len() {
-            continue;
-        }
-        if !updated.is_char_boundary(start) || !updated.is_char_boundary(end) {
-            continue;
-        }
 
         let replaced_len = end_u32.saturating_sub(start_u32);
         let inserted_len = edit.new_text.len() as u32;

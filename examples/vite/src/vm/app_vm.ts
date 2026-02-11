@@ -60,8 +60,6 @@ export class AppVM {
       source: "",
       diagnostics: [],
       tokens: [],
-      formatted: "",
-      quickFixes: [],
       outputType: "unknown",
       status: "idle",
     };
@@ -101,8 +99,6 @@ export class AppVM {
       const result = analyzeSource(formula.source, this.state.contextJson);
       formula.diagnostics = result.diagnostics || [];
       formula.tokens = result.tokens || [];
-      formula.formatted = result.formatted || "";
-      formula.quickFixes = result.quick_fixes || [];
       formula.outputType = result.output_type || "unknown";
       formula.status = "ok";
     } catch {
@@ -110,11 +106,12 @@ export class AppVM {
         kind: "error",
         message: "analysis failed",
         span: { range: { start: 0, end: 0 } },
+        line: 1,
+        col: 1,
+        actions: [],
       };
       formula.diagnostics = [diag];
       formula.tokens = [];
-      formula.formatted = "";
-      formula.quickFixes = [];
       formula.outputType = "unknown";
       formula.status = "error";
     }

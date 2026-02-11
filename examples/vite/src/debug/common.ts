@@ -6,8 +6,6 @@ import type { TokenDecorationRange } from "../editor_decorations";
 
 type DebugState = {
   source: string;
-  formatted: string;
-  quickFixCount?: number;
   outputType: string;
   diagnosticsCount: number;
   tokenCount: number;

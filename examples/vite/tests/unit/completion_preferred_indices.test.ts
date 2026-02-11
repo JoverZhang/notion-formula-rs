@@ -25,7 +25,8 @@ vi.mock("../../src/analyzer/wasm_client", () => ({
       preferredIndices: out?.preferred_indices ?? [],
     };
   },
-  posToLineCol: () => ({ line: 1, col: 1 }),
+  formatSource: () => ({ source: "", cursor: 0 }),
+  applyEditsSource: () => ({ source: "", cursor: 0 }),
   applyCompletionItem: () => null,
 }));
 

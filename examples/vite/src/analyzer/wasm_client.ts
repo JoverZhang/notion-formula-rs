@@ -1,10 +1,11 @@
 import init, * as wasm from "../pkg/analyzer_wasm.js";
 import type {
   AnalyzeResult,
+  ApplyResultView,
   CompletionItemView,
   CompletionOutputView,
-  LineColView,
   SignatureHelpView,
+  TextEditView,
 } from "./generated/wasm_dto";
 
 export type { Span } from "./generated/wasm_dto";
@@ -51,16 +52,24 @@ export function analyzeSource(source: string, contextJson: string): AnalyzeResul
   return wasm.analyze(source, contextJson) as AnalyzeResult;
 }
 
+export function formatSource(source: string, cursorUtf16: number): ApplyResultView {
+  return wasm.format(source, cursorUtf16) as ApplyResultView;
+}
+
+export function applyEditsSource(
+  source: string,
+  edits: TextEditView[],
+  cursorUtf16: number,
+): ApplyResultView {
+  return wasm.apply_edits(source, edits, cursorUtf16) as ApplyResultView;
+}
+
 export function completeSource(
   source: string,
   cursor: number,
   contextJson: string,
 ): CompletionOutputView {
   return wasm.complete(source, cursor, contextJson) as CompletionOutputView;
-}
-
-export function posToLineCol(source: string, pos: number): LineColView {
-  return wasm.pos_to_line_col(source, pos) as LineColView;
 }
 
 export function buildCompletionState(

@@ -1,20 +1,15 @@
 # Testing inventory
 
-Where the current regression coverage lives, and how snapshots are updated.
-
 ## Rust unit tests (`analyzer/`)
 
 - Location: `analyzer/src/tests/`
 - Coverage includes:
-  - lexer
-  - parser
-  - parser diagnostic quick-fix metadata + IDE quick-fix extraction
+  - lexer/parser/AST
+  - diagnostics and parser recovery
+  - diagnostic actions (quick-fix actions attached to diagnostics)
   - span invariants
-  - `tokens_in_span`
-  - `TokenQuery`
   - formatter
-  - completion DSL
-  - semantic checks
+  - completion/signature-help behavior
 
 Run:
 
@@ -25,14 +20,8 @@ cargo test -p analyzer
 ## Rust golden tests (`analyzer/`)
 
 Runners:
-
 - `analyzer/tests/format_golden.rs`
 - `analyzer/tests/diagnostics_golden.rs`
-
-Fixtures:
-
-- `analyzer/tests/format/*.formula` → `*.snap`
-- `analyzer/tests/diagnostics/*.formula` → `*.snap`
 
 Update snapshots:
 
@@ -45,35 +34,31 @@ BLESS=1 cargo test -p analyzer
 - `analyzer_wasm/tests/analyze.rs`
 - Validates:
   - UTF-16 span correctness
-  - token span integrity
-  - diagnostics mapping
-  - quick-fix DTO conversion (including formatting gate behavior)
-  - `context_json` validation rules (non-empty JSON; unknown fields rejected)
+  - diagnostics + diagnostic action conversion
+  - `format(source, cursor)` success/failure contract
+  - `apply_edits(source, edits, cursor)` validation and cursor rebasing
+  - UTF-16 conversion edge cases (emoji)
+  - context JSON validation
 
 Run:
 
 ```bash
 cargo test -p analyzer_wasm
+wasm-pack test --node analyzer_wasm
 ```
+
+Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test`
+integration tests under `analyzer_wasm/tests/`.
 
 ## Vite demo tests (`examples/vite/`)
 
-- Unit tests: `examples/vite/tests/unit/` (Vitest)
-- E2E tests: `examples/vite/tests/e2e/` (Playwright)
+- Unit tests: `examples/vite/tests/unit/`
+- E2E tests: `examples/vite/tests/e2e/`
 
-Note:
+Run:
 
-- Some unit tests import the generated WASM glue from `examples/vite/src/pkg/`.
-- Ensure `pnpm -C examples/vite wasm:build` has been run at least once (or provide
-  `examples/vite/src/pkg/analyzer_wasm.js`) before running `pnpm -C examples/vite test`.
-
-Regression coverage (non-exhaustive; grep the suites for details):
-
-- token highlighting
-- diagnostics propagation
-- chip spans / mapping
-- editor undo/redo keybindings
-- editor auto height growth
-- completion cursor placement (including UTF-16 text)
-- completion list scroll-into-view behavior
-- quick-fix application behavior (first-fix-per-click in panel UI)
+```bash
+pnpm -C examples/vite wasm:build
+pnpm -C examples/vite test
+pnpm -C examples/vite test:e2e
+```

@@ -1,5 +1,6 @@
 use crate::lexer::Span;
 use crate::source_map::SourceMap;
+use crate::text_edit::TextEdit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticCode {
@@ -46,20 +47,19 @@ pub struct Diagnostic {
     pub span: Span,
     pub labels: Vec<Label>,
     pub notes: Vec<String>,
+    pub actions: Vec<CodeAction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeAction {
+    pub title: String,
+    pub edits: Vec<TextEdit>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Label {
     pub span: Span,
     pub message: Option<String>,
-    pub quick_fix: Option<QuickFix>,
-}
-
-/// Structured text-edit hint attached to a diagnostic label.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QuickFix {
-    pub title: String,
-    pub new_text: String,
 }
 
 #[derive(Default, Debug)]
@@ -79,6 +79,17 @@ impl Diagnostics {
         message: impl Into<String>,
         labels: Vec<Label>,
     ) {
+        self.emit_with_labels_and_actions(code, span, message, labels, vec![]);
+    }
+
+    pub fn emit_with_labels_and_actions(
+        &mut self,
+        code: DiagnosticCode,
+        span: Span,
+        message: impl Into<String>,
+        labels: Vec<Label>,
+        actions: Vec<CodeAction>,
+    ) {
         let mut diag = Diagnostic {
             kind: DiagnosticKind::Error,
             code,
@@ -86,9 +97,11 @@ impl Diagnostics {
             span,
             labels,
             notes: vec![],
+            actions,
         };
 
         dedup_labels(&mut diag.labels);
+        dedup_actions(&mut diag.actions);
         self.push(diag);
     }
 
@@ -112,8 +125,10 @@ impl Diagnostics {
             let existing = &mut self.diags[existing_idx];
             existing.labels.extend(diag.labels);
             existing.notes.extend(diag.notes);
+            existing.actions.extend(diag.actions);
             dedup_labels(&mut existing.labels);
             dedup_notes(&mut existing.notes);
+            dedup_actions(&mut existing.actions);
         }
     }
 }
@@ -185,9 +200,6 @@ fn dedup_labels(labels: &mut Vec<Label>) {
             l.span.start,
             l.span.end,
             l.message.as_deref().unwrap_or("").to_owned(),
-            l.quick_fix
-                .as_ref()
-                .map(|f| (f.title.clone(), f.new_text.clone())),
         );
         seen.insert(key)
     });
@@ -198,4 +210,21 @@ fn dedup_notes(notes: &mut Vec<String>) {
 
     let mut seen = HashSet::new();
     notes.retain(|n| seen.insert(n.clone()));
+}
+
+fn dedup_actions(actions: &mut Vec<CodeAction>) {
+    use std::collections::HashSet;
+
+    let mut seen = HashSet::new();
+    actions.retain(|action| {
+        let key = (
+            action.title.clone(),
+            action
+                .edits
+                .iter()
+                .map(|edit| (edit.range.start, edit.range.end, edit.new_text.clone()))
+                .collect::<Vec<_>>(),
+        );
+        seen.insert(key)
+    });
 }

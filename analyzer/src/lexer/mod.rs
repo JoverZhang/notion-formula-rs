@@ -361,5 +361,6 @@ fn make_error(span: Span, message: String) -> Diagnostic {
         span,
         labels: vec![],
         notes: vec![],
+        actions: vec![],
     }
 }

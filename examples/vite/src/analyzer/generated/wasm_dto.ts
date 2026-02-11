@@ -14,28 +14,6 @@ end: number, };
 
 export type SpanView = { range: Span, };
 
-export type LineColView = { line: number, 
-/**
- * 1-based column from `SourceMap::line_col`.
- *
- * This is a Rust `char` count (Unicode scalar values). It is not UTF-16.
- */
-col: number, };
-
-export type DiagnosticKindView = "error";
-
-export type DiagnosticView = { kind: DiagnosticKindView, message: string, 
-/**
- * Location in the source text (UTF-16 span).
- */
-span: SpanView, };
-
-export type TokenView = { kind: string, text: string, 
-/**
- * Location in the source text (UTF-16 span).
- */
-span: SpanView, };
-
 export type TextEditView = { 
 /**
  * Replace range in the original document (UTF-16, half-open).
@@ -46,29 +24,51 @@ range: Span,
  */
 new_text: string, };
 
-export type QuickFixView = { title: string, 
+export type CodeActionView = { title: string, 
 /**
  * Edits are in original-document coordinates (UTF-16).
  */
 edits: Array<TextEditView>, };
 
+export type DiagnosticKindView = "error";
+
+export type DiagnosticView = { kind: DiagnosticKindView, message: string, 
+/**
+ * Location in the source text (UTF-16 span).
+ */
+span: SpanView, 
+/**
+ * 1-based line number derived from source byte offsets.
+ */
+line: number, 
+/**
+ * 1-based column number as Unicode scalar (`char`) count.
+ */
+col: number, 
+/**
+ * Diagnostic-level code actions.
+ */
+actions: Array<CodeActionView>, };
+
+export type TokenView = { kind: string, text: string, 
+/**
+ * Location in the source text (UTF-16 span).
+ */
+span: SpanView, };
+
 export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<TokenView>, 
-/**
- * Canonical formatted source (with trailing newline) for syntax-valid input only.
- *
- * Empty string whenever lex/parse diagnostics exist.
- */
-formatted: string, 
-/**
- * Structured quick fixes extracted from parser diagnostics.
- */
-quick_fixes: Array<QuickFixView>, 
 /**
  * Inferred root expression type rendered for UI (e.g. `"number | string"`).
  *
  * Never nullable. Unknown/failed inference is represented as `"unknown"`.
  */
 output_type: string, };
+
+export type ApplyResultView = { source: string, 
+/**
+ * Cursor position in the updated document (UTF-16).
+ */
+cursor: number, };
 
 export type DisplaySegmentView = { "kind": "Name", text: string, } | { "kind": "Punct", text: string, } | { "kind": "Separator", text: string, } | { "kind": "Ellipsis" } | { "kind": "Arrow", text: string, } | { "kind": "Param", name: string, ty: string, param_index: number | null, } | { "kind": "ReturnType", text: string, };
 

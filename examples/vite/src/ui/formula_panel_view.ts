@@ -4,12 +4,15 @@ import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirr
 import { Decoration, EditorView, keymap } from "@codemirror/view";
 import {
   applyCompletionItem,
+  applyEditsSource,
+  formatSource,
   safeBuildCompletionState,
   type CompletionItem,
   type SignatureHelp,
 } from "../analyzer/wasm_client";
+import type { TextEditView } from "../analyzer/generated/wasm_dto";
 import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
-import type { AnalyzerDiagnostic, AnalyzerQuickFix, FormulaId, FormulaState } from "../app/types";
+import type { AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
 import {
@@ -100,64 +103,22 @@ function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
   return VALID_PROP_NAMES.has(chip.argValue as PropName);
 }
 
-type QuickFixChange = { from: number; to: number; insert: string; order: number };
-
-function toQuickFixChanges(
-  fixes: AnalyzerQuickFix[],
-  docLen: number,
-): Array<{
-  from: number;
-  to: number;
-  insert: string;
-}> {
-  const raw: QuickFixChange[] = [];
-  let order = 0;
-  for (const fix of fixes) {
-    for (const edit of fix.edits ?? []) {
-      const from = edit?.range?.start;
-      const to = edit?.range?.end;
-      if (typeof from !== "number" || typeof to !== "number") continue;
-      if (from < 0 || to < from || to > docLen) continue;
-      raw.push({ from, to, insert: edit.new_text ?? "", order: order++ });
+export function firstDiagnosticAction(
+  diagnostics: AnalyzerDiagnostic[],
+): { title: string; edits: TextEditView[] } | null {
+  for (const diag of diagnostics) {
+    for (const action of diag.actions ?? []) {
+      if (!action) continue;
+      const edits = (action.edits ?? []).filter((edit) => {
+        const from = edit?.range?.start;
+        const to = edit?.range?.end;
+        return typeof from === "number" && typeof to === "number" && from >= 0 && to >= from;
+      });
+      if (edits.length === 0) continue;
+      return { title: action.title ?? "Apply quick fix", edits };
     }
   }
-
-  raw.sort((a, b) => a.from - b.from || a.to - b.to || a.order - b.order);
-
-  const merged: QuickFixChange[] = [];
-  for (const next of raw) {
-    const prev = merged[merged.length - 1];
-    if (!prev) {
-      merged.push(next);
-      continue;
-    }
-
-    if (next.from < prev.to) {
-      continue;
-    }
-
-    if (next.from === prev.from && next.to === prev.to) {
-      if (prev.from === prev.to) {
-        prev.insert += next.insert;
-      } else if (prev.insert !== next.insert) {
-        // conflicting replacements at the same range: keep the first deterministic fix
-      }
-      continue;
-    }
-
-    merged.push(next);
-  }
-
-  return merged.map((edit) => ({ from: edit.from, to: edit.to, insert: edit.insert }));
-}
-
-export function firstQuickFixChanges(
-  fixes: AnalyzerQuickFix[],
-  docLen: number,
-): Array<{ from: number; to: number; insert: string }> {
-  const firstFix = fixes[0];
-  if (!firstFix) return [];
-  return toQuickFixChanges([firstFix], docLen);
+  return null;
 }
 
 export function createFormulaPanelView(opts: {
@@ -463,39 +424,50 @@ export function createFormulaPanelView(opts: {
   let lastChipUiRanges: ChipDecorationRange[] = [];
   let lastChipSpans: ChipSpan[] = [];
   let lastChipMap: ChipOffsetMap | null = null;
-  let lastFormatted = "";
-  let lastQuickFixes: AnalyzerQuickFix[] = [];
+  let lastQuickFixAction: { title: string; edits: TextEditView[] } | null = null;
   let lastOutputType = "unknown";
   let lastSource = opts.initialSource;
 
   rerenderCompletions();
 
   formatBtn.addEventListener("click", () => {
-    const formatted = lastFormatted || "";
-    if (!formatted) return;
     const current = editorView.state.doc.toString();
-    if (current === formatted) return;
     const cursor = editorView.state.selection.main.head;
-    editorView.dispatch({
-      changes: { from: 0, to: editorView.state.doc.length, insert: formatted },
-      selection: { anchor: Math.min(cursor, formatted.length) },
-    });
-    editorView.focus();
+    try {
+      const applied = formatSource(current, cursor);
+      if (applied.source === current && applied.cursor === cursor) return;
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: applied.source },
+        selection: { anchor: Math.max(0, Math.min(applied.cursor, applied.source.length)) },
+      });
+      editorView.focus();
+    } catch {
+      return;
+    }
   });
 
   quickFixBtn.addEventListener("click", () => {
-    const docLen = editorView.state.doc.length;
-    const changes = firstQuickFixChanges(lastQuickFixes, docLen);
-    if (!changes.length) return;
-    editorView.dispatch({ changes });
-    editorView.focus();
+    const action = lastQuickFixAction;
+    if (!action || !action.edits.length) return;
+
+    const current = editorView.state.doc.toString();
+    const cursor = editorView.state.selection.main.head;
+    try {
+      const applied = applyEditsSource(current, action.edits, cursor);
+      if (applied.source === current && applied.cursor === cursor) return;
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: applied.source },
+        selection: { anchor: Math.max(0, Math.min(applied.cursor, applied.source.length)) },
+      });
+      editorView.focus();
+    } catch {
+      return;
+    }
   });
 
   registerPanelDebug(opts.id, {
     getState: () => ({
       source: lastSource,
-      formatted: lastFormatted,
-      quickFixCount: lastQuickFixes.length,
       outputType: lastOutputType,
       diagnosticsCount: lastDiagnostics.length,
       tokenCount: lastTokenRanges.length,
@@ -524,13 +496,12 @@ export function createFormulaPanelView(opts: {
     update(state: FormulaState) {
       lastSource = state.source;
       lastDiagnostics = state.diagnostics;
-      lastFormatted = state.formatted;
-      lastQuickFixes = state.quickFixes ?? [];
+      lastQuickFixAction = firstDiagnosticAction(state.diagnostics);
       lastOutputType = state.outputType;
-      quickFixBtn.disabled = lastQuickFixes.length === 0;
+      quickFixBtn.disabled = !lastQuickFixAction;
       quickFixBtn.title =
-        lastQuickFixes.length > 0
-          ? (lastQuickFixes[0]?.title ?? "Apply quick fix")
+        lastQuickFixAction
+          ? lastQuickFixAction.title
           : "No quick fix available";
       const outputTypeLabel = `output: ${state.outputType}`;
       outputTypeValueEl.textContent = outputTypeLabel;

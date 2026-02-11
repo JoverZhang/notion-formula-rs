@@ -2,6 +2,7 @@
 //! All coordinates are UTF-8 byte offsets into the input `text`.
 //! Spans are half-open ranges `[start, end)`.
 
+pub use crate::TextEdit;
 use crate::lexer::Span;
 use crate::semantic;
 
@@ -40,13 +41,6 @@ pub struct CompletionOutput {
     pub signature_help: Option<SignatureHelp>,
     /// Indices into `items` for the UI default selection.
     pub preferred_indices: Vec<usize>,
-}
-
-/// A single text edit in byte offsets.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextEdit {
-    pub range: Span,
-    pub new_text: String,
 }
 
 /// One completion candidate for an editor UI.

@@ -1,19 +1,16 @@
-import type { DiagnosticView, QuickFixView } from "../analyzer/generated/wasm_dto";
+import type { DiagnosticView } from "../analyzer/generated/wasm_dto";
 import type { Token } from "../editor_decorations";
 
 export const FORMULA_IDS = ["f1", "f2"] as const;
 export type FormulaId = (typeof FORMULA_IDS)[number];
 
 export type AnalyzerDiagnostic = DiagnosticView;
-export type AnalyzerQuickFix = QuickFixView;
 
 export type FormulaState = {
   id: FormulaId;
   source: string;
   diagnostics: AnalyzerDiagnostic[];
   tokens: Token[];
-  formatted: string;
-  quickFixes: AnalyzerQuickFix[];
   outputType: string;
   status: "idle" | "wasm-not-ready" | "analyzing" | "ok" | "error";
 };

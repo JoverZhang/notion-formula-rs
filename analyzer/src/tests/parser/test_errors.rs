@@ -42,13 +42,15 @@ fn diagnostics_list_trailing_comma_recovers() {
         trailing
     );
     assert!(
-        trailing.labels.iter().any(|l| {
-            l.quick_fix
-                .as_ref()
-                .is_some_and(|fix| fix.new_text.is_empty() && fix.title == "Remove trailing comma")
+        trailing.actions.iter().any(|action| {
+            action.title == "Remove trailing comma"
+                && action
+                    .edits
+                    .iter()
+                    .any(|e| e.range == trailing.span && e.new_text.is_empty())
         }),
-        "expected trailing-comma diagnostic to include structured quick-fix metadata, got {:?}",
-        trailing
+        "expected trailing-comma diagnostic to include a structured action, got {:?}",
+        trailing.actions
     );
 
     match &result.expr.kind {
@@ -81,13 +83,15 @@ fn diagnostics_call_missing_close_paren_has_insert_label() {
         diag
     );
     assert!(
-        diag.labels.iter().any(|l| {
-            l.quick_fix
-                .as_ref()
-                .is_some_and(|fix| fix.new_text == ")" && fix.title == "Insert `)`")
+        diag.actions.iter().any(|action| {
+            action.title == "Insert `)`"
+                && action
+                    .edits
+                    .iter()
+                    .any(|e| e.range.start == 3 && e.range.end == 3 && e.new_text == ")")
         }),
-        "expected missing-close-paren diagnostic to include structured quick-fix metadata, got {:?}",
-        diag
+        "expected diagnostic to include missing-close-paren action, got {:?}",
+        diag.actions
     );
 }
 
@@ -109,13 +113,15 @@ fn diagnostics_missing_comma_between_call_args_has_insert_label() {
         diag
     );
     assert!(
-        diag.labels.iter().any(|l| {
-            l.quick_fix
-                .as_ref()
-                .is_some_and(|fix| fix.new_text == "," && fix.title == "Insert `,`")
+        diag.actions.iter().any(|action| {
+            action.title == "Insert `,`"
+                && action
+                    .edits
+                    .iter()
+                    .any(|e| e.range.start == 4 && e.range.end == 4 && e.new_text == ",")
         }),
-        "expected missing-comma diagnostic to include structured quick-fix metadata, got {:?}",
-        diag
+        "expected diagnostic to include missing-comma action, got {:?}",
+        diag.actions
     );
 }
 
@@ -164,11 +170,29 @@ fn diagnostics_mismatched_delimiter_suggests_replacement() {
         "expected replacement suggestion label, got {diag:?}"
     );
     assert!(
-        diag.labels.iter().any(|l| {
-            l.quick_fix
-                .as_ref()
-                .is_some_and(|fix| fix.new_text == ")" && fix.title.contains("Replace"))
+        diag.actions.iter().any(|action| {
+            action.title.contains("Replace")
+                && action
+                    .edits
+                    .iter()
+                    .any(|e| e.range.start == 2 && e.range.end == 3 && e.new_text == ")")
         }),
-        "expected mismatched-delimiter diagnostic to include structured replacement quick-fix metadata, got {diag:?}"
+        "expected diagnostic to include mismatched-delimiter replacement action, got {:?}",
+        diag.actions
+    );
+}
+
+#[test]
+fn diagnostics_lex_error_has_no_actions() {
+    let result = analyze("1 @").unwrap();
+    assert!(
+        !result.diagnostics.is_empty(),
+        "expected lex diagnostics, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics.iter().all(|d| d.actions.is_empty()),
+        "lex diagnostics must not carry code actions, got {:?}",
+        result.diagnostics
     );
 }
