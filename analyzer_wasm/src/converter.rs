@@ -11,15 +11,17 @@
 use analyzer::SourceMap;
 use analyzer::completion::{CompletionConfig, DEFAULT_PREFERRED_LIMIT};
 use analyzer::semantic::{Context, Property, builtins_functions};
-use analyzer::{Diagnostic, DiagnosticKind, ParseOutput, Span, Token, TokenKind};
+use analyzer::{
+    Diagnostic, DiagnosticKind, ParseOutput, QuickFix as AnalyzerQuickFix, Span, Token, TokenKind,
+};
 use js_sys::Error as JsError;
 use serde::Deserialize;
 use wasm_bindgen::prelude::JsValue;
 
 use crate::dto::v1::{
     AnalyzeResult, CompletionItemKind, CompletionItemView, CompletionOutputView,
-    DiagnosticKindView, DiagnosticView, DisplaySegmentView, LineColView, SignatureHelpView,
-    SignatureItemView, Span as SpanDto, SpanView, TextEditView, TokenView,
+    DiagnosticKindView, DiagnosticView, DisplaySegmentView, LineColView, QuickFixView,
+    SignatureHelpView, SignatureItemView, Span as SpanDto, SpanView, TextEditView, TokenView,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::offsets::utf16_offset_to_byte;
@@ -102,6 +104,7 @@ impl Converter {
     }
 
     pub fn analyze_output(source: &str, output: ParseOutput, output_type: String) -> AnalyzeResult {
+        let quick_fixes = analyzer::quick_fixes(&output.diagnostics);
         let diagnostics = output
             .diagnostics
             .iter()
@@ -115,12 +118,21 @@ impl Converter {
             .map(|t| Self::token_view(source, t))
             .collect();
 
-        let formatted = analyzer::format_expr(&output.expr, source, &output.tokens);
+        let formatted = analyzer::formatted_if_syntax_valid(
+            &output.expr,
+            source,
+            &output.tokens,
+            &output.diagnostics,
+        );
 
         AnalyzeResult {
             diagnostics,
             tokens,
             formatted,
+            quick_fixes: quick_fixes
+                .iter()
+                .map(|fix| quick_fix_view(source, fix))
+                .collect(),
             output_type,
         }
     }
@@ -130,6 +142,7 @@ impl Converter {
             diagnostics: vec![Self::diagnostic_view(source, diag)],
             tokens: Vec::new(),
             formatted: String::new(),
+            quick_fixes: Vec::new(),
             output_type: analyzer::semantic::Ty::Unknown.to_string(),
         }
     }
@@ -272,6 +285,20 @@ impl Converter {
     }
 }
 
+fn quick_fix_view(source: &str, fix: &AnalyzerQuickFix) -> QuickFixView {
+    QuickFixView {
+        title: fix.title.clone(),
+        edits: fix
+            .edits
+            .iter()
+            .map(|edit| TextEditView {
+                range: byte_span_to_utf16_span(source, edit.range),
+                new_text: edit.new_text.clone(),
+            })
+            .collect(),
+    }
+}
+
 fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> DisplaySegmentView {
     use analyzer::ide::display::DisplaySegment as S;
     match seg {
@@ -393,5 +420,138 @@ mod tests {
         assert_eq!(view.kind, DiagnosticKindView::Error);
         assert_eq!(view.span.range.start, 2);
         assert_eq!(view.span.range.end, 3);
+    }
+
+    #[test]
+    fn analyze_output_disables_formatted_when_trailing_tokens_exist() {
+        let source = r#"123 "456""#;
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "unknown".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.is_empty());
+    }
+
+    #[test]
+    fn analyze_output_keeps_formatted_for_semantic_errors() {
+        let source = r#"prop("Missing")"#;
+        let mut output = analyzer::analyze(source).expect("expected parse output");
+        assert!(output.diagnostics.is_empty());
+
+        let ctx = analyzer::semantic::Context {
+            properties: vec![],
+            functions: analyzer::semantic::builtins_functions(),
+        };
+        let (ty, semantic_diags) = analyzer::semantic::analyze_expr(&output.expr, &ctx);
+        assert!(!semantic_diags.is_empty());
+        output.diagnostics.extend(semantic_diags);
+
+        let view = Converter::analyze_output(source, output, ty.to_string());
+        assert!(!view.formatted.is_empty());
+        assert!(view.quick_fixes.is_empty());
+    }
+
+    #[test]
+    fn analyze_output_offers_quick_fix_for_missing_close_paren() {
+        let source = "(123";
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "number".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.iter().any(|f| {
+            f.edits.iter().any(|e| {
+                e.range.start == source.len() as u32
+                    && e.range.end == source.len() as u32
+                    && e.new_text == ")"
+            })
+        }));
+    }
+
+    #[test]
+    fn analyze_output_offers_quick_fix_for_missing_nested_delimiters() {
+        let source = "([123";
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "list<number>".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.iter().any(|f| {
+            f.edits
+                .iter()
+                .any(|e| e.range.start == source.len() as u32 && e.range.end == source.len() as u32)
+        }));
+    }
+
+    #[test]
+    fn analyze_output_offers_quick_fix_for_missing_call_comma() {
+        let source = "f(1 2)";
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "unknown".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.iter().any(|f| {
+            f.edits
+                .iter()
+                .any(|e| e.range.start == 4 && e.range.end == 4 && e.new_text == ",")
+        }));
+    }
+
+    #[test]
+    fn analyze_output_offers_quick_fix_for_trailing_comma() {
+        let source = "[1,2,]";
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "list<number>".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.iter().any(|f| {
+            f.edits
+                .iter()
+                .any(|e| e.range.start == 4 && e.range.end == 5 && e.new_text.is_empty())
+        }));
+    }
+
+    #[test]
+    fn analyze_output_offers_quick_fix_for_mismatched_delimiter() {
+        let source = "(1]";
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "unknown".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.iter().any(|f| {
+            f.edits
+                .iter()
+                .any(|e| e.range.start == 2 && e.range.end == 3 && e.new_text == ")")
+        }));
+    }
+
+    #[test]
+    fn analyze_output_offers_insert_paren_fix_without_truncating_trailing_tokens() {
+        let source = r#"(123 "456""#;
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "unknown".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.iter().any(|f| {
+            f.edits
+                .iter()
+                .any(|e| e.range.start == 5 && e.range.end == 5 && e.new_text == ")")
+        }));
+    }
+
+    #[test]
+    fn analyze_output_disables_formatted_when_lex_error_would_drop_input() {
+        let source = "1 @";
+        let output = analyzer::analyze(source).expect("expected parse output with diagnostics");
+        assert!(!output.diagnostics.is_empty());
+
+        let view = Converter::analyze_output(source, output, "unknown".to_string());
+        assert_eq!(view.formatted, "");
+        assert!(view.quick_fixes.is_empty());
     }
 }

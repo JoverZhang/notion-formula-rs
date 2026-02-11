@@ -159,7 +159,8 @@ body {
 }
 
 .theme-toggle,
-.format-button {
+.format-button,
+.quick-fix-button {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 7px 14px;
@@ -181,15 +182,24 @@ body {
 }
 
 .theme-toggle:hover,
-.format-button:hover {
+.format-button:hover,
+.quick-fix-button:hover {
   transform: translateY(-1px);
   border-color: var(--border-strong);
   background: var(--surface-soft);
 }
 
 .theme-toggle:active,
-.format-button:active {
+.format-button:active,
+.quick-fix-button:active {
   transform: translateY(0);
+}
+
+.format-button:disabled,
+.quick-fix-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .table-section,
@@ -721,6 +731,16 @@ body {
     width: 100%;
     margin-bottom: 8px;
   }
+
+  .formula-actions {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .formula-output-type {
+    flex: 1 1 auto;
+    margin-left: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -732,6 +752,7 @@ body {
 
   .theme-toggle,
   .format-button,
+  .quick-fix-button,
   .completion-item,
   .editor .cm-editor {
     transition: none;

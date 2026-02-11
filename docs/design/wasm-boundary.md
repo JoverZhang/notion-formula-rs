@@ -40,7 +40,10 @@ Helper APIs (WASM):
 
 Key types:
 
-- `AnalyzeResult { diagnostics, tokens, formatted, output_type }`
+- `AnalyzeResult { diagnostics, tokens, formatted, quick_fixes, output_type }`
+  - `formatted` is empty whenever lex/parse diagnostics are present.
+  - `quick_fixes` contains structured UTF-16 edits converted from core
+    `analyzer::quick_fixes(&diagnostics)` (insert/replace delimiters, comma insertion/removal).
   - `output_type` is non-null (`string`): unknown/error uses `"unknown"`.
 - `Span { start, end }`
 - `SpanView { range: Span }`
@@ -93,3 +96,6 @@ Code:
 
 JS never deals with byte offsets.
 Rust core never deals with UTF-16 offsets.
+
+Quick-fix derivation lives in core (`analyzer/src/ide/quick_fix.rs`); WASM only converts byte
+ranges to UTF-16 DTO ranges.

@@ -6,6 +6,7 @@ struct AnalyzeResult {
     diagnostics: Vec<Diagnostic>,
     tokens: Vec<TokenView>,
     formatted: String,
+    quick_fixes: Vec<QuickFixView>,
     output_type: String,
 }
 
@@ -32,6 +33,18 @@ struct TokenView {
     kind: String,
     text: String,
     span: SpanView,
+}
+
+#[derive(Deserialize)]
+struct QuickFixView {
+    _title: String,
+    edits: Vec<TextEditView>,
+}
+
+#[derive(Deserialize)]
+struct TextEditView {
+    range: Span,
+    new_text: String,
 }
 
 fn analyze_value(source: &str) -> AnalyzeResult {
@@ -153,6 +166,120 @@ fn analyze_emoji_spans_and_diagnostics() {
     assert_eq!(diag.kind, "error");
     assert_eq!(diag.span.range.start, 2);
     assert_eq!(diag.span.range.end, 3);
+}
+
+#[wasm_bindgen_test]
+fn analyze_trailing_tokens_disables_formatted_output() {
+    let source = r#"123 "456""#;
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(result.quick_fixes.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn analyze_semantic_error_still_returns_formatted_output() {
+    let source = r#"prop("Missing")"#;
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(!result.formatted.is_empty());
+    assert!(result.quick_fixes.is_empty());
+}
+
+#[wasm_bindgen_test]
+fn analyze_missing_close_paren_returns_quick_fix() {
+    let source = "(123";
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(
+        result
+            .quick_fixes
+            .iter()
+            .flat_map(|f| f.edits.iter())
+            .any(|e| e.range.start == source.len() as u32
+                && e.range.end == source.len() as u32
+                && e.new_text == ")")
+    );
+}
+
+#[wasm_bindgen_test]
+fn analyze_missing_nested_delimiters_returns_quick_fix() {
+    let source = "([123";
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(
+        result
+            .quick_fixes
+            .iter()
+            .flat_map(|f| f.edits.iter())
+            .any(|e| {
+                e.range.start == source.len() as u32 && e.range.end == source.len() as u32
+            })
+    );
+}
+
+#[wasm_bindgen_test]
+fn analyze_missing_call_comma_returns_quick_fix() {
+    let source = "f(1 2)";
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(
+        result
+            .quick_fixes
+            .iter()
+            .flat_map(|f| f.edits.iter())
+            .any(|e| e.range.start == 4 && e.range.end == 4 && e.new_text == ",")
+    );
+}
+
+#[wasm_bindgen_test]
+fn analyze_trailing_comma_returns_quick_fix() {
+    let source = "[1,2,]";
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(
+        result
+            .quick_fixes
+            .iter()
+            .flat_map(|f| f.edits.iter())
+            .any(|e| e.range.start == 4 && e.range.end == 5 && e.new_text.is_empty())
+    );
+}
+
+#[wasm_bindgen_test]
+fn analyze_group_with_trailing_string_returns_insert_paren_fix() {
+    let source = r#"(123 "456""#;
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(
+        result
+            .quick_fixes
+            .iter()
+            .flat_map(|f| f.edits.iter())
+            .any(|e| e.range.start == 5 && e.range.end == 5 && e.new_text == ")")
+    );
+}
+
+#[wasm_bindgen_test]
+fn analyze_lex_error_disables_formatted_output() {
+    let source = "1 @";
+    let result = analyze_value(source);
+
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(result.formatted, "");
+    assert!(result.quick_fixes.is_empty());
 }
 
 #[wasm_bindgen_test]

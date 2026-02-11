@@ -52,6 +52,14 @@ pub struct Diagnostic {
 pub struct Label {
     pub span: Span,
     pub message: Option<String>,
+    pub quick_fix: Option<QuickFix>,
+}
+
+/// Structured text-edit hint attached to a diagnostic label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickFix {
+    pub title: String,
+    pub new_text: String,
 }
 
 #[derive(Default, Debug)]
@@ -177,6 +185,9 @@ fn dedup_labels(labels: &mut Vec<Label>) {
             l.span.start,
             l.span.end,
             l.message.as_deref().unwrap_or("").to_owned(),
+            l.quick_fix
+                .as_ref()
+                .map(|f| (f.title.clone(), f.new_text.clone())),
         );
         seen.insert(key)
     });

@@ -18,6 +18,11 @@ Frontend tooling for a Notion-like formula language: lexing, parsing, diagnostic
   - `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)` (`analyzer/src/analysis/mod.rs`)
 - Formatting:
   - `analyzer::format_expr(expr, source, tokens) -> String` (`analyzer/src/ide/format.rs`)
+- Syntax-aware editor helpers:
+  - `analyzer::formatted_if_syntax_valid(expr, source, tokens, diagnostics) -> String`
+  - `analyzer::quick_fixes(diagnostics) -> Vec<QuickFix>`
+  - `analyzer::has_syntax_errors(diagnostics) -> bool`
+  - Source: `analyzer/src/ide/quick_fix.rs`
 - Editor features:
   - `analyzer::completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput` (`analyzer/src/ide/completion/mod.rs`)
 - Diagnostics rendering:
@@ -47,6 +52,7 @@ Frontend tooling for a Notion-like formula language: lexing, parsing, diagnostic
 | `analyzer/src/analysis/` | `Ty` model; builtins; `ParamShape`; type inference + validation |
 | `analyzer/src/ide/display.rs` | Canonical UI display formatting (signature help segments, `Ty` rendering) |
 | `analyzer/src/ide/format.rs` | Formatter (comment/trivia-aware) |
+| `analyzer/src/ide/quick_fix.rs` | Structured syntax quick-fix extraction + syntax-valid formatting gate |
 | `analyzer/src/ide/completion/` | Completion + signature help (byte offsets) |
 | `analyzer/src/source_map.rs` | byte offset → 1-based `(line, col)` (col is Rust `char` count) |
 

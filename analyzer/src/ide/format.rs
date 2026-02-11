@@ -237,9 +237,10 @@ impl<'a> Formatter<'a> {
                 let text = format!("({inline})");
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         let mut out = Rendered::default();
         out.push_line(indent, "(");
@@ -261,9 +262,10 @@ impl<'a> Formatter<'a> {
                 let text = format!("[{}]", parts.join(", "));
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         self.format_delimited_seq(
             Rendered::default(),
@@ -291,9 +293,10 @@ impl<'a> Formatter<'a> {
                 };
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         let mut out = Rendered::default();
         let lparen = if needs_space {
@@ -331,9 +334,10 @@ impl<'a> Formatter<'a> {
                 let text = format!("{lhs} {op_str} {rhs}");
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         let mut out = Rendered::default();
         let left_rendered = self.format_expr_rendered(left, indent);
@@ -395,9 +399,10 @@ impl<'a> Formatter<'a> {
                 let text = format!("{c} ? {t} : {o}");
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         let mut out = Rendered::default();
         let cond_r = self.format_expr_rendered(cond, indent);
@@ -435,9 +440,10 @@ impl<'a> Formatter<'a> {
                 let text = format!("{callee}({})", parts.join(", "));
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         self.format_delimited_seq(
             Rendered::default(),
@@ -469,9 +475,10 @@ impl<'a> Formatter<'a> {
                 let text = format!("{receiver_inline}.{method}({})", parts.join(", "));
                 this.fits_on_line(indent, text.len())
                     .then_some(Rendered::single(indent, text))
-            }) {
-                return out;
-            }
+            })
+        {
+            return out;
+        }
 
         let receiver_r = self.format_expr_rendered(receiver, indent);
         self.format_delimited_seq(receiver_r, indent, format!(".{method}("), true, ")", args)

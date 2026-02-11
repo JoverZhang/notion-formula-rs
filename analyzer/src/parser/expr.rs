@@ -6,7 +6,7 @@
 use super::{ParseOutput, Parser};
 use crate::Token;
 use crate::ast::{AssocOp, Expr, ExprKind, NotKind, UnOp};
-use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
+use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic, QuickFix};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
 
 impl<'a> Parser<'a> {
@@ -573,6 +573,10 @@ impl<'a> Parser<'a> {
                         vec![Label {
                             span: sep_tok.span,
                             message: Some("remove this comma".into()),
+                            quick_fix: Some(QuickFix {
+                                title: "Remove trailing comma".into(),
+                                new_text: String::new(),
+                            }),
                         }],
                     );
                     break;
@@ -604,6 +608,10 @@ impl<'a> Parser<'a> {
                     vec![Label {
                         span: insertion,
                         message: Some(format!("insert {sep_expected}")),
+                        quick_fix: Some(QuickFix {
+                            title: "Insert `,`".into(),
+                            new_text: ",".into(),
+                        }),
                     }],
                 );
                 expecting_item = true;
@@ -697,6 +705,7 @@ impl<'a> Parser<'a> {
                     Label {
                         span: open_span,
                         message: Some(open_label.into()),
+                        quick_fix: None,
                     },
                     Label {
                         span: found.span,
@@ -704,6 +713,14 @@ impl<'a> Parser<'a> {
                             "replace {} with {expected}",
                             Self::describe_token(&found.kind)
                         )),
+                        quick_fix: Some(QuickFix {
+                            title: format!(
+                                "Replace {} with `{}`",
+                                Self::describe_token(&found.kind),
+                                close.to_str().unwrap_or_default()
+                            ),
+                            new_text: close.to_str().unwrap_or_default().to_string(),
+                        }),
                     },
                 ],
             )
@@ -714,10 +731,15 @@ impl<'a> Parser<'a> {
                     Label {
                         span: open_span,
                         message: Some(open_label.into()),
+                        quick_fix: None,
                     },
                     Label {
                         span: insertion,
                         message: Some(format!("insert {expected}")),
+                        quick_fix: Some(QuickFix {
+                            title: format!("Insert `{}`", close.to_str().unwrap_or_default()),
+                            new_text: close.to_str().unwrap_or_default().to_string(),
+                        }),
                     },
                 ],
             )

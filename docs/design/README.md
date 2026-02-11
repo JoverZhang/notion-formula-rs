@@ -16,7 +16,7 @@ module READMEs next to code (for example, `analyzer/README.md`).
 - [Design philosophy](#design-philosophy)
 - [Deep dives](#deep-dives)
 - [Drift tracker / open questions](#drift-tracker--open-questions)
-- [Former overview → new homes](#former-overview--new-homes)
+- [Former overview mapping](#former-overview-mapping)
 
 ## Pipeline
 
@@ -72,6 +72,8 @@ Rust (`analyzer/`):
 - `analyzer::analyze(text: &str) -> Result<ParseOutput, Diagnostic>` (`analyzer/src/lib.rs`)
 - `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)` (`analyzer/src/analysis/mod.rs`)
 - `analyzer::format_expr(expr, source, tokens) -> String` (`analyzer/src/ide/format.rs`)
+- `analyzer::formatted_if_syntax_valid(expr, source, tokens, diagnostics) -> String` (`analyzer/src/ide/quick_fix.rs`)
+- `analyzer::quick_fixes(diagnostics) -> Vec<QuickFix>` (`analyzer/src/ide/quick_fix.rs`)
 - `analyzer::completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput` (`analyzer/src/ide/completion/mod.rs`)
 - `analyzer::format_diagnostics(source, diags) -> String` (`analyzer/src/diagnostics.rs`)
 
@@ -154,6 +156,15 @@ call it out as a contract change.
   - `format_diagnostics` ordering: `(span.start, span.end, priority desc, message)` (then stable label ordering)
   - Deconfliction: one diag per span; higher priority wins; equal priority + identical message merges labels/notes
 
+### Syntax quick fixes
+
+- Parser diagnostics can attach structured label quick-fix metadata (`Label.quick_fix`) in byte
+  coordinates.
+- Core IDE helpers derive quick-fix actions from diagnostic metadata:
+  - `analyzer/src/ide/quick_fix.rs` (`quick_fixes`, `has_syntax_errors`, `formatted_if_syntax_valid`)
+- WASM only converts these core quick fixes to UTF-16 DTO edits; it does not parse diagnostic
+  message text.
+
 ### Signatures and signature help
 
 - Function signatures use `ParamShape { head, repeat, tail }` and enforce determinism invariants:
@@ -202,9 +213,10 @@ Related:
 - Repo housekeeping:
   - `rustc/` directory intent is unclear (document it with a README, or remove it).
 
-## Former overview → new homes
+## Former overview mapping
 
-`docs/overview-analyzer.md` was removed. Every prior section has an explicit replacement:
+The legacy overview document has been removed. The table below maps former overview sections to
+their current homes in maintained docs:
 
 | Former overview section | New home | Notes |
 |---|---|---|

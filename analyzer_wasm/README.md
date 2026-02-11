@@ -37,6 +37,11 @@ Notes:
   - `diagnostics`: `DiagnosticView[]`
   - `tokens`: `TokenView[]` (non-trivia tokens only; trivia is filtered out in the converter)
   - `formatted`: `string`
+    - empty string whenever lex/parse diagnostics exist
+  - `quick_fixes`: `QuickFixView[]`
+    - structured syntax-recovery edits (UTF-16 ranges) from core
+      `analyzer::quick_fixes(&diagnostics)`
+    - current fixes cover insert/replace delimiters and comma insertion/removal
   - `output_type`: `string` (semantic root type rendered by Rust, e.g. `"number | string"`)
     - never nullable; unknown/error uses `"unknown"`
 - `CompletionOutputView`:
@@ -48,7 +53,8 @@ Notes:
   - `signature_help`: optional structured segments
   - `preferred_indices`: `number[]`
 
-Conversion happens in `analyzer_wasm/src/converter.rs`.
+Conversion happens in `analyzer_wasm/src/converter.rs`; quick-fix derivation itself lives in
+`analyzer/src/ide/quick_fix.rs`.
 
 ### Error model
 
