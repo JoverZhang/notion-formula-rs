@@ -47,7 +47,7 @@ UI behavior that is intentionally TypeScript-owned:
     `AnalyzeResult.quick_fixes`), is enabled only when fixes are available, and exposes the active
     fix title via button hover tooltip.
   - `output: <type>` uses `AnalyzeResult.output_type` (non-null with `"unknown"` fallback),
-    right-aligned with overflow truncation.
+    right-aligned with end truncation (keeps the `output:` prefix visible).
 - Signature help renders analyzer-provided display segments; the UI does not parse type strings.
 - Analyzer diagnostics are mirrored into CodeMirror lint diagnostics.
 - Formula editor auto-grows with content via `.editor .cm-editor .cm-scroller`.

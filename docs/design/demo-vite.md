@@ -28,7 +28,7 @@ Behavior:
 - Suggestion UI uses one popover surface that can show signature help and diagnostics together.
 - The editor action row exposes `Format` + `Quick Fix`; the right side shows `output: <type>` from
   `AnalyzeResult.output_type` (non-null, unknown/error = `"unknown"`, right-aligned, truncated on
-  overflow).
+  overflow while preserving the left prefix).
   - `Format` applies `AnalyzeResult.formatted`, available only when syntax is valid.
   - `Quick Fix` applies the first structured fix from `AnalyzeResult.quick_fixes` (one fix per
     click), is enabled only when fixes exist, and exposes the current fix title via button hover

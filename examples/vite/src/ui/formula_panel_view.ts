@@ -180,7 +180,9 @@ export function createFormulaPanelView(opts: {
         <div class="formula-actions">
           <button class="format-button" type="button" data-testid="format-button" data-formula-id="${opts.id}">Format</button>
           <button class="quick-fix-button" type="button" data-testid="quick-fix-button" data-formula-id="${opts.id}" disabled>Quick Fix</button>
-          <div class="formula-output-type" data-testid="formula-output-type" data-formula-id="${opts.id}"></div>
+          <div class="formula-output-type" data-testid="formula-output-type" data-formula-id="${opts.id}">
+            <span class="formula-output-type-value"></span>
+          </div>
         </div>
         <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
           <div class="completion-header">Completions</div>
@@ -203,6 +205,7 @@ export function createFormulaPanelView(opts: {
   const formatBtn = must<HTMLButtonElement>(panel, ".format-button");
   const quickFixBtn = must<HTMLButtonElement>(panel, ".quick-fix-button");
   const outputTypeEl = must<HTMLElement>(panel, ".formula-output-type");
+  const outputTypeValueEl = must<HTMLElement>(panel, ".formula-output-type-value");
   const completionPanel = must<HTMLElement>(
     panel,
     '.completion-panel[data-testid="completion-panel"]',
@@ -530,7 +533,7 @@ export function createFormulaPanelView(opts: {
           ? (lastQuickFixes[0]?.title ?? "Apply quick fix")
           : "No quick fix available";
       const outputTypeLabel = `output: ${state.outputType}`;
-      outputTypeEl.textContent = outputTypeLabel;
+      outputTypeValueEl.textContent = outputTypeLabel;
       outputTypeEl.title = outputTypeLabel;
 
       const docLen = state.source.length;

@@ -297,6 +297,7 @@ body {
 
 .formula-panel {
   padding: 12px;
+  min-width: 0;
 }
 
 .formula-panel:nth-of-type(2) {
@@ -306,6 +307,7 @@ body {
 .formula-left {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .formula-label,
@@ -325,6 +327,7 @@ body {
   position: relative;
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .editor {
@@ -385,6 +388,7 @@ body {
   justify-content: flex-start;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .formula-output-type {
@@ -399,10 +403,15 @@ body {
   opacity: 0.85;
   font-size: 11px;
   font-family: var(--font-mono);
+}
+
+.formula-output-type-value {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: right;
 }
 
 .completion-panel {
