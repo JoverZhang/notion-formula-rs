@@ -20,8 +20,9 @@ If you are building an editor, this repo gives you a practical core:
   - completion + structured signature help
 - `analyzer_wasm/` (WASM bridge)
   - `analyze(source, context_json)`
+  - `format(source, cursor_utf16)`
+  - `apply_edits(source, edits, cursor_utf16)`
   - `complete(source, cursor_utf16, context_json)`
-  - `pos_to_line_col(source, pos_utf16)`
   - DTO export for TypeScript
 - `examples/vite/`
   - Vite + CodeMirror demo for live analysis/completion UX
@@ -74,7 +75,7 @@ pnpm -C examples/vite install   # first time only
 just run-example-vite
 
 # manual
-cd examples/vite && pnpm -s run wasm:build && npm run dev
+cd examples/vite && pnpm -s run wasm:build && pnpm -s run dev
 ```
 
 Open the URL printed by Vite (usually `http://127.0.0.1:5173`).
@@ -120,17 +121,26 @@ pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
 // TypeScript-facing API used by the demo wrapper
 // (examples/vite/src/analyzer/wasm_client.ts).
 export function analyzeSource(source: string, contextJson: string): AnalyzeResult;
+export function formatSource(
+  source: string,
+  cursor: number, // UTF-16 offset
+): ApplyResultView;
+export function applyEditsSource(
+  source: string,
+  edits: TextEditView[],
+  cursor: number, // UTF-16 offset
+): ApplyResultView;
 export function completeSource(
   source: string,
   cursor: number, // UTF-16 offset
   contextJson: string,
 ): CompletionOutputView;
-export function posToLineCol(source: string, pos: number): LineColView;
 
 // Under the hood, these call wasm-bindgen exports:
 // analyze(source, context_json) -> AnalyzeResult payload
+// format(source, cursor_utf16) -> ApplyResultView payload
+// apply_edits(source, edits, cursor_utf16) -> ApplyResultView payload
 // complete(source, cursor_utf16, context_json) -> CompletionOutputView payload
-// pos_to_line_col(source, pos_utf16) -> LineColView payload
 ```
 
 `context_json` rules are strict:
@@ -182,6 +192,7 @@ just test-analyzer_wasm
 
 # manual
 cargo test -p analyzer_wasm
+wasm-pack test --node analyzer_wasm
 ```
 
 ### Update golden snapshots (analyzer)

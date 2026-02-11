@@ -1,73 +1,189 @@
 # Design (notion-formula-rs)
 
-Stable architecture and contracts for the workspace.
+Start here for stable architecture and cross-crate contracts.
+Implementation details that change frequently should live next to code (`analyzer/README.md`,
+`analyzer_wasm/README.md`, `examples/vite/README.md`).
+
+## Table of contents
+
+- [Pipeline](#pipeline)
+- [Source tree](#source-tree)
+- [Data flow](#data-flow)
+- [Public entry points](#public-entry-points)
+- [Language contract (current implementation)](#language-contract-current-implementation)
+- [Key design decisions](#key-design-decisions)
+- [Contracts (hard rules)](#contracts-hard-rules)
+- [Design philosophy](#design-philosophy)
+- [Deep dives](#deep-dives)
+- [Drift tracker / open questions](#drift-tracker--open-questions)
 
 ## Pipeline
 
 ```text
 &str (UTF-8)
-  -> lexer (tokens + diagnostics)
-  -> parser (AST + diagnostics)
-  -> semantic (optional)
-  -> IDE helpers (format / completion)
-  -> WASM boundary (DTO v1 in UTF-16)
+  -> lexer: tokens (incl. trivia + EOF) + diagnostics
+  -> parser: ParseOutput (AST + parse diagnostics)
+  -> semantic analysis (optional; needs Context) -> (Ty + semantic diagnostics)
+  -> IDE helpers: formatter / completion / signature help
+  -> WASM bridge: DTO v1 (UTF-16 spans/offsets)
 ```
 
 ## Source tree
 
-- `analyzer/`: Rust core
-- `analyzer_wasm/`: WASM boundary
-- `examples/vite/`: demo UI
-- `docs/`: contracts and design notes
+```text
+.
+├─ analyzer/          Rust core analyzer (lexer/parser/AST/diagnostics/IDE helpers)
+├─ analyzer_wasm/     wasm-bindgen boundary + UTF-16 conversion + DTO v1
+├─ evaluator/         stub (currently unused)
+├─ examples/vite/     Vite + CodeMirror demo consuming analyzer_wasm
+└─ docs/              design docs + changelog guidance (start at docs/README.md)
+```
+
+Primary docs:
+
+| Path | Primary doc |
+|---|---|
+| `analyzer/` | [`analyzer/README.md`](../../analyzer/README.md) |
+| `analyzer_wasm/` | [`analyzer_wasm/README.md`](../../analyzer_wasm/README.md) |
+| `examples/vite/` | [`examples/vite/README.md`](../../examples/vite/README.md) |
+| `docs/` | [`docs/README.md`](../README.md) |
+
+## Data flow
+
+Stable boundary view:
+
+- `&str` (UTF-8) -> lexer -> `Tokens` (incl. trivia + EOF) + lex diagnostics
+- `Tokens` -> parser -> `ParseOutput { expr, diagnostics, tokens }`
+- `ParseOutput.expr` + `Context` -> semantic analysis -> `(Ty, semantic diagnostics)`
+- `(expr, tokens, source)` -> formatter -> `String`
+- `(source, cursor, Context)` -> completion/signature help -> `CompletionOutput`
+- Parser diagnostics may include `actions: Vec<CodeAction>` in byte coordinates.
+- WASM conversion maps core byte spans/edits to UTF-16 DTO spans/edits.
 
 ## Public entry points
 
-### Rust
+Rust (`analyzer/`):
 
-- `analyze(text) -> ParseOutput`
-- `semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
-- `format_expr(expr, source, tokens) -> String`
-- `completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput`
-- `format_diagnostics(source, diags) -> String`
+- `analyzer::analyze(text: &str) -> Result<ParseOutput, Diagnostic>`
+- `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
+- `analyzer::format_expr(expr, source, tokens) -> String`
+- `analyzer::completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput`
+- `analyzer::format_diagnostics(source, diags) -> String`
 
-### WASM
+WASM (`analyzer_wasm/`):
 
 - `analyze(source, context_json) -> AnalyzeResult`
 - `format(source, cursor_utf16) -> ApplyResultView`
 - `apply_edits(source, edits, cursor_utf16) -> ApplyResultView`
 - `complete(source, cursor_utf16, context_json) -> CompletionOutputView`
 
-## Key contracts (hard rules)
+Tooling:
 
-- Core analyzer uses UTF-8 byte offsets only.
-- WASM boundary is the only UTF-16 ↔ byte conversion layer.
-- JS/WASM spans/edits are UTF-16, half-open `[start, end)`.
-- Unified edit model: `TextEdit { range, new_text }`.
-- Diagnostic quick-fix actions are diagnostic-level payload (`actions`).
-- `format` and `apply_edits` always accept cursor and always return cursor.
-- `format`/`apply_edits` failures throw (`Err`) instead of payload-encoded result enums.
+- TS DTO export: `cargo run -p analyzer_wasm --bin export_ts`
 
-## Data model highlights
+## Language contract (current implementation)
 
-- `ParseOutput { expr, diagnostics, tokens }`
-- `Diagnostic { kind, code, message, span, labels, notes, actions }`
-- `CodeAction { title, edits: Vec<TextEdit> }`
-- `AnalyzeResult { diagnostics, tokens, output_type }`
-- `DiagnosticView { kind, message, span, line, col, actions }`
-- `ApplyResultView { source, cursor }`
+This section documents current lexer/parser behavior (code-backed):
+
+- Identifiers: ASCII letters/`_` and non-ASCII codepoints are accepted.
+- Numbers: ASCII digit integers only (no decimals yet).
+- Strings: double-quoted strings, no escapes yet.
+- Lists: trailing comma is rejected (`[1, 2,]` is a parse error).
+- Operators:
+  - `%` is modulo.
+  - `^` is power and right-associative.
+- Member access without a call is rejected (`receiver.method` must be `receiver.method(...)`).
+
+## Key design decisions
+
+These are the hard edges other code relies on:
+
+- Spans/offsets: core spans are UTF-8 byte offsets, half-open `[start, end)`.
+- WASM boundary encoding: DTO spans/offsets are UTF-16 code units, half-open `[start, end)`.
+- Determinism: diagnostics deconfliction + formatting order are deterministic.
+- Signature help is structured: UIs render segments, they do not parse signature strings.
+- `context_json` is strict: non-empty JSON; unknown top-level fields rejected.
+- Semantic and DTO payloads avoid nullable "unknown" values where explicit domain values exist
+  (`Ty::Unknown`, `"unknown"`).
+
+## Contracts (hard rules)
+
+These are stability guarantees. Contract changes require docs + tests + changelog updates.
+
+### Spans and offsets
+
+- Core spans are UTF-8 byte offsets (`analyzer/src/lexer/token.rs`).
+- DTO spans/edits are UTF-16 code units (`analyzer_wasm/src/dto/v1.rs`).
+- Conversion lives only in WASM (`analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`).
+- `DiagnosticView.line`/`col` are computed from byte offsets via `SourceMap::line_col` during
+  WASM conversion (`analyzer_wasm/src/converter/shared.rs`).
+
+### Token stream
+
+- Token stream includes trivia (`DocComment`, `Newline`) and explicit `Eof`.
+- `TokenQuery` is the canonical trivia-aware span/token neighbor API.
+
+### AST + syntax invariants
+
+- `ExprKind` is the closed set of core expression forms.
+- Parser recovers best-effort with `ExprKind::Error` nodes and diagnostics.
+- Member access without call is rejected.
+
+### Diagnostics determinism
+
+- Diagnostics deconflict by identical span with priority (`DiagnosticCode::priority`).
+- One diagnostic survives per span unless equal-priority/equal-message merge rules apply.
+- `format_diagnostics` output ordering is stable by span, priority, and message.
+
+### Actions and edits
+
+- Quick fixes are diagnostic-level payloads: `Diagnostic.actions: Vec<CodeAction>`.
+- Core edit model is unified: `TextEdit { range, new_text }` in byte coordinates.
+- WASM edit model is unified: `TextEditView` in UTF-16 coordinates.
+- `format` and `apply_edits` accept cursor and return `{ source, cursor }` on success.
+- `format`/`apply_edits` failures throw `Err` (not payload-encoded status enums).
+
+### Signature help
+
+- Signature shape uses `ParamShape { head, repeat, tail }` invariants.
+- Signature help output is structured (`DisplaySegment[]`) for direct UI rendering.
+- Active parameter mapping follows `docs/signature-help.md`.
+
+### WASM `context_json`
+
+- `context_json` must be non-empty valid JSON.
+- Unknown top-level fields are rejected (`deny_unknown_fields`).
+- Current schema: `{ properties: Property[], completion?: { preferred_limit?: number } }`.
+- `functions` are sourced from Rust builtins; JS does not provide them.
 
 ## Design philosophy
 
-- Keep core byte-based and deterministic.
-- Keep boundary conversion centralized.
-- Keep DTO surface small and explicit.
-- Keep `apply_edits` on one canonical edit-application pipeline; keep `format`
-  cursor mapping explicit and stable for editor UX.
+- Contracts-first: keep hard edges explicit, test-backed, and small.
+- Best-effort parsing: return useful AST + diagnostics instead of failing fast.
+- Determinism by default: stable ordering and tie-break rules for predictable UI behavior.
+- Clear boundary: Rust core stays UTF-8; JS-facing boundary stays UTF-16.
 
 ## Deep dives
 
-- `docs/design/wasm-boundary.md`
-- `docs/design/completion.md`
-- `docs/design/tokens-spans.md`
-- `docs/design/demo-vite.md`
-- `docs/design/testing.md`
+- Spans/tokens/trivia: [`docs/design/tokens-spans.md`](tokens-spans.md)
+- `TokenQuery`: [`docs/design/tokenquery.md`](tokenquery.md)
+- Builtins + types + postfix sugar: [`docs/design/builtins-and-types.md`](builtins-and-types.md)
+- Completion + signature help behavior: [`docs/design/completion.md`](completion.md)
+- WASM boundary + DTO v1: [`docs/design/wasm-boundary.md`](wasm-boundary.md)
+- Demo integration (`examples/vite`): [`docs/design/demo-vite.md`](demo-vite.md)
+- Test inventory: [`docs/design/testing.md`](testing.md)
+
+Related:
+
+- Signature help spec: [`docs/signature-help.md`](../signature-help.md)
+- Builtins spec list: [`docs/builtin_functions/README.md`](../builtin_functions/README.md)
+
+## Drift tracker / open questions
+
+- Language spec gaps to formalize:
+  - numeric grammar (decimals, edge cases)
+  - string escape grammar
+  - identifier character classes and normalization policy
+- Semantic parity gap to track:
+  - postfix validation still has narrower behavior than postfix inference/completion in some
+    call-shape paths (`docs/design/builtins-and-types.md`).

@@ -1,15 +1,18 @@
 # Testing inventory
 
+Where regression coverage lives, what each layer validates, and how to refresh snapshots.
+
 ## Rust unit tests (`analyzer/`)
 
 - Location: `analyzer/src/tests/`
 - Coverage includes:
-  - lexer/parser/AST
-  - diagnostics and parser recovery
+  - lexer/parser/AST behavior
+  - parser recovery + diagnostics priority/deconfliction
   - diagnostic actions (quick-fix actions attached to diagnostics)
-  - span invariants
-  - formatter
-  - completion/signature-help behavior
+  - span/token invariants (`Span`, `tokens_in_span`, `TokenQuery`)
+  - formatter behavior
+  - completion ranking + signature-help behavior
+  - semantic checks and builtin/type behavior
 
 Run:
 
@@ -20,8 +23,14 @@ cargo test -p analyzer
 ## Rust golden tests (`analyzer/`)
 
 Runners:
+
 - `analyzer/tests/format_golden.rs`
 - `analyzer/tests/diagnostics_golden.rs`
+
+Fixtures:
+
+- `analyzer/tests/format/*.formula` -> `*.snap`
+- `analyzer/tests/diagnostics/*.formula` -> `*.snap`
 
 Update snapshots:
 
@@ -33,12 +42,12 @@ BLESS=1 cargo test -p analyzer
 
 - `analyzer_wasm/tests/analyze.rs`
 - Validates:
-  - UTF-16 span correctness
+  - UTF-16 span/offset correctness (including emoji edge cases)
   - diagnostics + diagnostic action conversion
+  - line/column projection on diagnostic DTOs
   - `format(source, cursor)` success/failure contract
   - `apply_edits(source, edits, cursor)` validation and cursor rebasing
-  - UTF-16 conversion edge cases (emoji)
-  - context JSON validation
+  - strict `context_json` validation
 
 Run:
 
@@ -52,8 +61,24 @@ integration tests under `analyzer_wasm/tests/`.
 
 ## Vite demo tests (`examples/vite/`)
 
-- Unit tests: `examples/vite/tests/unit/`
-- E2E tests: `examples/vite/tests/e2e/`
+- Unit tests: `examples/vite/tests/unit/` (Vitest)
+- E2E tests: `examples/vite/tests/e2e/` (Playwright)
+
+Precondition:
+
+- Unit tests import the generated wasm package under `examples/vite/src/pkg/`.
+- Run `pnpm -C examples/vite wasm:build` at least once before `pnpm -C examples/vite test`.
+
+Regression coverage (non-exhaustive):
+
+- token highlighting and diagnostics propagation
+- chip spans/mapping and chip UI ranges
+- undo/redo editor keybindings
+- editor auto-height behavior
+- completion preferred indices + grouped rows
+- completion cursor placement (including UTF-16 content)
+- completion list scroll-into-view behavior
+- quick-fix action extraction and first-fix-per-click application
 
 Run:
 
