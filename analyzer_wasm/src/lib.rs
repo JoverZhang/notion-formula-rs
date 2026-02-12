@@ -13,10 +13,7 @@ use js_sys::Error as JsError;
 use wasm_bindgen::prelude::*;
 
 use crate::converter::Converter;
-use crate::dto::v1::{
-    AnalyzeResult, ApplyResult, Span as Utf16Span, TextEdit as Utf16TextEdit,
-};
-use crate::offsets::{byte_offset_to_utf16_offset, utf16_offset_to_byte};
+use crate::dto::v1::{AnalyzeResult, ApplyResult, Span as Utf16Span, TextEdit as Utf16TextEdit};
 use crate::text_edit::apply_text_edits_bytes_with_cursor;
 
 #[wasm_bindgen]
@@ -27,7 +24,7 @@ pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue>
         Ok(mut output) => {
             let (ty, diags) = analyzer::semantic::analyze_expr(&output.expr, &parsed.ctx);
             output.diagnostics.extend(diags);
-            Converter::analyze_output(&source, output, ty.to_string())
+            Converter::analyze_output(&source, output, ty)
         }
         Err(diag) => Converter::analyze_error(&source, &diag),
     };
@@ -68,7 +65,7 @@ pub fn apply_edits(source: String, edits: JsValue, cursor_utf16: u32) -> Result<
 
 #[wasm_bindgen]
 pub fn complete(source: String, cursor: usize, context_json: String) -> Result<JsValue, JsValue> {
-    let cursor_byte = Converter::cursor_utf16_to_byte(&source, cursor);
+    let cursor_byte = Converter::utf16_offset_to_byte(&source, cursor);
     let parsed = Converter::parse_context(&context_json)?;
 
     let output =
@@ -97,7 +94,7 @@ fn apply_sorted_byte_edits(
 
     let out = ApplyResult {
         source: updated_source.clone(),
-        cursor: byte_offset_to_utf16_offset(&updated_source, cursor_byte_after as usize),
+        cursor: Converter::byte_offset_to_utf16_offset(&updated_source, cursor_byte_after as usize),
     };
 
     serde_wasm_bindgen::to_value(&out).map_err(|_| JsValue::from(JsError::new("Serialize error")))
@@ -110,7 +107,7 @@ fn cursor_utf16_to_valid_byte(source: &str, cursor_utf16: u32) -> Result<usize, 
         return Err(JsValue::from(JsError::new("Invalid cursor")));
     }
 
-    let cursor_byte = utf16_offset_to_byte(source, cursor_utf16);
+    let cursor_byte = Converter::utf16_offset_to_byte(source, cursor_utf16);
     if !source.is_char_boundary(cursor_byte) {
         return Err(JsValue::from(JsError::new("Invalid cursor")));
     }
@@ -134,8 +131,8 @@ fn text_edits_utf16_to_sorted_byte(
             return Err(JsValue::from(JsError::new("Invalid edit range")));
         }
 
-        let start_byte = utf16_offset_to_byte(source, start_utf16);
-        let end_byte = utf16_offset_to_byte(source, end_utf16);
+        let start_byte = Converter::utf16_offset_to_byte(source, start_utf16);
+        let end_byte = Converter::utf16_offset_to_byte(source, end_utf16);
 
         if end_byte < start_byte {
             return Err(JsValue::from(JsError::new("Invalid edit range")));

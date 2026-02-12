@@ -2,6 +2,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { linter, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, keymap } from "@codemirror/view";
+import type { TextEdit } from "../analyzer/generated/wasm_dto";
 import {
   applyCompletionItem,
   applyEditsSource,
@@ -10,7 +11,6 @@ import {
   type CompletionItem,
   type SignatureHelp,
 } from "../analyzer/wasm_client";
-import type { TextEdit } from "../analyzer/generated/wasm_dto";
 import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
 import type { AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
@@ -499,10 +499,7 @@ export function createFormulaPanelView(opts: {
       lastQuickFixAction = firstDiagnosticAction(state.diagnostics);
       lastOutputType = state.outputType;
       quickFixBtn.disabled = !lastQuickFixAction;
-      quickFixBtn.title =
-        lastQuickFixAction
-          ? lastQuickFixAction.title
-          : "No quick fix available";
+      quickFixBtn.title = lastQuickFixAction ? lastQuickFixAction.title : "No quick fix available";
       const outputTypeLabel = `output: ${state.outputType}`;
       outputTypeValueEl.textContent = outputTypeLabel;
       outputTypeEl.title = outputTypeLabel;

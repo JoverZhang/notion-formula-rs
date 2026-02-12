@@ -1,39 +1,41 @@
+use crate::converter::Converter;
 use crate::converter::shared::span_dto;
 use crate::dto::v1::{
     CompletionItem, CompletionItemKind, CompletionOutput, DisplaySegment, SignatureHelp,
     SignatureItem, TextEdit,
 };
-use crate::offsets::byte_offset_to_utf16_offset;
 use crate::text_edit::apply_text_edits_bytes_with_cursor;
 
-pub(crate) fn completion_output_view(
-    source: &str,
-    output: &analyzer::CompletionOutput,
-) -> CompletionOutput {
-    let replace = span_dto(source, output.replace);
-    let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelp {
-        signatures: sig
-            .signatures
+impl Converter {
+    pub fn completion_output_view(
+        source: &str,
+        output: &analyzer::CompletionOutput,
+    ) -> CompletionOutput {
+        let replace = span_dto(source, output.replace);
+        let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelp {
+            signatures: sig
+                .signatures
+                .iter()
+                .map(|s| SignatureItem {
+                    segments: s.segments.iter().map(display_segment_view).collect(),
+                })
+                .collect(),
+            active_signature: sig.active_signature,
+            active_parameter: sig.active_parameter,
+        });
+
+        let items = output
+            .items
             .iter()
-            .map(|s| SignatureItem {
-                segments: s.segments.iter().map(display_segment_view).collect(),
-            })
-            .collect(),
-        active_signature: sig.active_signature,
-        active_parameter: sig.active_parameter,
-    });
+            .map(|item| completion_item_view(source, output, item))
+            .collect();
 
-    let items = output
-        .items
-        .iter()
-        .map(|item| completion_item_view(source, output, item))
-        .collect();
-
-    CompletionOutput {
-        items,
-        replace,
-        signature_help,
-        preferred_indices: output.preferred_indices.clone(),
+        CompletionOutput {
+            items,
+            replace,
+            signature_help,
+            preferred_indices: output.preferred_indices.clone(),
+        }
     }
 }
 
@@ -100,7 +102,7 @@ fn completion_item_view(
 
         let (updated, _) = apply_text_edits_bytes_with_cursor(source, &edits, 0);
         let cursor_byte = usize::min(usize::try_from(cursor_byte).unwrap_or(0), updated.len());
-        byte_offset_to_utf16_offset(&updated, cursor_byte)
+        Converter::byte_offset_to_utf16_offset(&updated, cursor_byte)
     });
 
     CompletionItem {

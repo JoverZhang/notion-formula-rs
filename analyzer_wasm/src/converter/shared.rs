@@ -1,6 +1,7 @@
 use analyzer::{
-    CodeAction as ByteCodeAction, Diagnostic as ByteDiagnostic, DiagnosticKind as ByteDiagnosticKind,
-    SourceMap, Span as ByteSpan, Token as ByteToken, TokenKind,
+    CodeAction as ByteCodeAction, Diagnostic as ByteDiagnostic,
+    DiagnosticKind as ByteDiagnosticKind, SourceMap, Span as ByteSpan, Token as ByteToken,
+    TokenKind,
 };
 
 use crate::dto::v1::{
@@ -21,7 +22,11 @@ pub(crate) fn diagnostic_view(
         span: span_dto(source, diag.span),
         line,
         col,
-        actions: diag.actions.iter().map(|action| code_action(source, action)).collect(),
+        actions: diag
+            .actions
+            .iter()
+            .map(|action| code_action(source, action))
+            .collect(),
     }
 }
 

@@ -59,9 +59,7 @@ describe("computeTokenDecorationRanges", () => {
 
 describe("getTokenSpanIssues", () => {
   it("flags out-of-bounds spans without overlap", () => {
-    const tokens: Token[] = [
-      { kind: "Ident", text: "prop", span: { start: 0, end: 4 } },
-    ];
+    const tokens: Token[] = [{ kind: "Ident", text: "prop", span: { start: 0, end: 4 } }];
 
     expect(getTokenSpanIssues(3, tokens)).toEqual({ outOfBounds: true, overlap: false });
   });

@@ -16,6 +16,7 @@
 ## Architecture
 
 Primary files:
+
 - `src/analyzer/wasm_client.ts`
 - `src/vm/app_vm.ts`
 - `src/ui/formula_panel_view.ts`
