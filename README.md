@@ -124,23 +124,23 @@ export function analyzeSource(source: string, contextJson: string): AnalyzeResul
 export function formatSource(
   source: string,
   cursor: number, // UTF-16 offset
-): ApplyResultView;
+): ApplyResult;
 export function applyEditsSource(
   source: string,
-  edits: TextEditView[],
+  edits: TextEdit[],
   cursor: number, // UTF-16 offset
-): ApplyResultView;
+): ApplyResult;
 export function completeSource(
   source: string,
   cursor: number, // UTF-16 offset
   contextJson: string,
-): CompletionOutputView;
+): CompletionOutput;
 
 // Under the hood, these call wasm-bindgen exports:
 // analyze(source, context_json) -> AnalyzeResult payload
-// format(source, cursor_utf16) -> ApplyResultView payload
-// apply_edits(source, edits, cursor_utf16) -> ApplyResultView payload
-// complete(source, cursor_utf16, context_json) -> CompletionOutputView payload
+// format(source, cursor_utf16) -> ApplyResult payload
+// apply_edits(source, edits, cursor_utf16) -> ApplyResult payload
+// complete(source, cursor_utf16, context_json) -> CompletionOutput payload
 ```
 
 `context_json` rules are strict:

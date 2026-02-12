@@ -5,9 +5,9 @@ This layer translates between editor coordinates (UTF-16) and core analyzer coor
 ## Exports
 
 - `analyze(source, context_json) -> AnalyzeResult`
-- `format(source, cursor_utf16) -> ApplyResultView`
-- `apply_edits(source, edits, cursor_utf16) -> ApplyResultView`
-- `complete(source, cursor_utf16, context_json) -> CompletionOutputView`
+- `format(source, cursor_utf16) -> ApplyResult`
+- `apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `complete(source, cursor_utf16, context_json) -> CompletionOutput`
 
 Rust signatures (wasm-bindgen):
 - `analyze(source: String, context_json: String) -> Result<JsValue, JsValue>`
@@ -25,10 +25,10 @@ Rust signatures (wasm-bindgen):
 ## DTOs (v1)
 
 - `AnalyzeResult { diagnostics, tokens, output_type }`
-- `DiagnosticView { kind, message, span, line, col, actions }`
-- `CodeActionView { title, edits }`
-- `TextEditView { range, new_text }`
-- `ApplyResultView { source, cursor }`
+- `Diagnostic { kind, message, span, line, col, actions }`
+- `CodeAction { title, edits }`
+- `TextEdit { range, new_text }`
+- `ApplyResult { source, cursor }`
 
 Diagnostics expose quick-fix actions directly as `actions`.
 Diagnostics include 1-based `line`/`col` for UI lists. These are
@@ -40,10 +40,12 @@ computed from diagnostic byte offsets through `analyzer::SourceMap::line_col`.
   - fails on any lex/parse diagnostic (`Err("Format error")`)
   - computes canonical formatted text
   - validates cursor against the input source
-  - returns updated source + UTF-16 cursor clamped to formatted length
+  - builds one full-document byte `TextEdit`
+  - applies through the shared byte-edit pipeline
+  - returns updated source + rebased UTF-16 cursor
 
 - `apply_edits(...)`:
-  - accepts UTF-16 `TextEditView[]`
+  - accepts UTF-16 `TextEdit[]`
   - converts to byte edits
   - validates ranges/boundaries/overlaps
   - applies with the shared byte-edit pipeline

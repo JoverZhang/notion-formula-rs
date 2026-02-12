@@ -73,9 +73,9 @@ Rust (`analyzer/`):
 WASM (`analyzer_wasm/`):
 
 - `analyze(source, context_json) -> AnalyzeResult`
-- `format(source, cursor_utf16) -> ApplyResultView`
-- `apply_edits(source, edits, cursor_utf16) -> ApplyResultView`
-- `complete(source, cursor_utf16, context_json) -> CompletionOutputView`
+- `format(source, cursor_utf16) -> ApplyResult`
+- `apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `complete(source, cursor_utf16, context_json) -> CompletionOutput`
 
 Tooling:
 
@@ -115,7 +115,7 @@ These are stability guarantees. Contract changes require docs + tests + changelo
 - Core spans are UTF-8 byte offsets (`analyzer/src/lexer/token.rs`).
 - DTO spans/edits are UTF-16 code units (`analyzer_wasm/src/dto/v1.rs`).
 - Conversion lives only in WASM (`analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`).
-- `DiagnosticView.line`/`col` are computed from byte offsets via `SourceMap::line_col` during
+- `Diagnostic.line`/`col` are computed from byte offsets via `SourceMap::line_col` during
   WASM conversion (`analyzer_wasm/src/converter/shared.rs`).
 
 ### Token stream
@@ -139,8 +139,10 @@ These are stability guarantees. Contract changes require docs + tests + changelo
 
 - Quick fixes are diagnostic-level payloads: `Diagnostic.actions: Vec<CodeAction>`.
 - Core edit model is unified: `TextEdit { range, new_text }` in byte coordinates.
-- WASM edit model is unified: `TextEditView` in UTF-16 coordinates.
+- WASM edit model is unified: `TextEdit` in UTF-16 coordinates.
 - `format` and `apply_edits` accept cursor and return `{ source, cursor }` on success.
+- `format` is implemented as one full-document `TextEdit` applied through the same
+  shared byte-edit pipeline used by `apply_edits`.
 - `format`/`apply_edits` failures throw `Err` (not payload-encoded status enums).
 
 ### Signature help
