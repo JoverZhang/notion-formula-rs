@@ -32,20 +32,14 @@ pub enum CompletionItemKind {
 
 /// Diagnostic severity/kind.
 #[derive(Serialize, TS, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DiagnosticKindView {
+pub enum DiagnosticKind {
     #[serde(rename = "error")]
     Error,
 }
 
-/// Wrapper around a [`Span`].
-#[derive(Serialize, TS)]
-pub struct SpanView {
-    pub range: Span,
-}
-
 /// A text edit in UTF-16 coordinates.
 #[derive(Serialize, Deserialize, TS)]
-pub struct TextEditView {
+pub struct TextEdit {
     /// Replace range in the original document (UTF-16, half-open).
     pub range: Span,
     /// Inserted verbatim.
@@ -54,41 +48,41 @@ pub struct TextEditView {
 
 /// A single diagnostic-attached code action.
 #[derive(Serialize, TS)]
-pub struct CodeActionView {
+pub struct CodeAction {
     pub title: String,
     /// Edits are in original-document coordinates (UTF-16).
-    pub edits: Vec<TextEditView>,
+    pub edits: Vec<TextEdit>,
 }
 
 /// A diagnostic message tied to a source span.
 #[derive(Serialize, TS)]
-pub struct DiagnosticView {
-    pub kind: DiagnosticKindView,
+pub struct Diagnostic {
+    pub kind: DiagnosticKind,
     pub message: String,
     /// Location in the source text (UTF-16 span).
-    pub span: SpanView,
+    pub span: Span,
     /// 1-based line number derived from source byte offsets.
     pub line: usize,
     /// 1-based column number as Unicode scalar (`char`) count.
     pub col: usize,
     /// Diagnostic-level code actions.
-    pub actions: Vec<CodeActionView>,
+    pub actions: Vec<CodeAction>,
 }
 
 /// A token view for editor tooling.
 #[derive(Serialize, TS)]
-pub struct TokenView {
+pub struct Token {
     pub kind: String,
     pub text: String,
     /// Location in the source text (UTF-16 span).
-    pub span: SpanView,
+    pub span: Span,
 }
 
 /// Result payload returned from the `analyze` WASM export.
 #[derive(Serialize, TS)]
 pub struct AnalyzeResult {
-    pub diagnostics: Vec<DiagnosticView>,
-    pub tokens: Vec<TokenView>,
+    pub diagnostics: Vec<Diagnostic>,
+    pub tokens: Vec<Token>,
     /// Inferred root expression type rendered for UI (e.g. `"number | string"`).
     ///
     /// Never nullable. Unknown/failed inference is represented as `"unknown"`.
@@ -97,7 +91,7 @@ pub struct AnalyzeResult {
 
 /// Result payload for `format` and `apply_edits`.
 #[derive(Serialize, TS)]
-pub struct ApplyResultView {
+pub struct ApplyResult {
     pub source: String,
     /// Cursor position in the updated document (UTF-16).
     pub cursor: u32,
@@ -105,21 +99,21 @@ pub struct ApplyResultView {
 
 /// Signature help for a call expression.
 #[derive(Serialize, TS)]
-pub struct SignatureHelpView {
-    pub signatures: Vec<SignatureItemView>,
+pub struct SignatureHelp {
+    pub signatures: Vec<SignatureItem>,
     pub active_signature: usize,
     pub active_parameter: usize,
 }
 
 /// A single signature in signature help.
 #[derive(Serialize, TS)]
-pub struct SignatureItemView {
-    pub segments: Vec<DisplaySegmentView>,
+pub struct SignatureItem {
+    pub segments: Vec<DisplaySegment>,
 }
 
 #[derive(Serialize, TS)]
 #[serde(tag = "kind", rename_all = "PascalCase")]
-pub enum DisplaySegmentView {
+pub enum DisplaySegment {
     Name {
         text: String,
     },
@@ -145,16 +139,16 @@ pub enum DisplaySegmentView {
 
 /// A single completion item.
 #[derive(Serialize, TS)]
-pub struct CompletionItemView {
+pub struct CompletionItem {
     pub label: String,
     pub kind: CompletionItemKind,
     pub insert_text: String,
     /// Primary edit to apply in the original document (UTF-16), if available.
-    pub primary_edit: Option<TextEditView>,
+    pub primary_edit: Option<TextEdit>,
     /// Cursor position in the updated document after applying edits (UTF-16).
     pub cursor: Option<u32>,
     /// Additional edits to apply in the original document (UTF-16).
-    pub additional_edits: Vec<TextEditView>,
+    pub additional_edits: Vec<TextEdit>,
     pub detail: Option<String>,
     pub is_disabled: bool,
     pub disabled_reason: Option<String>,
@@ -162,10 +156,10 @@ pub struct CompletionItemView {
 
 /// Completion result payload returned from the `complete` WASM export.
 #[derive(Serialize, TS)]
-pub struct CompletionOutputView {
-    pub items: Vec<CompletionItemView>,
+pub struct CompletionOutput {
+    pub items: Vec<CompletionItem>,
     /// Replace range in the original document (UTF-16).
     pub replace: Span,
-    pub signature_help: Option<SignatureHelpView>,
+    pub signature_help: Option<SignatureHelp>,
     pub preferred_indices: Vec<usize>,
 }

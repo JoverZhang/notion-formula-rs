@@ -1,66 +1,63 @@
-use analyzer::{Diagnostic, DiagnosticKind, SourceMap, Span, Token, TokenKind};
+use analyzer::{
+    CodeAction as ByteCodeAction, Diagnostic as ByteDiagnostic, DiagnosticKind as ByteDiagnosticKind,
+    SourceMap, Span as ByteSpan, Token as ByteToken, TokenKind,
+};
 
 use crate::dto::v1::{
-    CodeActionView, DiagnosticKindView, DiagnosticView, Span as SpanDto, SpanView, TextEditView,
-    TokenView,
+    CodeAction, Diagnostic, DiagnosticKind, Span as Utf16Span, TextEdit as Utf16TextEdit, Token,
 };
 use crate::span::byte_span_to_utf16_span;
 
 pub(crate) fn diagnostic_view(
     source: &str,
     sm: &SourceMap<'_>,
-    diag: &Diagnostic,
-) -> DiagnosticView {
+    diag: &ByteDiagnostic,
+) -> Diagnostic {
     let (line, col) = sm.line_col(diag.span.start);
 
-    DiagnosticView {
+    Diagnostic {
         kind: diagnostic_kind_view(&diag.kind),
         message: diag.message.clone(),
-        span: span_view(source, diag.span),
+        span: span_dto(source, diag.span),
         line,
         col,
-        actions: diag
-            .actions
+        actions: diag.actions.iter().map(|action| code_action(source, action)).collect(),
+    }
+}
+
+pub(crate) fn token_view(source: &str, token: &ByteToken) -> Token {
+    let start = token.span.start as usize;
+    let end = token.span.end as usize;
+    let text = source.get(start..end).unwrap_or("").to_string();
+
+    Token {
+        kind: token_kind_string(&token.kind).to_string(),
+        text,
+        span: span_dto(source, token.span),
+    }
+}
+
+fn code_action(source: &str, action: &ByteCodeAction) -> CodeAction {
+    CodeAction {
+        title: action.title.clone(),
+        edits: action
+            .edits
             .iter()
-            .map(|action| CodeActionView {
-                title: action.title.clone(),
-                edits: action
-                    .edits
-                    .iter()
-                    .map(|edit| TextEditView {
-                        range: span_dto(source, edit.range),
-                        new_text: edit.new_text.clone(),
-                    })
-                    .collect(),
+            .map(|edit| Utf16TextEdit {
+                range: span_dto(source, edit.range),
+                new_text: edit.new_text.clone(),
             })
             .collect(),
     }
 }
 
-pub(crate) fn token_view(source: &str, token: &Token) -> TokenView {
-    let start = token.span.start as usize;
-    let end = token.span.end as usize;
-    let text = source.get(start..end).unwrap_or("").to_string();
-
-    TokenView {
-        kind: token_kind_string(&token.kind).to_string(),
-        text,
-        span: span_view(source, token.span),
-    }
-}
-
-pub(crate) fn span_view(source: &str, span: Span) -> SpanView {
-    let range = byte_span_to_utf16_span(source, span);
-    SpanView { range }
-}
-
-pub(crate) fn span_dto(source: &str, span: Span) -> SpanDto {
+pub(crate) fn span_dto(source: &str, span: ByteSpan) -> Utf16Span {
     byte_span_to_utf16_span(source, span)
 }
 
-fn diagnostic_kind_view(kind: &DiagnosticKind) -> DiagnosticKindView {
+fn diagnostic_kind_view(kind: &ByteDiagnosticKind) -> DiagnosticKind {
     match kind {
-        DiagnosticKind::Error => DiagnosticKindView::Error,
+        ByteDiagnosticKind::Error => DiagnosticKind::Error,
     }
 }
 

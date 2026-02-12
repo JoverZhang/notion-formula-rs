@@ -1,16 +1,16 @@
 import init, * as wasm from "../pkg/analyzer_wasm.js";
 import type {
   AnalyzeResult,
-  ApplyResultView,
-  CompletionItemView,
-  CompletionOutputView,
-  SignatureHelpView,
-  TextEditView,
+  ApplyResult,
+  CompletionItem as CompletionItemDto,
+  CompletionOutput,
+  SignatureHelp as SignatureHelpDto,
+  TextEdit,
 } from "./generated/wasm_dto";
 
 export type { Span } from "./generated/wasm_dto";
-export type CompletionItem = CompletionItemView;
-export type SignatureHelp = SignatureHelpView;
+export type CompletionItem = CompletionItemDto;
+export type SignatureHelp = SignatureHelpDto;
 
 export type CompletionState = {
   items: CompletionItem[];
@@ -52,24 +52,24 @@ export function analyzeSource(source: string, contextJson: string): AnalyzeResul
   return wasm.analyze(source, contextJson) as AnalyzeResult;
 }
 
-export function formatSource(source: string, cursorUtf16: number): ApplyResultView {
-  return wasm.format(source, cursorUtf16) as ApplyResultView;
+export function formatSource(source: string, cursorUtf16: number): ApplyResult {
+  return wasm.format(source, cursorUtf16) as ApplyResult;
 }
 
 export function applyEditsSource(
   source: string,
-  edits: TextEditView[],
+  edits: TextEdit[],
   cursorUtf16: number,
-): ApplyResultView {
-  return wasm.apply_edits(source, edits, cursorUtf16) as ApplyResultView;
+): ApplyResult {
+  return wasm.apply_edits(source, edits, cursorUtf16) as ApplyResult;
 }
 
 export function completeSource(
   source: string,
   cursor: number,
   contextJson: string,
-): CompletionOutputView {
-  return wasm.complete(source, cursor, contextJson) as CompletionOutputView;
+): CompletionOutput {
+  return wasm.complete(source, cursor, contextJson) as CompletionOutput;
 }
 
 export function buildCompletionState(

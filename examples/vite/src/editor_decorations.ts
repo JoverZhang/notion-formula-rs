@@ -1,8 +1,8 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import type { TokenView } from "./analyzer/generated/wasm_dto";
+import type { Token as AnalyzerToken } from "./analyzer/generated/wasm_dto";
 
-export type Token = TokenView;
+export type Token = AnalyzerToken;
 
 export type Chip = {
   spanStart: number;
@@ -43,11 +43,11 @@ function isTriviaKind(kind: string): boolean {
 
 export function sortTokens(tokens: Token[]): Token[] {
   return [...tokens].sort((a, b) => {
-    const aStart = a.span?.range?.start ?? Number.MAX_SAFE_INTEGER;
-    const bStart = b.span?.range?.start ?? Number.MAX_SAFE_INTEGER;
+    const aStart = a.span?.start ?? Number.MAX_SAFE_INTEGER;
+    const bStart = b.span?.start ?? Number.MAX_SAFE_INTEGER;
     if (aStart !== bStart) return aStart - bStart;
-    const aEnd = a.span?.range?.end ?? Number.MAX_SAFE_INTEGER;
-    const bEnd = b.span?.range?.end ?? Number.MAX_SAFE_INTEGER;
+    const aEnd = a.span?.end ?? Number.MAX_SAFE_INTEGER;
+    const bEnd = b.span?.end ?? Number.MAX_SAFE_INTEGER;
     return aEnd - bEnd;
   });
 }
@@ -65,7 +65,7 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
   for (let i = 0; i < sortedTokens.length; i += 1) {
     const ident = sortedTokens[i];
     if (!ident || ident.kind !== "Ident" || ident.text !== "prop") continue;
-    const identStart = ident.span?.range?.start;
+    const identStart = ident.span?.start;
     if (typeof identStart !== "number") continue;
 
     const openIndex = nextNonTrivia(sortedTokens, i + 1);
@@ -80,9 +80,9 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     const closeParen = sortedTokens[closeIndex];
     if (!closeParen || closeParen.kind !== "CloseParen") continue;
 
-    const stringStart = stringToken.span?.range?.start;
-    const stringEnd = stringToken.span?.range?.end;
-    const closeEnd = closeParen.span?.range?.end;
+    const stringStart = stringToken.span?.start;
+    const stringEnd = stringToken.span?.end;
+    const closeEnd = closeParen.span?.end;
     if (typeof stringStart !== "number" || typeof stringEnd !== "number") continue;
     if (typeof closeEnd !== "number" || closeEnd <= stringEnd) continue;
 
@@ -121,8 +121,8 @@ function scanTokenSpans(
   let outOfBounds = false;
   for (const token of tokens) {
     if (!token || token.kind === "Eof") continue;
-    const start = token.span?.range?.start;
-    const end = token.span?.range?.end;
+    const start = token.span?.start;
+    const end = token.span?.end;
     if (typeof start !== "number" || typeof end !== "number") continue;
     if (start === end) continue;
     if (start < 0 || end < 0 || end < start || start > docLen || end > docLen) {

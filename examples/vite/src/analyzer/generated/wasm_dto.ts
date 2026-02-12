@@ -12,9 +12,7 @@ start: number,
  */
 end: number, };
 
-export type SpanView = { range: Span, };
-
-export type TextEditView = { 
+export type TextEdit = { 
 /**
  * Replace range in the original document (UTF-16, half-open).
  */
@@ -24,19 +22,19 @@ range: Span,
  */
 new_text: string, };
 
-export type CodeActionView = { title: string, 
+export type CodeAction = { title: string, 
 /**
  * Edits are in original-document coordinates (UTF-16).
  */
-edits: Array<TextEditView>, };
+edits: Array<TextEdit>, };
 
-export type DiagnosticKindView = "error";
+export type DiagnosticKind = "error";
 
-export type DiagnosticView = { kind: DiagnosticKindView, message: string, 
+export type Diagnostic = { kind: DiagnosticKind, message: string, 
 /**
  * Location in the source text (UTF-16 span).
  */
-span: SpanView, 
+span: Span, 
 /**
  * 1-based line number derived from source byte offsets.
  */
@@ -48,15 +46,15 @@ col: number,
 /**
  * Diagnostic-level code actions.
  */
-actions: Array<CodeActionView>, };
+actions: Array<CodeAction>, };
 
-export type TokenView = { kind: string, text: string, 
+export type Token = { kind: string, text: string, 
 /**
  * Location in the source text (UTF-16 span).
  */
-span: SpanView, };
+span: Span, };
 
-export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<TokenView>, 
+export type AnalyzeResult = { diagnostics: Array<Diagnostic>, tokens: Array<Token>, 
 /**
  * Inferred root expression type rendered for UI (e.g. `"number | string"`).
  *
@@ -64,25 +62,25 @@ export type AnalyzeResult = { diagnostics: Array<DiagnosticView>, tokens: Array<
  */
 output_type: string, };
 
-export type ApplyResultView = { source: string, 
+export type ApplyResult = { source: string, 
 /**
  * Cursor position in the updated document (UTF-16).
  */
 cursor: number, };
 
-export type DisplaySegmentView = { "kind": "Name", text: string, } | { "kind": "Punct", text: string, } | { "kind": "Separator", text: string, } | { "kind": "Ellipsis" } | { "kind": "Arrow", text: string, } | { "kind": "Param", name: string, ty: string, param_index: number | null, } | { "kind": "ReturnType", text: string, };
+export type DisplaySegment = { "kind": "Name", text: string, } | { "kind": "Punct", text: string, } | { "kind": "Separator", text: string, } | { "kind": "Ellipsis" } | { "kind": "Arrow", text: string, } | { "kind": "Param", name: string, ty: string, param_index: number | null, } | { "kind": "ReturnType", text: string, };
 
-export type SignatureItemView = { segments: Array<DisplaySegmentView>, };
+export type SignatureItem = { segments: Array<DisplaySegment>, };
 
-export type SignatureHelpView = { signatures: Array<SignatureItemView>, active_signature: number, active_parameter: number, };
+export type SignatureHelp = { signatures: Array<SignatureItem>, active_signature: number, active_parameter: number, };
 
 export type CompletionItemKind = "FunctionGeneral" | "FunctionText" | "FunctionNumber" | "FunctionDate" | "FunctionPeople" | "FunctionList" | "FunctionSpecial" | "Builtin" | "Property" | "Operator";
 
-export type CompletionItemView = { label: string, kind: CompletionItemKind, insert_text: string, 
+export type CompletionItem = { label: string, kind: CompletionItemKind, insert_text: string, 
 /**
  * Primary edit to apply in the original document (UTF-16), if available.
  */
-primary_edit: TextEditView | null, 
+primary_edit: TextEdit | null, 
 /**
  * Cursor position in the updated document after applying edits (UTF-16).
  */
@@ -90,11 +88,11 @@ cursor: number | null,
 /**
  * Additional edits to apply in the original document (UTF-16).
  */
-additional_edits: Array<TextEditView>, detail: string | null, is_disabled: boolean, disabled_reason: string | null, };
+additional_edits: Array<TextEdit>, detail: string | null, is_disabled: boolean, disabled_reason: string | null, };
 
-export type CompletionOutputView = { items: Array<CompletionItemView>, 
+export type CompletionOutput = { items: Array<CompletionItem>, 
 /**
  * Replace range in the original document (UTF-16).
  */
-replace: Span, signature_help: SignatureHelpView | null, preferred_indices: Array<number>, };
+replace: Span, signature_help: SignatureHelp | null, preferred_indices: Array<number>, };
 

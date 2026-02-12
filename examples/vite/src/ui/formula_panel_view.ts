@@ -10,7 +10,7 @@ import {
   type CompletionItem,
   type SignatureHelp,
 } from "../analyzer/wasm_client";
-import type { TextEditView } from "../analyzer/generated/wasm_dto";
+import type { TextEdit } from "../analyzer/generated/wasm_dto";
 import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
 import type { AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
@@ -105,7 +105,7 @@ function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
 
 export function firstDiagnosticAction(
   diagnostics: AnalyzerDiagnostic[],
-): { title: string; edits: TextEditView[] } | null {
+): { title: string; edits: TextEdit[] } | null {
   for (const diag of diagnostics) {
     for (const action of diag.actions ?? []) {
       if (!action) continue;
@@ -424,7 +424,7 @@ export function createFormulaPanelView(opts: {
   let lastChipUiRanges: ChipDecorationRange[] = [];
   let lastChipSpans: ChipSpan[] = [];
   let lastChipMap: ChipOffsetMap | null = null;
-  let lastQuickFixAction: { title: string; edits: TextEditView[] } | null = null;
+  let lastQuickFixAction: { title: string; edits: TextEdit[] } | null = null;
   let lastOutputType = "unknown";
   let lastSource = opts.initialSource;
 

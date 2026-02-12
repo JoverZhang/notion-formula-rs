@@ -3,7 +3,7 @@
 //! This module is intentionally stateless and centralizes:
 //! - Input conversion (e.g. parsing context JSON).
 //! - UTF-16 ↔ byte offset bridging for editor-facing positions.
-//! - DTO conversion (internal analyzer types → `dto::v1::*` views).
+//! - DTO conversion (internal analyzer types → `dto::v1::*`).
 
 mod analyze;
 mod completion;
@@ -12,7 +12,7 @@ mod shared;
 
 use wasm_bindgen::prelude::JsValue;
 
-use crate::dto::v1::{AnalyzeResult, CompletionOutputView};
+use crate::dto::v1::{AnalyzeResult, CompletionOutput};
 use crate::offsets::utf16_offset_to_byte;
 
 pub use context::ParsedContext;
@@ -45,7 +45,7 @@ impl Converter {
     pub fn completion_output_view(
         source: &str,
         output: &analyzer::CompletionOutput,
-    ) -> CompletionOutputView {
+    ) -> CompletionOutput {
         completion::completion_output_view(source, output)
     }
 }

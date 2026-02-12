@@ -55,8 +55,8 @@ mod tests {
             .first()
             .expect("expected diagnostic for incomplete expression");
 
-        assert_eq!(diag.span.range.start, 6);
-        assert_eq!(diag.span.range.end, 7);
+        assert_eq!(diag.span.start, 6);
+        assert_eq!(diag.span.end, 7);
         assert_eq!(diag.line, 2);
         assert_eq!(diag.col, 3);
     }

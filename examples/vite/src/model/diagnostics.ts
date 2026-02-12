@@ -37,9 +37,9 @@ function toCmSeverity(kind?: string): "error" | "warning" | "info" {
 }
 
 export function normalizeDiagRange(diag: AnalyzerDiagnostic, docLen: number): Range | null {
-  const start = diag.span?.range?.start;
+  const start = diag.span?.start;
   if (typeof start !== "number") return null;
-  const end = diag.span?.range?.end;
+  const end = diag.span?.end;
   const from = clamp(start, 0, docLen);
   const rawTo = typeof end === "number" ? end : start + 1;
   return { from, to: clamp(Math.max(rawTo, from + 1), 0, docLen) };

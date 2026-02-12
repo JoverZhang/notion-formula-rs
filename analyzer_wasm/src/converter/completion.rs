@@ -1,7 +1,7 @@
 use crate::converter::shared::span_dto;
 use crate::dto::v1::{
-    CompletionItemKind, CompletionItemView, CompletionOutputView, DisplaySegmentView,
-    SignatureHelpView, SignatureItemView, TextEditView,
+    CompletionItem, CompletionItemKind, CompletionOutput, DisplaySegment, SignatureHelp,
+    SignatureItem, TextEdit,
 };
 use crate::offsets::byte_offset_to_utf16_offset;
 use crate::text_edit::apply_text_edits_bytes_with_cursor;
@@ -9,13 +9,13 @@ use crate::text_edit::apply_text_edits_bytes_with_cursor;
 pub(crate) fn completion_output_view(
     source: &str,
     output: &analyzer::CompletionOutput,
-) -> CompletionOutputView {
+) -> CompletionOutput {
     let replace = span_dto(source, output.replace);
-    let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelpView {
+    let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelp {
         signatures: sig
             .signatures
             .iter()
-            .map(|s| SignatureItemView {
+            .map(|s| SignatureItem {
                 segments: s.segments.iter().map(display_segment_view).collect(),
             })
             .collect(),
@@ -29,7 +29,7 @@ pub(crate) fn completion_output_view(
         .map(|item| completion_item_view(source, output, item))
         .collect();
 
-    CompletionOutputView {
+    CompletionOutput {
         items,
         replace,
         signature_help,
@@ -41,8 +41,8 @@ fn completion_item_view(
     source: &str,
     output: &analyzer::CompletionOutput,
     item: &analyzer::CompletionItem,
-) -> CompletionItemView {
-    let primary_edit_view = item.primary_edit.as_ref().map(|edit| TextEditView {
+) -> CompletionItem {
+    let primary_edit_view = item.primary_edit.as_ref().map(|edit| TextEdit {
         range: span_dto(source, edit.range),
         new_text: edit.new_text.clone(),
     });
@@ -50,7 +50,7 @@ fn completion_item_view(
     let additional_edits = item
         .additional_edits
         .iter()
-        .map(|edit| TextEditView {
+        .map(|edit| TextEdit {
             range: span_dto(source, edit.range),
             new_text: edit.new_text.clone(),
         })
@@ -103,7 +103,7 @@ fn completion_item_view(
         byte_offset_to_utf16_offset(&updated, cursor_byte)
     });
 
-    CompletionItemView {
+    CompletionItem {
         label: item.label.clone(),
         kind: completion_kind_view(item.kind),
         insert_text: item.insert_text.clone(),
@@ -116,24 +116,24 @@ fn completion_item_view(
     }
 }
 
-fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> DisplaySegmentView {
+fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> DisplaySegment {
     use analyzer::ide::display::DisplaySegment as S;
     match seg {
-        S::Name { text } => DisplaySegmentView::Name { text: text.clone() },
-        S::Punct { text } => DisplaySegmentView::Punct { text: text.clone() },
-        S::Separator { text } => DisplaySegmentView::Separator { text: text.clone() },
-        S::Ellipsis => DisplaySegmentView::Ellipsis,
-        S::Arrow { text } => DisplaySegmentView::Arrow { text: text.clone() },
+        S::Name { text } => DisplaySegment::Name { text: text.clone() },
+        S::Punct { text } => DisplaySegment::Punct { text: text.clone() },
+        S::Separator { text } => DisplaySegment::Separator { text: text.clone() },
+        S::Ellipsis => DisplaySegment::Ellipsis,
+        S::Arrow { text } => DisplaySegment::Arrow { text: text.clone() },
         S::Param {
             name,
             ty,
             param_index,
-        } => DisplaySegmentView::Param {
+        } => DisplaySegment::Param {
             name: name.clone(),
             ty: ty.clone(),
             param_index: *param_index,
         },
-        S::ReturnType { text } => DisplaySegmentView::ReturnType { text: text.clone() },
+        S::ReturnType { text } => DisplaySegment::ReturnType { text: text.clone() },
     }
 }
 

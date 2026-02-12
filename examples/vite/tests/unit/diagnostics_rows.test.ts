@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { DiagnosticView } from "../../src/analyzer/generated/wasm_dto";
+import type { Diagnostic } from "../../src/analyzer/generated/wasm_dto";
 import { buildDiagnosticTextRows } from "../../src/model/diagnostics";
 
-function diag(overrides: Partial<DiagnosticView>): DiagnosticView {
+function diag(overrides: Partial<Diagnostic>): Diagnostic {
   return {
     kind: "error",
     message: "msg",
-    span: { range: { start: 0, end: 1 } },
+    span: { start: 0, end: 1 },
     line: 1,
     col: 1,
     actions: [],
@@ -29,7 +29,7 @@ describe("buildDiagnosticTextRows", () => {
   it("keeps chip position suffix with line/col prefix", () => {
     const rows = buildDiagnosticTextRows(
       "x",
-      [diag({ message: "expected expression", line: 4, col: 9, span: { range: { start: 2, end: 3 } } })],
+      [diag({ message: "expected expression", line: 4, col: 9, span: { start: 2, end: 3 } })],
       {
         toChipPos: (rawPos: number) => rawPos,
         toRawPos: (chipPos: number) => chipPos,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { SignatureHelpView } from "../../src/analyzer/generated/wasm_dto";
+import type { SignatureHelp } from "../../src/analyzer/generated/wasm_dto";
 import { planSignatureTokens } from "../../src/model/signature";
 
-function makeSignatureHelp(): SignatureHelpView {
+function makeSignatureHelp(): SignatureHelp {
   return {
     signatures: [
       {

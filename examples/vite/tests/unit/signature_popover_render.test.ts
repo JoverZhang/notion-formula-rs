@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SignatureHelpView } from "../../src/analyzer/generated/wasm_dto";
+import type { SignatureHelp } from "../../src/analyzer/generated/wasm_dto";
 import { createSignaturePopover } from "../../src/ui/signature_popover";
 
-function makeLongSignatureHelp(): SignatureHelpView {
+function makeLongSignatureHelp(): SignatureHelp {
   return {
     signatures: [
       {

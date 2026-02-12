@@ -11,21 +11,21 @@ This crate owns all UTF-16 ↔ UTF-8 byte conversion. Core analyzer stays byte-o
 Defined in `analyzer_wasm/src/lib.rs`:
 
 - `analyze(source, context_json) -> AnalyzeResult`
-- `format(source, cursor_utf16) -> ApplyResultView`
-- `apply_edits(source, edits, cursor_utf16) -> ApplyResultView`
-- `complete(source, cursor_utf16, context_json) -> CompletionOutputView`
+- `format(source, cursor_utf16) -> ApplyResult`
+- `apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `complete(source, cursor_utf16, context_json) -> CompletionOutput`
 
 ## DTOs (`dto::v1`)
 
 - `AnalyzeResult { diagnostics, tokens, output_type }`
-- `DiagnosticView { kind, message, span, line, col, actions }`
-- `CodeActionView { title, edits }`
-- `TextEditView { range, new_text }`
-- `ApplyResultView { source, cursor }`
-- `CompletionOutputView { items, replace, signature_help, preferred_indices }`
+- `Diagnostic { kind, message, span, line, col, actions }`
+- `CodeAction { title, edits }`
+- `TextEdit { range, new_text }`
+- `ApplyResult { source, cursor }`
+- `CompletionOutput { items, replace, signature_help, preferred_indices }`
 
 All spans/offsets in DTOs are UTF-16 code units and half-open `[start, end)`.
-`DiagnosticView.line`/`col` are 1-based values derived from core byte spans via
+`Diagnostic.line`/`col` are 1-based values derived from core byte spans via
 `analyzer::SourceMap::line_col` (`col` is Unicode scalar count).
 
 ## Error model
@@ -44,9 +44,9 @@ All spans/offsets in DTOs are UTF-16 code units and half-open `[start, end)`.
 
 - `apply_edits` rebases cursor through the shared byte-edit pipeline in
   `analyzer_wasm/src/text_edit.rs`.
-- `format` validates the incoming cursor against the original source and returns a
-  UTF-16 cursor clamped to formatted output length (it does not rebase through a
-  synthetic full-document edit).
+- `format` validates the incoming cursor against the original source, builds one
+  full-document byte `TextEdit`, and applies it through the same shared byte-edit
+  pipeline used by `apply_edits`.
 
 ## `context_json` contract
 

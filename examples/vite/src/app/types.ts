@@ -1,10 +1,10 @@
-import type { DiagnosticView } from "../analyzer/generated/wasm_dto";
+import type { Diagnostic } from "../analyzer/generated/wasm_dto";
 import type { Token } from "../editor_decorations";
 
 export const FORMULA_IDS = ["f1", "f2"] as const;
 export type FormulaId = (typeof FORMULA_IDS)[number];
 
-export type AnalyzerDiagnostic = DiagnosticView;
+export type AnalyzerDiagnostic = Diagnostic;
 
 export type FormulaState = {
   id: FormulaId;

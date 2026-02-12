@@ -105,7 +105,7 @@ export class AppVM {
       const diag: AnalyzerDiagnostic = {
         kind: "error",
         message: "analysis failed",
-        span: { range: { start: 0, end: 0 } },
+        span: { start: 0, end: 0 },
         line: 1,
         col: 1,
         actions: [],

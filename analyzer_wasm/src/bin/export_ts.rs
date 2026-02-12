@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
-    AnalyzeResult, ApplyResultView, CodeActionView, CompletionItemKind, CompletionItemView,
-    CompletionOutputView, DiagnosticKindView, DiagnosticView, DisplaySegmentView,
-    SignatureHelpView, SignatureItemView, Span, SpanView, TextEditView, TokenView,
+    AnalyzeResult, ApplyResult, CodeAction, CompletionItem, CompletionItemKind, CompletionOutput,
+    Diagnostic, DiagnosticKind, DisplaySegment, SignatureHelp, SignatureItem, Span, TextEdit,
+    Token,
 };
 use ts_rs::TS;
 
@@ -22,20 +22,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for decl in [
         Span::decl(),
-        SpanView::decl(),
-        TextEditView::decl(),
-        CodeActionView::decl(),
-        DiagnosticKindView::decl(),
-        DiagnosticView::decl(),
-        TokenView::decl(),
+        TextEdit::decl(),
+        CodeAction::decl(),
+        DiagnosticKind::decl(),
+        Diagnostic::decl(),
+        Token::decl(),
         AnalyzeResult::decl(),
-        ApplyResultView::decl(),
-        DisplaySegmentView::decl(),
-        SignatureItemView::decl(),
-        SignatureHelpView::decl(),
+        ApplyResult::decl(),
+        DisplaySegment::decl(),
+        SignatureItem::decl(),
+        SignatureHelp::decl(),
         CompletionItemKind::decl(),
-        CompletionItemView::decl(),
-        CompletionOutputView::decl(),
+        CompletionItem::decl(),
+        CompletionOutput::decl(),
     ] {
         let decl = export_decl(decl);
         out.push_str(&decl);

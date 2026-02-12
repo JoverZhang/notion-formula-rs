@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompletionItemView, SignatureHelpView } from "../../src/analyzer/generated/wasm_dto";
+import type { CompletionItem, SignatureHelp } from "../../src/analyzer/generated/wasm_dto";
 import { createFormulaPanelView } from "../../src/ui/formula_panel_view";
 
 type MockCompleteOutput = {
-  items: CompletionItemView[];
-  signature_help: SignatureHelpView | null;
+  items: CompletionItem[];
+  signature_help: SignatureHelp | null;
   preferred_indices: number[];
   replace?: { start: number; end: number };
 };
@@ -68,7 +68,7 @@ function mountAndGetEditorView(initialSource: string): EditorView {
 }
 
 describe("recommended completions", () => {
-  const items: CompletionItemView[] = [
+  const items: CompletionItem[] = [
     {
       label: "textFn",
       kind: "FunctionText",

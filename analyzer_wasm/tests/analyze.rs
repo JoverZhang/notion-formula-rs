@@ -6,12 +6,12 @@ use wasm_bindgen_test::wasm_bindgen_test;
 #[derive(Deserialize)]
 struct AnalyzeResult {
     diagnostics: Vec<Diagnostic>,
-    tokens: Vec<TokenView>,
+    tokens: Vec<Token>,
     output_type: String,
 }
 
 #[derive(Deserialize)]
-struct ApplyResultView {
+struct ApplyResult {
     source: String,
     cursor: u32,
 }
@@ -23,36 +23,31 @@ struct Span {
 }
 
 #[derive(Deserialize)]
-struct SpanView {
-    range: Span,
-}
-
-#[derive(Deserialize)]
 struct Diagnostic {
     kind: String,
     #[allow(dead_code)]
     message: String,
-    span: SpanView,
+    span: Span,
     line: usize,
     col: usize,
-    actions: Vec<CodeActionView>,
+    actions: Vec<CodeAction>,
 }
 
 #[derive(Deserialize)]
-struct CodeActionView {
+struct CodeAction {
     title: String,
-    edits: Vec<TextEditView>,
+    edits: Vec<TextEdit>,
 }
 
 #[derive(Deserialize)]
-struct TokenView {
+struct Token {
     kind: String,
     text: String,
-    span: SpanView,
+    span: Span,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-struct TextEditView {
+struct TextEdit {
     range: Span,
     new_text: String,
 }
@@ -63,24 +58,24 @@ fn analyze_value(source: &str) -> AnalyzeResult {
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
 }
 
-fn format_value(source: &str, cursor_utf16: u32) -> ApplyResultView {
+fn format_value(source: &str, cursor_utf16: u32) -> ApplyResult {
     let value =
         analyzer_wasm::format(source.to_string(), cursor_utf16).expect("expected format() Ok");
-    serde_wasm_bindgen::from_value(value).expect("expected ApplyResultView")
+    serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
 
-fn edit(start: u32, end: u32, new_text: &str) -> TextEditView {
-    TextEditView {
+fn edit(start: u32, end: u32, new_text: &str) -> TextEdit {
+    TextEdit {
         range: Span { start, end },
         new_text: new_text.to_string(),
     }
 }
 
-fn apply_edits_value(source: &str, edits: &[TextEditView], cursor_utf16: u32) -> ApplyResultView {
+fn apply_edits_value(source: &str, edits: &[TextEdit], cursor_utf16: u32) -> ApplyResult {
     let edits: JsValue = serde_wasm_bindgen::to_value(edits).expect("expected edits JsValue");
     let value = analyzer_wasm::apply_edits(source.to_string(), edits, cursor_utf16)
         .expect("expected apply_edits() Ok");
-    serde_wasm_bindgen::from_value(value).expect("expected ApplyResultView")
+    serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
 
 fn utf16_slice(source: &str, start: usize, end: usize) -> String {
@@ -136,22 +131,18 @@ fn analyze_ascii_spans_and_output_type() {
     assert_eq!(kinds, vec!["Number", "Plus", "Number", "Eof"]);
 
     let first = &result.tokens[0];
-    assert_eq!(first.span.range.start, 0);
-    assert_eq!(first.span.range.end, 1);
+    assert_eq!(first.span.start, 0);
+    assert_eq!(first.span.end, 1);
 
     let plus = &result.tokens[1];
-    assert_eq!(plus.span.range.start, 1);
-    assert_eq!(plus.span.range.end, 2);
+    assert_eq!(plus.span.start, 1);
+    assert_eq!(plus.span.end, 2);
 
     for token in &result.tokens {
         if token.text.is_empty() {
             continue;
         }
-        let slice = utf16_slice(
-            source,
-            token.span.range.start as usize,
-            token.span.range.end as usize,
-        );
+        let slice = utf16_slice(source, token.span.start as usize, token.span.end as usize);
         assert_eq!(slice, token.text);
     }
 }
@@ -163,23 +154,19 @@ fn analyze_chinese_spans() {
 
     let ident = &result.tokens[0];
     assert_eq!(ident.kind, "Ident");
-    assert_eq!(ident.span.range.start, 0);
-    assert_eq!(ident.span.range.end, 2);
+    assert_eq!(ident.span.start, 0);
+    assert_eq!(ident.span.end, 2);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.kind, "Plus");
-    assert_eq!(plus.span.range.start, 2);
-    assert_eq!(plus.span.range.end, 3);
+    assert_eq!(plus.span.start, 2);
+    assert_eq!(plus.span.end, 3);
 
     for token in &result.tokens {
         if token.text.is_empty() {
             continue;
         }
-        let slice = utf16_slice(
-            source,
-            token.span.range.start as usize,
-            token.span.range.end as usize,
-        );
+        let slice = utf16_slice(source, token.span.start as usize, token.span.end as usize);
         assert_eq!(slice, token.text);
     }
 }
@@ -191,13 +178,13 @@ fn analyze_emoji_spans_and_diagnostics() {
 
     let ident = &result.tokens[0];
     assert_eq!(ident.kind, "Ident");
-    assert_eq!(ident.span.range.start, 0);
-    assert_eq!(ident.span.range.end, 2);
+    assert_eq!(ident.span.start, 0);
+    assert_eq!(ident.span.end, 2);
 
     let plus = &result.tokens[1];
     assert_eq!(plus.kind, "Plus");
-    assert_eq!(plus.span.range.start, 2);
-    assert_eq!(plus.span.range.end, 3);
+    assert_eq!(plus.span.start, 2);
+    assert_eq!(plus.span.end, 3);
 
     let error_source = "1 +";
     let error_result = analyze_value(error_source);
@@ -206,8 +193,8 @@ fn analyze_emoji_spans_and_diagnostics() {
 
     let diag = &error_result.diagnostics[0];
     assert_eq!(diag.kind, "error");
-    assert_eq!(diag.span.range.start, 2);
-    assert_eq!(diag.span.range.end, 3);
+    assert_eq!(diag.span.start, 2);
+    assert_eq!(diag.span.end, 3);
 }
 
 #[wasm_bindgen_test]
@@ -239,8 +226,8 @@ fn analyze_diagnostics_include_line_col_multiline() {
         .expect("expected diagnostic for incomplete expression");
 
     assert_eq!(diag.kind, "error");
-    assert_eq!(diag.span.range.start, 6);
-    assert_eq!(diag.span.range.end, 7);
+    assert_eq!(diag.span.start, 6);
+    assert_eq!(diag.span.end, 7);
     assert_eq!(diag.line, 2);
     assert_eq!(diag.col, 3);
 }
@@ -256,10 +243,10 @@ fn format_success_returns_source_and_cursor() {
 }
 
 #[wasm_bindgen_test]
-fn format_preserves_mid_document_cursor() {
+fn format_rebases_mid_document_cursor_through_full_replace_edit() {
     let source = "1+2";
     let out = format_value(source, 1);
-    assert_eq!(out.cursor, 1);
+    assert_eq!(out.cursor, 0);
 }
 
 #[wasm_bindgen_test]
@@ -315,7 +302,7 @@ fn apply_edits_emoji_utf16_conversion_is_correct() {
 
     let out = analyzer_wasm::apply_edits(source.to_string(), edits, 2)
         .expect("expected apply_edits() Ok");
-    let out: ApplyResultView = serde_wasm_bindgen::from_value(out).expect("ApplyResultView");
+    let out: ApplyResult = serde_wasm_bindgen::from_value(out).expect("ApplyResult");
 
     assert_eq!(out.source, "😀Z");
     assert_eq!(out.cursor, 2);
