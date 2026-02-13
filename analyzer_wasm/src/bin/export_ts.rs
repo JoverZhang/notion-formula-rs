@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
-    AnalyzeResult, ApplyResult, CodeAction, CompletionItem, CompletionItemKind, CompletionOutput,
-    Diagnostic, DiagnosticKind, DisplaySegment, SignatureHelp, SignatureItem, Span, TextEdit,
-    Token,
+    AnalyzeResult, ApplyResult, CodeAction, CompletionItem, CompletionItemKind, CompletionResult,
+    Diagnostic, DiagnosticKind, DisplaySegment, HelpResult, SignatureHelp, SignatureItem, Span,
+    TextEdit, Token,
 };
 use ts_rs::TS;
 
@@ -34,7 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         SignatureHelp::decl(),
         CompletionItemKind::decl(),
         CompletionItem::decl(),
-        CompletionOutput::decl(),
+        CompletionResult::decl(),
+        HelpResult::decl(),
     ] {
         let decl = export_decl(decl);
         out.push_str(&decl);

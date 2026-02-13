@@ -9,7 +9,7 @@
   - `analyzeSource`
   - `formatSource`
   - `applyEditsSource`
-  - `completeSource`
+  - `helpSource`
 - wasm-pack output: `src/pkg/`
 - DTO types: `src/analyzer/generated/wasm_dto.ts`
 

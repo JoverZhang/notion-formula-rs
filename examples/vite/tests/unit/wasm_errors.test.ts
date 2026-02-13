@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { analyzeSource, completeSource, initWasm } from "../../src/analyzer/wasm_client";
+import { analyzeSource, helpSource, initWasm } from "../../src/analyzer/wasm_client";
 
 beforeAll(async () => {
   await initWasm();
@@ -16,10 +16,10 @@ describe("WASM host contract errors", () => {
     }
   });
 
-  it("completeSource throws an Error for invalid context JSON", () => {
+  it("helpSource throws an Error for invalid context JSON", () => {
     try {
-      completeSource("1+2", 0, "{");
-      throw new Error("expected completeSource to throw");
+      helpSource("1+2", 0, "{");
+      throw new Error("expected helpSource to throw");
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
       expect((e as Error).message).toContain("Invalid context JSON");

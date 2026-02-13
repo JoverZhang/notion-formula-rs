@@ -11,4 +11,6 @@ mod test_completion_smoke;
 #[cfg(test)]
 mod test_display_format_ty;
 #[cfg(test)]
+mod test_edit_ops;
+#[cfg(test)]
 mod test_format_idempotence;

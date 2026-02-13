@@ -154,12 +154,18 @@ pub struct CompletionItem {
     pub disabled_reason: Option<String>,
 }
 
-/// Completion result payload returned from the `complete` WASM export.
+/// Completion payload returned from `ide_help` (without signature help).
 #[derive(Serialize, TS)]
-pub struct CompletionOutput {
+pub struct CompletionResult {
     pub items: Vec<CompletionItem>,
     /// Replace range in the original document (UTF-16).
     pub replace: Span,
-    pub signature_help: Option<SignatureHelp>,
     pub preferred_indices: Vec<usize>,
+}
+
+/// Help result payload returned from the `ide_help` WASM export.
+#[derive(Serialize, TS)]
+pub struct HelpResult {
+    pub completion: CompletionResult,
+    pub signature_help: Option<SignatureHelp>,
 }

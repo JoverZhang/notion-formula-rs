@@ -12,11 +12,16 @@ Editor-facing behavior implemented in `analyzer/src/ide/completion/`.
 
 - `completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput`
   - Code: `analyzer/src/ide/completion/mod.rs`
+- `ide::help(source, cursor_byte, ctx, config) -> HelpResult`
+  - Code: `analyzer/src/ide/mod.rs`
 - `CompletionOutput`:
   - `items: Vec<CompletionItem>`
   - `replace: Span` (byte offsets in the original doc)
   - `signature_help: Option<SignatureHelp>`
   - `preferred_indices: Vec<usize>`
+- `HelpResult`:
+  - `completion: CompletionResult { items, replace, preferred_indices }`
+  - `signature_help: Option<SignatureHelp>`
 
 Edit/cursor rule:
 

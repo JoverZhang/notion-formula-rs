@@ -1,8 +1,8 @@
 use crate::semantic::{self, Context, Ty, builtins_functions};
-use crate::{Span, analyze};
+use crate::{Span, analyze_syntax};
 
 fn infer_ok(source: &str, ctx: &Context) -> Ty {
-    let output = analyze(source).unwrap();
+    let output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
@@ -18,7 +18,7 @@ fn infer_ok(source: &str, ctx: &Context) -> Ty {
 }
 
 fn assert_single_diag(source: &str, ctx: &Context, message: &str, span: Span) {
-    let output = analyze(source).unwrap();
+    let output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",

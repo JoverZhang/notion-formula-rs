@@ -1,4 +1,4 @@
-use crate::analyze;
+use crate::analyze_syntax;
 use crate::ast::{Expr, ExprKind};
 use crate::lexer::Span;
 
@@ -75,7 +75,7 @@ fn assert_tree_invariants(expr: &Expr) {
 #[test]
 fn test_parser_spans_nested_groups() {
     let src = "( (a) )";
-    let out = analyze(src).unwrap();
+    let out = analyze_syntax(src);
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
 
     let expr = &out.expr;
@@ -96,7 +96,7 @@ fn test_parser_spans_nested_groups() {
 #[test]
 fn test_parser_spans_call_with_comments() {
     let src = "f(a/*c*/,b)";
-    let out = analyze(src).unwrap();
+    let out = analyze_syntax(src);
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
 
     let expr = &out.expr;
@@ -114,7 +114,7 @@ fn test_parser_spans_call_with_comments() {
 #[test]
 fn test_parser_spans_unary_call_with_comments() {
     let src = "-f(a/*c*/,b)";
-    let out = analyze(src).unwrap();
+    let out = analyze_syntax(src);
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
 
     let expr = &out.expr;
@@ -137,7 +137,7 @@ fn test_parser_spans_unary_call_with_comments() {
 #[test]
 fn test_parser_spans_member_call_with_newline_and_comment() {
     let src = "a\n/*c*/.if(b,c)";
-    let out = analyze(src).unwrap();
+    let out = analyze_syntax(src);
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
 
     let expr = &out.expr;
@@ -156,7 +156,7 @@ fn test_parser_spans_member_call_with_newline_and_comment() {
 #[test]
 fn test_parser_spans_error_recovery_in_call_arg_list() {
     let src = "f(,a)";
-    let out = analyze(src).unwrap();
+    let out = analyze_syntax(src);
     assert!(!out.diagnostics.is_empty());
 
     let expr = &out.expr;
@@ -178,7 +178,7 @@ fn test_parser_spans_error_recovery_in_call_arg_list() {
 #[test]
 fn test_parser_spans_error_member_call_missing_method_ident() {
     let src = "a.(b)";
-    let out = analyze(src).unwrap();
+    let out = analyze_syntax(src);
     assert!(!out.diagnostics.is_empty());
 
     let expr = &out.expr;

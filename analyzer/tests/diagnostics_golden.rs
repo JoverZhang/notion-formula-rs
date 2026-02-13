@@ -3,7 +3,7 @@ mod common;
 use std::path::Path;
 
 use analyzer::semantic::{Context, Property, Ty, builtins_functions};
-use analyzer::{analyze, format_diagnostics};
+use analyzer::{analyze, analyze_syntax, format_diagnostics};
 use common::golden::run_golden_dir;
 
 #[test]
@@ -19,7 +19,7 @@ fn diagnostics_golden() {
                 .map(|s| s.starts_with("semantic_"))
                 .unwrap_or(false);
 
-            let out = if is_semantic {
+            let diagnostics = if is_semantic {
                 let ctx = Context {
                     properties: vec![Property {
                         name: "Title".into(),
@@ -28,15 +28,12 @@ fn diagnostics_golden() {
                     }],
                     functions: builtins_functions(),
                 };
-                let mut out = analyze(source).expect("analyze() should return ParseOutput");
-                let (_, diags) = analyzer::semantic::analyze_expr(&out.expr, &ctx);
-                out.diagnostics.extend(diags);
-                out
+                analyze(source, &ctx).diagnostics
             } else {
-                analyze(source).expect("analyze() should return ParseOutput")
+                analyze_syntax(source).diagnostics
             };
 
-            format_diagnostics(source, out.diagnostics)
+            format_diagnostics(source, diagnostics)
         },
     );
 }

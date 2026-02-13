@@ -6,98 +6,69 @@ mod converter;
 pub mod dto;
 mod offsets;
 mod span;
-mod text_edit;
 
-use analyzer::{DiagnosticCode, Span as ByteSpan, TextEdit as ByteTextEdit};
+use analyzer::{Span as ByteSpan, TextEdit as ByteTextEdit};
 use js_sys::Error as JsError;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::converter::Converter;
 use crate::dto::v1::{AnalyzeResult, ApplyResult, Span as Utf16Span, TextEdit as Utf16TextEdit};
-use crate::text_edit::apply_text_edits_bytes_with_cursor;
 
 #[wasm_bindgen]
 pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue> {
     let parsed = Converter::parse_context(&context_json)?;
-
-    let result: AnalyzeResult = match analyzer::analyze(&source) {
-        Ok(mut output) => {
-            let (ty, diags) = analyzer::semantic::analyze_expr(&output.expr, &parsed.ctx);
-            output.diagnostics.extend(diags);
-            Converter::analyze_output(&source, output, ty)
-        }
-        Err(diag) => Converter::analyze_error(&source, &diag),
-    };
-
-    serde_wasm_bindgen::to_value(&result)
-        .map_err(|_| JsValue::from(JsError::new("Serialize error")))
+    let result = analyzer::analyze(&source, &parsed.ctx);
+    let out: AnalyzeResult = Converter::analyze_output(&source, result);
+    to_js_value(&out)
 }
 
 #[wasm_bindgen]
-pub fn format(source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
-    let output =
-        analyzer::analyze(&source).map_err(|_| JsValue::from(JsError::new("Format error")))?;
-
-    if has_syntax_errors(&output.diagnostics) {
-        return Err(JsValue::from(JsError::new("Format error")));
-    }
-
-    let _ = cursor_utf16_to_valid_byte(&source, cursor_utf16)?;
-    let formatted = analyzer::format_expr(&output.expr, &source, &output.tokens);
-    let full_document_edit = ByteTextEdit {
-        range: ByteSpan {
-            start: 0,
-            end: source.len() as u32,
-        },
-        new_text: formatted,
-    };
-    apply_sorted_byte_edits(&source, vec![full_document_edit], cursor_utf16)
+pub fn ide_format(source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
+    let cursor_byte = cursor_utf16_to_valid_byte(&source, cursor_utf16)? as u32;
+    let output = analyzer::ide_format(&source, cursor_byte).map_err(ide_error_to_js)?;
+    to_utf16_apply_result(output)
 }
 
 #[wasm_bindgen]
-pub fn apply_edits(source: String, edits: JsValue, cursor_utf16: u32) -> Result<JsValue, JsValue> {
+pub fn ide_apply_edits(
+    source: String,
+    edits: JsValue,
+    cursor_utf16: u32,
+) -> Result<JsValue, JsValue> {
     let edits_view: Vec<Utf16TextEdit> = serde_wasm_bindgen::from_value(edits)
         .map_err(|_| JsValue::from(JsError::new("Invalid edits")))?;
 
-    let byte_edits = text_edits_utf16_to_sorted_byte(&source, edits_view)?;
-    apply_sorted_byte_edits(&source, byte_edits, cursor_utf16)
+    let byte_edits = text_edits_utf16_to_byte(&source, edits_view)?;
+    let cursor_byte = cursor_utf16_to_valid_byte(&source, cursor_utf16)? as u32;
+    let output =
+        analyzer::ide_apply_edits(&source, byte_edits, cursor_byte).map_err(ide_error_to_js)?;
+    to_utf16_apply_result(output)
 }
 
 #[wasm_bindgen]
-pub fn complete(source: String, cursor: usize, context_json: String) -> Result<JsValue, JsValue> {
+pub fn ide_help(source: String, cursor: usize, context_json: String) -> Result<JsValue, JsValue> {
     let cursor_byte = Converter::utf16_offset_to_byte(&source, cursor);
     let parsed = Converter::parse_context(&context_json)?;
-
-    let output =
-        analyzer::completion::complete(&source, cursor_byte, Some(&parsed.ctx), parsed.completion);
-
-    let out = Converter::completion_output_view(&source, &output);
-    serde_wasm_bindgen::to_value(&out).map_err(|_| JsValue::from(JsError::new("Serialize error")))
+    let output = analyzer::ide_help(&source, cursor_byte, &parsed.ctx, parsed.completion);
+    let out = Converter::help_output_view(&source, &output);
+    to_js_value(&out)
 }
 
-fn has_syntax_errors(diagnostics: &[analyzer::Diagnostic]) -> bool {
-    diagnostics
-        .iter()
-        .any(|d| matches!(d.code, DiagnosticCode::LexError | DiagnosticCode::Parse(_)))
+fn to_js_value<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    serde_wasm_bindgen::to_value(value).map_err(|_| JsValue::from(JsError::new("Serialize error")))
 }
 
-fn apply_sorted_byte_edits(
-    source: &str,
-    edits: Vec<ByteTextEdit>,
-    cursor_utf16: u32,
-) -> Result<JsValue, JsValue> {
-    let cursor_byte = cursor_utf16_to_valid_byte(source, cursor_utf16)?;
-    validate_sorted_non_overlapping_edits(source, &edits)?;
-
-    let (updated_source, cursor_byte_after) =
-        apply_text_edits_bytes_with_cursor(source, &edits, cursor_byte as u32);
-
+fn to_utf16_apply_result(output: analyzer::IdeApplyResult) -> Result<JsValue, JsValue> {
     let out = ApplyResult {
-        source: updated_source.clone(),
-        cursor: Converter::byte_offset_to_utf16_offset(&updated_source, cursor_byte_after as usize),
+        cursor: Converter::byte_offset_to_utf16_offset(&output.source, output.cursor as usize),
+        source: output.source,
     };
+    to_js_value(&out)
+}
 
-    serde_wasm_bindgen::to_value(&out).map_err(|_| JsValue::from(JsError::new("Serialize error")))
+fn ide_error_to_js(err: analyzer::IdeError) -> JsValue {
+    JsValue::from(JsError::new(err.message()))
 }
 
 fn cursor_utf16_to_valid_byte(source: &str, cursor_utf16: u32) -> Result<usize, JsValue> {
@@ -115,7 +86,7 @@ fn cursor_utf16_to_valid_byte(source: &str, cursor_utf16: u32) -> Result<usize, 
     Ok(cursor_byte)
 }
 
-fn text_edits_utf16_to_sorted_byte(
+fn text_edits_utf16_to_byte(
     source: &str,
     edits: Vec<Utf16TextEdit>,
 ) -> Result<Vec<ByteTextEdit>, JsValue> {
@@ -150,41 +121,5 @@ fn text_edits_utf16_to_sorted_byte(
         });
     }
 
-    byte_edits.sort_by(|a, b| {
-        a.range
-            .start
-            .cmp(&b.range.start)
-            .then(a.range.end.cmp(&b.range.end))
-    });
-
-    validate_sorted_non_overlapping_edits(source, &byte_edits)?;
     Ok(byte_edits)
-}
-
-fn validate_sorted_non_overlapping_edits(
-    source: &str,
-    edits: &[ByteTextEdit],
-) -> Result<(), JsValue> {
-    let mut prev_end = 0u32;
-    let source_len = source.len() as u32;
-
-    for (index, edit) in edits.iter().enumerate() {
-        if edit.range.end < edit.range.start || edit.range.end > source_len {
-            return Err(JsValue::from(JsError::new("Invalid edit range")));
-        }
-
-        if !source.is_char_boundary(edit.range.start as usize)
-            || !source.is_char_boundary(edit.range.end as usize)
-        {
-            return Err(JsValue::from(JsError::new("Invalid edit range")));
-        }
-
-        if index > 0 && edit.range.start < prev_end {
-            return Err(JsValue::from(JsError::new("Overlapping edits")));
-        }
-
-        prev_end = edit.range.end;
-    }
-
-    Ok(())
 }

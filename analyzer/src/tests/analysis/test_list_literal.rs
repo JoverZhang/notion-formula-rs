@@ -1,8 +1,8 @@
-use crate::analyze;
+use crate::analyze_syntax;
 use crate::semantic::{self, Context, Ty};
 
 fn infer_ok(source: &str) -> Ty {
-    let output = analyze(source).unwrap();
+    let output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",

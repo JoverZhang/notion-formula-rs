@@ -1,15 +1,9 @@
-use analyzer::{Diagnostic, ParseOutput};
-
 use crate::converter::Converter;
 use crate::converter::shared::{diagnostic_view, token_view};
 use crate::dto::v1::AnalyzeResult;
 
 impl Converter {
-    pub fn analyze_output(
-        source: &str,
-        output: ParseOutput,
-        output_type: analyzer::semantic::Ty,
-    ) -> AnalyzeResult {
+    pub fn analyze_output(source: &str, output: analyzer::AnalyzeResult) -> AnalyzeResult {
         let source_map = analyzer::SourceMap::new(source);
 
         let diagnostics = output
@@ -28,17 +22,7 @@ impl Converter {
         AnalyzeResult {
             diagnostics,
             tokens,
-            output_type: output_type.to_string(),
-        }
-    }
-
-    pub fn analyze_error(source: &str, diag: &Diagnostic) -> AnalyzeResult {
-        let source_map = analyzer::SourceMap::new(source);
-
-        AnalyzeResult {
-            diagnostics: vec![diagnostic_view(source, &source_map, diag)],
-            tokens: Vec::new(),
-            output_type: analyzer::semantic::Ty::Unknown.to_string(),
+            output_type: output.output_type.to_string(),
         }
     }
 }
@@ -50,9 +34,13 @@ mod tests {
     #[test]
     fn diagnostics_include_line_col_for_multiline_source() {
         let source = "1 +\n2 *";
-        let output = analyzer::analyze(source).expect("expected ParseOutput");
+        let ctx = analyzer::semantic::Context {
+            properties: Vec::new(),
+            functions: analyzer::semantic::builtins_functions(),
+        };
+        let output = analyzer::analyze(source, &ctx);
 
-        let result = Converter::analyze_output(source, output, analyzer::semantic::Ty::Unknown);
+        let result = Converter::analyze_output(source, output);
         let diag = result
             .diagnostics
             .first()

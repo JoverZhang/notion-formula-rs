@@ -59,8 +59,8 @@ fn analyze_value(source: &str) -> AnalyzeResult {
 }
 
 fn format_value(source: &str, cursor_utf16: u32) -> ApplyResult {
-    let value =
-        analyzer_wasm::format(source.to_string(), cursor_utf16).expect("expected format() Ok");
+    let value = analyzer_wasm::ide_format(source.to_string(), cursor_utf16)
+        .expect("expected ide_format() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
 
@@ -73,8 +73,8 @@ fn edit(start: u32, end: u32, new_text: &str) -> TextEdit {
 
 fn apply_edits_value(source: &str, edits: &[TextEdit], cursor_utf16: u32) -> ApplyResult {
     let edits: JsValue = serde_wasm_bindgen::to_value(edits).expect("expected edits JsValue");
-    let value = analyzer_wasm::apply_edits(source.to_string(), edits, cursor_utf16)
-        .expect("expected apply_edits() Ok");
+    let value = analyzer_wasm::ide_apply_edits(source.to_string(), edits, cursor_utf16)
+        .expect("expected ide_apply_edits() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
 
@@ -252,14 +252,16 @@ fn format_rebases_mid_document_cursor_through_full_replace_edit() {
 #[wasm_bindgen_test]
 fn format_parse_error_returns_err() {
     let source = "1 +";
-    let err = analyzer_wasm::format(source.to_string(), 0).expect_err("expected format() Err");
+    let err =
+        analyzer_wasm::ide_format(source.to_string(), 0).expect_err("expected ide_format() Err");
     assert_eq!(error_message(err).as_deref(), Some("Format error"));
 }
 
 #[wasm_bindgen_test]
 fn format_lex_error_returns_err() {
     let source = "1 @";
-    let err = analyzer_wasm::format(source.to_string(), 0).expect_err("expected format() Err");
+    let err =
+        analyzer_wasm::ide_format(source.to_string(), 0).expect_err("expected ide_format() Err");
     assert_eq!(error_message(err).as_deref(), Some("Format error"));
 }
 
@@ -278,7 +280,7 @@ fn apply_edits_overlapping_returns_err() {
     let edits: JsValue = serde_wasm_bindgen::to_value(&vec![edit(1, 3, "X"), edit(2, 4, "Y")])
         .expect("edits to JsValue");
 
-    let err = analyzer_wasm::apply_edits(source.to_string(), edits, 0)
+    let err = analyzer_wasm::ide_apply_edits(source.to_string(), edits, 0)
         .expect_err("expected overlapping edits Err");
     assert_eq!(error_message(err).as_deref(), Some("Overlapping edits"));
 }
@@ -289,7 +291,7 @@ fn apply_edits_invalid_range_returns_err() {
     let edits: JsValue =
         serde_wasm_bindgen::to_value(&vec![edit(5, 5, "X")]).expect("edits to JsValue");
 
-    let err = analyzer_wasm::apply_edits(source.to_string(), edits, 0)
+    let err = analyzer_wasm::ide_apply_edits(source.to_string(), edits, 0)
         .expect_err("expected invalid range Err");
     assert_eq!(error_message(err).as_deref(), Some("Invalid edit range"));
 }
@@ -300,8 +302,8 @@ fn apply_edits_emoji_utf16_conversion_is_correct() {
     let edits: JsValue =
         serde_wasm_bindgen::to_value(&vec![edit(2, 3, "Z")]).expect("edits to JsValue");
 
-    let out = analyzer_wasm::apply_edits(source.to_string(), edits, 2)
-        .expect("expected apply_edits() Ok");
+    let out = analyzer_wasm::ide_apply_edits(source.to_string(), edits, 2)
+        .expect("expected ide_apply_edits() Ok");
     let out: ApplyResult = serde_wasm_bindgen::from_value(out).expect("ApplyResult");
 
     assert_eq!(out.source, "😀Z");
@@ -341,9 +343,9 @@ fn analyze_rejects_invalid_properties_structure() {
 }
 
 #[wasm_bindgen_test]
-fn complete_invalid_context_errors() {
+fn ide_help_invalid_context_errors() {
     let source = "1+2";
-    let err = analyzer_wasm::complete(source.to_string(), 0, "{".to_string())
-        .expect_err("expected complete() Err on invalid context JSON");
+    let err = analyzer_wasm::ide_help(source.to_string(), 0, "{".to_string())
+        .expect_err("expected ide_help() Err on invalid context JSON");
     assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
 }

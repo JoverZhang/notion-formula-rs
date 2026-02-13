@@ -55,8 +55,9 @@ Stable boundary view:
 - `&str` (UTF-8) -> lexer -> `Tokens` (incl. trivia + EOF) + lex diagnostics
 - `Tokens` -> parser -> `ParseOutput { expr, diagnostics, tokens }`
 - `ParseOutput.expr` + `Context` -> semantic analysis -> `(Ty, semantic diagnostics)`
+- `analyze(source, ctx)` -> `AnalyzeResult { diagnostics, tokens, output_type }`
 - `(expr, tokens, source)` -> formatter -> `String`
-- `(source, cursor, Context)` -> completion/signature help -> `CompletionOutput`
+- `(source, cursor, Context)` -> IDE help -> `HelpResult { completion, signature_help }`
 - Parser diagnostics may include `actions: Vec<CodeAction>` in byte coordinates.
 - WASM conversion maps core byte spans/edits to UTF-16 DTO spans/edits.
 
@@ -64,18 +65,22 @@ Stable boundary view:
 
 Rust (`analyzer/`):
 
-- `analyzer::analyze(text: &str) -> Result<ParseOutput, Diagnostic>`
+- `analyzer::analyze_syntax(text: &str) -> SyntaxResult`
+- `analyzer::analyze(text: &str, ctx: &Context) -> AnalyzeResult`
 - `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
 - `analyzer::format_expr(expr, source, tokens) -> String`
 - `analyzer::completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput`
+- `analyzer::ide_help(source, cursor_byte, ctx, config) -> HelpResult`
+- `analyzer::ide_format(source, cursor_byte) -> Result<IdeApplyResult, IdeError>`
+- `analyzer::ide_apply_edits(source, edits, cursor_byte) -> Result<IdeApplyResult, IdeError>`
 - `analyzer::format_diagnostics(source, diags) -> String`
 
 WASM (`analyzer_wasm/`):
 
 - `analyze(source, context_json) -> AnalyzeResult`
-- `format(source, cursor_utf16) -> ApplyResult`
-- `apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `complete(source, cursor_utf16, context_json) -> CompletionOutput`
+- `ide_format(source, cursor_utf16) -> ApplyResult`
+- `ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `ide_help(source, cursor_utf16, context_json) -> HelpResult`
 
 Tooling:
 
@@ -140,10 +145,11 @@ These are stability guarantees. Contract changes require docs + tests + changelo
 - Quick fixes are diagnostic-level payloads: `Diagnostic.actions: Vec<CodeAction>`.
 - Core edit model is unified: `TextEdit { range, new_text }` in byte coordinates.
 - WASM edit model is unified: `TextEdit` in UTF-16 coordinates.
-- `format` and `apply_edits` accept cursor and return `{ source, cursor }` on success.
-- `format` is implemented as one full-document `TextEdit` applied through the same
-  shared byte-edit pipeline used by `apply_edits`.
-- `format`/`apply_edits` failures throw `Err` (not payload-encoded status enums).
+- Core `ide_format` and `ide_apply_edits` accept byte cursor and return `{ source, cursor }`.
+- WASM `ide_format` and `ide_apply_edits` accept UTF-16 cursor and return UTF-16 cursor.
+- Core `ide_format` uses one full-document `TextEdit` through the same byte-edit pipeline as
+  core `ide_apply_edits`.
+- WASM forwards to core after UTF-16 ↔ byte conversion; failures throw `Err` (not payload enums).
 
 ### Signature help
 

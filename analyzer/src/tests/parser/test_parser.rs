@@ -1,18 +1,17 @@
 use crate::ast::{BinOpKind, ExprKind};
 use crate::lexer::LitKind;
-use crate::{analyze, tests::common::trim_indent};
+use crate::{analyze_syntax, tests::common::trim_indent};
 
 #[test]
 fn test_pretty() {
-    let parsed = analyze(&trim_indent(
+    let parsed = analyze_syntax(&trim_indent(
         r#"
             if(
                 prop("Title"),
                 1,
                 0
             )"#,
-    ))
-    .unwrap();
+    ));
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -23,7 +22,7 @@ fn test_pretty() {
 
 #[test]
 fn test_precedence() {
-    let parsed = analyze("1 + 2 * 3").unwrap();
+    let parsed = analyze_syntax("1 + 2 * 3");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -37,7 +36,7 @@ fn test_precedence() {
 
 #[test]
 fn test_ternary_parse_shape() {
-    let parsed = analyze("1 ? 2 : 3").unwrap();
+    let parsed = analyze_syntax("1 ? 2 : 3");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
@@ -45,7 +44,7 @@ fn test_ternary_parse_shape() {
     assert_lit_num!(then, 2);
     assert_lit_num!(otherwise, 3);
 
-    let parsed = analyze("1 ? 2 : 3 ? 4 : 5").unwrap();
+    let parsed = analyze_syntax("1 ? 2 : 3 ? 4 : 5");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
     let (cond, then, otherwise) = assert_ternary!(ast);
@@ -59,7 +58,7 @@ fn test_ternary_parse_shape() {
 
 #[test]
 fn test_caret_is_right_associative() {
-    let parsed = analyze("2 ^ 3 ^ 2").unwrap();
+    let parsed = analyze_syntax("2 ^ 3 ^ 2");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -72,7 +71,7 @@ fn test_caret_is_right_associative() {
 
 #[test]
 fn test_ternary_binds_lower_than_or_and_comparisons() {
-    let parsed = analyze("1 > 2 || 3 > 4 ? \"x\" : \"y\"").unwrap();
+    let parsed = analyze_syntax("1 > 2 || 3 > 4 ? \"x\" : \"y\"");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -86,7 +85,7 @@ fn test_ternary_binds_lower_than_or_and_comparisons() {
 
 #[test]
 fn test_ternary_missing_colon_recovers_to_colon() {
-    let parsed = analyze("1 ? 2 foo : 3").unwrap();
+    let parsed = analyze_syntax("1 ? 2 foo : 3");
     assert_eq!(parsed.diagnostics.len(), 1);
     assert!(parsed.diagnostics[0].message.starts_with("expected ':'"));
 
@@ -99,7 +98,7 @@ fn test_ternary_missing_colon_recovers_to_colon() {
 
 #[test]
 fn test_ternary_is_right_associative_with_idents() {
-    let parsed = analyze("a ? b : c ? d : e").unwrap();
+    let parsed = analyze_syntax("a ? b : c ? d : e");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -109,7 +108,7 @@ fn test_ternary_is_right_associative_with_idents() {
 
 #[test]
 fn test_postfix_binds_tighter_than_infix() {
-    let parsed = analyze("a.if(b,c) + d").unwrap();
+    let parsed = analyze_syntax("a.if(b,c) + d");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -133,7 +132,7 @@ fn test_postfix_binds_tighter_than_infix() {
 
 #[test]
 fn test_unary_applies_to_postfix_completed_expression() {
-    let parsed = analyze("-f(1) * 2").unwrap();
+    let parsed = analyze_syntax("-f(1) * 2");
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -149,7 +148,7 @@ fn test_unary_applies_to_postfix_completed_expression() {
 
 #[test]
 fn test_call_arg_list_missing_comma_recovers_as_two_args() {
-    let parsed = analyze("f(1 2)").unwrap();
+    let parsed = analyze_syntax("f(1 2)");
     assert_eq!(
         parsed.diagnostics.len(),
         1,
@@ -165,7 +164,7 @@ fn test_call_arg_list_missing_comma_recovers_as_two_args() {
 
 #[test]
 fn test_list_literal_missing_comma_recovers_as_two_items() {
-    let parsed = analyze("[1 2]").unwrap();
+    let parsed = analyze_syntax("[1 2]");
     assert_eq!(
         parsed.diagnostics.len(),
         1,
@@ -181,7 +180,7 @@ fn test_list_literal_missing_comma_recovers_as_two_items() {
 
 #[test]
 fn test_ternary_missing_then_expr_recovers() {
-    let parsed = analyze("1 ? : 3").unwrap();
+    let parsed = analyze_syntax("1 ? : 3");
     assert!(
         !parsed.diagnostics.is_empty(),
         "diags: {:?}",
@@ -197,7 +196,7 @@ fn test_ternary_missing_then_expr_recovers() {
 
 #[test]
 fn test_ternary_missing_else_expr_recovers_without_consuming_close_paren() {
-    let parsed = analyze("(1 ? 2 : )").unwrap();
+    let parsed = analyze_syntax("(1 ? 2 : )");
     assert!(
         !parsed.diagnostics.is_empty(),
         "diags: {:?}",
@@ -217,7 +216,7 @@ fn test_ternary_missing_else_expr_recovers_without_consuming_close_paren() {
 
 #[test]
 fn test_member_call_extra_dot_recovers() {
-    let parsed = analyze("a..if(b,c)").unwrap();
+    let parsed = analyze_syntax("a..if(b,c)");
     assert!(
         !parsed.diagnostics.is_empty(),
         "diags: {:?}",

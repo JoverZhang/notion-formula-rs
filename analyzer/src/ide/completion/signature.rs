@@ -299,9 +299,7 @@ fn infer_call_arg_tys_best_effort(
             _ => {}
         }
 
-        let Ok(parsed) = crate::analyze(trimmed) else {
-            return Some(semantic::Ty::Unknown);
-        };
+        let parsed = crate::analyze_syntax(trimmed);
 
         let mut map = semantic::TypeMap::default();
         Some(semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map))
@@ -366,27 +364,28 @@ fn infer_call_arg_tys_best_effort(
     let mut arg_tys: Vec<Option<semantic::Ty>> = Vec::new();
 
     // If this is a member call, try to include the receiver type as the leading argument.
-    if include_receiver_as_arg
-        && let Ok(parsed) = crate::analyze(source)
-        && let Some(call_expr) =
+    if include_receiver_as_arg {
+        let parsed = crate::analyze_syntax(source);
+        if let Some(call_expr) =
             find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
-        && let ExprKind::MemberCall { receiver, .. } = &call_expr.kind
-    {
-        let mut map = semantic::TypeMap::default();
-        let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
-        let mut ty = map
-            .get(receiver.id)
-            .cloned()
-            .unwrap_or(semantic::Ty::Unknown);
-        if matches!(ty, semantic::Ty::Unknown)
-            && matches!(
-                &receiver.kind,
-                ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
-            )
+            && let ExprKind::MemberCall { receiver, .. } = &call_expr.kind
         {
-            ty = semantic::Ty::Boolean;
+            let mut map = semantic::TypeMap::default();
+            let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
+            let mut ty = map
+                .get(receiver.id)
+                .cloned()
+                .unwrap_or(semantic::Ty::Unknown);
+            if matches!(ty, semantic::Ty::Unknown)
+                && matches!(
+                    &receiver.kind,
+                    ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
+                )
+            {
+                ty = semantic::Ty::Boolean;
+            }
+            arg_tys.push(Some(ty));
         }
-        arg_tys.push(Some(ty));
     }
 
     for span in spans {

@@ -2,7 +2,7 @@ mod common;
 
 use std::path::Path;
 
-use analyzer::{analyze, format_expr};
+use analyzer::{analyze_syntax, format_expr};
 use common::golden::run_golden_dir;
 
 #[test]
@@ -12,9 +12,7 @@ fn format_golden() {
         Path::new("tests/format"),
         "snap",
         |path, source| {
-            let out = analyze(source).unwrap_or_else(|e| {
-                panic!("analyze() returned Err for {:?}: {:?}", path, e);
-            });
+            let out = analyze_syntax(source);
 
             assert!(
                 out.diagnostics.is_empty(),

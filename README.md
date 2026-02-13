@@ -20,9 +20,9 @@ If you are building an editor, this repo gives you a practical core:
   - completion + structured signature help
 - `analyzer_wasm/` (WASM bridge)
   - `analyze(source, context_json)`
-  - `format(source, cursor_utf16)`
-  - `apply_edits(source, edits, cursor_utf16)`
-  - `complete(source, cursor_utf16, context_json)`
+  - `ide_format(source, cursor_utf16)`
+  - `ide_apply_edits(source, edits, cursor_utf16)`
+  - `ide_help(source, cursor_utf16, context_json)`
   - DTO export for TypeScript
 - `examples/vite/`
   - Vite + CodeMirror demo for live analysis/completion UX
@@ -95,7 +95,10 @@ There is no end-user CLI compiler here. You normally integrate through Rust APIs
 
 ```rust
 // Lex + parse. Returns AST, tokens, and parse diagnostics.
-pub fn analyze(text: &str) -> Result<ParseOutput, Diagnostic>;
+pub fn analyze_syntax(text: &str) -> SyntaxResult;
+
+// Lex + parse + semantic analysis using your context.
+pub fn analyze(text: &str, ctx: &semantic::Context) -> AnalyzeResult;
 
 // Type inference + semantic validation using your context.
 pub fn analyze_expr(expr: &ast::Expr, ctx: &semantic::Context) -> (semantic::Ty, Vec<Diagnostic>);
@@ -110,6 +113,22 @@ pub fn complete(
     ctx: Option<&semantic::Context>,
     config: CompletionConfig,
 ) -> CompletionOutput;
+
+// IDE-facing completion + signature-help shape split.
+pub fn ide_help(
+    source: &str,
+    cursor_byte: usize,
+    ctx: &semantic::Context,
+    config: CompletionConfig,
+) -> HelpResult;
+
+// IDE edit operations in byte coordinates.
+pub fn ide_format(source: &str, cursor_byte: u32) -> Result<IdeApplyResult, IdeError>;
+pub fn ide_apply_edits(
+    source: &str,
+    edits: Vec<TextEdit>,
+    cursor_byte: u32,
+) -> Result<IdeApplyResult, IdeError>;
 
 // Deterministic, human-readable diagnostics rendering.
 pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
@@ -130,17 +149,17 @@ export function applyEditsSource(
   edits: TextEdit[],
   cursor: number, // UTF-16 offset
 ): ApplyResult;
-export function completeSource(
+export function helpSource(
   source: string,
   cursor: number, // UTF-16 offset
   contextJson: string,
-): CompletionOutput;
+): HelpResult;
 
 // Under the hood, these call wasm-bindgen exports:
 // analyze(source, context_json) -> AnalyzeResult payload
-// format(source, cursor_utf16) -> ApplyResult payload
-// apply_edits(source, edits, cursor_utf16) -> ApplyResult payload
-// complete(source, cursor_utf16, context_json) -> CompletionOutput payload
+// ide_format(source, cursor_utf16) -> ApplyResult payload
+// ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult payload
+// ide_help(source, cursor_utf16, context_json) -> HelpResult payload
 ```
 
 `context_json` rules are strict:

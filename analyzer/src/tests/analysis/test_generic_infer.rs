@@ -1,4 +1,4 @@
-use crate::analyze;
+use crate::analyze_syntax;
 use crate::semantic::{
     Context, FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamShape,
     ParamSig, Ty, TypeMap, infer_expr_with_map,
@@ -13,7 +13,7 @@ fn p(name: &str, ty: Ty) -> ParamSig {
 }
 
 fn infer(source: &str, ctx: &Context) -> (Ty, TypeMap, crate::ast::Expr) {
-    let output = analyze(source).unwrap();
+    let output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",

@@ -1,14 +1,14 @@
-use crate::{analyze, format_expr};
+use crate::{analyze_syntax, format_expr};
 
 fn assert_format_idempotent(input: &str) {
-    let a1 = analyze(input).unwrap();
+    let a1 = analyze_syntax(input);
     assert!(
         a1.diagnostics.is_empty(),
         "expected no parse errors for input {input}, got {:?}",
         a1.diagnostics
     );
     let f1 = format_expr(&a1.expr, input, &a1.tokens);
-    let a2 = analyze(&f1).unwrap();
+    let a2 = analyze_syntax(&f1);
     assert!(
         a2.diagnostics.is_empty(),
         "format-produced input should parse cleanly: {f1}, errors: {:?}",
@@ -49,7 +49,7 @@ fn format_preserves_not_and_bang_notation() {
     ];
 
     for (input, expected) in cases {
-        let out = analyze(input).unwrap();
+        let out = analyze_syntax(input);
         assert!(
             out.diagnostics.is_empty(),
             "expected no parse errors for input {input}, got {:?}",

@@ -1,10 +1,10 @@
-use crate::analyze;
+use crate::analyze_syntax;
 use crate::ast::ExprKind;
 use crate::lexer::LitKind;
 
 #[test]
 fn parser_list_empty() {
-    let parsed = analyze("[]").unwrap();
+    let parsed = analyze_syntax("[]");
     assert!(
         parsed.diagnostics.is_empty(),
         "diags: {:?}",
@@ -18,7 +18,7 @@ fn parser_list_empty() {
 
 #[test]
 fn parser_list_three_items() {
-    let parsed = analyze("[1,2,3]").unwrap();
+    let parsed = analyze_syntax("[1,2,3]");
     assert!(
         parsed.diagnostics.is_empty(),
         "diags: {:?}",

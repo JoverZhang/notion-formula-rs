@@ -3,7 +3,7 @@ import type {
   AnalyzeResult,
   ApplyResult,
   CompletionItem as CompletionItemDto,
-  CompletionOutput,
+  HelpResult,
   SignatureHelp as SignatureHelpDto,
   TextEdit,
 } from "./generated/wasm_dto";
@@ -53,7 +53,7 @@ export function analyzeSource(source: string, contextJson: string): AnalyzeResul
 }
 
 export function formatSource(source: string, cursorUtf16: number): ApplyResult {
-  return wasm.format(source, cursorUtf16) as ApplyResult;
+  return wasm.ide_format(source, cursorUtf16) as ApplyResult;
 }
 
 export function applyEditsSource(
@@ -61,15 +61,15 @@ export function applyEditsSource(
   edits: TextEdit[],
   cursorUtf16: number,
 ): ApplyResult {
-  return wasm.apply_edits(source, edits, cursorUtf16) as ApplyResult;
+  return wasm.ide_apply_edits(source, edits, cursorUtf16) as ApplyResult;
 }
 
-export function completeSource(
+export function helpSource(
   source: string,
   cursor: number,
   contextJson: string,
-): CompletionOutput {
-  return wasm.complete(source, cursor, contextJson) as CompletionOutput;
+): HelpResult {
+  return wasm.ide_help(source, cursor, contextJson) as HelpResult;
 }
 
 export function buildCompletionState(
@@ -77,12 +77,13 @@ export function buildCompletionState(
   cursor: number,
   contextJson: string,
 ): CompletionState {
-  const output = completeSource(source, cursor, contextJson);
+  const output = helpSource(source, cursor, contextJson);
+  const completion = output.completion;
   return {
-    items: output.items ?? [],
+    items: completion?.items ?? [],
     signatureHelp: output.signature_help ?? null,
-    preferredIndices: Array.isArray(output.preferred_indices)
-      ? output.preferred_indices.filter((n) => typeof n === "number")
+    preferredIndices: Array.isArray(completion?.preferred_indices)
+      ? completion.preferred_indices.filter((n) => typeof n === "number")
       : [],
   };
 }

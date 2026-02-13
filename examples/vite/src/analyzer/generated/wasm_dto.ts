@@ -90,9 +90,11 @@ cursor: number | null,
  */
 additional_edits: Array<TextEdit>, detail: string | null, is_disabled: boolean, disabled_reason: string | null, };
 
-export type CompletionOutput = { items: Array<CompletionItem>, 
+export type CompletionResult = { items: Array<CompletionItem>, 
 /**
  * Replace range in the original document (UTF-16).
  */
-replace: Span, signature_help: SignatureHelp | null, preferred_indices: Array<number>, };
+replace: Span, preferred_indices: Array<number>, };
+
+export type HelpResult = { completion: CompletionResult, signature_help: SignatureHelp | null, };
 

@@ -1,7 +1,7 @@
 use crate::semantic::{
     self, Context, FunctionCategory, FunctionSig, GenericId, ParamShape, ParamSig, Property, Ty,
 };
-use crate::{Span, analyze};
+use crate::{Span, analyze_syntax};
 
 fn p(name: &str, ty: Ty) -> ParamSig {
     ParamSig {
@@ -20,7 +20,7 @@ fn opt(name: &str, ty: Ty) -> ParamSig {
 }
 
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
-    let output = analyze(source).unwrap();
+    let output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
@@ -183,7 +183,7 @@ fn test_sum_accepts_number_list_property() {
 
 #[test]
 fn validate_call_does_not_wildcard_inferred_actual_generic() {
-    let output = analyze("foo(prop(\"x\"))").unwrap();
+    let output = analyze_syntax("foo(prop(\"x\"))");
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",

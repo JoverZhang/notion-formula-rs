@@ -1,14 +1,14 @@
 use crate::ast::{BinOp, BinOpKind};
 use crate::tests::common::trim_indent;
 use crate::{
-    analyze,
+    analyze_syntax,
     ast::{Expr, ExprKind},
     lexer::{Lit, LitKind, Span, Symbol},
 };
 
 #[test]
 fn test_analyze_single_line() {
-    let parsed = analyze(r#"if(prop("Title"), 1, 0)"#).unwrap();
+    let parsed = analyze_syntax(r#"if(prop("Title"), 1, 0)"#);
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -69,15 +69,14 @@ fn test_analyze_single_line() {
 
 #[test]
 fn test_analyze_multiple_lines() {
-    let parsed = analyze(&trim_indent(
+    let parsed = analyze_syntax(&trim_indent(
         r#"
             if(
                 prop("Title"),
                 1,
                 0
             )"#,
-    ))
-    .unwrap();
+    ));
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
 
@@ -138,7 +137,7 @@ fn test_analyze_multiple_lines() {
 
 #[test]
 fn test_precedence() {
-    let parsed = analyze(r#"1 + 2 * 3"#).unwrap();
+    let parsed = analyze_syntax(r#"1 + 2 * 3"#);
     assert!(parsed.diagnostics.is_empty());
     let ast = parsed.expr;
     assert_eq!(

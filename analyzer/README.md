@@ -10,18 +10,26 @@ Core analyzer for a Notion-like formula language.
 
 ## Entry points
 
-- `analyzer::analyze(text) -> Result<ParseOutput, Diagnostic>`
+- `analyzer::analyze_syntax(text) -> SyntaxResult` (`lex + parse`)
+- `analyzer::analyze(text, ctx) -> AnalyzeResult` (`lex + parse + sema`)
 - `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
 - `analyzer::format_expr(expr, source, tokens) -> String`
 - `analyzer::completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput`
+- `analyzer::ide_help(source, cursor_byte, ctx, config) -> HelpResult`
+- `analyzer::ide_format(source, cursor_byte) -> Result<IdeApplyResult, IdeError>`
+- `analyzer::ide_apply_edits(source, edits, cursor_byte) -> Result<IdeApplyResult, IdeError>`
 - `analyzer::format_diagnostics(source, diags) -> String`
 
 ## Key output types
 
 - `ParseOutput { expr, diagnostics, tokens }`
+- `AnalyzeResult { diagnostics, tokens, output_type }`
 - `Diagnostic { kind, code, message, span, labels, notes, actions }`
 - `CodeAction { title, edits: Vec<TextEdit> }`
 - `TextEdit { range, new_text }`
+- `HelpResult { completion, signature_help }`
+- `CompletionResult { items, replace, preferred_indices }`
+- `IdeApplyResult { source, cursor }` (byte cursor)
 
 Quick fixes are represented as diagnostic actions, not as a separate parse-output list.
 
@@ -35,7 +43,8 @@ Quick fixes are represented as diagnostic actions, not as a separate parse-outpu
 | `analyzer/src/analysis/` | Type inference + semantic diagnostics |
 | `analyzer/src/ide/format.rs` | Formatter |
 | `analyzer/src/ide/completion/` | Completion + signature help |
-| `analyzer/src/text_edit.rs` | Unified edit model |
+| `analyzer/src/ide/edit.rs` | IDE format/apply_edits pipeline (byte cursors + edit validation) |
+| `analyzer/src/text_edit.rs` | Unified edit model + cursor rebasing through edits |
 
 ## Invariants
 

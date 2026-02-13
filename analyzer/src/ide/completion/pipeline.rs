@@ -149,9 +149,7 @@ fn infer_postfix_receiver_ty(
         return semantic::Ty::Unknown;
     }
 
-    let Ok(parsed) = crate::analyze(receiver_source) else {
-        return semantic::Ty::Unknown;
-    };
+    let parsed = crate::analyze_syntax(receiver_source);
 
     let mut map = semantic::TypeMap::default();
     semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map)

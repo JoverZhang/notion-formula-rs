@@ -1,17 +1,13 @@
 use crate::converter::Converter;
 use crate::converter::shared::span_dto;
 use crate::dto::v1::{
-    CompletionItem, CompletionItemKind, CompletionOutput, DisplaySegment, SignatureHelp,
-    SignatureItem, TextEdit,
+    CompletionItem, CompletionItemKind, CompletionResult as CompletionResultDto, DisplaySegment,
+    HelpResult as HelpResultDto, SignatureHelp, SignatureItem, TextEdit,
 };
-use crate::text_edit::apply_text_edits_bytes_with_cursor;
 
 impl Converter {
-    pub fn completion_output_view(
-        source: &str,
-        output: &analyzer::CompletionOutput,
-    ) -> CompletionOutput {
-        let replace = span_dto(source, output.replace);
+    pub fn help_output_view(source: &str, output: &analyzer::ide::HelpResult) -> HelpResultDto {
+        let replace = span_dto(source, output.completion.replace);
         let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelp {
             signatures: sig
                 .signatures
@@ -25,23 +21,26 @@ impl Converter {
         });
 
         let items = output
+            .completion
             .items
             .iter()
-            .map(|item| completion_item_view(source, output, item))
+            .map(|item| completion_item_view(source, &output.completion, item))
             .collect();
 
-        CompletionOutput {
-            items,
-            replace,
+        HelpResultDto {
+            completion: CompletionResultDto {
+                items,
+                replace,
+                preferred_indices: output.completion.preferred_indices.clone(),
+            },
             signature_help,
-            preferred_indices: output.preferred_indices.clone(),
         }
     }
 }
 
 fn completion_item_view(
     source: &str,
-    output: &analyzer::CompletionOutput,
+    completion: &analyzer::ide::CompletionResult,
     item: &analyzer::CompletionItem,
 ) -> CompletionItem {
     let primary_edit_view = item.primary_edit.as_ref().map(|edit| TextEdit {
@@ -72,7 +71,7 @@ fn completion_item_view(
         // The analyzer's `cursor` is intended to be a position in the updated document after
         // applying the primary edit, but additional edits may shift that position.
         let mut cursor_byte: i64 = i64::from(item.cursor.unwrap_or_else(|| {
-            output
+            completion
                 .replace
                 .start
                 .saturating_add(primary_edit.new_text.len() as u32)
@@ -100,7 +99,7 @@ fn completion_item_view(
             }
         }
 
-        let (updated, _) = apply_text_edits_bytes_with_cursor(source, &edits, 0);
+        let (updated, _) = analyzer::apply_text_edits_bytes_with_cursor(source, &edits, 0);
         let cursor_byte = usize::min(usize::try_from(cursor_byte).unwrap_or(0), updated.len());
         Converter::byte_offset_to_utf16_offset(&updated, cursor_byte)
     });

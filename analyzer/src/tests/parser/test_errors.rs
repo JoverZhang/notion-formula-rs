@@ -1,10 +1,10 @@
-use crate::analyze;
+use crate::analyze_syntax;
 use crate::ast::ExprKind;
 use crate::diagnostics::DiagnosticKind;
 
 #[test]
 fn test_trailing_tokens_error() {
-    let result = analyze("1 2").unwrap();
+    let result = analyze_syntax("1 2");
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(result.diagnostics[0].kind, DiagnosticKind::Error);
     assert!(
@@ -17,7 +17,7 @@ fn test_trailing_tokens_error() {
 #[test]
 fn test_multiple_errors_collected() {
     // Missing operand before ')' and an unmatched ')'
-    let result = analyze("(1 + ) 3").unwrap();
+    let result = analyze_syntax("(1 + ) 3");
     assert!(
         result.diagnostics.len() >= 2,
         "expected at least two diagnostics, got {:?}",
@@ -27,7 +27,7 @@ fn test_multiple_errors_collected() {
 
 #[test]
 fn diagnostics_list_trailing_comma_recovers() {
-    let result = analyze("[1,2,]").unwrap();
+    let result = analyze_syntax("[1,2,]");
     let trailing = result
         .diagnostics
         .iter()
@@ -61,7 +61,7 @@ fn diagnostics_list_trailing_comma_recovers() {
 
 #[test]
 fn diagnostics_call_missing_close_paren_has_insert_label() {
-    let result = analyze("f(1").unwrap();
+    let result = analyze_syntax("f(1");
     let diag = result
         .diagnostics
         .iter()
@@ -97,7 +97,7 @@ fn diagnostics_call_missing_close_paren_has_insert_label() {
 
 #[test]
 fn diagnostics_missing_comma_between_call_args_has_insert_label() {
-    let result = analyze("f(1 2)").unwrap();
+    let result = analyze_syntax("f(1 2)");
     let diag = result
         .diagnostics
         .iter()
@@ -129,7 +129,7 @@ fn diagnostics_missing_comma_between_call_args_has_insert_label() {
 fn diagnostics_eof_deconflict_prefers_missing_close_delimiter() {
     // `f(1,` can lead to both "missing expr after comma" and "missing ')'" at EOF.
     // Ensure we only emit the delimiter diagnostic at that insertion point.
-    let result = analyze("f(1,").unwrap();
+    let result = analyze_syntax("f(1,");
     assert_eq!(
         result.diagnostics.len(),
         1,
@@ -145,7 +145,7 @@ fn diagnostics_eof_deconflict_prefers_missing_close_delimiter() {
 
 #[test]
 fn diagnostics_mismatched_delimiter_suggests_replacement() {
-    let result = analyze("(1]").unwrap();
+    let result = analyze_syntax("(1]");
     assert_eq!(
         result.diagnostics.len(),
         1,
@@ -184,7 +184,7 @@ fn diagnostics_mismatched_delimiter_suggests_replacement() {
 
 #[test]
 fn diagnostics_lex_error_has_no_actions() {
-    let result = analyze("1 @").unwrap();
+    let result = analyze_syntax("1 @");
     assert!(
         !result.diagnostics.is_empty(),
         "expected lex diagnostics, got {:?}",

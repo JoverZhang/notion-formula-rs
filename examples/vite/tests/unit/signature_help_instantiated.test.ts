@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { completeSource, initWasm } from "../../src/analyzer/wasm_client";
+import { helpSource, initWasm } from "../../src/analyzer/wasm_client";
 
 const contextJson = JSON.stringify({ properties: [] });
 
@@ -7,7 +7,7 @@ function sigLabelAtCloseParen(source: string): string {
   const cursor = source.lastIndexOf(")");
   expect(cursor).toBeGreaterThanOrEqual(0);
 
-  const out = completeSource(source, cursor, contextJson);
+  const out = helpSource(source, cursor, contextJson);
   expect(out.signature_help).not.toBeNull();
   const help = out.signature_help!;
   const activeSig = help.signatures[help.active_signature] ?? help.signatures[0];
@@ -30,7 +30,7 @@ function sigAtCloseParen(source: string) {
   const cursor = source.lastIndexOf(")");
   expect(cursor).toBeGreaterThanOrEqual(0);
 
-  const out = completeSource(source, cursor, contextJson);
+  const out = helpSource(source, cursor, contextJson);
   expect(out.signature_help).not.toBeNull();
   return out.signature_help!;
 }
