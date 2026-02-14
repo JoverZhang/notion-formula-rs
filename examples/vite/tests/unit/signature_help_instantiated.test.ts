@@ -1,13 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { helpSource, initWasm } from "../../src/analyzer/wasm_client";
-
-const contextJson = JSON.stringify({ properties: [] });
+import { ANALYZER_CONFIG } from "../../src/app/context";
 
 function sigLabelAtCloseParen(source: string): string {
   const cursor = source.lastIndexOf(")");
   expect(cursor).toBeGreaterThanOrEqual(0);
 
-  const out = helpSource(source, cursor, contextJson);
+  const out = helpSource(source, cursor);
   expect(out.signature_help).not.toBeNull();
   const help = out.signature_help!;
   const activeSig = help.signatures[help.active_signature] ?? help.signatures[0];
@@ -30,13 +29,13 @@ function sigAtCloseParen(source: string) {
   const cursor = source.lastIndexOf(")");
   expect(cursor).toBeGreaterThanOrEqual(0);
 
-  const out = helpSource(source, cursor, contextJson);
+  const out = helpSource(source, cursor);
   expect(out.signature_help).not.toBeNull();
   return out.signature_help!;
 }
 
 beforeAll(async () => {
-  await initWasm();
+  await initWasm(ANALYZER_CONFIG);
 });
 
 describe("WASM signature help (instantiated types)", () => {

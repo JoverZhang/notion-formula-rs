@@ -1,5 +1,5 @@
 import "./style.css";
-import { CONTEXT_JSON } from "./app/context";
+import { ANALYZER_CONFIG } from "./app/context";
 import { FORMULA_IDS, type FormulaId } from "./app/types";
 import { createFormulaPanelView } from "./ui/formula_panel_view";
 import { createRootLayoutView } from "./ui/layout";
@@ -49,7 +49,7 @@ async function start() {
 
   const panelViews: Partial<Record<FormulaId, ReturnType<typeof createFormulaPanelView>>> = {};
   const vm = new AppVM({
-    contextJson: CONTEXT_JSON,
+    analyzerConfig: ANALYZER_CONFIG,
     onStateChange: (state) => {
       for (const id of FORMULA_IDS) panelViews[id]?.update(state.formulas[id]);
       tableView.updateFormulaStatus({

@@ -47,7 +47,7 @@ BLESS=1 cargo test -p analyzer
   - line/column projection on diagnostic DTOs
   - `ide_format(source, cursor)` success/failure contract
   - `ide_apply_edits(source, edits, cursor)` validation and cursor rebasing
-  - strict `context_json` validation
+  - strict `AnalyzerConfig` constructor validation
 
 Run:
 

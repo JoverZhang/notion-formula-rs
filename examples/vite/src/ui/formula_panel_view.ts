@@ -11,7 +11,7 @@ import {
   type CompletionItem,
   type SignatureHelp,
 } from "../analyzer/wasm_client";
-import { CONTEXT_JSON, PROPERTY_SCHEMA } from "../app/context";
+import { PROPERTY_SCHEMA } from "../app/context";
 import type { AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
@@ -292,7 +292,7 @@ export function createFormulaPanelView(opts: {
       completionTimer = null;
       const source = view.state.doc.toString();
       const cursor = view.state.selection.main.head;
-      const next = safeBuildCompletionState(source, cursor, CONTEXT_JSON);
+      const next = safeBuildCompletionState(source, cursor);
       completionItems = next.items;
       signatureHelp = next.signatureHelp;
       preferredCompletionIndices = next.preferredIndices;

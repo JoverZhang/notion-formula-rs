@@ -1,38 +1,23 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { analyzeSource, helpSource, initWasm } from "../../src/analyzer/wasm_client";
+import * as wasm from "../../src/pkg/analyzer_wasm.js";
+import { ANALYZER_CONFIG } from "../../src/app/context";
+import { analyzeSource, formatSource, initWasm } from "../../src/analyzer/wasm_client";
 
 beforeAll(async () => {
-  await initWasm();
+  await initWasm(ANALYZER_CONFIG);
 });
 
 describe("WASM host contract errors", () => {
-  it("analyzeSource throws an Error for invalid context JSON", () => {
-    try {
-      analyzeSource("1+2", "{");
-      throw new Error("expected analyzeSource to throw");
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-      expect((e as Error).message).toContain("Invalid context JSON");
-    }
+  it("Analyzer constructor throws on invalid config shape", () => {
+    expect(() => new wasm.Analyzer({ functions: [] })).toThrowError(/Invalid analyzer config/);
   });
 
-  it("helpSource throws an Error for invalid context JSON", () => {
-    try {
-      helpSource("1+2", 0, "{");
-      throw new Error("expected helpSource to throw");
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-      expect((e as Error).message).toContain("Invalid context JSON");
-    }
+  it("analyzeSource still succeeds after initialization", () => {
+    const out = analyzeSource("1+2");
+    expect(out.output_type).toBe("number");
   });
 
-  it("analyzeSource throws an Error when context JSON contains functions", () => {
-    try {
-      analyzeSource("1+2", JSON.stringify({ functions: [] }));
-      throw new Error("expected analyzeSource to throw");
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-      expect((e as Error).message).toContain("Invalid context JSON");
-    }
+  it("formatSource throws analyzer IDE errors", () => {
+    expect(() => formatSource("1 +", 0)).toThrowError(/Format error/);
   });
 });

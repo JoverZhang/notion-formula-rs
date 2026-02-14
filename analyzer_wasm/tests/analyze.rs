@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
+use analyzer_wasm::dto::v1::AnalyzerConfig;
+
 #[derive(Deserialize)]
 struct AnalyzeResult {
     diagnostics: Vec<Diagnostic>,
@@ -52,14 +54,35 @@ struct TextEdit {
     new_text: String,
 }
 
+#[derive(Deserialize)]
+struct CompletionResult {
+    preferred_indices: Vec<usize>,
+}
+
+#[derive(Deserialize)]
+struct HelpResult {
+    completion: CompletionResult,
+}
+
+fn analyzer(preferred_limit: Option<usize>) -> analyzer_wasm::Analyzer {
+    let config = AnalyzerConfig {
+        properties: Vec::new(),
+        preferred_limit,
+    };
+    let config = serde_wasm_bindgen::to_value(&config).expect("expected analyzer config JsValue");
+    analyzer_wasm::Analyzer::new(config).expect("expected Analyzer::new Ok")
+}
+
 fn analyze_value(source: &str) -> AnalyzeResult {
-    let value = analyzer_wasm::analyze(source.to_string(), r#"{}"#.to_string())
+    let value = analyzer(None)
+        .analyze(source.to_string())
         .expect("expected analyze() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected AnalyzeResult")
 }
 
 fn format_value(source: &str, cursor_utf16: u32) -> ApplyResult {
-    let value = analyzer_wasm::ide_format(source.to_string(), cursor_utf16)
+    let value = analyzer(None)
+        .ide_format(source.to_string(), cursor_utf16)
         .expect("expected ide_format() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
@@ -73,7 +96,8 @@ fn edit(start: u32, end: u32, new_text: &str) -> TextEdit {
 
 fn apply_edits_value(source: &str, edits: &[TextEdit], cursor_utf16: u32) -> ApplyResult {
     let edits: JsValue = serde_wasm_bindgen::to_value(edits).expect("expected edits JsValue");
-    let value = analyzer_wasm::ide_apply_edits(source.to_string(), edits, cursor_utf16)
+    let value = analyzer(None)
+        .ide_apply_edits(source.to_string(), edits, cursor_utf16)
         .expect("expected ide_apply_edits() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
@@ -252,16 +276,18 @@ fn format_rebases_mid_document_cursor_through_full_replace_edit() {
 #[wasm_bindgen_test]
 fn format_parse_error_returns_err() {
     let source = "1 +";
-    let err =
-        analyzer_wasm::ide_format(source.to_string(), 0).expect_err("expected ide_format() Err");
+    let err = analyzer(None)
+        .ide_format(source.to_string(), 0)
+        .expect_err("expected ide_format() Err");
     assert_eq!(error_message(err).as_deref(), Some("Format error"));
 }
 
 #[wasm_bindgen_test]
 fn format_lex_error_returns_err() {
     let source = "1 @";
-    let err =
-        analyzer_wasm::ide_format(source.to_string(), 0).expect_err("expected ide_format() Err");
+    let err = analyzer(None)
+        .ide_format(source.to_string(), 0)
+        .expect_err("expected ide_format() Err");
     assert_eq!(error_message(err).as_deref(), Some("Format error"));
 }
 
@@ -280,7 +306,8 @@ fn apply_edits_overlapping_returns_err() {
     let edits: JsValue = serde_wasm_bindgen::to_value(&vec![edit(1, 3, "X"), edit(2, 4, "Y")])
         .expect("edits to JsValue");
 
-    let err = analyzer_wasm::ide_apply_edits(source.to_string(), edits, 0)
+    let err = analyzer(None)
+        .ide_apply_edits(source.to_string(), edits, 0)
         .expect_err("expected overlapping edits Err");
     assert_eq!(error_message(err).as_deref(), Some("Overlapping edits"));
 }
@@ -291,7 +318,8 @@ fn apply_edits_invalid_range_returns_err() {
     let edits: JsValue =
         serde_wasm_bindgen::to_value(&vec![edit(5, 5, "X")]).expect("edits to JsValue");
 
-    let err = analyzer_wasm::ide_apply_edits(source.to_string(), edits, 0)
+    let err = analyzer(None)
+        .ide_apply_edits(source.to_string(), edits, 0)
         .expect_err("expected invalid range Err");
     assert_eq!(error_message(err).as_deref(), Some("Invalid edit range"));
 }
@@ -302,7 +330,8 @@ fn apply_edits_emoji_utf16_conversion_is_correct() {
     let edits: JsValue =
         serde_wasm_bindgen::to_value(&vec![edit(2, 3, "Z")]).expect("edits to JsValue");
 
-    let out = analyzer_wasm::ide_apply_edits(source.to_string(), edits, 2)
+    let out = analyzer(None)
+        .ide_apply_edits(source.to_string(), edits, 2)
         .expect("expected ide_apply_edits() Ok");
     let out: ApplyResult = serde_wasm_bindgen::from_value(out).expect("ApplyResult");
 
@@ -311,41 +340,69 @@ fn apply_edits_emoji_utf16_conversion_is_correct() {
 }
 
 #[wasm_bindgen_test]
-fn analyze_invalid_context_errors() {
-    let source = "1+2";
-    let err = analyzer_wasm::analyze(source.to_string(), "{".to_string())
-        .expect_err("expected analyze() Err on invalid context JSON");
-    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
+fn analyzer_new_rejects_non_object_config() {
+    let err = analyzer_wasm::Analyzer::new(JsValue::from_str("{"))
+        .err()
+        .expect("expected Analyzer::new Err on invalid config");
+    assert_eq!(err, "Invalid analyzer config");
 }
 
 #[wasm_bindgen_test]
-fn analyze_empty_context_errors() {
-    let source = "1+2";
-    let err = analyzer_wasm::analyze(source.to_string(), "   ".to_string())
-        .expect_err("expected analyze() Err on empty context JSON");
-    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
+fn analyzer_new_rejects_unknown_fields() {
+    let config = js_sys::Object::new();
+    Reflect::set(
+        &config,
+        &JsValue::from_str("functions"),
+        &js_sys::Array::new().into(),
+    )
+    .expect("set functions");
+    let err = analyzer_wasm::Analyzer::new(config.into())
+        .err()
+        .expect("expected Analyzer::new Err on unknown fields");
+    assert_eq!(err, "Invalid analyzer config");
 }
 
 #[wasm_bindgen_test]
-fn analyze_rejects_functions_in_context_json() {
-    let source = "1+2";
-    let err = analyzer_wasm::analyze(source.to_string(), r#"{"functions":[]}"#.to_string())
-        .expect_err("expected analyze() Err on unknown context JSON fields");
-    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
+fn analyzer_new_rejects_invalid_properties_structure() {
+    let config = js_sys::Object::new();
+    Reflect::set(
+        &config,
+        &JsValue::from_str("properties"),
+        &js_sys::Object::new().into(),
+    )
+    .expect("set properties");
+    let err = analyzer_wasm::Analyzer::new(config.into())
+        .err()
+        .expect("expected Analyzer::new Err on invalid properties");
+    assert_eq!(err, "Invalid analyzer config");
 }
 
 #[wasm_bindgen_test]
-fn analyze_rejects_invalid_properties_structure() {
-    let source = "1+2";
-    let err = analyzer_wasm::analyze(source.to_string(), r#"{"properties":{}}"#.to_string())
-        .expect_err("expected analyze() Err on invalid context JSON structure");
-    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
+fn analyzer_config_nullable_preferred_limit_defaults_to_five() {
+    let source = "if(";
+
+    let out_null = analyzer(None)
+        .ide_help(source.to_string(), 3)
+        .expect("expected ide_help() Ok");
+    let out_null: HelpResult = serde_wasm_bindgen::from_value(out_null).expect("HelpResult");
+
+    let out_five = analyzer(Some(5))
+        .ide_help(source.to_string(), 3)
+        .expect("expected ide_help() Ok");
+    let out_five: HelpResult = serde_wasm_bindgen::from_value(out_five).expect("HelpResult");
+
+    assert_eq!(
+        out_null.completion.preferred_indices,
+        out_five.completion.preferred_indices
+    );
 }
 
 #[wasm_bindgen_test]
-fn ide_help_invalid_context_errors() {
-    let source = "1+2";
-    let err = analyzer_wasm::ide_help(source.to_string(), 0, "{".to_string())
-        .expect_err("expected ide_help() Err on invalid context JSON");
-    assert_eq!(error_message(err).as_deref(), Some("Invalid context JSON"));
+fn analyzer_config_zero_preferred_limit_disables_preferred_indices() {
+    let out = analyzer(Some(0))
+        .ide_help("if(".to_string(), 3)
+        .expect("expected ide_help() Ok");
+    let out: HelpResult = serde_wasm_bindgen::from_value(out).expect("HelpResult");
+
+    assert!(out.completion.preferred_indices.is_empty());
 }

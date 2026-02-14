@@ -10,13 +10,17 @@ This crate owns all UTF-16 ↔ UTF-8 byte conversion. Core analyzer stays byte-o
 
 Defined in `analyzer_wasm/src/lib.rs`:
 
-- `analyze(source, context_json) -> AnalyzeResult`
-- `ide_format(source, cursor_utf16) -> ApplyResult`
-- `ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `ide_help(source, cursor_utf16, context_json) -> HelpResult`
+- `new Analyzer(config: AnalyzerConfig)`
+- `Analyzer.analyze(source) -> AnalyzeResult`
+- `Analyzer.ide_format(source, cursor_utf16) -> ApplyResult`
+- `Analyzer.ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `Analyzer.ide_help(source, cursor_utf16) -> HelpResult`
 
 ## DTOs (`dto::v1`)
 
+- `AnalyzerConfig { properties, preferred_limit }`
+- `Property { name, type }`
+- `Ty = Number | String | Boolean | Date | List<Ty>`
 - `AnalyzeResult { diagnostics, tokens, output_type }`
 - `Diagnostic { kind, message, span, line, col, actions }`
 - `CodeAction { title, edits }`
@@ -29,12 +33,19 @@ All spans/offsets in DTOs are UTF-16 code units and half-open `[start, end)`.
 `Diagnostic.line`/`col` are 1-based values derived from core byte spans via
 `analyzer::SourceMap::line_col` (`col` is Unicode scalar count).
 
+Offset conversion helpers are centralized in `analyzer_wasm/src/offsets.rs`:
+- `utf16_to_8_offset`
+- `utf8_to_16_offset`
+- `utf16_to_8_cursor`
+- `utf16_to_8_text_edits`
+
 ## Error model
 
-- `analyze`: throws only for invalid context JSON / serialization errors.
+- `Analyzer::new`: returns `Err("Invalid analyzer config")` for invalid config shape.
+- `analyze`: throws only for serialization errors.
 - `ide_format`: throws on syntax-invalid input (`Format error`).
 - `ide_apply_edits`: throws on invalid edits / invalid cursor / overlaps.
-- `ide_help`: throws on invalid context JSON / serialization errors.
+- `ide_help`: throws only for serialization errors.
 
 ## Edit application rules
 
@@ -45,12 +56,13 @@ All spans/offsets in DTOs are UTF-16 code units and half-open `[start, end)`.
 Core edit application (sorting, overlap checks, cursor rebasing, full-document format edit) now
 lives in `analyzer/src/ide/edit.rs`. WASM only converts UTF-16 ↔ UTF-8 and serializes DTOs.
 
-## `context_json` contract
+## `AnalyzerConfig` contract
 
-- non-empty JSON string
+- object shape only (constructor argument)
 - unknown top-level fields rejected
-- current schema:
-  - `{ properties: Property[], completion?: { preferred_limit?: number } }`
+- schema:
+  - `{ properties?: Property[], preferred_limit?: number | null }`
+- `preferred_limit = null` uses default `5`
 
 ## Testing
 

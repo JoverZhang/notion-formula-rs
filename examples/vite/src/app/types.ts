@@ -1,4 +1,4 @@
-import type { Diagnostic } from "../analyzer/generated/wasm_dto";
+import type { AnalyzerConfig, Diagnostic } from "../analyzer/generated/wasm_dto";
 import type { Token } from "../editor_decorations";
 
 export const FORMULA_IDS = ["f1", "f2"] as const;
@@ -17,6 +17,6 @@ export type FormulaState = {
 
 export type AppState = {
   wasmReady: boolean;
-  contextJson: string;
+  analyzerConfig: AnalyzerConfig;
   formulas: Record<FormulaId, FormulaState>;
 };

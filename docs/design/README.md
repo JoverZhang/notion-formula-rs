@@ -77,10 +77,11 @@ Rust (`analyzer/`):
 
 WASM (`analyzer_wasm/`):
 
-- `analyze(source, context_json) -> AnalyzeResult`
-- `ide_format(source, cursor_utf16) -> ApplyResult`
-- `ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `ide_help(source, cursor_utf16, context_json) -> HelpResult`
+- `new Analyzer(config: AnalyzerConfig)`
+- `Analyzer.analyze(source) -> AnalyzeResult`
+- `Analyzer.ide_format(source, cursor_utf16) -> ApplyResult`
+- `Analyzer.ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `Analyzer.ide_help(source, cursor_utf16) -> HelpResult`
 
 Tooling:
 
@@ -107,7 +108,7 @@ These are the hard edges other code relies on:
 - WASM boundary encoding: DTO spans/offsets are UTF-16 code units, half-open `[start, end)`.
 - Determinism: diagnostics deconfliction + formatting order are deterministic.
 - Signature help is structured: UIs render segments, they do not parse signature strings.
-- `context_json` is strict: non-empty JSON; unknown top-level fields rejected.
+- `AnalyzerConfig` is strict: object input; unknown top-level fields rejected.
 - Semantic and DTO payloads avoid nullable "unknown" values where explicit domain values exist
   (`Ty::Unknown`, `"unknown"`).
 
@@ -157,11 +158,12 @@ These are stability guarantees. Contract changes require docs + tests + changelo
 - Signature help output is structured (`DisplaySegment[]`) for direct UI rendering.
 - Active parameter mapping follows `docs/signature-help.md`.
 
-### WASM `context_json`
+### WASM `AnalyzerConfig`
 
-- `context_json` must be non-empty valid JSON.
-- Unknown top-level fields are rejected (`deny_unknown_fields`).
-- Current schema: `{ properties: Property[], completion?: { preferred_limit?: number } }`.
+- Constructor config must be an object.
+- Unknown top-level fields are rejected.
+- Current schema: `{ properties?: Property[], preferred_limit?: number | null }`.
+- `preferred_limit = null` uses default `5`.
 - `functions` are sourced from Rust builtins; JS does not provide them.
 
 ## Design philosophy

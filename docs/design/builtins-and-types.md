@@ -5,7 +5,7 @@ Semantic analysis is best-effort inference + validation against builtin signatur
 ## Context
 
 - `Context { properties, functions }`
-  - `properties`: supplied externally (WASM `context_json`)
+  - `properties`: supplied externally (WASM `AnalyzerConfig`)
   - `functions`: sourced from Rust builtins (JS cannot supply them)
 - Code: `analyzer/src/analysis/mod.rs`
 

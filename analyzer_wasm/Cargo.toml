@@ -10,7 +10,6 @@ crate-type = ["cdylib", "rlib"]
 analyzer = { path = "../analyzer" }
 serde = "1.0.228"
 serde-wasm-bindgen = "0.6.5"
-serde_json = "1.0.145"
 ts-rs = { version = "10", features = ["serde-compat"] }
 wasm-bindgen = "0.2.106"
 js-sys = "0.3.83"

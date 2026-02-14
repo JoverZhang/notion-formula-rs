@@ -1,4 +1,5 @@
 import { analyzeSource, initWasm } from "../analyzer/wasm_client";
+import type { AnalyzerConfig } from "../analyzer/generated/wasm_dto";
 import {
   FORMULA_IDS,
   type AppState,
@@ -10,7 +11,7 @@ import {
 const DEBOUNCE_MS = 80;
 
 type VMOpts = {
-  contextJson: string;
+  analyzerConfig: AnalyzerConfig;
   onStateChange: (state: AppState) => void;
 };
 
@@ -22,14 +23,14 @@ export class AppVM {
   constructor(opts: VMOpts) {
     this.state = {
       wasmReady: false,
-      contextJson: opts.contextJson,
+      analyzerConfig: opts.analyzerConfig,
       formulas: this.createFormulas(),
     };
     this.onStateChange = opts.onStateChange;
   }
 
   async start(): Promise<void> {
-    await initWasm();
+    await initWasm(this.state.analyzerConfig);
     this.state.wasmReady = true;
     for (const formula of Object.values(this.state.formulas)) {
       if (formula.source) {
@@ -96,7 +97,7 @@ export class AppVM {
     this.onStateChange(this.state);
 
     try {
-      const result = analyzeSource(formula.source, this.state.contextJson);
+      const result = analyzeSource(formula.source);
       formula.diagnostics = result.diagnostics || [];
       formula.tokens = result.tokens || [];
       formula.outputType = result.output_type || "unknown";

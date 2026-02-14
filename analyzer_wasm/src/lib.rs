@@ -7,119 +7,134 @@ pub mod dto;
 mod offsets;
 mod span;
 
-use analyzer::{Span as ByteSpan, TextEdit as ByteTextEdit};
+use analyzer::CompletionConfig;
+use analyzer::analysis::{Context, Property as AnalyzerProperty, builtins_functions};
 use js_sys::Error as JsError;
+use js_sys::Object;
 use serde::Serialize;
+use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 
 use crate::converter::Converter;
-use crate::dto::v1::{AnalyzeResult, ApplyResult, Span as Utf16Span, TextEdit as Utf16TextEdit};
+use crate::dto::v1::{AnalyzeResult, AnalyzerConfig, ApplyResult, TextEdit as Utf16TextEdit};
+use crate::offsets::{utf16_to_8_cursor, utf16_to_8_text_edits};
+
+const DEFAULT_PREFERRED_LIMIT: usize = 5;
 
 #[wasm_bindgen]
-pub fn analyze(source: String, context_json: String) -> Result<JsValue, JsValue> {
-    let parsed = Converter::parse_context(&context_json)?;
-    let result = analyzer::analyze(&source, &parsed.ctx);
-    let out: AnalyzeResult = Converter::analyze_output(&source, result);
-    to_js_value(&out)
+pub struct Analyzer {
+    context: Context,
+    preferred_limit: usize,
 }
 
 #[wasm_bindgen]
-pub fn ide_format(source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
-    let cursor_byte = cursor_utf16_to_valid_byte(&source, cursor_utf16)? as u32;
-    let output = analyzer::ide_format(&source, cursor_byte).map_err(ide_error_to_js)?;
-    to_utf16_apply_result(output)
+impl Analyzer {
+    /// Create a new analyzer with the given config.
+    ///
+    /// @param config: [`AnalyzerConfig`]
+    /// @returns [`Analyzer`]
+    /// @throws [`String`] if the config is invalid
+    #[wasm_bindgen(constructor)]
+    pub fn new(config: JsValue) -> Result<Self, String> {
+        validate_config_keys(&config)?;
+        let input: AnalyzerConfig = from_value(config, "Invalid analyzer config")?;
+        Ok(Self {
+            context: Context {
+                properties: input
+                    .properties
+                    .into_iter()
+                    .map(|p| AnalyzerProperty {
+                        name: p.name,
+                        ty: p.ty.into(),
+                        disabled_reason: None,
+                    })
+                    .collect(),
+                functions: builtins_functions(),
+            },
+            preferred_limit: input.preferred_limit.unwrap_or(DEFAULT_PREFERRED_LIMIT),
+        })
+    }
+
+    pub fn analyze(&self, source: String) -> Result<JsValue, JsValue> {
+        let result = analyzer::analyze(&source, &self.context);
+        let out: AnalyzeResult = Converter::analyze_output(&source, result);
+        to_value(&out)
+    }
+
+    pub fn ide_format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
+        let cursor_byte = utf16_to_8_cursor(&source, cursor_utf16).map_err(ide_err)? as u32;
+        let output = analyzer::ide_format(&source, cursor_byte).map_err(ide_err)?;
+        to_value(&ApplyResult {
+            cursor: Converter::utf8_to_16_offset(&output.source, output.cursor as usize),
+            source: output.source,
+        })
+    }
+
+    pub fn ide_apply_edits(
+        &self,
+        source: String,
+        edits: JsValue,
+        cursor_utf16: u32,
+    ) -> Result<JsValue, JsValue> {
+        let text_edits: Vec<Utf16TextEdit> = serde_wasm_bindgen::from_value(edits)
+            .map_err(|_| JsValue::from(JsError::new("Invalid edits")))?;
+        let text_edits = utf16_to_8_text_edits(&source, text_edits).map_err(ide_err)?;
+        let cursor = utf16_to_8_cursor(&source, cursor_utf16).map_err(ide_err)? as u32;
+
+        let result = analyzer::ide_apply_edits(&source, text_edits, cursor).map_err(ide_err)?;
+
+        to_value(&ApplyResult {
+            cursor: Converter::utf8_to_16_offset(&result.source, result.cursor as usize),
+            source: result.source,
+        })
+    }
+
+    pub fn ide_help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
+        let cursor = Converter::utf16_to_8_offset(&source, cursor_utf16 as usize);
+
+        let output = analyzer::ide_help(
+            &source,
+            cursor,
+            &self.context,
+            CompletionConfig {
+                preferred_limit: self.preferred_limit,
+            },
+        );
+        to_value(&Converter::help_output_view(&source, &output))
+    }
 }
 
-#[wasm_bindgen]
-pub fn ide_apply_edits(
-    source: String,
-    edits: JsValue,
-    cursor_utf16: u32,
-) -> Result<JsValue, JsValue> {
-    let edits_view: Vec<Utf16TextEdit> = serde_wasm_bindgen::from_value(edits)
-        .map_err(|_| JsValue::from(JsError::new("Invalid edits")))?;
-
-    let byte_edits = text_edits_utf16_to_byte(&source, edits_view)?;
-    let cursor_byte = cursor_utf16_to_valid_byte(&source, cursor_utf16)? as u32;
-    let output =
-        analyzer::ide_apply_edits(&source, byte_edits, cursor_byte).map_err(ide_error_to_js)?;
-    to_utf16_apply_result(output)
-}
-
-#[wasm_bindgen]
-pub fn ide_help(source: String, cursor: usize, context_json: String) -> Result<JsValue, JsValue> {
-    let cursor_byte = Converter::utf16_offset_to_byte(&source, cursor);
-    let parsed = Converter::parse_context(&context_json)?;
-    let output = analyzer::ide_help(&source, cursor_byte, &parsed.ctx, parsed.completion);
-    let out = Converter::help_output_view(&source, &output);
-    to_js_value(&out)
-}
-
-fn to_js_value<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
+fn to_value<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
     serde_wasm_bindgen::to_value(value).map_err(|_| JsValue::from(JsError::new("Serialize error")))
 }
 
-fn to_utf16_apply_result(output: analyzer::IdeApplyResult) -> Result<JsValue, JsValue> {
-    let out = ApplyResult {
-        cursor: Converter::byte_offset_to_utf16_offset(&output.source, output.cursor as usize),
-        source: output.source,
-    };
-    to_js_value(&out)
+fn from_value<T: serde::de::DeserializeOwned>(
+    value: JsValue,
+    err: &'static str,
+) -> Result<T, String> {
+    serde_wasm_bindgen::from_value(value).map_err(|_| err.to_string())
 }
 
-fn ide_error_to_js(err: analyzer::IdeError) -> JsValue {
+fn ide_err(err: analyzer::IdeError) -> JsValue {
     JsValue::from(JsError::new(err.message()))
 }
 
-fn cursor_utf16_to_valid_byte(source: &str, cursor_utf16: u32) -> Result<usize, JsValue> {
-    let utf16_len = source.encode_utf16().count();
-    let cursor_utf16 = cursor_utf16 as usize;
-    if cursor_utf16 > utf16_len {
-        return Err(JsValue::from(JsError::new("Invalid cursor")));
+fn validate_config_keys(config: &JsValue) -> Result<(), String> {
+    if !config.is_object() {
+        return Err("Invalid analyzer config".to_string());
     }
 
-    let cursor_byte = Converter::utf16_offset_to_byte(source, cursor_utf16);
-    if !source.is_char_boundary(cursor_byte) {
-        return Err(JsValue::from(JsError::new("Invalid cursor")));
+    let object = config.unchecked_ref::<Object>();
+    let keys = Object::keys(object);
+    for i in 0..keys.length() {
+        let Some(key) = keys.get(i).as_string() else {
+            return Err("Invalid analyzer config".to_string());
+        };
+        match key.as_str() {
+            "properties" | "preferred_limit" => {}
+            _ => return Err("Invalid analyzer config".to_string()),
+        }
     }
 
-    Ok(cursor_byte)
-}
-
-fn text_edits_utf16_to_byte(
-    source: &str,
-    edits: Vec<Utf16TextEdit>,
-) -> Result<Vec<ByteTextEdit>, JsValue> {
-    let utf16_len = source.encode_utf16().count();
-
-    let mut byte_edits = Vec::with_capacity(edits.len());
-    for edit in edits {
-        let Utf16Span { start, end } = edit.range;
-        let start_utf16 = start as usize;
-        let end_utf16 = end as usize;
-
-        if end_utf16 < start_utf16 || end_utf16 > utf16_len {
-            return Err(JsValue::from(JsError::new("Invalid edit range")));
-        }
-
-        let start_byte = Converter::utf16_offset_to_byte(source, start_utf16);
-        let end_byte = Converter::utf16_offset_to_byte(source, end_utf16);
-
-        if end_byte < start_byte {
-            return Err(JsValue::from(JsError::new("Invalid edit range")));
-        }
-        if !source.is_char_boundary(start_byte) || !source.is_char_boundary(end_byte) {
-            return Err(JsValue::from(JsError::new("Invalid edit range")));
-        }
-
-        byte_edits.push(ByteTextEdit {
-            range: ByteSpan {
-                start: start_byte as u32,
-                end: end_byte as u32,
-            },
-            new_text: edit.new_text,
-        });
-    }
-
-    Ok(byte_edits)
+    Ok(())
 }

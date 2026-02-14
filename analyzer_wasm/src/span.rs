@@ -10,7 +10,7 @@ use crate::{converter::Converter, dto::v1::Span as Utf16Span};
 ///
 /// If an endpoint is not on a UTF-8 char boundary, it is floored to the previous boundary.
 pub fn byte_span_to_utf16_span(source: &str, span: Span) -> Utf16Span {
-    let start = Converter::byte_offset_to_utf16_offset(source, span.start as usize);
-    let end = Converter::byte_offset_to_utf16_offset(source, span.end as usize);
+    let start = Converter::utf8_to_16_offset(source, span.start as usize);
+    let end = Converter::utf8_to_16_offset(source, span.end as usize);
     Utf16Span { start, end }
 }

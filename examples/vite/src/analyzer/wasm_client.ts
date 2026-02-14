@@ -1,6 +1,7 @@
 import init, * as wasm from "../pkg/analyzer_wasm.js";
 import type {
   AnalyzeResult,
+  AnalyzerConfig,
   ApplyResult,
   CompletionItem as CompletionItemDto,
   HelpResult,
@@ -8,7 +9,7 @@ import type {
   TextEdit,
 } from "./generated/wasm_dto";
 
-export type { Span } from "./generated/wasm_dto";
+export type { AnalyzerConfig, Span } from "./generated/wasm_dto";
 export type CompletionItem = CompletionItemDto;
 export type SignatureHelp = SignatureHelpDto;
 
@@ -24,8 +25,9 @@ export type CompletionApplyResult = {
 };
 
 let initPromise: Promise<void> | null = null;
+let analyzer: wasm.Analyzer | null = null;
 
-export async function initWasm(): Promise<void> {
+export async function initWasm(config: AnalyzerConfig): Promise<void> {
   if (initPromise) {
     return initPromise;
   }
@@ -38,22 +40,29 @@ export async function initWasm(): Promise<void> {
       const { fileURLToPath } = await import("node:url");
       const wasmUrl = new URL("../pkg/analyzer_wasm_bg.wasm", import.meta.url);
       const wasmBytes = await readFile(fileURLToPath(wasmUrl));
-      await init(wasmBytes);
-      return;
+      await init({ module_or_path: wasmBytes });
+    } else {
+      await init();
     }
-
-    await init();
+    analyzer = new wasm.Analyzer(config);
   })();
 
   return initPromise;
 }
 
-export function analyzeSource(source: string, contextJson: string): AnalyzeResult {
-  return wasm.analyze(source, contextJson) as AnalyzeResult;
+function getAnalyzer(): wasm.Analyzer {
+  if (analyzer) {
+    return analyzer;
+  }
+  throw new Error("WASM analyzer is not initialized");
+}
+
+export function analyzeSource(source: string): AnalyzeResult {
+  return getAnalyzer().analyze(source) as AnalyzeResult;
 }
 
 export function formatSource(source: string, cursorUtf16: number): ApplyResult {
-  return wasm.ide_format(source, cursorUtf16) as ApplyResult;
+  return getAnalyzer().ide_format(source, cursorUtf16) as ApplyResult;
 }
 
 export function applyEditsSource(
@@ -61,23 +70,15 @@ export function applyEditsSource(
   edits: TextEdit[],
   cursorUtf16: number,
 ): ApplyResult {
-  return wasm.ide_apply_edits(source, edits, cursorUtf16) as ApplyResult;
+  return getAnalyzer().ide_apply_edits(source, edits, cursorUtf16) as ApplyResult;
 }
 
-export function helpSource(
-  source: string,
-  cursor: number,
-  contextJson: string,
-): HelpResult {
-  return wasm.ide_help(source, cursor, contextJson) as HelpResult;
+export function helpSource(source: string, cursor: number): HelpResult {
+  return getAnalyzer().ide_help(source, cursor) as HelpResult;
 }
 
-export function buildCompletionState(
-  source: string,
-  cursor: number,
-  contextJson: string,
-): CompletionState {
-  const output = helpSource(source, cursor, contextJson);
+export function buildCompletionState(source: string, cursor: number): CompletionState {
+  const output = helpSource(source, cursor);
   const completion = output.completion;
   return {
     items: completion?.items ?? [],
@@ -88,13 +89,9 @@ export function buildCompletionState(
   };
 }
 
-export function safeBuildCompletionState(
-  source: string,
-  cursor: number,
-  contextJson: string,
-): CompletionState {
+export function safeBuildCompletionState(source: string, cursor: number): CompletionState {
   try {
-    return buildCompletionState(source, cursor, contextJson);
+    return buildCompletionState(source, cursor);
   } catch {
     return { items: [], signatureHelp: null, preferredIndices: [] };
   }

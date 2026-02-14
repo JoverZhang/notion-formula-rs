@@ -136,7 +136,7 @@ Type ranking is a separate pass (`apply_type_ranking`) used when an expected typ
 - `preferred_indices` are “smart picks” for UI defaults.
 - Computed from ranked items that match the query, up to `preferred_limit`.
 - `preferred_limit` defaults to `5`.
-- `context_json.completion.preferred_limit` overrides; `0` disables preferred computation.
+- `AnalyzerConfig.preferred_limit` overrides; `0` disables preferred computation.
 - Code: `analyzer/src/ide/completion/rank.rs`
 
 ## Signature help

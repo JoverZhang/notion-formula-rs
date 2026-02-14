@@ -6,10 +6,12 @@
 ## Integration notes
 
 - WASM wrapper: `src/analyzer/wasm_client.ts`
+  - `initWasm(analyzerConfig)`
   - `analyzeSource`
   - `formatSource`
   - `applyEditsSource`
   - `helpSource`
+- Analyzer config source: `src/app/context.ts` (`ANALYZER_CONFIG`)
 - wasm-pack output: `src/pkg/`
 - DTO types: `src/analyzer/generated/wasm_dto.ts`
 

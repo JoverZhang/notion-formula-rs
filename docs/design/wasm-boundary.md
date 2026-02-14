@@ -4,16 +4,18 @@ This layer translates between editor coordinates (UTF-16) and core analyzer coor
 
 ## Exports
 
-- `analyze(source, context_json) -> AnalyzeResult`
-- `ide_format(source, cursor_utf16) -> ApplyResult`
-- `ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `ide_help(source, cursor_utf16, context_json) -> HelpResult`
+- `new Analyzer(config: AnalyzerConfig)`
+- `Analyzer.analyze(source) -> AnalyzeResult`
+- `Analyzer.ide_format(source, cursor_utf16) -> ApplyResult`
+- `Analyzer.ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `Analyzer.ide_help(source, cursor_utf16) -> HelpResult`
 
 Rust signatures (wasm-bindgen):
-- `analyze(source: String, context_json: String) -> Result<JsValue, JsValue>`
-- `ide_format(source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
-- `ide_apply_edits(source: String, edits: JsValue, cursor_utf16: u32) -> Result<JsValue, JsValue>`
-- `ide_help(source: String, cursor_utf16: usize, context_json: String) -> Result<JsValue, JsValue>`
+- `Analyzer::new(config: JsValue) -> Result<Analyzer, String>`
+- `Analyzer::analyze(&self, source: String) -> Result<JsValue, JsValue>`
+- `Analyzer::ide_format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
+- `Analyzer::ide_apply_edits(&self, source: String, edits: JsValue, cursor_utf16: u32) -> Result<JsValue, JsValue>`
+- `Analyzer::ide_help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
 
 ## Hard rules
 
@@ -24,6 +26,9 @@ Rust signatures (wasm-bindgen):
 
 ## DTOs (v1)
 
+- `AnalyzerConfig { properties, preferred_limit }`
+- `Property { name, type }`
+- `Ty = Number | String | Boolean | Date | List<Ty>`
 - `AnalyzeResult { diagnostics, tokens, output_type }`
 - `Diagnostic { kind, message, span, line, col, actions }`
 - `CodeAction { title, edits }`
@@ -35,6 +40,12 @@ Rust signatures (wasm-bindgen):
 Diagnostics expose quick-fix actions directly as `actions`.
 Diagnostics include 1-based `line`/`col` for UI lists. These are
 computed from diagnostic byte offsets through `analyzer::SourceMap::line_col`.
+
+Offset conversion helpers are centralized in `analyzer_wasm/src/offsets.rs`:
+- `utf16_to_8_offset`
+- `utf8_to_16_offset`
+- `utf16_to_8_cursor`
+- `utf16_to_8_text_edits`
 
 ## Formatting and edit application
 
@@ -62,15 +73,17 @@ Core edit behavior is implemented in `analyzer/src/ide/edit.rs`:
 
 ## Error model
 
-- `analyze` and `ide_help` throw on invalid context JSON.
+- `Analyzer::new` returns `Err("Invalid analyzer config")` for invalid config shape.
+- `analyze` and `ide_help` throw only on serialization failures.
 - `ide_format` and `ide_apply_edits` throw on operation failure (not encoded in payload).
 - error messages are minimal and deterministic (`Format error`, `Invalid edits`, `Invalid edit range`, `Overlapping edits`, `Invalid cursor`).
 
-## Context JSON contract
+## Analyzer config contract
 
-- non-empty valid JSON
+- object input only
 - unknown top-level fields rejected
-- schema: `{ properties: Property[], completion?: { preferred_limit?: number } }`
+- schema: `{ properties?: Property[], preferred_limit?: number | null }`
+- `preferred_limit = null` means default `5`
 
 ## Source pointers
 

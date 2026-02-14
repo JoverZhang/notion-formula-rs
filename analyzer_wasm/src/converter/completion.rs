@@ -101,7 +101,7 @@ fn completion_item_view(
 
         let (updated, _) = analyzer::apply_text_edits_bytes_with_cursor(source, &edits, 0);
         let cursor_byte = usize::min(usize::try_from(cursor_byte).unwrap_or(0), updated.len());
-        Converter::byte_offset_to_utf16_offset(&updated, cursor_byte)
+        Converter::utf8_to_16_offset(&updated, cursor_byte)
     });
 
     CompletionItem {

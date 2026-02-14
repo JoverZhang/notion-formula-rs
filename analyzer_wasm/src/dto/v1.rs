@@ -3,8 +3,49 @@
 //! JS-facing types returned by `analyzer_wasm`.
 //! Spans and offsets use UTF-16 code units and are half-open `[start, end)`.
 
+use analyzer::analysis::Ty as AnalyzerTy;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "PascalCase")]
+pub enum Ty {
+    Number,
+    String,
+    Boolean,
+    Date,
+    List(Box<Ty>),
+}
+
+impl From<Ty> for AnalyzerTy {
+    fn from(ty: Ty) -> AnalyzerTy {
+        match ty {
+            Ty::Number => AnalyzerTy::Number,
+            Ty::String => AnalyzerTy::String,
+            Ty::Boolean => AnalyzerTy::Boolean,
+            Ty::Date => AnalyzerTy::Date,
+            Ty::List(ty) => AnalyzerTy::List(Box::new((*ty).into())),
+        }
+    }
+}
+
+/// A property available to `prop("Name")` calls and to editor completion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub struct Property {
+    /// Canonical property name as referenced by `prop("...")`.
+    pub name: String,
+    #[serde(rename = "type")]
+    /// Declared property type.
+    pub ty: Ty,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct AnalyzerConfig {
+    #[serde(default)]
+    pub properties: Vec<Property>,
+    pub preferred_limit: Option<usize>,
+}
 
 /// A span in UTF-16 code units (half-open `[start, end)`).
 #[derive(Serialize, Deserialize, TS, Clone, Copy, Debug, PartialEq, Eq)]

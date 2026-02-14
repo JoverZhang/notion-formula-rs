@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use analyzer_wasm::dto::v1::{
-    AnalyzeResult, ApplyResult, CodeAction, CompletionItem, CompletionItemKind, CompletionResult,
-    Diagnostic, DiagnosticKind, DisplaySegment, HelpResult, SignatureHelp, SignatureItem, Span,
-    TextEdit, Token,
+    AnalyzeResult, AnalyzerConfig, ApplyResult, CodeAction, CompletionItem, CompletionItemKind,
+    CompletionResult, Diagnostic, DiagnosticKind, DisplaySegment, HelpResult, Property,
+    SignatureHelp, SignatureItem, Span, TextEdit, Token, Ty,
 };
 use ts_rs::TS;
 
@@ -21,6 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     out.push_str("// AUTO-GENERATED: `cargo run -p analyzer_wasm --bin export_ts`\n\n");
 
     for decl in [
+        Ty::decl(),
+        Property::decl(),
+        AnalyzerConfig::decl(),
         Span::decl(),
         TextEdit::decl(),
         CodeAction::decl(),

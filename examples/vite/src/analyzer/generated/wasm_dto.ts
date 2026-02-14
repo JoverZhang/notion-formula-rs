@@ -2,6 +2,20 @@
 /* prettier-ignore */
 // AUTO-GENERATED: `cargo run -p analyzer_wasm --bin export_ts`
 
+export type Ty = "Number" | "String" | "Boolean" | "Date" | { "List": Ty };
+
+export type Property = { 
+/**
+ * Canonical property name as referenced by `prop("...")`.
+ */
+name: string, 
+/**
+ * Declared property type.
+ */
+type: Ty, };
+
+export type AnalyzerConfig = { properties: Array<Property>, preferred_limit: number | null, };
+
 export type Span = { 
 /**
  * Start offset in UTF-16 code units.
