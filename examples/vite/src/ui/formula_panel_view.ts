@@ -100,7 +100,7 @@ function must<T extends Element>(root: ParentNode, selector: string): T {
 }
 
 function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
-  return VALID_PROP_NAMES.has(chip.argValue as PropName);
+  return VALID_PROP_NAMES.has(chip.argValue);
 }
 
 export function firstDiagnosticAction(

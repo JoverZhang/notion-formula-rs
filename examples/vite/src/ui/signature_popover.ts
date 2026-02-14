@@ -120,6 +120,7 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
     if (!signature || !unwrapped.signatureMain) {
       return;
     }
+    const signatureMain = unwrapped.signatureMain;
 
     if (wrapRaf !== null) cancelAnimationFrame(wrapRaf);
     wrapRaf = requestAnimationFrame(() => {
@@ -127,8 +128,8 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
       if (!isActive || signatureEl.classList.contains("hidden") || signatureEl.clientWidth === 0)
         return;
       const hasMainOverflow = shouldUseWrappedSignature({
-        scrollWidth: unwrapped.signatureMain.scrollWidth,
-        clientWidth: unwrapped.signatureMain.clientWidth,
+        scrollWidth: signatureMain.scrollWidth,
+        clientWidth: signatureMain.clientWidth,
       });
       const hasPopoverOverflow = shouldUseWrappedSignature({
         scrollWidth: signatureEl.scrollWidth,

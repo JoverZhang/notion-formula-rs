@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import * as wasm from "../../src/pkg/analyzer_wasm.js";
-import { ANALYZER_CONFIG } from "../../src/app/context";
 import { analyzeSource, formatSource, initWasm } from "../../src/analyzer/wasm_client";
+import { ANALYZER_CONFIG } from "../../src/app/context";
+import * as wasm from "../../src/pkg/analyzer_wasm.js";
 
 beforeAll(async () => {
   await initWasm(ANALYZER_CONFIG);

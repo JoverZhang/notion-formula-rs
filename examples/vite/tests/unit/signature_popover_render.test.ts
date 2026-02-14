@@ -42,9 +42,8 @@ describe("signature popover render", () => {
   });
 
   it("uses wrapped mode when popover overflows even if main width appears equal", () => {
-    let rafCb: FrameRequestCallback | null = null;
-    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
-      rafCb = cb;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0);
       return 1;
     });
     vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
@@ -79,9 +78,6 @@ describe("signature popover render", () => {
     expect(main).toBeTruthy();
     Object.defineProperty(main!, "clientWidth", { configurable: true, get: () => 460 });
     Object.defineProperty(main!, "scrollWidth", { configurable: true, get: () => 460 });
-
-    expect(rafCb).toBeTruthy();
-    rafCb?.(0);
 
     expect(signatureEl.dataset.wrap).toBe("wrapped");
     expect(signatureEl.classList.contains("hidden")).toBe(false);

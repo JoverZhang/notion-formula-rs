@@ -1,5 +1,5 @@
-import { analyzeSource, initWasm } from "../analyzer/wasm_client";
 import type { AnalyzerConfig } from "../analyzer/generated/wasm_dto";
+import { analyzeSource, initWasm } from "../analyzer/wasm_client";
 import {
   FORMULA_IDS,
   type AppState,
