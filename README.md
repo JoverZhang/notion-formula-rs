@@ -1,39 +1,41 @@
 # notion-formula-rs
 
-`notion-formula-rs` is a Rust workspace for Notion-style formula tooling.
+`notion-formula-rs` is a Rust workspace for **Notion-style formula language tooling**.
 
-If you are building an editor, this repo gives you a practical core:
+This repo focuses on the **front-end / editor-facing** parts: parse, diagnostics, formatting, and IDE-style assists.
+It is designed as building blocks for editors and UIs (including browser apps via WASM), not as a full end-user compiler.
 
-- lexing and parsing
+If you are building an editor or an interactive formula UI, this repo provides:
+
+- lexing + parsing to an AST
 - diagnostics with stable spans
-- formatting
-- semantic checks
-- completion and signature help
-- a WASM boundary for browser apps
+- deterministic formatting
+- IDE-style assists (completion, signature help, code actions)
+- a WASM boundary for browser demos and integrations
 
 ## What Works Today
 
 - `analyzer/` (Rust core)
-  - parser pipeline (lexer -> parser -> AST -> diagnostics)
-  - formatter
-  - semantic validation with context-aware checks
-  - completion + structured signature help
+  - lexer → parser → AST
+  - diagnostics (deterministic, with stable spans)
+  - formatter (stable output)
+  - basic / partial semantic validation using user-provided context
+  - IDE assists: completion + structured signature help (and related edit helpers)
+
 - `analyzer_wasm/` (WASM bridge)
-  - `new Analyzer(config)` (stateful instance)
-  - `Analyzer.analyze(source)`
-  - `Analyzer.format(source, cursor_utf16)`
-  - `Analyzer.apply_edits(source, edits, cursor_utf16)`
-  - `Analyzer.help(source, cursor_utf16)`
-  - DTO export for TypeScript
+  - a stateful `Analyzer(config)` instance for browser apps
+  - `analyze / format / apply_edits / help`
+  - DTOs for TypeScript consumers (used by the demo)
+
 - `examples/vite/`
-  - Vite + CodeMirror demo for live analysis/completion UX
+  - Vite + CodeMirror demo for live analysis / completion UX
   - Vitest + Playwright coverage for core editor flows
 
 ## Current Limits
 
-- `evaluator/` is a TODO right now (coming soon).
-- Language and type coverage are still expanding.
-- Some spec areas are intentionally tracked as TODOs in design docs (for example full numeric/string grammar details).
+- Runtime evaluation (`evaluator/`) is still TODO.
+- Language and type coverage are still expanding. The goal is Notion Formula compatibility; extensions are additive and intended to be opt-in.
+- Some areas are intentionally tracked as TODOs in design docs while the toolchain stabilizes.
 
 ## Prerequisites
 
