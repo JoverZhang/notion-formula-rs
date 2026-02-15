@@ -1,6 +1,6 @@
 use crate::completion::{CompletionConfig, CompletionData, complete};
-use crate::semantic::Ty;
-use crate::semantic::{Context, builtins_functions};
+use analyzer::semantic::Ty;
+use analyzer::semantic::{Context, builtins_functions};
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 
 #[test]

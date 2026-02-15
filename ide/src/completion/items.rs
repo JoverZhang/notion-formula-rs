@@ -2,7 +2,7 @@
 //! Items are not ranked here (ranking happens in `rank`).
 
 use super::{CompletionData, CompletionItem, CompletionKind};
-use crate::semantic;
+use analyzer::semantic;
 
 /// Completion items at an expression start.
 pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {

@@ -1,15 +1,16 @@
-use crate::semantic::{Context, builtins_functions};
-use crate::{CompletionConfig, IdeError, Span, TextEdit, ide_apply_edits, ide_format, ide_help};
+use analyzer::semantic::{Context, builtins_functions};
+use analyzer::Span;
+use crate::{CompletionConfig, IdeError, TextEdit, apply_edits, format, help};
 
 #[test]
 fn ide_format_reports_error_on_syntax_errors() {
-    let err = ide_format("1 +", 0).expect_err("expected format error");
+    let err = format("1 +", 0).expect_err("expected format error");
     assert_eq!(err, IdeError::FormatError);
 }
 
 #[test]
 fn ide_format_rebases_cursor_through_full_replace() {
-    let out = ide_format("1+2", 1).expect("expected formatted output");
+    let out = format("1+2", 1).expect("expected formatted output");
     assert_eq!(out.cursor, 0);
 }
 
@@ -26,7 +27,7 @@ fn ide_apply_edits_rejects_overlapping_ranges() {
         },
     ];
 
-    let err = ide_apply_edits("abcd", edits, 0).expect_err("expected overlap error");
+    let err = apply_edits("abcd", edits, 0).expect_err("expected overlap error");
     assert_eq!(err, IdeError::OverlappingEdits);
 }
 
@@ -37,7 +38,7 @@ fn ide_apply_edits_applies_and_rebases_cursor() {
         new_text: "XYZ".to_string(),
     }];
 
-    let out = ide_apply_edits("abcd", edits, 3).expect("expected edits to apply");
+    let out = apply_edits("abcd", edits, 3).expect("expected edits to apply");
     assert_eq!(out.source, "aXYZcd");
     assert_eq!(out.cursor, 5);
 }
@@ -48,7 +49,7 @@ fn ide_help_splits_completion_and_signature_help() {
         properties: Vec::new(),
         functions: builtins_functions(),
     };
-    let out = ide_help("if(", 3, &ctx, CompletionConfig::default());
+    let out = help("if(", 3, &ctx, CompletionConfig::default());
 
     assert!(
         out.signature_help.is_some(),

@@ -2,7 +2,7 @@ mod common;
 
 use std::path::Path;
 
-use analyzer::{analyze_syntax, format_expr};
+use analyzer::analyze_syntax;
 use common::golden::run_golden_dir;
 
 #[test]
@@ -21,11 +21,11 @@ fn format_golden() {
                 out.diagnostics
             );
 
-            let mut formatted = format_expr(&out.expr, source, &out.tokens);
-            if !formatted.ends_with('\n') {
-                formatted.push('\n');
-            }
-            formatted
+            ide::format(source, 0)
+                .unwrap_or_else(|err| {
+                    panic!("expected format success for {:?}, got {:?}", path, err)
+                })
+                .source
         },
     );
 }

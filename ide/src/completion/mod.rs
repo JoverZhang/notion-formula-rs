@@ -3,8 +3,8 @@
 //! Spans are half-open ranges `[start, end)`.
 
 pub use crate::TextEdit;
-use crate::lexer::Span;
-use crate::semantic;
+use analyzer::Span;
+use analyzer::semantic;
 
 mod items;
 mod matchers;
@@ -115,7 +115,7 @@ pub enum CompletionData {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureItem {
-    pub segments: Vec<crate::ide::display::DisplaySegment>,
+    pub segments: Vec<crate::display::DisplaySegment>,
 }
 
 /// Signature display for a call at the cursor.

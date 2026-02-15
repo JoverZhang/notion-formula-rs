@@ -7,8 +7,8 @@ pub mod dto;
 mod offsets;
 mod span;
 
-use analyzer::CompletionConfig;
 use analyzer::analysis::{Context, Property as AnalyzerProperty, builtins_functions};
+use ide::CompletionConfig;
 use js_sys::Error as JsError;
 use js_sys::Object;
 use serde::Serialize;
@@ -63,7 +63,7 @@ impl Analyzer {
 
     pub fn format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
         let cursor_byte = utf16_to_8_cursor(&source, cursor_utf16).map_err(operation_err)? as u32;
-        let output = analyzer::ide_format(&source, cursor_byte).map_err(operation_err)?;
+        let output = ide::format(&source, cursor_byte).map_err(operation_err)?;
         to_value(&ApplyResult {
             cursor: Converter::utf8_to_16_offset(&output.source, output.cursor as usize),
             source: output.source,
@@ -81,8 +81,7 @@ impl Analyzer {
         let text_edits = utf16_to_8_text_edits(&source, text_edits).map_err(operation_err)?;
         let cursor = utf16_to_8_cursor(&source, cursor_utf16).map_err(operation_err)? as u32;
 
-        let result =
-            analyzer::ide_apply_edits(&source, text_edits, cursor).map_err(operation_err)?;
+        let result = ide::apply_edits(&source, text_edits, cursor).map_err(operation_err)?;
 
         to_value(&ApplyResult {
             cursor: Converter::utf8_to_16_offset(&result.source, result.cursor as usize),
@@ -93,7 +92,7 @@ impl Analyzer {
     pub fn help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
         let cursor = Converter::utf16_to_8_offset(&source, cursor_utf16 as usize);
 
-        let output = analyzer::ide_help(
+        let output = ide::help(
             &source,
             cursor,
             &self.context,
@@ -116,7 +115,7 @@ fn from_value<T: serde::de::DeserializeOwned>(
     serde_wasm_bindgen::from_value(value).map_err(|_| err.to_string())
 }
 
-fn operation_err(err: analyzer::IdeError) -> JsValue {
+fn operation_err(err: ide::IdeError) -> JsValue {
     JsValue::from(JsError::new(err.message()))
 }
 

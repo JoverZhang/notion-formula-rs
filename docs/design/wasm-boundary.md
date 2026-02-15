@@ -51,17 +51,17 @@ Offset conversion helpers are centralized in `analyzer_wasm/src/offsets.rs`:
 
 - `format(...)`:
   - validates UTF-16 cursor and converts to byte cursor
-  - forwards to core `analyzer::ide_format(...)`
+  - forwards to core `ide::format(...)`
   - maps byte cursor in result back to UTF-16
 
 - `apply_edits(...)`:
   - accepts UTF-16 `TextEdit[]`
   - converts to byte edits
   - validates UTF-16 bounds + UTF-8 char boundaries
-  - forwards to core `analyzer::ide_apply_edits(...)`
+  - forwards to core `ide::apply_edits(...)`
   - returns updated source + rebased cursor
 
-Core edit behavior is implemented in `analyzer/src/ide/edit.rs`:
+Core edit behavior is implemented in `ide/src/edit.rs`:
 - syntax-error gating for format
 - edit sorting and overlap checks
 - shared byte-edit apply + cursor rebasing
@@ -90,4 +90,4 @@ Core edit behavior is implemented in `analyzer/src/ide/edit.rs`:
 - exports: `analyzer_wasm/src/lib.rs`
 - conversion helpers: `analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`
 - DTOs: `analyzer_wasm/src/dto/v1.rs`
-- core edit pipeline: `analyzer/src/ide/edit.rs`, `analyzer/src/text_edit.rs`
+- core edit pipeline: `ide/src/edit.rs`, `ide/src/text_edit.rs`

@@ -2,7 +2,7 @@ use crate::completion::{
     CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
     complete,
 };
-use crate::semantic::{Context, FunctionSig, Property, Ty, builtins_functions};
+use analyzer::semantic::{Context, FunctionSig, Property, Ty, builtins_functions};
 use std::collections::HashSet;
 
 // ----------------------------
@@ -659,7 +659,7 @@ impl CompletionTestBuilder {
             .segments
             .iter()
             .find_map(|seg| match seg {
-                crate::ide::display::DisplaySegment::Param {
+                crate::DisplaySegment::Param {
                     name,
                     param_index: Some(i),
                     ..
@@ -685,7 +685,7 @@ impl CompletionTestBuilder {
             .expect("expected at least one signature");
         let mut rendered = String::new();
         for seg in &active.segments {
-            use crate::ide::display::DisplaySegment as S;
+            use crate::DisplaySegment as S;
             match seg {
                 S::Name { text }
                 | S::Punct { text }
@@ -717,7 +717,7 @@ impl CompletionTestBuilder {
             .expect("expected at least one signature");
         let mut rendered = String::new();
         for seg in &active.segments {
-            use crate::ide::display::DisplaySegment as S;
+            use crate::DisplaySegment as S;
             match seg {
                 S::Name { text }
                 | S::Punct { text }

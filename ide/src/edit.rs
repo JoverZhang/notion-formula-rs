@@ -1,5 +1,5 @@
 use crate::apply_text_edits_bytes_with_cursor;
-use crate::{Diagnostic, DiagnosticCode, Span as ByteSpan, TextEdit as ByteTextEdit};
+use analyzer::{Diagnostic, DiagnosticCode, Span as ByteSpan, TextEdit as ByteTextEdit};
 
 /// Result payload for IDE edit operations in byte coordinates.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,14 +30,14 @@ impl IdeError {
 
 /// Format a source string and rebase a byte cursor through the full-document replacement edit.
 pub fn ide_format(source: &str, cursor: u32) -> Result<ApplyResult, IdeError> {
-    let output = crate::analyze_syntax(source);
+    let output = analyzer::analyze_syntax(source);
 
     if has_syntax_errors(&output.diagnostics) {
         return Err(IdeError::FormatError);
     }
 
     let source_len = u32::try_from(source.len()).map_err(|_| IdeError::InvalidEditRange)?;
-    let formatted = crate::format_expr(&output.expr, source, &output.tokens);
+    let formatted = crate::format::format_expr(&output.expr, source, &output.tokens);
     let full_document_edit = ByteTextEdit {
         range: ByteSpan {
             start: 0,

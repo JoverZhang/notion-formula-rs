@@ -18,9 +18,12 @@ If you are building an editor or an interactive formula UI, this repo provides:
 - `analyzer/` (Rust core)
   - lexer → parser → AST
   - diagnostics (deterministic, with stable spans)
-  - formatter (stable output)
   - basic / partial semantic validation using user-provided context
-  - IDE assists: completion + structured signature help (and related edit helpers)
+
+- `ide/` (Rust IDE helpers)
+  - formatter (stable output)
+  - IDE assists: completion + structured signature help
+  - edit operations: `format / apply_edits` in byte coordinates
 
 - `analyzer_wasm/` (WASM bridge)
   - a stateful `Analyzer(config)` instance for browser apps
@@ -106,35 +109,35 @@ pub fn analyze(text: &str, ctx: &semantic::Context) -> AnalyzeResult;
 // Type inference + semantic validation using your context.
 pub fn analyze_expr(expr: &ast::Expr, ctx: &semantic::Context) -> (semantic::Ty, Vec<Diagnostic>);
 
-// Stable formatter output for parsed expressions.
-pub fn format_expr(expr: &ast::Expr, source: &str, tokens: &[Token]) -> String;
+// Infer expression types for subexpressions (used by IDE/signature-help).
+pub fn infer_expr_with_map(
+    expr: &ast::Expr,
+    ctx: &semantic::Context,
+    map: &mut TypeMap,
+) -> semantic::Ty;
 
-// Completion items + replace span + signature help + preferred indices.
-pub fn complete(
-    text: &str,
-    cursor_byte: usize,
-    ctx: Option<&semantic::Context>,
-    config: CompletionConfig,
-) -> CompletionOutput;
+// Deterministic, human-readable diagnostics rendering.
+pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
+```
 
+### Rust (`ide`)
+
+```rust
 // IDE-facing completion + signature-help shape split.
-pub fn ide_help(
+pub fn help(
     source: &str,
     cursor_byte: usize,
-    ctx: &semantic::Context,
+    ctx: &analyzer::semantic::Context,
     config: CompletionConfig,
 ) -> HelpResult;
 
 // IDE edit operations in byte coordinates.
-pub fn ide_format(source: &str, cursor_byte: u32) -> Result<IdeApplyResult, IdeError>;
-pub fn ide_apply_edits(
+pub fn format(source: &str, cursor_byte: u32) -> Result<ApplyResult, IdeError>;
+pub fn apply_edits(
     source: &str,
-    edits: Vec<TextEdit>,
+    edits: Vec<analyzer::TextEdit>,
     cursor_byte: u32,
-) -> Result<IdeApplyResult, IdeError>;
-
-// Deterministic, human-readable diagnostics rendering.
-pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
+) -> Result<ApplyResult, IdeError>;
 ```
 
 ### WASM (`analyzer_wasm`)
@@ -256,7 +259,8 @@ just run-example-vite  # build wasm and start demo dev server
 
 | Path | Role |
 |---|---|
-| `analyzer/` | Core analyzer logic: lexer/parser/AST/diagnostics/semantic/IDE helpers |
+| `analyzer/` | Core analyzer logic: lexer/parser/AST/diagnostics/semantic |
+| `ide/` | IDE/editor helpers: format/completion/help/edit-apply |
 | `analyzer_wasm/` | WASM boundary, UTF-16<->UTF-8 conversions, DTO serialization |
 | `evaluator/` | Runtime evaluator TODO (coming soon) |
 | `examples/vite/` | Browser demo (CodeMirror + WASM integration) |
@@ -268,7 +272,7 @@ If you only read three docs, read these first:
 
 1. [`docs/design/README.md`](docs/design/README.md) (stable architecture + contracts)
 2. [`analyzer/README.md`](analyzer/README.md) (current analyzer behavior and module map)
-3. [`analyzer_wasm/README.md`](analyzer_wasm/README.md) (WASM boundary and DTO rules)
+3. [`ide/README.md`](ide/README.md) (IDE helper surface and contracts)
 
 More focused docs:
 

@@ -4,10 +4,9 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp};
-use crate::lexer::{CommentKind, Lit, LitKind, Span, Token, TokenKind, TokenRange};
-use crate::parser::TokenQuery;
-use crate::source_map::SourceMap;
+use analyzer::TokenQuery;
+use analyzer::ast::{BinOp, BinOpKind, Expr, ExprKind, UnOp};
+use analyzer::{CommentKind, Lit, LitKind, SourceMap, Span, Token, TokenKind, TokenRange};
 
 const INDENT: usize = 2;
 const MAX_WIDTH: usize = 80;
@@ -279,7 +278,7 @@ impl<'a> Formatter<'a> {
 
     fn format_unary(&mut self, expr: &Expr, indent: usize, op: UnOp, inner: &Expr) -> Rendered {
         let op_str = op.as_str();
-        let needs_space = matches!(op, UnOp::Not(crate::ast::NotKind::Keyword));
+        let needs_space = matches!(op, UnOp::Not(analyzer::ast::NotKind::Keyword));
 
         let has_newline = self.expr_has_newline(expr);
 
@@ -634,7 +633,7 @@ impl<'a> Formatter<'a> {
                     let has_newline = self
                         .source
                         .get(span_range)
-                        .map(|s| s.contains('\n'))
+                        .map(|s: &str| s.contains('\n'))
                         .unwrap_or(true);
                     if has_newline {
                         break;
@@ -675,7 +674,7 @@ impl<'a> Formatter<'a> {
         let e = e.min(self.source.len());
         self.source
             .get(s..e)
-            .map(|s| s.contains('\n'))
+            .map(|s: &str| s.contains('\n'))
             .unwrap_or(false)
     }
 }

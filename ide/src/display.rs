@@ -3,7 +3,7 @@
 //! This module is intentionally small and deterministic. It is the single
 //! canonical place for formatting UI-facing signature help segments.
 
-use crate::semantic::Ty;
+use analyzer::semantic::Ty;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

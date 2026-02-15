@@ -8,6 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 analyzer = { path = "../analyzer" }
+ide = { path = "../ide" }
 serde = "1.0.228"
 serde-wasm-bindgen = "0.6.5"
 ts-rs = { version = "10", features = ["serde-compat"] }

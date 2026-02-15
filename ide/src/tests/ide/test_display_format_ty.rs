@@ -1,4 +1,4 @@
-use crate::semantic::Ty;
+use analyzer::semantic::Ty;
 
 #[test]
 fn format_ty_list_union_parens() {

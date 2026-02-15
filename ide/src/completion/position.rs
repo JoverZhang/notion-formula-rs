@@ -1,8 +1,8 @@
 //! Cursor/position helpers for completion.
 //! All `cursor` values are UTF-8 byte offsets into the original source text.
 
-use crate::lexer::{LitKind, Span, Token, TokenKind};
-use crate::semantic;
+use analyzer::semantic;
+use analyzer::{LitKind, Span, Token, TokenKind};
 
 /// Coarse completion position, derived from nearby non-trivia tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -268,12 +268,12 @@ pub(super) fn replace_span_for_expr_start(tokens: &[Token], cursor: u32) -> Span
 #[cfg(test)]
 mod tests {
     use super::prev_non_trivia_insertion;
-    use crate::lexer::{TokenKind, lex};
+    use analyzer::TokenKind;
 
     #[test]
     fn prev_non_trivia_insertion_treats_cursor_at_token_start_as_before() {
         let source = "a)";
-        let tokens = lex(source).tokens;
+        let tokens = analyzer::analyze_syntax(source).tokens;
 
         // Cursor is at the start of `)`.
         let cursor = 1;

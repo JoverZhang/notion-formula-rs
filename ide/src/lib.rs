@@ -1,46 +1,59 @@
-//! IDE-facing API surface extracted from `analyzer`.
+//! IDE helpers for editor integrations.
 //!
-//! This crate currently forwards to `analyzer` so callers can switch dependencies
-//! before implementation is fully moved here.
+//! Coordinates are UTF-8 byte offsets (`[start, end)`), matching `analyzer`.
+
+mod completion;
+mod display;
+mod edit;
+mod format;
+mod text_edit;
 
 pub use analyzer::TextEdit;
-pub use analyzer::{HelpResult, IdeError};
+pub use completion::{
+    CompletionConfig, CompletionData, CompletionItem, CompletionKind, SignatureHelp, SignatureItem,
+};
+pub use display::DisplaySegment;
+pub use edit::{ApplyResult, IdeError, apply_edits};
+pub use text_edit::apply_text_edits_bytes_with_cursor;
 
-pub type ApplyResult = analyzer::IdeApplyResult;
-pub type CompletionResult = analyzer::IdeCompletionResult;
-
-pub mod completion {
-    pub use analyzer::{
-        CompletionConfig, CompletionData, CompletionItem, CompletionKind, SignatureHelp,
-    };
+/// Completion payload used by `help`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionResult {
+    pub items: Vec<completion::CompletionItem>,
+    pub replace: analyzer::Span,
+    pub preferred_indices: Vec<usize>,
 }
 
-pub mod display {
-    pub use analyzer::ide::display::DisplaySegment;
-}
-
-pub use completion::{CompletionConfig, CompletionData, CompletionItem, CompletionKind, SignatureHelp};
-
-/// Format a source string and rebase a byte cursor.
-pub fn format(source: &str, cursor_byte: u32) -> Result<ApplyResult, IdeError> {
-    analyzer::ide_format(source, cursor_byte)
-}
-
-/// Apply byte edits and rebase a byte cursor.
-pub fn apply_edits(
-    source: &str,
-    edits: Vec<TextEdit>,
-    cursor_byte: u32,
-) -> Result<ApplyResult, IdeError> {
-    analyzer::ide_apply_edits(source, edits, cursor_byte)
+/// Combined completion + signature help payload for IDE integrations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HelpResult {
+    pub completion: CompletionResult,
+    pub signature_help: Option<completion::SignatureHelp>,
 }
 
 /// Compute completion and signature-help at a byte cursor.
 pub fn help(
     source: &str,
-    cursor_byte: usize,
+    cursor: usize,
     ctx: &analyzer::semantic::Context,
-    config: CompletionConfig,
+    config: completion::CompletionConfig,
 ) -> HelpResult {
-    analyzer::ide_help(source, cursor_byte, ctx, config)
+    let output = completion::complete(source, cursor, Some(ctx), config);
+
+    HelpResult {
+        completion: CompletionResult {
+            items: output.items,
+            replace: output.replace,
+            preferred_indices: output.preferred_indices,
+        },
+        signature_help: output.signature_help,
+    }
 }
+
+/// Format a source string and rebase a byte cursor.
+pub fn format(source: &str, cursor_byte: u32) -> Result<ApplyResult, IdeError> {
+    edit::ide_format(source, cursor_byte)
+}
+
+#[cfg(test)]
+mod tests;

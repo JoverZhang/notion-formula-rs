@@ -2,7 +2,7 @@
 
 Start here for stable architecture and cross-crate contracts.
 Implementation details that change frequently should live next to code (`analyzer/README.md`,
-`analyzer_wasm/README.md`, `examples/vite/README.md`).
+`ide/README.md`, `analyzer_wasm/README.md`, `examples/vite/README.md`).
 
 ## Table of contents
 
@@ -24,7 +24,7 @@ Implementation details that change frequently should live next to code (`analyze
   -> lexer: tokens (incl. trivia + EOF) + diagnostics
   -> parser: ParseOutput (AST + parse diagnostics)
   -> semantic analysis (optional; needs Context) -> (Ty + semantic diagnostics)
-  -> IDE helpers: formatter / completion / signature help
+  -> IDE crate: formatter / completion / signature help / edit application
   -> WASM bridge: DTO v1 (UTF-16 spans/offsets)
 ```
 
@@ -32,7 +32,8 @@ Implementation details that change frequently should live next to code (`analyze
 
 ```text
 .
-├─ analyzer/          Rust core analyzer (lexer/parser/AST/diagnostics/IDE helpers)
+├─ analyzer/          Rust core analyzer (lexer/parser/AST/diagnostics/semantic)
+├─ ide/               Rust IDE/editor helpers (format/completion/help/edit apply)
 ├─ analyzer_wasm/     wasm-bindgen boundary + UTF-16 conversion + DTO v1
 ├─ evaluator/         stub (currently unused)
 ├─ examples/vite/     Vite + CodeMirror demo consuming analyzer_wasm
@@ -44,6 +45,7 @@ Primary docs:
 | Path | Primary doc |
 |---|---|
 | `analyzer/` | [`analyzer/README.md`](../../analyzer/README.md) |
+| `ide/` | [`ide/README.md`](../../ide/README.md) |
 | `analyzer_wasm/` | [`analyzer_wasm/README.md`](../../analyzer_wasm/README.md) |
 | `examples/vite/` | [`examples/vite/README.md`](../../examples/vite/README.md) |
 | `docs/` | [`docs/README.md`](../README.md) |
@@ -56,8 +58,9 @@ Stable boundary view:
 - `Tokens` -> parser -> `ParseOutput { expr, diagnostics, tokens }`
 - `ParseOutput.expr` + `Context` -> semantic analysis -> `(Ty, semantic diagnostics)`
 - `analyze(source, ctx)` -> `AnalyzeResult { diagnostics, tokens, output_type }`
-- `(expr, tokens, source)` -> formatter -> `String`
-- `(source, cursor, Context)` -> IDE help -> `HelpResult { completion, signature_help }`
+- `(expr, tokens, source)` -> formatter (in `ide`) -> `String`
+- `(source, cursor, Context)` -> `ide::help(...)` -> `HelpResult { completion, signature_help }`
+- `(source, cursor, edits)` -> `ide::{format, apply_edits}` -> `{ source, cursor }`
 - Parser diagnostics may include `actions: Vec<CodeAction>` in byte coordinates.
 - WASM conversion maps core byte spans/edits to UTF-16 DTO spans/edits.
 
@@ -68,12 +71,14 @@ Rust (`analyzer/`):
 - `analyzer::analyze_syntax(text: &str) -> SyntaxResult`
 - `analyzer::analyze(text: &str, ctx: &Context) -> AnalyzeResult`
 - `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
-- `analyzer::format_expr(expr, source, tokens) -> String`
-- `analyzer::completion::complete(text, cursor_byte, ctx, config) -> CompletionOutput`
-- `analyzer::ide_help(source, cursor_byte, ctx, config) -> HelpResult`
-- `analyzer::ide_format(source, cursor_byte) -> Result<IdeApplyResult, IdeError>`
-- `analyzer::ide_apply_edits(source, edits, cursor_byte) -> Result<IdeApplyResult, IdeError>`
+- `analyzer::infer_expr_with_map(expr, ctx, map) -> Ty`
 - `analyzer::format_diagnostics(source, diags) -> String`
+
+Rust (`ide/`):
+
+- `ide::help(source, cursor_byte, ctx, config) -> HelpResult`
+- `ide::format(source, cursor_byte) -> Result<ApplyResult, IdeError>`
+- `ide::apply_edits(source, edits, cursor_byte) -> Result<ApplyResult, IdeError>`
 
 WASM (`analyzer_wasm/`):
 
@@ -146,10 +151,10 @@ These are stability guarantees. Contract changes require docs + tests + changelo
 - Quick fixes are diagnostic-level payloads: `Diagnostic.actions: Vec<CodeAction>`.
 - Core edit model is unified: `TextEdit { range, new_text }` in byte coordinates.
 - WASM edit model is unified: `TextEdit` in UTF-16 coordinates.
-- Core `ide_format` and `ide_apply_edits` accept byte cursor and return `{ source, cursor }`.
+- Core `ide::format` and `ide::apply_edits` accept byte cursor and return `{ source, cursor }`.
 - WASM `format` and `apply_edits` accept UTF-16 cursor and return UTF-16 cursor.
-- Core `ide_format` uses one full-document `TextEdit` through the same byte-edit pipeline as
-  core `ide_apply_edits`.
+- Core `ide::format` uses one full-document `TextEdit` through the same byte-edit pipeline as
+  core `ide::apply_edits`.
 - WASM forwards to core after UTF-16 ↔ byte conversion; failures throw `Err` (not payload enums).
 
 ### Signature help

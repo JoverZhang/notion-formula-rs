@@ -133,7 +133,7 @@ Semantic treatment (best-effort):
   - keep only functions where the first postfix parameter accepts receiver type (`ty_accepts`)
   - if receiver infers to `Unknown`, current completion keeps the full postfix-capable set
     (TODO: narrow once an explicit `any` type is modeled)
-  - Code: `analyzer/src/ide/completion/pipeline.rs`, `analyzer/src/ide/completion/items.rs`
+  - Code: `ide/src/completion/pipeline.rs`, `ide/src/completion/items.rs`
 
 The postfix allowlist is derived from builtins:
 

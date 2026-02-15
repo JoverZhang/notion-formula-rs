@@ -1,6 +1,7 @@
-use crate::semantic::Ty;
+use analyzer::semantic::Ty;
+use analyzer::Span;
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
-use crate::{CompletionConfig, Span};
+use crate::CompletionConfig;
 
 #[test]
 fn completion_when_expecting_separator_in_call_shows_after_atom_operators() {
@@ -105,7 +106,7 @@ fn completion_ident_end_before_close_paren_treats_ident_as_query() {
 
     let source = "if(d)";
     let cursor = source.find(')').unwrap();
-    let out = crate::complete(source, cursor, Some(&c), CompletionConfig::default());
+    let out = crate::completion::complete(source, cursor, Some(&c), CompletionConfig::default());
 
     assert_eq!(
         out.replace,

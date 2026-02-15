@@ -7,7 +7,6 @@ use crate::{lexer::lex, parser::Parser};
 
 pub mod analysis;
 mod diagnostics;
-pub mod ide;
 mod lexer;
 mod parser;
 mod source_map;
@@ -46,22 +45,15 @@ pub fn analyze(text: &str, ctx: &analysis::Context) -> AnalyzeResult {
 }
 
 pub use analysis as semantic;
+pub use analysis::{ExprId, TypeMap, infer_expr_with_map};
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{
     CodeAction, Diagnostic, DiagnosticCode, DiagnosticKind, Diagnostics, ParseDiagnostic,
 };
-pub use ide::completion;
-pub use ide::completion::{
-    CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput,
-    SignatureHelp, complete,
-};
-pub use ide::format::format_expr;
-pub use ide::{
-    ApplyResult as IdeApplyResult, CompletionResult as IdeCompletionResult, HelpResult, IdeError,
-    apply_edits as ide_apply_edits, help as ide_help, ide_format,
-};
+pub use lexer::Lit;
 pub use lexer::{CommentKind, LitKind, Span, Token, TokenKind};
 pub use lexer::{NodeId, Spanned, Symbol, TokenIdx, TokenRange, tokens_in_span};
+pub use parser::TokenQuery;
 pub use parser::ast;
 pub use source_map::SourceMap;
-pub use text_edit::{TextEdit, apply_text_edits_bytes_with_cursor};
+pub use text_edit::TextEdit;

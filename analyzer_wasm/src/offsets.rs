@@ -2,7 +2,8 @@
 //!
 //! Inputs are clamped and floored to valid boundaries, so these helpers never panic.
 
-use analyzer::{IdeError, Span as ByteSpan, TextEdit as ByteTextEdit};
+use analyzer::{Span as ByteSpan, TextEdit as ByteTextEdit};
+use ide::IdeError;
 
 use crate::converter::Converter;
 use crate::dto::v1::{Span as Utf16Span, TextEdit as Utf16TextEdit};
@@ -120,7 +121,7 @@ pub fn utf16_to_8_text_edits(
 
 #[cfg(test)]
 mod tests {
-    use analyzer::IdeError;
+    use ide::IdeError;
 
     use crate::converter::Converter;
     use crate::dto::v1::{Span as Utf16Span, TextEdit as Utf16TextEdit};

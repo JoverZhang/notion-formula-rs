@@ -91,7 +91,7 @@ fn signature_help_sum_variadic_number_only_case_4_two_numbers() {
 
 #[test]
 fn signature_help_sum_prefers_known_actual_types_for_union_slots() {
-    let c = ctx().prop("Number", crate::semantic::Ty::Number).build();
+    let c = ctx().prop("Number", analyzer::semantic::Ty::Number).build();
     t(r#"sum(prop("Number"), [1, 2, 3]$0)"#)
         .ctx(c)
         .expect_sig_label("sum(values1: number, values2: number[], ...) -> number");
@@ -137,9 +137,9 @@ fn signature_help_postfix_ifs_uses_method_style_and_boolean_receiver() {
 #[test]
 fn signature_help_postfix_ifs_third_condition_highlights_condition3() {
     let c = ctx()
-        .prop("Number", crate::semantic::Ty::Number)
-        .prop("Title", crate::semantic::Ty::String)
-        .prop("Date", crate::semantic::Ty::Date)
+        .prop("Number", analyzer::semantic::Ty::Number)
+        .prop("Title", analyzer::semantic::Ty::String)
+        .prop("Date", analyzer::semantic::Ty::Date)
         .build();
 
     t(r#"
@@ -202,7 +202,7 @@ fn signature_help_if_propagates_unknown() {
 
 #[test]
 fn signature_help_if_ternary_branch_inferrs_union() {
-    let c = ctx().prop("Title", crate::semantic::Ty::String).build();
+    let c = ctx().prop("Title", analyzer::semantic::Ty::String).build();
     t(r#"if(true, prop("Title"), 4 == 4 ? true : "false"$0)"#)
         .ctx(c)
         .expect_sig_label(

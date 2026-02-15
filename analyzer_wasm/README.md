@@ -5,6 +5,8 @@ WASM/JS boundary for `analyzer`.
 ## Responsibility
 
 This crate owns all UTF-16 ↔ UTF-8 byte conversion. Core analyzer stays byte-only.
+`analyze` forwards to `analyzer`; IDE operations (`format` / `apply_edits` / `help`) forward to
+the `ide` crate.
 
 ## Exports
 
@@ -54,7 +56,7 @@ Offset conversion helpers are centralized in `analyzer_wasm/src/offsets.rs`:
 - converted byte ranges must be UTF-8 char boundaries
 
 Core edit application (sorting, overlap checks, cursor rebasing, full-document format edit) now
-lives in `analyzer/src/ide/edit.rs`. WASM only converts UTF-16 ↔ UTF-8 and serializes DTOs.
+lives in `ide/src/edit.rs`. WASM only converts UTF-16 ↔ UTF-8 and serializes DTOs.
 
 ## `AnalyzerConfig` contract
 

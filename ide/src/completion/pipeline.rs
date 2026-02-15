@@ -3,9 +3,8 @@
 
 use super::position::PositionKind;
 use super::{CompletionConfig, CompletionOutput};
-use crate::lexer::lex;
-use crate::lexer::{Span, Token, TokenKind};
-use crate::semantic;
+use analyzer::semantic;
+use analyzer::{Span, Token, TokenKind};
 
 /// Computes completion output for a single cursor position.
 pub(super) fn complete(
@@ -15,7 +14,7 @@ pub(super) fn complete(
     config: CompletionConfig,
 ) -> CompletionOutput {
     let cursor_u32 = u32::try_from(cursor).unwrap_or(u32::MAX);
-    let tokens = lex(text).tokens;
+    let tokens = analyzer::analyze_syntax(text).tokens;
 
     let default_replace = Span {
         start: cursor_u32,
@@ -149,8 +148,8 @@ fn infer_postfix_receiver_ty(
         return semantic::Ty::Unknown;
     }
 
-    let parsed = crate::analyze_syntax(receiver_source);
+    let parsed = analyzer::analyze_syntax(receiver_source);
 
-    let mut map = semantic::TypeMap::default();
-    semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map)
+    let mut map = analyzer::TypeMap::default();
+    analyzer::infer_expr_with_map(&parsed.expr, ctx, &mut map)
 }

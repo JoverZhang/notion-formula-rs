@@ -6,7 +6,7 @@ use crate::dto::v1::{
 };
 
 impl Converter {
-    pub fn help_output_view(source: &str, output: &analyzer::ide::HelpResult) -> HelpResultDto {
+    pub fn help_output_view(source: &str, output: &ide::HelpResult) -> HelpResultDto {
         let replace = span_dto(source, output.completion.replace);
         let signature_help = output.signature_help.as_ref().map(|sig| SignatureHelp {
             signatures: sig
@@ -40,8 +40,8 @@ impl Converter {
 
 fn completion_item_view(
     source: &str,
-    completion: &analyzer::ide::CompletionResult,
-    item: &analyzer::CompletionItem,
+    completion: &ide::CompletionResult,
+    item: &ide::CompletionItem,
 ) -> CompletionItem {
     let primary_edit_view = item.primary_edit.as_ref().map(|edit| TextEdit {
         range: span_dto(source, edit.range),
@@ -99,7 +99,7 @@ fn completion_item_view(
             }
         }
 
-        let (updated, _) = analyzer::apply_text_edits_bytes_with_cursor(source, &edits, 0);
+        let (updated, _) = ide::apply_text_edits_bytes_with_cursor(source, &edits, 0);
         let cursor_byte = usize::min(usize::try_from(cursor_byte).unwrap_or(0), updated.len());
         Converter::utf8_to_16_offset(&updated, cursor_byte)
     });
@@ -117,8 +117,8 @@ fn completion_item_view(
     }
 }
 
-fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> DisplaySegment {
-    use analyzer::ide::display::DisplaySegment as S;
+fn display_segment_view(seg: &ide::DisplaySegment) -> DisplaySegment {
+    use ide::DisplaySegment as S;
     match seg {
         S::Name { text } => DisplaySegment::Name { text: text.clone() },
         S::Punct { text } => DisplaySegment::Punct { text: text.clone() },
@@ -138,8 +138,8 @@ fn display_segment_view(seg: &analyzer::ide::display::DisplaySegment) -> Display
     }
 }
 
-fn completion_kind_view(kind: analyzer::CompletionKind) -> CompletionItemKind {
-    use analyzer::CompletionKind::*;
+fn completion_kind_view(kind: ide::CompletionKind) -> CompletionItemKind {
+    use ide::CompletionKind::*;
     match kind {
         FunctionGeneral => CompletionItemKind::FunctionGeneral,
         FunctionText => CompletionItemKind::FunctionText,

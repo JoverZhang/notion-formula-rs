@@ -7,6 +7,7 @@ version = 4
 name = "analyzer"
 version = "0.1.0"
 dependencies = [
+ "ide",
  "serde",
 ]
 
@@ -15,6 +16,7 @@ name = "analyzer_wasm"
 version = "0.1.0"
 dependencies = [
  "analyzer",
+ "ide",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
@@ -86,6 +88,7 @@ name = "ide"
 version = "0.1.0"
 dependencies = [
  "analyzer",
+ "serde",
 ]
 
 [[package]]

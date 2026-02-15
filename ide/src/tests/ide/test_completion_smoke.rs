@@ -1,5 +1,5 @@
 use crate::completion::CompletionData;
-use crate::semantic::Ty;
+use analyzer::semantic::Ty;
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 
 #[test]

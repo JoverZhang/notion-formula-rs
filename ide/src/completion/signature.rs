@@ -3,11 +3,324 @@
 
 use super::SignatureHelp;
 use super::position::prev_non_trivia_before;
-use crate::ast::{Expr, ExprKind};
-use crate::ide::completion::SignatureItem;
-use crate::ide::display::{ParamSlot, RenderedSignature, build_signature_segments};
-use crate::lexer::{Token, TokenKind};
-use crate::semantic;
+use crate::completion::SignatureItem;
+use crate::display::{ParamSlot, RenderedSignature, build_signature_segments};
+use analyzer::ast::{Expr, ExprKind};
+use analyzer::semantic;
+use analyzer::{Span, Token, TokenKind};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CompletedRepeatShape {
+    tail_start: usize,
+    repeat_groups: usize,
+}
+
+fn required_tail_prefix_len(tail: &[semantic::ParamSig]) -> usize {
+    let mut required = 0usize;
+    for (idx, p) in tail.iter().enumerate() {
+        if !p.optional {
+            required = idx + 1;
+        }
+    }
+    required
+}
+
+fn ceil_to_multiple(n: usize, m: usize) -> usize {
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return 0;
+    }
+    let rem = n % m;
+    if rem == 0 { n } else { n + (m - rem) }
+}
+
+fn resolve_repeat_tail_used_with_min_groups(
+    params: &semantic::ParamShape,
+    total: usize,
+    repeat_min_groups: usize,
+) -> Option<usize> {
+    if params.repeat.is_empty() {
+        return Some(params.tail.len());
+    }
+
+    let head_len = params.head.len();
+    if total < head_len {
+        return None;
+    }
+
+    let repeat_len = params.repeat.len();
+    let tail_min = required_tail_prefix_len(&params.tail);
+    let min_middle = repeat_len.saturating_mul(repeat_min_groups);
+
+    for tail_used in (tail_min..=params.tail.len()).rev() {
+        if total < head_len + tail_used {
+            continue;
+        }
+        let middle = total - head_len - tail_used;
+        if middle >= min_middle && middle.is_multiple_of(repeat_len) {
+            return Some(tail_used);
+        }
+    }
+
+    None
+}
+
+fn complete_repeat_shape(
+    params: &semantic::ParamShape,
+    total: usize,
+) -> Option<CompletedRepeatShape> {
+    const REPEAT_MIN_GROUPS: usize = 1;
+
+    if params.repeat.is_empty() {
+        return None;
+    }
+
+    let head_len = params.head.len();
+    let repeat_len = params.repeat.len();
+    if repeat_len == 0 {
+        return None;
+    }
+
+    if let Some(tail_used) =
+        resolve_repeat_tail_used_with_min_groups(params, total, REPEAT_MIN_GROUPS)
+    {
+        let tail_start = total.saturating_sub(tail_used);
+        let middle = total.saturating_sub(head_len + tail_used);
+        let repeat_groups = middle / repeat_len;
+        return Some(CompletedRepeatShape {
+            tail_start,
+            repeat_groups,
+        });
+    }
+
+    let tail_min = required_tail_prefix_len(&params.tail);
+    let min_middle = repeat_len.saturating_mul(REPEAT_MIN_GROUPS);
+
+    let mut best: Option<(usize /* total */, usize /* tail_used */)> = None;
+    for tail_used in tail_min..=params.tail.len() {
+        let min_total_for_tail = head_len.saturating_add(tail_used);
+        let min_total_for_middle = head_len
+            .saturating_add(tail_used)
+            .saturating_add(min_middle);
+
+        let base_total = total.max(min_total_for_tail).max(min_total_for_middle);
+        let middle_base = base_total - head_len - tail_used;
+        let middle = ceil_to_multiple(middle_base, repeat_len);
+        let completed_total = head_len + tail_used + middle;
+
+        match best {
+            None => best = Some((completed_total, tail_used)),
+            Some((best_total, best_tail_used)) => {
+                if completed_total < best_total
+                    || (completed_total == best_total && tail_used > best_tail_used)
+                {
+                    best = Some((completed_total, tail_used));
+                }
+            }
+        }
+    }
+
+    let (completed_total, tail_used) = best?;
+    let tail_start = completed_total - tail_used;
+    let middle = completed_total - head_len - tail_used;
+    let repeat_groups = middle / repeat_len;
+    Some(CompletedRepeatShape {
+        tail_start,
+        repeat_groups,
+    })
+}
+
+type Subst = HashMap<semantic::GenericId, semantic::Ty>;
+type GenericRegistry = HashMap<semantic::GenericId, semantic::GenericParamKind>;
+
+fn registry_for(sig: &semantic::FunctionSig) -> GenericRegistry {
+    sig.generics.iter().map(|g| (g.id, g.kind)).collect()
+}
+
+fn bind_generic(
+    subst: &mut Subst,
+    registry: &GenericRegistry,
+    id: semantic::GenericId,
+    actual: &semantic::Ty,
+) {
+    let kind = registry
+        .get(&id)
+        .copied()
+        .unwrap_or(semantic::GenericParamKind::Plain);
+
+    fn contains_unknown(ty: &semantic::Ty) -> bool {
+        match ty {
+            semantic::Ty::Unknown => true,
+            semantic::Ty::Union(members) => members.iter().any(contains_unknown),
+            _ => false,
+        }
+    }
+
+    match kind {
+        semantic::GenericParamKind::Plain => {
+            if matches!(actual, semantic::Ty::Unknown) {
+                return;
+            }
+
+            let to_add = vec![actual.clone()];
+            match subst.get(&id).cloned() {
+                None => {
+                    subst.insert(id, semantic::normalize_union(to_add));
+                }
+                Some(prev) => {
+                    subst.insert(
+                        id,
+                        semantic::normalize_union(std::iter::once(prev).chain(to_add)),
+                    );
+                }
+            }
+        }
+        semantic::GenericParamKind::Variant => {
+            if contains_unknown(actual) {
+                subst.insert(id, semantic::Ty::Unknown);
+                return;
+            }
+
+            if subst
+                .get(&id)
+                .is_some_and(|t| matches!(t, semantic::Ty::Unknown))
+            {
+                return;
+            }
+
+            let mut to_add: Vec<semantic::Ty> = Vec::new();
+            match actual {
+                semantic::Ty::Union(members) => {
+                    to_add.extend(members.iter().cloned());
+                }
+                other => {
+                    to_add.push(other.clone());
+                }
+            }
+
+            if to_add.is_empty() {
+                return;
+            }
+
+            match subst.get(&id).cloned() {
+                None => {
+                    subst.insert(id, semantic::normalize_union(to_add));
+                }
+                Some(prev) => {
+                    subst.insert(
+                        id,
+                        semantic::normalize_union(std::iter::once(prev).chain(to_add)),
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn unify(
+    subst: &mut Subst,
+    registry: &GenericRegistry,
+    expected: &semantic::Ty,
+    actual: &semantic::Ty,
+) {
+    match expected {
+        semantic::Ty::Generic(id) => bind_generic(subst, registry, *id, actual),
+        semantic::Ty::List(exp_inner) => {
+            if let semantic::Ty::List(act_inner) = actual {
+                unify(subst, registry, exp_inner, act_inner);
+            }
+        }
+        semantic::Ty::Union(branches) => {
+            for branch in branches {
+                unify(subst, registry, branch, actual);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn apply(subst: &Subst, ty_template: &semantic::Ty) -> semantic::Ty {
+    match ty_template {
+        semantic::Ty::Generic(id) => subst.get(id).cloned().unwrap_or(semantic::Ty::Unknown),
+        semantic::Ty::List(inner) => semantic::Ty::List(Box::new(apply(subst, inner))),
+        semantic::Ty::Union(members) => {
+            semantic::normalize_union(members.iter().map(|m| apply(subst, m)))
+        }
+        other => other.clone(),
+    }
+}
+
+fn unify_call_args_present(
+    sig: &semantic::FunctionSig,
+    arg_tys: &[Option<semantic::Ty>],
+    subst: &mut Subst,
+) {
+    let registry = registry_for(sig);
+
+    if sig.params.repeat.is_empty() {
+        let total_params = sig.params.head.len() + sig.params.tail.len();
+        for (idx, actual) in arg_tys.iter().enumerate() {
+            if idx >= total_params {
+                break;
+            }
+            let Some(actual) = actual else {
+                continue;
+            };
+            let expected = if idx < sig.params.head.len() {
+                sig.params.head.get(idx)
+            } else {
+                sig.params.tail.get(idx - sig.params.head.len())
+            };
+            if let Some(param) = expected {
+                unify(subst, &registry, &param.ty, actual);
+            }
+        }
+        return;
+    }
+
+    let head_len = sig.params.head.len();
+    let Some(shape) = complete_repeat_shape(&sig.params, arg_tys.len()) else {
+        return;
+    };
+
+    for (idx, actual) in arg_tys.iter().enumerate() {
+        let Some(actual) = actual else {
+            continue;
+        };
+
+        let expected = if idx < head_len {
+            sig.params.head.get(idx)
+        } else if idx >= shape.tail_start {
+            sig.params.tail.get(idx - shape.tail_start)
+        } else {
+            let r_idx = (idx - head_len) % sig.params.repeat.len();
+            sig.params.repeat.get(r_idx)
+        };
+
+        if let Some(param) = expected {
+            unify(subst, &registry, &param.ty, actual);
+        }
+    }
+}
+
+fn instantiate_sig(
+    sig: &semantic::FunctionSig,
+    arg_tys: &[Option<semantic::Ty>],
+) -> (Vec<semantic::Ty>, semantic::Ty) {
+    let mut subst = Subst::new();
+    unify_call_args_present(sig, arg_tys, &mut subst);
+
+    let params = sig
+        .display_params()
+        .into_iter()
+        .map(|p| apply(&subst, &p.ty))
+        .collect::<Vec<_>>();
+    let ret = apply(&subst, &sig.ret);
+    (params, ret)
+}
 
 /// Call-site info derived from tokens, using byte offsets for the cursor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -164,7 +477,7 @@ fn render_signature(
     let repeat_len = sig.params.repeat.len();
 
     let (repeat_groups_displayed, tail_start) =
-        semantic::complete_repeat_shape(&sig.params, total_args_for_shape)
+        complete_repeat_shape(&sig.params, total_args_for_shape)
             .map(|s| (s.repeat_groups, s.tail_start))
             .unwrap_or((1, usize::MAX));
 
@@ -299,14 +612,14 @@ fn infer_call_arg_tys_best_effort(
             _ => {}
         }
 
-        let parsed = crate::analyze_syntax(trimmed);
+        let parsed = analyzer::analyze_syntax(trimmed);
 
-        let mut map = semantic::TypeMap::default();
-        Some(semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map))
+        let mut map = analyzer::TypeMap::default();
+        Some(analyzer::infer_expr_with_map(&parsed.expr, ctx, &mut map))
     }
 
-    fn arg_spans(tokens: &[Token], lparen_idx: usize, source_len: u32) -> Vec<crate::Span> {
-        let mut spans = Vec::<crate::Span>::new();
+    fn arg_spans(tokens: &[Token], lparen_idx: usize, source_len: u32) -> Vec<Span> {
+        let mut spans = Vec::<Span>::new();
         let Some(lparen) = tokens.get(lparen_idx) else {
             return spans;
         };
@@ -325,7 +638,7 @@ fn infer_call_arg_tys_best_effort(
                 TokenKind::OpenBracket => bracket_depth += 1,
                 TokenKind::CloseParen => {
                     if paren_depth == 0 && bracket_depth == 0 {
-                        spans.push(crate::Span {
+                        spans.push(Span {
                             start,
                             end: token.span.start,
                         });
@@ -341,7 +654,7 @@ fn infer_call_arg_tys_best_effort(
                     }
                 }
                 TokenKind::Comma if paren_depth == 0 && bracket_depth == 0 => {
-                    spans.push(crate::Span {
+                    spans.push(Span {
                         start,
                         end: token.span.start,
                     });
@@ -351,7 +664,7 @@ fn infer_call_arg_tys_best_effort(
             }
         }
 
-        spans.push(crate::Span {
+        spans.push(Span {
             start,
             end: source_len,
         });
@@ -365,13 +678,13 @@ fn infer_call_arg_tys_best_effort(
 
     // If this is a member call, try to include the receiver type as the leading argument.
     if include_receiver_as_arg {
-        let parsed = crate::analyze_syntax(source);
+        let parsed = analyzer::analyze_syntax(source);
         if let Some(call_expr) =
             find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
             && let ExprKind::MemberCall { receiver, .. } = &call_expr.kind
         {
-            let mut map = semantic::TypeMap::default();
-            let _ = semantic::infer_expr_with_map(&parsed.expr, ctx, &mut map);
+            let mut map = analyzer::TypeMap::default();
+            let _ = analyzer::infer_expr_with_map(&parsed.expr, ctx, &mut map);
             let mut ty = map
                 .get(receiver.id)
                 .cloned()
@@ -423,7 +736,7 @@ fn active_parameter_for_call(
             return 0;
         }
 
-        let Some(shape) = semantic::complete_repeat_shape(&sig.params, total_args_for_shape) else {
+        let Some(shape) = complete_repeat_shape(&sig.params, total_args_for_shape) else {
             return 0;
         };
 
@@ -497,7 +810,7 @@ pub(super) fn compute_signature_help_if_in_call(
         && semantic::is_postfix_capable(func);
 
     let arg_tys = infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
-    let (inst_param_tys, inst_ret) = semantic::instantiate_sig(func, arg_tys.as_slice());
+    let (inst_param_tys, inst_ret) = instantiate_sig(func, arg_tys.as_slice());
 
     // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
     let arg_index_full = call_ctx.arg_index.saturating_add(is_method_style as usize);
