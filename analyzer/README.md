@@ -33,6 +33,7 @@ Quick fixes are represented as diagnostic actions, not as a separate parse-outpu
 
 | Path | Owns |
 |---|---|
+| `analyzer/src/span.rs` | Core `Span`/`Spanned` byte-range types |
 | `analyzer/src/lexer/` | Tokens + trivia + EOF + lex diagnostics |
 | `analyzer/src/parser/` | Pratt parser, AST, recovery |
 | `analyzer/src/diagnostics.rs` | Diagnostic model + deterministic formatting |

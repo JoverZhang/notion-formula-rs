@@ -10,6 +10,7 @@ mod diagnostics;
 mod lexer;
 mod parser;
 mod source_map;
+mod span;
 mod tests;
 mod text_edit;
 
@@ -51,9 +52,10 @@ pub use diagnostics::{
     CodeAction, Diagnostic, DiagnosticCode, DiagnosticKind, Diagnostics, ParseDiagnostic,
 };
 pub use lexer::Lit;
-pub use lexer::{CommentKind, LitKind, Span, Token, TokenKind};
-pub use lexer::{NodeId, Spanned, Symbol, TokenIdx, TokenRange, tokens_in_span};
+pub use lexer::{CommentKind, LitKind, Token, TokenKind};
+pub use lexer::{NodeId, Symbol, TokenIdx, TokenRange, tokens_in_span};
 pub use parser::TokenQuery;
 pub use parser::ast;
 pub use source_map::SourceMap;
+pub use span::{Span, Spanned};
 pub use text_edit::TextEdit;

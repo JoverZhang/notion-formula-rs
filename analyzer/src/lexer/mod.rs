@@ -2,9 +2,10 @@ use crate::diagnostics::{Diagnostic, DiagnosticCode, DiagnosticKind};
 
 mod token;
 
+pub use crate::span::{Span, Spanned};
 pub use token::{
-    CommentKind, Lit, LitKind, NodeId, Span, Spanned, Symbol, Token, TokenIdx, TokenKind,
-    TokenRange, tokens_in_span,
+    CommentKind, Lit, LitKind, NodeId, Symbol, Token, TokenIdx, TokenKind, TokenRange,
+    tokens_in_span,
 };
 
 pub struct LexOutput {

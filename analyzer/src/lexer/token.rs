@@ -3,30 +3,14 @@
 //! [`Span`] uses UTF-8 byte offsets into the original source and is half-open `[start, end)`.
 //! The lexer also emits a [`TokenKind::Eof`] token with an empty span at end of input.
 
+use crate::Span;
+
 pub type NodeId = u32;
 pub type TokenIdx = u32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
     pub text: String,
-}
-
-/// Half-open byte span into the source string: `[start, end)`.
-///
-/// `start` and `end` must be valid UTF-8 slice boundaries for that same source string.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Span {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl Span {
-    pub fn to(&self, other: Span) -> Span {
-        Span {
-            start: self.start,
-            end: other.end,
-        }
-    }
 }
 
 /// Half-open range of token indices: `[lo, hi)`.
@@ -40,12 +24,6 @@ impl TokenRange {
     pub fn new(lo: TokenIdx, hi: TokenIdx) -> Self {
         Self { lo, hi }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Spanned<T> {
-    pub node: T,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
