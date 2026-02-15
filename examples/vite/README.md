@@ -7,10 +7,10 @@
 
 - WASM wrapper: `src/analyzer/wasm_client.ts`
   - `initWasm(analyzerConfig)`
-  - `analyzeSource`
-  - `formatSource`
-  - `applyEditsSource`
-  - `helpSource`
+  - `analyze`
+  - `format`
+  - `apply_edits`
+  - `help`
 - Analyzer config source: `src/app/context.ts` (`ANALYZER_CONFIG`)
 - wasm-pack output: `src/pkg/`
 - DTO types: `src/analyzer/generated/wasm_dto.ts`
@@ -30,11 +30,11 @@ Primary files:
 ## UI behavior
 
 - Action row shows `Format`, `Quick Fix`, and `output: <type>`.
-- `Format` calls `formatSource(currentSource, currentCursorUtf16)` and applies returned
+- `Format` calls `format(currentSource, currentCursorUtf16)` and applies returned
   `{ source, cursor }`.
 - `Quick Fix` is derived from `AnalyzeResult.diagnostics[].actions`.
   - First available action is used.
-  - Apply uses `applyEditsSource(currentSource, action.edits, currentCursorUtf16)`.
+  - Apply uses `apply_edits(currentSource, action.edits, currentCursorUtf16)`.
 - Completion/signature help is TypeScript-rendered from structured WASM payloads.
 
 ## Debug bridge

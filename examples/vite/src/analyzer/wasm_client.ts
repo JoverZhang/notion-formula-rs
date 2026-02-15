@@ -57,28 +57,24 @@ function getAnalyzer(): wasm.Analyzer {
   throw new Error("WASM analyzer is not initialized");
 }
 
-export function analyzeSource(source: string): AnalyzeResult {
+export function analyze(source: string): AnalyzeResult {
   return getAnalyzer().analyze(source) as AnalyzeResult;
 }
 
-export function formatSource(source: string, cursorUtf16: number): ApplyResult {
-  return getAnalyzer().ide_format(source, cursorUtf16) as ApplyResult;
+export function format(source: string, cursorUtf16: number): ApplyResult {
+  return getAnalyzer().format(source, cursorUtf16) as ApplyResult;
 }
 
-export function applyEditsSource(
-  source: string,
-  edits: TextEdit[],
-  cursorUtf16: number,
-): ApplyResult {
-  return getAnalyzer().ide_apply_edits(source, edits, cursorUtf16) as ApplyResult;
+export function apply_edits(source: string, edits: TextEdit[], cursorUtf16: number): ApplyResult {
+  return getAnalyzer().apply_edits(source, edits, cursorUtf16) as ApplyResult;
 }
 
-export function helpSource(source: string, cursor: number): HelpResult {
-  return getAnalyzer().ide_help(source, cursor) as HelpResult;
+export function help(source: string, cursor: number): HelpResult {
+  return getAnalyzer().help(source, cursor) as HelpResult;
 }
 
 export function buildCompletionState(source: string, cursor: number): CompletionState {
-  const output = helpSource(source, cursor);
+  const output = help(source, cursor);
   const completion = output.completion;
   return {
     items: completion?.items ?? [],

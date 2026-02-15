@@ -5,8 +5,8 @@ import { Decoration, EditorView, keymap } from "@codemirror/view";
 import type { TextEdit } from "../analyzer/generated/wasm_dto";
 import {
   applyCompletionItem,
-  applyEditsSource,
-  formatSource,
+  apply_edits,
+  format,
   safeBuildCompletionState,
   type CompletionItem,
   type SignatureHelp,
@@ -434,7 +434,7 @@ export function createFormulaPanelView(opts: {
     const current = editorView.state.doc.toString();
     const cursor = editorView.state.selection.main.head;
     try {
-      const applied = formatSource(current, cursor);
+      const applied = format(current, cursor);
       if (applied.source === current && applied.cursor === cursor) return;
       editorView.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: applied.source },
@@ -453,7 +453,7 @@ export function createFormulaPanelView(opts: {
     const current = editorView.state.doc.toString();
     const cursor = editorView.state.selection.main.head;
     try {
-      const applied = applyEditsSource(current, action.edits, cursor);
+      const applied = apply_edits(current, action.edits, cursor);
       if (applied.source === current && applied.cursor === cursor) return;
       editorView.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: applied.source },

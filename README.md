@@ -19,10 +19,11 @@ If you are building an editor, this repo gives you a practical core:
   - semantic validation with context-aware checks
   - completion + structured signature help
 - `analyzer_wasm/` (WASM bridge)
-  - `analyze(source, context_json)`
-  - `ide_format(source, cursor_utf16)`
-  - `ide_apply_edits(source, edits, cursor_utf16)`
-  - `ide_help(source, cursor_utf16, context_json)`
+  - `new Analyzer(config)` (stateful instance)
+  - `Analyzer.analyze(source)`
+  - `Analyzer.format(source, cursor_utf16)`
+  - `Analyzer.apply_edits(source, edits, cursor_utf16)`
+  - `Analyzer.help(source, cursor_utf16)`
   - DTO export for TypeScript
 - `examples/vite/`
   - Vite + CodeMirror demo for live analysis/completion UX
@@ -137,46 +138,44 @@ pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
 ### WASM (`analyzer_wasm`)
 
 ```typescript
-// TypeScript-facing API used by the demo wrapper
+// wasm-bindgen exports (stateful Analyzer instance).
+export class Analyzer {
+  constructor(config: AnalyzerConfig);
+  analyze(source: string): AnalyzeResult;
+  format(source: string, cursorUtf16: number): ApplyResult;
+  apply_edits(source: string, edits: TextEdit[], cursorUtf16: number): ApplyResult;
+  help(source: string, cursorUtf16: number): HelpResult;
+}
+
+// TypeScript wrapper API used by the demo
 // (examples/vite/src/analyzer/wasm_client.ts).
-export function analyzeSource(source: string, contextJson: string): AnalyzeResult;
-export function formatSource(
-  source: string,
-  cursor: number, // UTF-16 offset
-): ApplyResult;
-export function applyEditsSource(
+export function initWasm(config: AnalyzerConfig): Promise<void>;
+export function analyze(source: string): AnalyzeResult;
+export function format(source: string, cursorUtf16: number): ApplyResult;
+export function apply_edits(
   source: string,
   edits: TextEdit[],
-  cursor: number, // UTF-16 offset
+  cursorUtf16: number,
 ): ApplyResult;
-export function helpSource(
-  source: string,
-  cursor: number, // UTF-16 offset
-  contextJson: string,
-): HelpResult;
-
-// Under the hood, these call wasm-bindgen exports:
-// analyze(source, context_json) -> AnalyzeResult payload
-// ide_format(source, cursor_utf16) -> ApplyResult payload
-// ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult payload
-// ide_help(source, cursor_utf16, context_json) -> HelpResult payload
+export function help(source: string, cursorUtf16: number): HelpResult;
 ```
 
-`context_json` rules are strict:
+`AnalyzerConfig` rules are strict:
 
-- it must be a non-empty JSON string
+- it must be an object
 - unknown top-level fields are rejected
-- use `"{}"` when you have no context to pass
+- use `{}` when you have no context to pass
+- `preferred_limit` is optional; `null` uses default `5`
 
 Current schema:
 
 ```json
 {
   "properties": [
-    { "name": "Status", "type": "String", "disabled_reason": null },
-    { "name": "Score", "type": "Number", "disabled_reason": null }
+    { "name": "Status", "type": "String" },
+    { "name": "Score", "type": "Number" }
   ],
-  "completion": { "preferred_limit": 6 }
+  "preferred_limit": 6
 }
 ```
 

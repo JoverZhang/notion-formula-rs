@@ -79,9 +79,9 @@ WASM (`analyzer_wasm/`):
 
 - `new Analyzer(config: AnalyzerConfig)`
 - `Analyzer.analyze(source) -> AnalyzeResult`
-- `Analyzer.ide_format(source, cursor_utf16) -> ApplyResult`
-- `Analyzer.ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `Analyzer.ide_help(source, cursor_utf16) -> HelpResult`
+- `Analyzer.format(source, cursor_utf16) -> ApplyResult`
+- `Analyzer.apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `Analyzer.help(source, cursor_utf16) -> HelpResult`
 
 Tooling:
 
@@ -147,7 +147,7 @@ These are stability guarantees. Contract changes require docs + tests + changelo
 - Core edit model is unified: `TextEdit { range, new_text }` in byte coordinates.
 - WASM edit model is unified: `TextEdit` in UTF-16 coordinates.
 - Core `ide_format` and `ide_apply_edits` accept byte cursor and return `{ source, cursor }`.
-- WASM `ide_format` and `ide_apply_edits` accept UTF-16 cursor and return UTF-16 cursor.
+- WASM `format` and `apply_edits` accept UTF-16 cursor and return UTF-16 cursor.
 - Core `ide_format` uses one full-document `TextEdit` through the same byte-edit pipeline as
   core `ide_apply_edits`.
 - WASM forwards to core after UTF-16 ↔ byte conversion; failures throw `Err` (not payload enums).

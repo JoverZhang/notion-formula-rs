@@ -6,16 +6,16 @@ This layer translates between editor coordinates (UTF-16) and core analyzer coor
 
 - `new Analyzer(config: AnalyzerConfig)`
 - `Analyzer.analyze(source) -> AnalyzeResult`
-- `Analyzer.ide_format(source, cursor_utf16) -> ApplyResult`
-- `Analyzer.ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `Analyzer.ide_help(source, cursor_utf16) -> HelpResult`
+- `Analyzer.format(source, cursor_utf16) -> ApplyResult`
+- `Analyzer.apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `Analyzer.help(source, cursor_utf16) -> HelpResult`
 
 Rust signatures (wasm-bindgen):
 - `Analyzer::new(config: JsValue) -> Result<Analyzer, String>`
 - `Analyzer::analyze(&self, source: String) -> Result<JsValue, JsValue>`
-- `Analyzer::ide_format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
-- `Analyzer::ide_apply_edits(&self, source: String, edits: JsValue, cursor_utf16: u32) -> Result<JsValue, JsValue>`
-- `Analyzer::ide_help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
+- `Analyzer::format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
+- `Analyzer::apply_edits(&self, source: String, edits: JsValue, cursor_utf16: u32) -> Result<JsValue, JsValue>`
+- `Analyzer::help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue>`
 
 ## Hard rules
 
@@ -49,12 +49,12 @@ Offset conversion helpers are centralized in `analyzer_wasm/src/offsets.rs`:
 
 ## Formatting and edit application
 
-- `ide_format(...)`:
+- `format(...)`:
   - validates UTF-16 cursor and converts to byte cursor
   - forwards to core `analyzer::ide_format(...)`
   - maps byte cursor in result back to UTF-16
 
-- `ide_apply_edits(...)`:
+- `apply_edits(...)`:
   - accepts UTF-16 `TextEdit[]`
   - converts to byte edits
   - validates UTF-16 bounds + UTF-8 char boundaries
@@ -66,7 +66,7 @@ Core edit behavior is implemented in `analyzer/src/ide/edit.rs`:
 - edit sorting and overlap checks
 - shared byte-edit apply + cursor rebasing
 
-## Validation rules (`ide_apply_edits`)
+## Validation rules (`apply_edits`)
 
 - each edit range must be inside UTF-16 document bounds
 - converted byte ranges must be valid UTF-8 char boundaries
@@ -74,8 +74,8 @@ Core edit behavior is implemented in `analyzer/src/ide/edit.rs`:
 ## Error model
 
 - `Analyzer::new` returns `Err("Invalid analyzer config")` for invalid config shape.
-- `analyze` and `ide_help` throw only on serialization failures.
-- `ide_format` and `ide_apply_edits` throw on operation failure (not encoded in payload).
+- `analyze` and `help` throw only on serialization failures.
+- `format` and `apply_edits` throw on operation failure (not encoded in payload).
 - error messages are minimal and deterministic (`Format error`, `Invalid edits`, `Invalid edit range`, `Overlapping edits`, `Invalid cursor`).
 
 ## Analyzer config contract

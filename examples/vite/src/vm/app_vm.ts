@@ -1,5 +1,5 @@
 import type { AnalyzerConfig } from "../analyzer/generated/wasm_dto";
-import { analyzeSource, initWasm } from "../analyzer/wasm_client";
+import { analyze, initWasm } from "../analyzer/wasm_client";
 import {
   FORMULA_IDS,
   type AppState,
@@ -97,7 +97,7 @@ export class AppVM {
     this.onStateChange(this.state);
 
     try {
-      const result = analyzeSource(formula.source);
+      const result = analyze(formula.source);
       formula.diagnostics = result.diagnostics || [];
       formula.tokens = result.tokens || [];
       formula.outputType = result.output_type || "unknown";

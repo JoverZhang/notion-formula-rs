@@ -61,16 +61,16 @@ impl Analyzer {
         to_value(&out)
     }
 
-    pub fn ide_format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
-        let cursor_byte = utf16_to_8_cursor(&source, cursor_utf16).map_err(ide_err)? as u32;
-        let output = analyzer::ide_format(&source, cursor_byte).map_err(ide_err)?;
+    pub fn format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
+        let cursor_byte = utf16_to_8_cursor(&source, cursor_utf16).map_err(operation_err)? as u32;
+        let output = analyzer::ide_format(&source, cursor_byte).map_err(operation_err)?;
         to_value(&ApplyResult {
             cursor: Converter::utf8_to_16_offset(&output.source, output.cursor as usize),
             source: output.source,
         })
     }
 
-    pub fn ide_apply_edits(
+    pub fn apply_edits(
         &self,
         source: String,
         edits: JsValue,
@@ -78,10 +78,11 @@ impl Analyzer {
     ) -> Result<JsValue, JsValue> {
         let text_edits: Vec<Utf16TextEdit> = serde_wasm_bindgen::from_value(edits)
             .map_err(|_| JsValue::from(JsError::new("Invalid edits")))?;
-        let text_edits = utf16_to_8_text_edits(&source, text_edits).map_err(ide_err)?;
-        let cursor = utf16_to_8_cursor(&source, cursor_utf16).map_err(ide_err)? as u32;
+        let text_edits = utf16_to_8_text_edits(&source, text_edits).map_err(operation_err)?;
+        let cursor = utf16_to_8_cursor(&source, cursor_utf16).map_err(operation_err)? as u32;
 
-        let result = analyzer::ide_apply_edits(&source, text_edits, cursor).map_err(ide_err)?;
+        let result =
+            analyzer::ide_apply_edits(&source, text_edits, cursor).map_err(operation_err)?;
 
         to_value(&ApplyResult {
             cursor: Converter::utf8_to_16_offset(&result.source, result.cursor as usize),
@@ -89,7 +90,7 @@ impl Analyzer {
         })
     }
 
-    pub fn ide_help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
+    pub fn help(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {
         let cursor = Converter::utf16_to_8_offset(&source, cursor_utf16 as usize);
 
         let output = analyzer::ide_help(
@@ -115,7 +116,7 @@ fn from_value<T: serde::de::DeserializeOwned>(
     serde_wasm_bindgen::from_value(value).map_err(|_| err.to_string())
 }
 
-fn ide_err(err: analyzer::IdeError) -> JsValue {
+fn operation_err(err: analyzer::IdeError) -> JsValue {
     JsValue::from(JsError::new(err.message()))
 }
 

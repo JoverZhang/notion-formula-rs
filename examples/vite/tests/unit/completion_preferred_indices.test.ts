@@ -25,8 +25,8 @@ vi.mock("../../src/analyzer/wasm_client", () => ({
       preferredIndices: out?.preferred_indices ?? [],
     };
   },
-  formatSource: () => ({ source: "", cursor: 0 }),
-  applyEditsSource: () => ({ source: "", cursor: 0 }),
+  format: () => ({ source: "", cursor: 0 }),
+  apply_edits: () => ({ source: "", cursor: 0 }),
   applyCompletionItem: () => null,
 }));
 

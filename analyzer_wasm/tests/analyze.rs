@@ -82,8 +82,8 @@ fn analyze_value(source: &str) -> AnalyzeResult {
 
 fn format_value(source: &str, cursor_utf16: u32) -> ApplyResult {
     let value = analyzer(None)
-        .ide_format(source.to_string(), cursor_utf16)
-        .expect("expected ide_format() Ok");
+        .format(source.to_string(), cursor_utf16)
+        .expect("expected format() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
 
@@ -97,8 +97,8 @@ fn edit(start: u32, end: u32, new_text: &str) -> TextEdit {
 fn apply_edits_value(source: &str, edits: &[TextEdit], cursor_utf16: u32) -> ApplyResult {
     let edits: JsValue = serde_wasm_bindgen::to_value(edits).expect("expected edits JsValue");
     let value = analyzer(None)
-        .ide_apply_edits(source.to_string(), edits, cursor_utf16)
-        .expect("expected ide_apply_edits() Ok");
+        .apply_edits(source.to_string(), edits, cursor_utf16)
+        .expect("expected apply_edits() Ok");
     serde_wasm_bindgen::from_value(value).expect("expected ApplyResult")
 }
 
@@ -277,8 +277,8 @@ fn format_rebases_mid_document_cursor_through_full_replace_edit() {
 fn format_parse_error_returns_err() {
     let source = "1 +";
     let err = analyzer(None)
-        .ide_format(source.to_string(), 0)
-        .expect_err("expected ide_format() Err");
+        .format(source.to_string(), 0)
+        .expect_err("expected format() Err");
     assert_eq!(error_message(err).as_deref(), Some("Format error"));
 }
 
@@ -286,8 +286,8 @@ fn format_parse_error_returns_err() {
 fn format_lex_error_returns_err() {
     let source = "1 @";
     let err = analyzer(None)
-        .ide_format(source.to_string(), 0)
-        .expect_err("expected ide_format() Err");
+        .format(source.to_string(), 0)
+        .expect_err("expected format() Err");
     assert_eq!(error_message(err).as_deref(), Some("Format error"));
 }
 
@@ -307,7 +307,7 @@ fn apply_edits_overlapping_returns_err() {
         .expect("edits to JsValue");
 
     let err = analyzer(None)
-        .ide_apply_edits(source.to_string(), edits, 0)
+        .apply_edits(source.to_string(), edits, 0)
         .expect_err("expected overlapping edits Err");
     assert_eq!(error_message(err).as_deref(), Some("Overlapping edits"));
 }
@@ -319,7 +319,7 @@ fn apply_edits_invalid_range_returns_err() {
         serde_wasm_bindgen::to_value(&vec![edit(5, 5, "X")]).expect("edits to JsValue");
 
     let err = analyzer(None)
-        .ide_apply_edits(source.to_string(), edits, 0)
+        .apply_edits(source.to_string(), edits, 0)
         .expect_err("expected invalid range Err");
     assert_eq!(error_message(err).as_deref(), Some("Invalid edit range"));
 }
@@ -331,8 +331,8 @@ fn apply_edits_emoji_utf16_conversion_is_correct() {
         serde_wasm_bindgen::to_value(&vec![edit(2, 3, "Z")]).expect("edits to JsValue");
 
     let out = analyzer(None)
-        .ide_apply_edits(source.to_string(), edits, 2)
-        .expect("expected ide_apply_edits() Ok");
+        .apply_edits(source.to_string(), edits, 2)
+        .expect("expected apply_edits() Ok");
     let out: ApplyResult = serde_wasm_bindgen::from_value(out).expect("ApplyResult");
 
     assert_eq!(out.source, "😀Z");
@@ -382,13 +382,13 @@ fn analyzer_config_nullable_preferred_limit_defaults_to_five() {
     let source = "if(";
 
     let out_null = analyzer(None)
-        .ide_help(source.to_string(), 3)
-        .expect("expected ide_help() Ok");
+        .help(source.to_string(), 3)
+        .expect("expected help() Ok");
     let out_null: HelpResult = serde_wasm_bindgen::from_value(out_null).expect("HelpResult");
 
     let out_five = analyzer(Some(5))
-        .ide_help(source.to_string(), 3)
-        .expect("expected ide_help() Ok");
+        .help(source.to_string(), 3)
+        .expect("expected help() Ok");
     let out_five: HelpResult = serde_wasm_bindgen::from_value(out_five).expect("HelpResult");
 
     assert_eq!(
@@ -400,8 +400,8 @@ fn analyzer_config_nullable_preferred_limit_defaults_to_five() {
 #[wasm_bindgen_test]
 fn analyzer_config_zero_preferred_limit_disables_preferred_indices() {
     let out = analyzer(Some(0))
-        .ide_help("if(".to_string(), 3)
-        .expect("expected ide_help() Ok");
+        .help("if(".to_string(), 3)
+        .expect("expected help() Ok");
     let out: HelpResult = serde_wasm_bindgen::from_value(out).expect("HelpResult");
 
     assert!(out.completion.preferred_indices.is_empty());

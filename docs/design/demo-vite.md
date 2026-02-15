@@ -19,7 +19,7 @@ For the full file map, see `examples/vite/README.md`.
 ## Action row behavior
 
 - `Format`:
-  - calls `formatSource(source, cursorUtf16)`
+  - calls `format(source, cursorUtf16)`
   - applies returned `{ source, cursor }`
   - is a no-op on thrown WASM format errors
 
@@ -27,7 +27,7 @@ For the full file map, see `examples/vite/README.md`.
   - derived from `AnalyzeResult.diagnostics[].actions`
   - uses the first actionable diagnostic action (first-fix-per-click)
   - button tooltip reflects the active action title
-  - applies edits via `applyEditsSource(source, action.edits, cursorUtf16)`
+  - applies edits via `apply_edits(source, action.edits, cursorUtf16)`
 
 - `output: <type>` uses `AnalyzeResult.output_type` and is always present.
 

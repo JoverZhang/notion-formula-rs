@@ -45,8 +45,8 @@ BLESS=1 cargo test -p analyzer
   - UTF-16 span/offset correctness (including emoji edge cases)
   - diagnostics + diagnostic action conversion
   - line/column projection on diagnostic DTOs
-  - `ide_format(source, cursor)` success/failure contract
-  - `ide_apply_edits(source, edits, cursor)` validation and cursor rebasing
+  - `format(source, cursor)` success/failure contract
+  - `apply_edits(source, edits, cursor)` validation and cursor rebasing
   - strict `AnalyzerConfig` constructor validation
 
 Run:

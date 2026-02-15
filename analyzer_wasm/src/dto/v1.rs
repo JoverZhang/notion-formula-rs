@@ -195,7 +195,7 @@ pub struct CompletionItem {
     pub disabled_reason: Option<String>,
 }
 
-/// Completion payload returned from `ide_help` (without signature help).
+/// Completion payload returned from `help`
 #[derive(Serialize, TS)]
 pub struct CompletionResult {
     pub items: Vec<CompletionItem>,
@@ -204,7 +204,7 @@ pub struct CompletionResult {
     pub preferred_indices: Vec<usize>,
 }
 
-/// Help result payload returned from the `ide_help` WASM export.
+/// Help result payload returned from the `help` WASM export.
 #[derive(Serialize, TS)]
 pub struct HelpResult {
     pub completion: CompletionResult,

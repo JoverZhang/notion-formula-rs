@@ -1,15 +1,15 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { helpSource, initWasm } from "../../src/analyzer/wasm_client";
+import { help, initWasm } from "../../src/analyzer/wasm_client";
 import { ANALYZER_CONFIG } from "../../src/app/context";
 
 function sigLabelAtCloseParen(source: string): string {
   const cursor = source.lastIndexOf(")");
   expect(cursor).toBeGreaterThanOrEqual(0);
 
-  const out = helpSource(source, cursor);
+  const out = help(source, cursor);
   expect(out.signature_help).not.toBeNull();
-  const help = out.signature_help!;
-  const activeSig = help.signatures[help.active_signature] ?? help.signatures[0];
+  const sigHelp = out.signature_help!;
+  const activeSig = sigHelp.signatures[sigHelp.active_signature] ?? sigHelp.signatures[0];
   expect(activeSig).toBeTruthy();
   return activeSig.segments
     .map((s) => {
@@ -29,7 +29,7 @@ function sigAtCloseParen(source: string) {
   const cursor = source.lastIndexOf(")");
   expect(cursor).toBeGreaterThanOrEqual(0);
 
-  const out = helpSource(source, cursor);
+  const out = help(source, cursor);
   expect(out.signature_help).not.toBeNull();
   return out.signature_help!;
 }

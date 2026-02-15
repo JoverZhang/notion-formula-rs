@@ -12,9 +12,9 @@ Defined in `analyzer_wasm/src/lib.rs`:
 
 - `new Analyzer(config: AnalyzerConfig)`
 - `Analyzer.analyze(source) -> AnalyzeResult`
-- `Analyzer.ide_format(source, cursor_utf16) -> ApplyResult`
-- `Analyzer.ide_apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `Analyzer.ide_help(source, cursor_utf16) -> HelpResult`
+- `Analyzer.format(source, cursor_utf16) -> ApplyResult`
+- `Analyzer.apply_edits(source, edits, cursor_utf16) -> ApplyResult`
+- `Analyzer.help(source, cursor_utf16) -> HelpResult`
 
 ## DTOs (`dto::v1`)
 
@@ -43,13 +43,13 @@ Offset conversion helpers are centralized in `analyzer_wasm/src/offsets.rs`:
 
 - `Analyzer::new`: returns `Err("Invalid analyzer config")` for invalid config shape.
 - `analyze`: throws only for serialization errors.
-- `ide_format`: throws on syntax-invalid input (`Format error`).
-- `ide_apply_edits`: throws on invalid edits / invalid cursor / overlaps.
-- `ide_help`: throws only for serialization errors.
+- `format`: throws on syntax-invalid input (`Format error`).
+- `apply_edits`: throws on invalid edits / invalid cursor / overlaps.
+- `help`: throws only for serialization errors.
 
 ## Edit application rules
 
-`ide_apply_edits` validates UTF-16 ranges strictly before forwarding to core:
+`apply_edits` validates UTF-16 ranges strictly before forwarding to core:
 - UTF-16 ranges must be within the document
 - converted byte ranges must be UTF-8 char boundaries
 
