@@ -56,10 +56,12 @@ Run from repository root.
 ```bash
 # just
 just test-analyzer
+just test-ide
 just test-analyzer_wasm
 
 # manual
 cargo test -p analyzer
+cargo test -p ide
 cargo test -p analyzer_wasm
 ```
 
@@ -207,6 +209,16 @@ just test-analyzer
 cargo test -p analyzer
 ```
 
+### Rust IDE tests
+
+```bash
+# just
+just test-ide
+
+# manual
+cargo test -p ide
+```
+
 ### Rust WASM tests
 
 ```bash
@@ -218,7 +230,9 @@ cargo test -p analyzer_wasm
 wasm-pack test --node analyzer_wasm
 ```
 
-### Update golden snapshots (analyzer)
+### Update golden snapshots
+
+Diagnostics golden (`analyzer`):
 
 ```bash
 # just
@@ -226,6 +240,16 @@ just test-analyzer-bless
 
 # manual
 BLESS=1 cargo test -p analyzer
+```
+
+Format golden (`ide`):
+
+```bash
+# just
+just test-ide-bless
+
+# manual
+BLESS=1 cargo test -p ide format_golden
 ```
 
 ### Demo unit + E2E tests
@@ -249,8 +273,10 @@ just fix      # clippy --fix + frontend lint fixes
 just gen-ts   # export TS DTO types from analyzer_wasm
 just test     # repo test suite
 just test-analyzer
+just test-ide
 just test-analyzer_wasm
 just test-analyzer-bless
+just test-ide-bless
 just test-example-vite
 just run-example-vite  # build wasm and start demo dev server
 ```

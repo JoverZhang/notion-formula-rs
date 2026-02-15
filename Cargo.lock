@@ -7,7 +7,6 @@ version = 4
 name = "analyzer"
 version = "0.1.0"
 dependencies = [
- "ide",
  "serde",
 ]
 

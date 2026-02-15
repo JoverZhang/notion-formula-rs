@@ -10,8 +10,6 @@ Where regression coverage lives, what each layer validates, and how to refresh s
   - parser recovery + diagnostics priority/deconfliction
   - diagnostic actions (quick-fix actions attached to diagnostics)
   - span/token invariants (`Span`, `tokens_in_span`, `TokenQuery`)
-  - formatter behavior
-  - completion ranking + signature-help behavior
   - semantic checks and builtin/type behavior
 
 Run:
@@ -20,22 +18,53 @@ Run:
 cargo test -p analyzer
 ```
 
-## Rust golden tests (`analyzer/`)
+## Rust unit tests (`ide/`)
+
+- Location: `ide/src/tests/`
+- Coverage includes:
+  - formatter behavior + idempotence
+  - completion ranking/position behavior
+  - signature-help behavior
+  - edit application/validation behavior
+
+Run:
+
+```bash
+cargo test -p ide
+```
+
+## Rust golden tests
+
+Diagnostics golden (`analyzer/`):
 
 Runners:
 
-- `analyzer/tests/format_golden.rs`
 - `analyzer/tests/diagnostics_golden.rs`
 
 Fixtures:
 
-- `analyzer/tests/format/*.formula` -> `*.snap`
 - `analyzer/tests/diagnostics/*.formula` -> `*.snap`
 
 Update snapshots:
 
 ```bash
 BLESS=1 cargo test -p analyzer
+```
+
+Format golden (`ide/`):
+
+Runners:
+
+- `ide/tests/format_golden.rs`
+
+Fixtures:
+
+- `ide/tests/format/*.formula` -> `*.snap`
+
+Update snapshots:
+
+```bash
+BLESS=1 cargo test -p ide format_golden
 ```
 
 ## WASM tests (`analyzer_wasm/`)
