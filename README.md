@@ -1,44 +1,49 @@
 # notion-formula-rs
 
-`notion-formula-rs` is a Rust workspace for **Notion-style formula language tooling**.
+- **Demo:** https://www.jovers.org/notion-formula-rs
+- **Docs:** [Design docs](./docs/design/README.md)
+- **Status:**
+  - Editor tooling (analyzer + completion/assists) is usable today.
+  - Evaluator/runtime execution is the next milestone (host-context contract first).
 
-This repo focuses on the **front-end / editor-facing** parts: parse, diagnostics, formatting, and IDE-style assists.
-It is designed as building blocks for editors and UIs (including browser apps via WASM), not as a full end-user compiler.
+## What is this?
 
-If you are building an editor or an interactive formula UI, this repo provides:
+`notion-formula-rs` is a Rust workspace for **Notion-style formula tooling**.
+
+It targets **editor-facing** use cases: parse, diagnostics, formatting, and IDE-style assists.
+It is meant to be embedded in editors/UIs (including browser apps via WASM), not shipped as a standalone product.
+
+You get:
 
 - lexing + parsing to an AST
-- diagnostics with stable spans
+- diagnostics with stable spans/offsets
 - deterministic formatting
 - IDE-style assists (completion, signature help, code actions)
 - a WASM boundary for browser demos and integrations
 
+## Predictable, compile-time typing (no runtime magic)
+
+The analyzer performs compile-time type inference and produces a deterministic result type.
+When possible, we preserve union types instead of collapsing mixed branches to `unknown` (in Notion today).
+
+Example (in my testing):
+
+- In Notion today: `if(true, 1, "2")` → `unknown`
+- Here:            `if(true, 1, "2")` → `number | string`
+
 ## What Works Today
 
-- `analyzer/` (Rust core)
-  - lexer → parser → AST
-  - diagnostics (deterministic, with stable spans)
-  - basic / partial semantic validation using user-provided context
-
-- `ide/` (Rust IDE helpers)
-  - formatter (stable output)
-  - IDE assists: completion + structured signature help
-  - edit operations: `format / apply_edits` in byte coordinates
-
-- `analyzer_wasm/` (WASM bridge)
-  - a stateful `Analyzer(config)` instance for browser apps
-  - `analyze / format / apply_edits / help`
-  - DTOs for TypeScript consumers (used by the demo)
-
-- `examples/vite/`
-  - Vite + CodeMirror demo for live analysis / completion UX
-  - Vitest + Playwright coverage for core editor flows
+- `analyzer/`: parsing + diagnostics + semantic checks
+- `ide/`: formatter + completion/signature help + edit ops
+- `analyzer_wasm/`: WASM/JS API + TypeScript DTOs
+- `examples/vite/`: CodeMirror demo + UI test coverage
 
 ## Current Limits
 
-- Runtime evaluation (`evaluator/`) is still TODO.
-- Language and type coverage are still expanding. The goal is Notion Formula compatibility; extensions are additive and intended to be opt-in.
-- Some areas are intentionally tracked as TODOs in design docs while the toolchain stabilizes.
+- Evaluator/runtime execution is not implemented yet; it is the next milestone (host-context contract first).
+- Language and type coverage are still expanding. Notion Formula compatibility is the default; extensions are additive and opt-in.
+- Some areas are tracked as TODOs in design docs while the toolchain stabilizes.
+
 
 ## Prerequisites
 
