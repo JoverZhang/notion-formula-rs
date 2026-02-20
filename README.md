@@ -31,6 +31,17 @@ Example (in my testing):
 - In Notion today: `if(true, 1, "2")` → `unknown`
 - Here:            `if(true, 1, "2")` → `number | string`
 
+## Editor assists (signature help, completion)
+
+The analyzer also provides IDE-style assists for interactive formula UIs.
+
+Example:
+
+- Signature help for variadic `ifs(...)` shows parameter names/types and a precise return type.
+  - `ifs(true, 1, false, "2", false)` → `boolean | number | string`
+
+![Signature help for ifs(...)](./docs/assets/signature-help-ifs.webp)
+
 ## What Works Today
 
 - `analyzer/`: parsing + diagnostics + semantic checks
