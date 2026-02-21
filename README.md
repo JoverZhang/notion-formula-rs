@@ -24,7 +24,7 @@ You get:
 ## Predictable, compile-time typing (no runtime magic)
 
 The analyzer performs compile-time type inference and produces a deterministic result type.
-When possible, we preserve union types instead of collapsing mixed branches to `unknown` (in Notion today).
+When possible, we preserve union types instead of collapsing mixed branches to `unknown`.
 
 Example (in my testing):
 
@@ -40,7 +40,7 @@ Example:
 - Signature help for variadic `ifs(...)` shows parameter names/types and a precise return type.
   - `ifs(true, 1, false, "2", false)` → `boolean | number | string`
 
-![Signature help for ifs(...)](./docs/assets/signature-help-ifs.webp)
+![Signature help for ifs(...)](docs/assets/signature-help-ifs.webp)
 
 ## What Works Today
 
@@ -54,7 +54,6 @@ Example:
 - Evaluator/runtime execution is not implemented yet; it is the next milestone (host-context contract first).
 - Language and type coverage are still expanding. Notion Formula compatibility is the default; extensions are additive and opt-in.
 - Some areas are tracked as TODOs in design docs while the toolchain stabilizes.
-
 
 ## Prerequisites
 
