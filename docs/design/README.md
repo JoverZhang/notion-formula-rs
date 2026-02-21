@@ -1,204 +1,89 @@
 # Design (notion-formula-rs)
 
-Start here for stable architecture and cross-crate contracts.
-Implementation details that change frequently should live next to code (`analyzer/README.md`,
-`ide/README.md`, `analyzer_wasm/README.md`, `examples/vite/README.md`).
+This file only covers stable architecture, cross-crate contracts, and drift tracking.
+For implementation details, read each module README, such as `analyzer/README.md`, `ide/README.md`, `analyzer_wasm/README.md`, and `examples/vite/README.md`.
+For the docs entry point, see `docs/README.md`.
 
-## Table of contents
+## Goals
 
-- [Pipeline](#pipeline)
-- [Source tree](#source-tree)
-- [Data flow](#data-flow)
-- [Public entry points](#public-entry-points)
-- [Language contract (current implementation)](#language-contract-current-implementation)
-- [Key design decisions](#key-design-decisions)
-- [Contracts (hard rules)](#contracts-hard-rules)
-- [Design philosophy](#design-philosophy)
-- [Deep dives](#deep-dives)
-- [Drift tracker / open questions](#drift-tracker--open-questions)
+- Provide stable, reusable formula parsing and diagnostics.
+- Provide IDE-level editing experience: format, completion, and signature help.
+- Provide WASM/TS-facing entrypoints plus a lightweight DTO anti-corruption layer, so coordinate systems stay consistent.
 
-## Pipeline
+## Module Summary
 
-```text
-&str (UTF-8)
-  -> lexer: tokens (incl. trivia + EOF) + diagnostics
-  -> parser: ParseOutput (AST + parse diagnostics)
-  -> semantic analysis (optional; needs Context) -> (Ty + semantic diagnostics)
-  -> IDE crate: formatter / completion / signature help / edit application
-  -> WASM bridge: DTO v1 (UTF-16 spans/offsets)
-```
+| Module | Summary | Primary doc |
+| --- | --- | --- |
+| `analyzer/` | lexer + parser + AST + diagnostics + semantic | `analyzer/README.md` |
+| `ide/` | format / completion / signature help / edit apply | `ide/README.md` |
+| `analyzer_wasm/` | wasm-bindgen boundary + UTF-16 mapping + DTO v1 | `analyzer_wasm/README.md` |
+| `evaluator/` | WIP | - |
+| `examples/vite/` | demo integration | `examples/vite/README.md` |
+| `docs/` | design docs + changelog guidance | `docs/README.md` |
 
-## Source tree
+## Design Philosophy
 
-```text
-.
-├─ analyzer/          Rust core analyzer (lexer/parser/AST/diagnostics/semantic)
-├─ ide/               Rust IDE/editor helpers (format/completion/help/edit apply)
-├─ analyzer_wasm/     wasm-bindgen boundary + UTF-16 conversion + DTO v1
-├─ evaluator/         stub (currently unused)
-├─ examples/vite/     Vite + CodeMirror demo consuming analyzer_wasm
-└─ docs/              design docs + changelog guidance (start at docs/README.md)
-```
+- Keep it simple: ship strong capabilities without dragging in unnecessary structure.
+- Contracts first: stable boundaries and contracts come first, and changes must be traceable.
+- Best-effort parsing: do not stop parsing on local errors; return as much useful output as possible.
+- Determinism by default: same input, same output (ordering, dedupe, formatting).
+- Clear boundary: Rust core uses UTF-8 bytes, JS/WASM uses UTF-16 code units.
 
-Primary docs:
+## Glossary
 
-| Path | Primary doc |
-|---|---|
-| `analyzer/` | [`analyzer/README.md`](../../analyzer/README.md) |
-| `ide/` | [`ide/README.md`](../../ide/README.md) |
-| `analyzer_wasm/` | [`analyzer_wasm/README.md`](../../analyzer_wasm/README.md) |
-| `examples/vite/` | [`examples/vite/README.md`](../../examples/vite/README.md) |
-| `docs/` | [`docs/README.md`](../README.md) |
+- `token`: a syntax unit, such as a number, string, operator, keyword, or identifier.
+- `trivia`: non-semantic tokens, such as newlines, comments, and doc comments.
+- `diagnostic`: an error or warning tied to source code.
+- `code action`: a special diagnostic that carries a quick-fix suggestion.
+- `span`: a source range represented as a half-open interval `[start, end)`.
+- `cursor`: a source position in `[0, length)`. In tests we mark it as `$0` (same naming style as rustc tests).
 
-## Data flow
+## Design (Keep It Simple)
 
-Stable boundary view:
+### analyzer
 
-- `&str` (UTF-8) -> lexer -> `Tokens` (incl. trivia + EOF) + lex diagnostics
-- `Tokens` -> parser -> `ParseOutput { expr, diagnostics, tokens }`
-- `ParseOutput.expr` + `Context` -> semantic analysis -> `(Ty, semantic diagnostics)`
-- `analyze(source, ctx)` -> `AnalyzeResult { diagnostics, tokens, output_type }`
-- `(expr, tokens, source)` -> formatter (in `ide`) -> `String`
-- `(source, cursor, Context)` -> `ide::help(...)` -> `HelpResult { completion, signature_help }`
-- `(source, cursor, edits)` -> `ide::{format, apply_edits}` -> `{ source, cursor }`
-- Parser diagnostics may include `actions: Vec<CodeAction>` in byte coordinates.
-- WASM conversion maps core byte spans/edits to UTF-16 DTO spans/edits.
+The core goal of `analyzer` is a recovering compiler: parsing does not stop because of local errors, and still produces AST + diagnostics for IDE use and downstream semantic analysis.
 
-## Public entry points
+Key tradeoffs:
 
-Rust (`analyzer/`):
+- Keep trivia such as `group`, newlines, and comments in the AST so formatting can reuse the same structure. This avoids maintaining a separate CST in `ide`; for this lightweight grammar, the extra compile-time cost is acceptable.
+- During parsing, insert `ErrorExpr` placeholders and emit diagnostics to improve one-pass diagnostic quality.
+- Some diagnostics carry code actions (for example missing parentheses or commas) for lightweight quick fixes.
 
-- `analyzer::analyze_syntax(text: &str) -> SyntaxResult`
-- `analyzer::analyze(text: &str, ctx: &Context) -> AnalyzeResult`
-- `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
-- `analyzer::infer_expr_with_map(expr, ctx, map) -> Ty`
-- `analyzer::format_diagnostics(source, diags) -> String`
+### ide
 
-Rust (`ide/`):
+The core job of `ide` is to provide modern editor behaviors: format, completion, and signature help.
+The design direction is to reuse `analyzer` structures and keep output stable and explainable.
 
-- `ide::help(source, cursor_byte, ctx, config) -> HelpResult`
-- `ide::format(source, cursor_byte) -> Result<ApplyResult, IdeError>`
-- `ide::apply_edits(source, edits, cursor_byte) -> Result<ApplyResult, IdeError>`
+See [`docs/design/completion.md`](completion.md).
 
-WASM (`analyzer_wasm/`):
+### analyzer_wasm
 
-- `new Analyzer(config: AnalyzerConfig)`
-- `Analyzer.analyze(source) -> AnalyzeResult`
-- `Analyzer.format(source, cursor_utf16) -> ApplyResult`
-- `Analyzer.apply_edits(source, edits, cursor_utf16) -> ApplyResult`
-- `Analyzer.help(source, cursor_utf16) -> HelpResult`
+`analyzer_wasm` is the JS/TS-facing facade for `analyzer` and `ide`, and also provides a lightweight DTO anti-corruption layer.
 
-Tooling:
+Design principles:
 
-- TS DTO export: `cargo run -p analyzer_wasm --bin export_ts`
+- Only expose the APIs and coordinate conversions we actually need; avoid extra logic.
+- UTF-8 byte <-> UTF-16 code unit span conversion only happens here.
 
-## Language contract (current implementation)
+### evaluator
 
-This section documents current lexer/parser behavior (code-backed):
+WIP.
 
-- Identifiers: ASCII letters/`_` and non-ASCII codepoints are accepted.
-- Numbers: ASCII digit integers only (no decimals yet).
-- Strings: double-quoted strings, no escapes yet.
-- Lists: trailing comma is rejected (`[1, 2,]` is a parse error).
-- Operators:
-  - `%` is modulo.
-  - `^` is power and right-associative.
-- Member access without a call is rejected (`receiver.method` must be `receiver.method(...)`).
+## Language Scope
 
-## Key design decisions
+- Syntax targets follow Notion's official guide: <https://www.notion.com/help/formula-syntax>.
 
-These are the hard edges other code relies on:
+Syntax summary:
 
-- Spans/offsets: core spans are UTF-8 byte offsets, half-open `[start, end)`.
-- WASM boundary encoding: DTO spans/offsets are UTF-16 code units, half-open `[start, end)`.
-- Determinism: diagnostics deconfliction + formatting order are deterministic.
-- Signature help is structured: UIs render segments, they do not parse signature strings.
-- `AnalyzerConfig` is strict: object input; unknown top-level fields rejected.
-- Semantic and DTO payloads avoid nullable "unknown" values where explicit domain values exist
-  (`Ty::Unknown`, `"unknown"`).
-
-## Contracts (hard rules)
-
-These are stability guarantees. Contract changes require docs + tests + changelog updates.
-
-### Spans and offsets
-
-- Core spans are UTF-8 byte offsets (`analyzer/src/lexer/token.rs`).
-- DTO spans/edits are UTF-16 code units (`analyzer_wasm/src/dto/v1.rs`).
-- Conversion lives only in WASM (`analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`).
-- `Diagnostic.line`/`col` are computed from byte offsets via `SourceMap::line_col` during
-  WASM conversion (`analyzer_wasm/src/converter/shared.rs`).
-
-### Token stream
-
-- Token stream includes trivia (`DocComment`, `Newline`) and explicit `Eof`.
-- `TokenQuery` is the canonical trivia-aware span/token neighbor API.
-
-### AST + syntax invariants
-
-- `ExprKind` is the closed set of core expression forms.
-- Parser recovers best-effort with `ExprKind::Error` nodes and diagnostics.
-- Member access without call is rejected.
-
-### Diagnostics determinism
-
-- Diagnostics deconflict by identical span with priority (`DiagnosticCode::priority`).
-- One diagnostic survives per span unless equal-priority/equal-message merge rules apply.
-- `format_diagnostics` output ordering is stable by span, priority, and message.
-
-### Actions and edits
-
-- Quick fixes are diagnostic-level payloads: `Diagnostic.actions: Vec<CodeAction>`.
-- Core edit model is unified: `TextEdit { range, new_text }` in byte coordinates.
-- WASM edit model is unified: `TextEdit` in UTF-16 coordinates.
-- Core `ide::format` and `ide::apply_edits` accept byte cursor and return `{ source, cursor }`.
-- WASM `format` and `apply_edits` accept UTF-16 cursor and return UTF-16 cursor.
-- Core `ide::format` uses one full-document `TextEdit` through the same byte-edit pipeline as
-  core `ide::apply_edits`.
-- WASM forwards to core after UTF-16 ↔ byte conversion; failures throw `Err` (not payload enums).
-
-### Signature help
-
-- Signature shape uses `ParamShape { head, repeat, tail }` invariants.
-- Signature help output is structured (`DisplaySegment[]`) for direct UI rendering.
-- Active parameter mapping follows `docs/signature-help.md`.
-
-### WASM `AnalyzerConfig`
-
-- Constructor config must be an object.
-- Unknown top-level fields are rejected.
-- Current schema: `{ properties?: Property[], preferred_limit?: number | null }`.
-- `preferred_limit = null` uses default `5`.
-- `functions` are sourced from Rust builtins; JS does not provide them.
-
-## Design philosophy
-
-- Contracts-first: keep hard edges explicit, test-backed, and small.
-- Best-effort parsing: return useful AST + diagnostics instead of failing fast.
-- Determinism by default: stable ordering and tie-break rules for predictable UI behavior.
-- Clear boundary: Rust core stays UTF-8; JS-facing boundary stays UTF-16.
-
-## Deep dives
-
-- Spans/tokens/trivia: [`docs/design/tokens-spans.md`](tokens-spans.md)
-- `TokenQuery`: [`docs/design/tokenquery.md`](tokenquery.md)
-- Builtins + types + postfix sugar: [`docs/design/builtins-and-types.md`](builtins-and-types.md)
-- Completion + signature help behavior: [`docs/design/completion.md`](completion.md)
-- WASM boundary + DTO v1: [`docs/design/wasm-boundary.md`](wasm-boundary.md)
-- Demo integration (`examples/vite`): [`docs/design/demo-vite.md`](demo-vite.md)
-- Test inventory: [`docs/design/testing.md`](testing.md)
-
-Related:
-
-- Signature help spec: [`docs/signature-help.md`](../signature-help.md)
-- Builtins spec list: [`docs/builtin_functions/README.md`](../builtin_functions/README.md)
-
-## Drift tracker / open questions
-
-- Language spec gaps to formalize:
-  - numeric grammar (decimals, edge cases)
-  - string escape grammar
-  - identifier character classes and normalization policy
-- Semantic parity gap to track:
-  - postfix validation still has narrower behavior than postfix inference/completion in some
-    call-shape paths (`docs/design/builtins-and-types.md`).
+- Identifiers: Unicode letters or `_`, followed by Unicode code points.
+- Numbers: integers, floating-point decimals, and scientific notation.
+- Strings: double-quoted strings with escapes: `\n`, `\t`, `\"`, `\\`.
+- Lists: trailing commas like `[1, 2,]` are rejected.
+- Operators: basic arithmetic operators `+`, `-`, `*`, `/`, `%`, `^`; `%` is modulo, and `^` is right-associative exponentiation.
+- Logical operators: `&&`, `||`, `!`.
+- Keywords: `not`, `true`, `false`.
+- Function calls: regular function calls and member method calls are supported.
+  - Regular function call: `name(arg1, ...)`.
+  - Member method call: `receiver.name(arg1, ...)`.
+  - Built-in function support status: `docs/builtin_functions/README.md`.

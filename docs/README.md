@@ -4,7 +4,9 @@ Start at: [`docs/design/README.md`](design/README.md).
 
 ## What lives where
 
-- `docs/design/README.md`: repo map + contracts + drift tracker.
+- `docs/design/README.md`: repo map + contracts/drift tracker index.
+- `docs/design/contracts.md`: design contracts (hard rules).
+- `docs/design/drift-tracker.md`: open questions and known gaps.
 - `README.md` next to code: module/crate docs (e.g. `analyzer/README.md`).
 - `docs/changelogs/YYYYMMDD-short-slug.md`: user-visible changes.
 
