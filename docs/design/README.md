@@ -2,13 +2,13 @@
 
 This file only covers stable architecture, cross-crate contracts, and drift tracking.
 For implementation details, read each module README, such as `analyzer/README.md`, `ide/README.md`, `analyzer_wasm/README.md`, and `examples/vite/README.md`.
-For the docs entry point, see `docs/README.md`.
+For the documentation entry point, see `docs/README.md`.
 
 ## Goals
 
 - Provide stable, reusable formula parsing and diagnostics.
 - Provide IDE-level editing experience: format, completion, and signature help.
-- Provide WASM/TS-facing entrypoints plus a lightweight DTO anti-corruption layer, so coordinate systems stay consistent.
+- Provide WASM/TS-facing entrypoints plus a lightweight DTO anti-corruption layer, keeping UTF-8/UTF-16 coordinates consistent.
 
 ## Module Summary
 
@@ -25,7 +25,7 @@ For the docs entry point, see `docs/README.md`.
 
 - Keep it simple: ship strong capabilities without dragging in unnecessary structure.
 - Contracts first: stable boundaries and contracts come first, and changes must be traceable.
-- Best-effort parsing: do not stop parsing on local errors; return as much useful output as possible.
+- Best-effort parsing: do not stop parsing on syntax errors; return as much useful output as possible.
 - Determinism by default: same input, same output (ordering, dedupe, formatting).
 - Clear boundary: Rust core uses UTF-8 bytes, JS/WASM uses UTF-16 code units.
 
@@ -46,7 +46,7 @@ The core goal of `analyzer` is a recovering compiler: parsing does not stop beca
 
 Key tradeoffs:
 
-- Keep trivia such as `group`, newlines, and comments in the AST so formatting can reuse the same structure. This avoids maintaining a separate CST in `ide`; for this lightweight grammar, the extra compile-time cost is acceptable.
+- Keep trivia such as `group`, `newlines`, and `comments` in the AST so formatting can reuse the same structure. This avoids maintaining a separate CST in `ide`; for this lightweight grammar, the extra analysis cost is acceptable.
 - During parsing, insert `ErrorExpr` placeholders and emit diagnostics to improve one-pass diagnostic quality.
 - Some diagnostics carry code actions (for example missing parentheses or commas) for lightweight quick fixes.
 
@@ -72,11 +72,11 @@ WIP.
 
 ## Language Scope
 
-- Syntax targets follow Notion's official guide: <https://www.notion.com/help/formula-syntax>.
+- Syntax follows Notion’s official guide: <https://www.notion.com/help/formula-syntax>.
 
 Syntax summary:
 
-- Identifiers: Unicode letters or `_`, followed by Unicode code points.
+- Identifiers: start with a Unicode letter or `_`, followed by Unicode letters, digits, or `_`.
 - Numbers: integers, floating-point decimals, and scientific notation.
 - Strings: double-quoted strings with escapes: `\n`, `\t`, `\"`, `\\`.
 - Lists: trailing commas like `[1, 2,]` are rejected.
