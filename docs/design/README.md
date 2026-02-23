@@ -55,7 +55,7 @@ Key tradeoffs:
 The core job of `ide` is to provide modern editor behaviors: format, completion, and signature help.
 The design direction is to reuse `analyzer` structures and keep output stable and explainable.
 
-See [`docs/design/completion.md`](completion.md).
+See [`docs/design/ide.md`](ide.md).
 
 ### analyzer_wasm
 
