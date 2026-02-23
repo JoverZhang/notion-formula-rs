@@ -1,14 +1,25 @@
 //! Signature help for calls under the cursor.
 //! Uses UTF-8 byte offsets (via tokens/spans) and best-effort type inference.
 
-use super::SignatureHelp;
-use super::position::prev_non_trivia_before;
-use crate::completion::SignatureItem;
+use crate::context::{CallContext, prev_non_trivia_before};
 use crate::display::{ParamSlot, RenderedSignature, build_signature_segments};
 use analyzer::ast::{Expr, ExprKind};
 use analyzer::semantic;
 use analyzer::{Span, Token, TokenKind};
 use std::collections::HashMap;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureItem {
+    pub segments: Vec<crate::display::DisplaySegment>,
+}
+
+/// Signature display for a call at the cursor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureHelp {
+    pub signatures: Vec<SignatureItem>,
+    pub active_signature: usize,
+    pub active_parameter: usize,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CompletedRepeatShape {
@@ -320,14 +331,6 @@ fn instantiate_sig(
         .collect::<Vec<_>>();
     let ret = apply(&subst, &sig.ret);
     (params, ret)
-}
-
-/// Call-site info derived from tokens, using byte offsets for the cursor.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CallContext {
-    pub(super) callee: String,
-    pub(super) lparen_idx: usize,
-    pub(super) arg_index: usize,
 }
 
 fn ty_contains_generic(ty: &semantic::Ty) -> bool {
@@ -766,11 +769,11 @@ fn active_parameter_for_call(
 /// Computes signature help when the cursor is inside a call argument list.
 ///
 /// Returns `None` if the cursor is before the `(`, or if the callee is unknown.
-pub(super) fn compute_signature_help_if_in_call(
+pub(crate) fn compute_signature_help_if_in_call(
     source: &str,
     tokens: &[Token],
     cursor: u32,
-    ctx: Option<&semantic::Context>,
+    ctx: &semantic::Context,
     call_ctx: Option<&CallContext>,
 ) -> Option<SignatureHelp> {
     let call_ctx = call_ctx?;
@@ -781,7 +784,6 @@ pub(super) fn compute_signature_help_if_in_call(
         return None;
     }
 
-    let ctx = ctx?;
     let func = ctx
         .functions
         .iter()
@@ -833,87 +835,4 @@ pub(super) fn compute_signature_help_if_in_call(
         active_signature: 0,
         active_parameter,
     })
-}
-
-/// Finds the innermost call whose `(` starts before `cursor`.
-pub(super) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallContext> {
-    let mut stack = Vec::new();
-    for (idx, token) in tokens.iter().enumerate() {
-        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
-            continue;
-        }
-        if token.span.start >= cursor {
-            break;
-        }
-        match token.kind {
-            TokenKind::OpenParen => stack.push(idx),
-            TokenKind::CloseParen => {
-                let _ = stack.pop();
-            }
-            _ => {}
-        }
-    }
-    let lparen_idx = *stack.last()?;
-    let (_, callee_token) = prev_non_trivia_before(tokens, lparen_idx)?;
-    let TokenKind::Ident(ref symbol) = callee_token.kind else {
-        return None;
-    };
-    let mut arg_index = 0usize;
-    let mut paren_depth = 0i32;
-    let mut bracket_depth = 0i32;
-    for token in tokens.iter().skip(lparen_idx + 1) {
-        if token.is_trivia() || matches!(token.kind, TokenKind::Eof) {
-            continue;
-        }
-        if token.span.start >= cursor {
-            break;
-        }
-        match token.kind {
-            TokenKind::OpenParen => paren_depth += 1,
-            TokenKind::OpenBracket => bracket_depth += 1,
-            TokenKind::CloseParen => {
-                if paren_depth > 0 {
-                    paren_depth -= 1;
-                }
-            }
-            TokenKind::CloseBracket => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
-            }
-            TokenKind::Comma => {
-                if paren_depth == 0 && bracket_depth == 0 {
-                    arg_index += 1;
-                }
-            }
-            _ => {}
-        }
-    }
-    Some(CallContext {
-        callee: symbol.text.clone(),
-        lparen_idx,
-        arg_index,
-    })
-}
-
-/// Best-effort expected type for the active argument position.
-///
-/// Returns `None` for wildcard-ish types (`Unknown` and `Generic(_)`).
-pub(super) fn expected_call_arg_ty(
-    call_ctx: Option<&CallContext>,
-    ctx: Option<&semantic::Context>,
-) -> Option<semantic::Ty> {
-    let call_ctx = call_ctx?;
-    let ctx = ctx?;
-    let ty = ctx
-        .functions
-        .iter()
-        .find(|func| func.name == call_ctx.callee)
-        .and_then(|func| func.param_for_arg_index(call_ctx.arg_index))
-        .map(|param| param.ty.clone())?;
-
-    match ty {
-        semantic::Ty::Unknown | semantic::Ty::Generic(_) => None,
-        other => Some(other),
-    }
 }

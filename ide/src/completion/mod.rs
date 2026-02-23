@@ -3,15 +3,16 @@
 //! Spans are half-open ranges `[start, end)`.
 
 pub use crate::TextEdit;
+use crate::signature::SignatureHelp;
 use analyzer::Span;
 use analyzer::semantic;
 
 mod items;
 mod matchers;
-mod pipeline;
-mod position;
-mod rank;
-mod signature;
+mod ranking;
+
+pub(crate) use items::{after_atom_items, after_dot_items, expr_start_items};
+pub(crate) use ranking::{apply_type_ranking, finalize_output};
 
 /// Default for `CompletionConfig.preferred_limit`.
 pub const DEFAULT_PREFERRED_LIMIT: usize = 5;
@@ -113,27 +114,22 @@ pub enum CompletionData {
     PostfixMethod { name: String },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureItem {
-    pub segments: Vec<crate::display::DisplaySegment>,
-}
-
-/// Signature display for a call at the cursor.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureHelp {
-    pub signatures: Vec<SignatureItem>,
-    pub active_signature: usize,
-    pub active_parameter: usize,
-}
-
 /// Computes completion items and signature help at a cursor position.
 ///
 /// `cursor` is a UTF-8 byte offset into `text`.
+#[allow(dead_code)]
 pub fn complete(
     text: &str,
     cursor: usize,
-    ctx: Option<&semantic::Context>,
+    ctx: &semantic::Context,
     config: CompletionConfig,
 ) -> CompletionOutput {
-    pipeline::complete(text, cursor, ctx, config)
+    let help = crate::help(text, cursor, ctx, config);
+
+    CompletionOutput {
+        items: help.completion.items,
+        replace: help.completion.replace,
+        signature_help: help.signature_help,
+        preferred_indices: help.completion.preferred_indices,
+    }
 }

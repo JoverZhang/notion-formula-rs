@@ -4,11 +4,11 @@
 
 use std::cmp::Ordering;
 
-use super::matchers::{FuzzyScore, fuzzy_score, fuzzy_score_cmp, normalize_for_match};
-use super::position::PositionKind;
-use super::{
+use crate::completion::matchers::{FuzzyScore, fuzzy_score, fuzzy_score_cmp, normalize_for_match};
+use crate::completion::{
     CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
 };
+use crate::context::PositionKind;
 use analyzer::Span;
 use analyzer::semantic;
 
@@ -137,20 +137,20 @@ fn apply_query_ranking(query_norm: &str, items: &mut Vec<CompletionItem>, mode: 
     *items = ranked.into_iter().map(|r| r.item).collect();
 }
 
-pub(super) fn finalize_output(
-    text: &str,
+pub(crate) fn finalize_output(
     mut output: CompletionOutput,
+    query: Option<&str>,
     config: CompletionConfig,
     position_kind: PositionKind,
 ) -> CompletionOutput {
     attach_primary_edits(output.replace, &mut output.items);
 
-    let Some(query) = completion_query_for_replace(text, output.replace) else {
+    let Some(query) = query else {
         output.preferred_indices = Vec::new();
         return output;
     };
 
-    let query_norm = normalize_for_match(&query);
+    let query_norm = normalize_for_match(query);
     let mode = if matches!(position_kind, PositionKind::AfterDot) {
         RankMode::Postfix
     } else {
@@ -160,42 +160,6 @@ pub(super) fn finalize_output(
     output.preferred_indices =
         preferred_indices_for_items(&output.items, &query_norm, config.preferred_limit);
     output
-}
-
-fn completion_query_for_replace(text: &str, replace: Span) -> Option<String> {
-    if replace.start == replace.end {
-        return None;
-    }
-
-    let start = usize::try_from(u32::min(replace.start, replace.end)).ok()?;
-    let end = usize::try_from(u32::max(replace.start, replace.end)).ok()?;
-    if end > text.len() {
-        return None;
-    }
-    if !text.is_char_boundary(start) || !text.is_char_boundary(end) {
-        return None;
-    }
-
-    let raw = text.get(start..end)?;
-    if raw.chars().all(|c| c.is_whitespace()) {
-        return None;
-    }
-    if !raw
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c.is_whitespace())
-    {
-        return None;
-    }
-
-    let query: String = raw
-        .chars()
-        .filter(|c| !c.is_whitespace() && *c != '_')
-        .map(|c| c.to_ascii_lowercase())
-        .collect();
-    if query.is_empty() {
-        return None;
-    }
-    Some(query)
 }
 
 fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
@@ -239,7 +203,7 @@ fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
 }
 
 /// Picks “smart” item indices that match the query, up to `preferred_limit`.
-pub(super) fn preferred_indices_for_items(
+pub(crate) fn preferred_indices_for_items(
     items: &[CompletionItem],
     query_norm: &str,
     preferred_limit: usize,
@@ -272,10 +236,10 @@ pub(super) fn preferred_indices_for_items(
 }
 
 /// Groups items by `CompletionKind` and reorders groups toward `expected_ty`.
-pub(super) fn apply_type_ranking(
+pub(crate) fn apply_type_ranking(
     items: &mut Vec<CompletionItem>,
     expected_ty: Option<semantic::Ty>,
-    ctx: Option<&semantic::Context>,
+    ctx: &semantic::Context,
 ) {
     let expected_ty = match expected_ty {
         Some(expected_ty) => expected_ty,
@@ -359,9 +323,8 @@ pub(super) fn apply_type_ranking(
     }
 }
 
-fn item_result_ty(item: &CompletionItem, ctx: Option<&semantic::Context>) -> Option<semantic::Ty> {
+fn item_result_ty(item: &CompletionItem, ctx: &semantic::Context) -> Option<semantic::Ty> {
     if let Some(data) = &item.data {
-        let ctx = ctx?;
         return match data {
             CompletionData::Function { name } => ctx
                 .functions

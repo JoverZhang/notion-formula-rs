@@ -17,6 +17,14 @@ It depends on `analyzer` for core syntax/semantic structures and analysis entry 
 - `ide::format(source, cursor_byte) -> Result<ApplyResult, IdeError>`
 - `ide::apply_edits(source, edits, cursor_byte) -> Result<ApplyResult, IdeError>`
 
+## Help architecture
+
+- `ide::help` is the orchestration entry.
+- `src/context.rs` detects call context, position kind, replace span, and query.
+- `src/signature.rs` computes signature help from call context.
+- `src/completion/items.rs` builds raw completion candidates by position kind.
+- `src/completion/ranking.rs` applies edits, query ranking, and preferred indices.
+
 ## Dependencies on analyzer
 
 - Methods: `analyzer::analyze_syntax`, `analyzer::analyze`, `analyzer::infer_expr_with_map`

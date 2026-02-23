@@ -1,40 +1,36 @@
 //! Builds the raw completion item list for a position.
-//! Items are not ranked here (ranking happens in `rank`).
+//! Items are not ranked here (ranking happens in `ranking`).
 
-use super::{CompletionData, CompletionItem, CompletionKind};
+use crate::completion::{CompletionData, CompletionItem, CompletionKind};
 use analyzer::semantic;
 
 /// Completion items at an expression start.
-pub(super) fn expr_start_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
+pub(crate) fn expr_start_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     let mut items = Vec::new();
-    if let Some(ctx) = ctx {
-        items.extend(prop_variable_items(ctx));
-        items.extend(builtin_expr_start_items());
-        items.extend(ctx.functions.iter().map(|func| {
-            let detail = Some(func.detail.clone());
-            CompletionItem {
-                label: format!("{}()", func.name),
-                kind: CompletionKind::from(func.category),
-                insert_text: format!("{}()", func.name),
-                primary_edit: None,
-                cursor: None,
-                additional_edits: Vec::new(),
-                detail,
-                is_disabled: false,
-                disabled_reason: None,
-                data: Some(CompletionData::Function {
-                    name: func.name.clone(),
-                }),
-            }
-        }));
-    } else {
-        items.extend(builtin_expr_start_items());
-    }
+    items.extend(prop_variable_items(ctx));
+    items.extend(builtin_expr_start_items());
+    items.extend(ctx.functions.iter().map(|func| {
+        let detail = Some(func.detail.clone());
+        CompletionItem {
+            label: format!("{}()", func.name),
+            kind: CompletionKind::from(func.category),
+            insert_text: format!("{}()", func.name),
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
+            detail,
+            is_disabled: false,
+            disabled_reason: None,
+            data: Some(CompletionData::Function {
+                name: func.name.clone(),
+            }),
+        }
+    }));
     items
 }
 
 /// Completion items after an atom (e.g. after `ident`, a literal, or `)`).
-pub(super) fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<CompletionItem> {
+pub(crate) fn after_atom_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     const OPS: [&str; 10] = ["==", "!=", ">=", ">", "<=", "<", "+", "-", "*", "/"];
 
     let mut items = Vec::new();
@@ -57,8 +53,8 @@ pub(super) fn after_atom_items(ctx: Option<&semantic::Context>) -> Vec<Completio
 }
 
 /// Completion items right after a `.` (member-access context).
-pub(super) fn after_dot_items(
-    ctx: Option<&semantic::Context>,
+pub(crate) fn after_dot_items(
+    ctx: &semantic::Context,
     receiver_ty: &semantic::Ty,
 ) -> Vec<CompletionItem> {
     // In a member-access context, the `.` already exists in the source.
@@ -95,7 +91,7 @@ fn builtin_expr_start_items() -> Vec<CompletionItem> {
 }
 
 fn postfix_method_items(
-    ctx: Option<&semantic::Context>,
+    ctx: &semantic::Context,
     insert_dot: bool,
     receiver_ty: &semantic::Ty,
 ) -> Vec<CompletionItem> {
@@ -173,9 +169,6 @@ fn postfix_method_items(
 
     let mut items = Vec::new();
 
-    let Some(ctx) = ctx else {
-        return items;
-    };
     let postfix_capable = semantic::postfix_capable_builtin_names();
     for func in &ctx.functions {
         if !postfix_capable.contains(func.name.as_str()) {

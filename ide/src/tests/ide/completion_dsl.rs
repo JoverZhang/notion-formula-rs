@@ -274,13 +274,20 @@ pub struct CompletionTestBuilder {
     input_with_cursor: String,
     replaced: String,
     cursor: u32,
-    ctx: Option<Context>,
+    ctx: Context,
     config: Option<CompletionConfig>,
     output: Option<CompletionOutput>,
     ignore_props: bool,
 }
 
 impl CompletionTestBuilder {
+    fn empty_context() -> Context {
+        Context {
+            properties: Vec::new(),
+            functions: Vec::new(),
+        }
+    }
+
     fn new(input_with_cursor: &str) -> Self {
         let cursor = input_with_cursor
             .find("$0")
@@ -296,7 +303,7 @@ impl CompletionTestBuilder {
             input_with_cursor: text,
             replaced,
             cursor: cursor as u32,
-            ctx: None,
+            ctx: Self::empty_context(),
             config: None,
             output: None,
             ignore_props: false,
@@ -304,12 +311,12 @@ impl CompletionTestBuilder {
     }
 
     pub fn ctx(mut self, ctx: Context) -> Self {
-        self.ctx = Some(ctx);
+        self.ctx = ctx;
         self
     }
 
     pub fn no_ctx(mut self) -> Self {
-        self.ctx = None;
+        self.ctx = Self::empty_context();
         self
     }
 
@@ -351,12 +358,7 @@ impl CompletionTestBuilder {
     fn ensure_run(&mut self) -> &CompletionOutput {
         if self.output.is_none() {
             let config = self.config.unwrap_or_default();
-            let out = complete(
-                &self.replaced,
-                self.cursor as usize,
-                self.ctx.as_ref(),
-                config,
-            );
+            let out = complete(&self.replaced, self.cursor as usize, &self.ctx, config);
             self.output = Some(out);
         }
         self.output.as_ref().unwrap()

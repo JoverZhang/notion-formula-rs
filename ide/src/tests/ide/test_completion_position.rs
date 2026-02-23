@@ -106,7 +106,7 @@ fn completion_ident_end_before_close_paren_treats_ident_as_query() {
 
     let source = "if(d)";
     let cursor = source.find(')').unwrap();
-    let out = crate::completion::complete(source, cursor, Some(&c), CompletionConfig::default());
+    let out = crate::completion::complete(source, cursor, &c, CompletionConfig::default());
 
     assert_eq!(
         out.replace,

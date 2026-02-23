@@ -57,7 +57,7 @@ fn completion_inside_call_arg_empty_does_not_apply_fuzzy_ranking() {
 fn completion_non_ascii_query_disables_ranking_and_preserves_order() {
     let c = ctx().build();
 
-    let baseline = complete("", 0, Some(&c), CompletionConfig::default());
+    let baseline = complete("", 0, &c, CompletionConfig::default());
     let baseline_items = baseline
         .items
         .iter()
@@ -68,7 +68,7 @@ fn completion_non_ascii_query_disables_ranking_and_preserves_order() {
     // disabled because the replace text contains non-ASCII characters.
     let source = "αβ";
     let cursor = "α".len();
-    let out = complete(source, cursor, Some(&c), CompletionConfig::default());
+    let out = complete(source, cursor, &c, CompletionConfig::default());
 
     assert_eq!(out.replace.start, 0);
     assert_eq!(out.replace.end, u32::try_from(source.len()).unwrap());
@@ -162,7 +162,7 @@ fn completion_single_char_query_prefers_prefix_prop_over_short_contains() {
         .expect_contains_labels(&["Title", "at()"])
         .expect_order("Title", "at()");
 
-    let out = complete("t", 1, Some(&c), CompletionConfig::default());
+    let out = complete("t", 1, &c, CompletionConfig::default());
     let top = out
         .items
         .iter()
