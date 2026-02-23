@@ -6,6 +6,12 @@ build:
 check:
   cargo check && cargo clippy && cd examples/vite && pnpm -s run check
 
+typecheck:
+  cargo check
+
+wasm:
+  cd examples/vite && pnpm -s run wasm:build
+
 fix:
   cargo clippy --fix --allow-dirty --allow-staged && cd examples/vite && pnpm -s run lint:fix
 
@@ -16,6 +22,8 @@ gen-ts:
   cargo run -p analyzer_wasm --bin export_ts
 
 test: test-analyzer test-ide test-analyzer_wasm test-example-vite
+
+verify: test-analyzer test-ide test-analyzer_wasm
 
 test-analyzer:
   cargo test -p analyzer
@@ -31,6 +39,8 @@ test-analyzer-bless:
 
 test-ide-bless:
   BLESS=1 cargo test -p ide format_golden
+
+bless: test-analyzer-bless test-ide-bless
 
 test-example-vite:
   cd examples/vite && pnpm -s run wasm:build && pnpm -s run test && pnpm -s run test:e2e
