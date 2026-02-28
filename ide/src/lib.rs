@@ -77,53 +77,49 @@ impl<'a> HelpSession<'a> {
 
     fn run(self) -> HelpResult {
         // 1) Detect call/position/query context at the cursor.
-        let cursor_ctx = self.detect_cursor_context();
+        let cursor_ctx = context::detect_cursor_context(
+            self.source,
+            self.tokens.as_slice(),
+            self.cursor,
+            self.ctx,
+        );
 
         // 2) Compute signature help from call context.
-        let signature_help = self.compute_signature_help(&cursor_ctx);
-
-        // 3) Compute completion items from position kind and rank by query.
-        let completion = self.compute_completion(cursor_ctx);
-
-        HelpResult {
-            completion,
-            signature_help,
-        }
-    }
-
-    fn detect_cursor_context(&self) -> CursorContext {
-        context::detect_cursor_context(self.source, self.tokens.as_slice(), self.cursor, self.ctx)
-    }
-
-    fn compute_signature_help(&self, cursor_ctx: &CursorContext) -> Option<SignatureHelp> {
-        signature::compute_signature_help_if_in_call(
+        let signature_help = signature::compute_signature_help_if_in_call(
             self.source,
             self.tokens.as_slice(),
             self.cursor,
             self.ctx,
             cursor_ctx.call_ctx.as_ref(),
-        )
-    }
-
-    fn compute_completion(&self, cursor_ctx: CursorContext) -> CompletionResult {
-        let draft = self.build_completion_draft(&cursor_ctx);
-        let output = completion::CompletionOutput {
-            items: draft.items,
-            replace: draft.replace,
-            signature_help: None,
-            preferred_indices: Vec::new(),
-        };
-        let output = completion::finalize_output(
-            output,
-            cursor_ctx.query.as_deref(),
-            self.config,
-            cursor_ctx.position_kind,
         );
 
-        CompletionResult {
-            items: output.items,
-            replace: output.replace,
-            preferred_indices: output.preferred_indices,
+        // 3) Build raw completion items for the position kind.
+        let draft = self.build_completion_draft(&cursor_ctx);
+
+        // 4) Attach primary edits and cursor positions.
+        let mut items = draft.items;
+        completion::attach_primary_edits(draft.replace, &mut items);
+
+        // 5) Rank by query (sort + filter).
+        if let Some(query) = cursor_ctx.query.as_deref() {
+            completion::rank_by_query(query, &mut items, cursor_ctx.position_kind);
+        }
+
+        // 6) Pick preferred indices.
+        let preferred_indices = match cursor_ctx.query.as_deref() {
+            Some(query) => {
+                completion::preferred_indices(&items, query, self.config.preferred_limit)
+            }
+            None => Vec::new(),
+        };
+
+        HelpResult {
+            completion: CompletionResult {
+                items,
+                replace: draft.replace,
+                preferred_indices,
+            },
+            signature_help,
         }
     }
 

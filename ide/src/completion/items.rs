@@ -10,21 +10,12 @@ pub(crate) fn expr_start_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     items.extend(prop_variable_items(ctx));
     items.extend(builtin_expr_start_items());
     items.extend(ctx.functions.iter().map(|func| {
-        let detail = Some(func.detail.clone());
-        CompletionItem {
-            label: format!("{}()", func.name),
-            kind: CompletionKind::from(func.category),
-            insert_text: format!("{}()", func.name),
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail,
-            is_disabled: false,
-            disabled_reason: None,
-            data: Some(CompletionData::Function {
+        CompletionItem::new(format!("{}()", func.name), CompletionKind::from(func.category))
+            .with_insert_text(format!("{}()", func.name))
+            .with_detail(func.detail.clone())
+            .with_data(CompletionData::Function {
                 name: func.name.clone(),
-            }),
-        }
+            })
     }));
     items
 }
@@ -33,19 +24,10 @@ pub(crate) fn expr_start_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
 pub(crate) fn after_atom_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     const OPS: [&str; 10] = ["==", "!=", ">=", ">", "<=", "<", "+", "-", "*", "/"];
 
-    let mut items = Vec::new();
-    items.extend(OPS.into_iter().map(|op| CompletionItem {
-        label: op.to_string(),
-        kind: CompletionKind::Operator,
-        insert_text: op.to_string(),
-        primary_edit: None,
-        cursor: None,
-        additional_edits: Vec::new(),
-        detail: None,
-        is_disabled: false,
-        disabled_reason: None,
-        data: None,
-    }));
+    let mut items: Vec<CompletionItem> = OPS
+        .into_iter()
+        .map(|op| CompletionItem::new(op, CompletionKind::Operator))
+        .collect();
 
     items.extend(postfix_method_items(ctx, true, &semantic::Ty::Unknown));
 
@@ -66,26 +48,15 @@ fn needs_trailing_space(name: &str) -> bool {
 }
 
 fn builtin_expr_start_items() -> Vec<CompletionItem> {
-    [("not", "not"), ("true", "true"), ("false", "false")]
+    ["not", "true", "false"]
         .into_iter()
-        .map(|(label, insert_text)| {
-            let insert_text = if needs_trailing_space(label) {
-                format!("{insert_text} ")
+        .map(|name| {
+            let insert_text = if needs_trailing_space(name) {
+                format!("{name} ")
             } else {
-                insert_text.to_string()
+                name.to_string()
             };
-            CompletionItem {
-                label: label.to_string(),
-                kind: CompletionKind::Builtin,
-                insert_text,
-                primary_edit: None,
-                cursor: None,
-                additional_edits: Vec::new(),
-                detail: None,
-                is_disabled: false,
-                disabled_reason: None,
-                data: None,
-            }
+            CompletionItem::new(name, CompletionKind::Builtin).with_insert_text(insert_text)
         })
         .collect()
 }
@@ -167,39 +138,26 @@ fn postfix_method_items(
         semantic::ty_accepts(&first_param.ty, receiver_ty)
     }
 
-    let mut items = Vec::new();
-
     let postfix_capable = semantic::postfix_capable_builtin_names();
-    for func in &ctx.functions {
-        if !postfix_capable.contains(func.name.as_str()) {
-            continue;
-        }
-        if !receiver_matches_postfix_first_param(func, receiver_ty) {
-            continue;
-        }
-        let label = format!(".{}()", func.name);
-        let insert_text = if insert_dot {
-            format!(".{}()", func.name)
-        } else {
-            format!("{}()", func.name)
-        };
-        items.push(CompletionItem {
-            label,
-            kind: CompletionKind::from(func.category),
-            insert_text,
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: Some(postfix_detail(func)),
-            is_disabled: false,
-            disabled_reason: None,
-            data: Some(CompletionData::PostfixMethod {
-                name: func.name.clone(),
-            }),
-        });
-    }
-
-    items
+    ctx.functions
+        .iter()
+        .filter(|func| postfix_capable.contains(func.name.as_str()))
+        .filter(|func| receiver_matches_postfix_first_param(func, receiver_ty))
+        .map(|func| {
+            let label = format!(".{}()", func.name);
+            let insert_text = if insert_dot {
+                format!(".{}()", func.name)
+            } else {
+                format!("{}()", func.name)
+            };
+            CompletionItem::new(label, CompletionKind::from(func.category))
+                .with_insert_text(insert_text)
+                .with_detail(postfix_detail(func))
+                .with_data(CompletionData::PostfixMethod {
+                    name: func.name.clone(),
+                })
+        })
+        .collect()
 }
 
 fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
@@ -209,24 +167,14 @@ fn prop_variable_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     let mut enabled = Vec::new();
     let mut disabled = Vec::new();
     for prop in &ctx.properties {
-        let label = prop.name.clone();
         let insert_text = format!(r#"prop("{}")"#, prop.name);
-        let item = CompletionItem {
-            label,
-            kind: CompletionKind::Property,
-            insert_text,
-            primary_edit: None,
-            cursor: None,
-            additional_edits: Vec::new(),
-            detail: None,
-            is_disabled: prop.disabled_reason.is_some(),
-            disabled_reason: prop.disabled_reason.clone(),
-            data: Some(CompletionData::PropExpr {
+        let item = CompletionItem::new(prop.name.clone(), CompletionKind::Property)
+            .with_insert_text(insert_text)
+            .with_data(CompletionData::PropExpr {
                 property_name: prop.name.clone(),
-            }),
-        };
-        if prop.disabled_reason.is_some() {
-            disabled.push(item);
+            });
+        if let Some(reason) = &prop.disabled_reason {
+            disabled.push(item.disabled(reason.clone()));
         } else {
             enabled.push(item);
         }

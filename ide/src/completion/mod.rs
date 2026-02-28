@@ -12,7 +12,7 @@ mod matchers;
 mod ranking;
 
 pub(crate) use items::{after_atom_items, after_dot_items, expr_start_items};
-pub(crate) use ranking::{apply_type_ranking, finalize_output};
+pub(crate) use ranking::{apply_type_ranking, attach_primary_edits, preferred_indices, rank_by_query};
 
 /// Default for `CompletionConfig.preferred_limit`.
 pub const DEFAULT_PREFERRED_LIMIT: usize = 5;
@@ -48,6 +48,9 @@ pub struct CompletionOutput {
 ///
 /// If `cursor` is set, it is a desired byte offset in the updated document after applying
 /// the primary edit.
+///
+/// Use [`CompletionItem::new`] to construct with sensible defaults, then chain
+/// builder methods (`.with_detail()`, `.with_data()`, etc.) to customise.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionItem {
     pub label: String,
@@ -60,6 +63,49 @@ pub struct CompletionItem {
     pub is_disabled: bool,
     pub disabled_reason: Option<String>,
     pub data: Option<CompletionData>,
+}
+
+impl CompletionItem {
+    /// Creates a new completion item with the given label and kind.
+    ///
+    /// `insert_text` defaults to a clone of `label`; all optional fields start
+    /// as `None` / empty / `false`.
+    pub fn new(label: impl Into<String>, kind: CompletionKind) -> Self {
+        let label = label.into();
+        Self {
+            insert_text: label.clone(),
+            label,
+            kind,
+            primary_edit: None,
+            cursor: None,
+            additional_edits: Vec::new(),
+            detail: None,
+            is_disabled: false,
+            disabled_reason: None,
+            data: None,
+        }
+    }
+
+    pub fn with_insert_text(mut self, text: impl Into<String>) -> Self {
+        self.insert_text = text.into();
+        self
+    }
+
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn with_data(mut self, data: CompletionData) -> Self {
+        self.data = Some(data);
+        self
+    }
+
+    pub fn disabled(mut self, reason: impl Into<String>) -> Self {
+        self.is_disabled = true;
+        self.disabled_reason = Some(reason.into());
+        self
+    }
 }
 
 /// High-level bucket for UI grouping.
