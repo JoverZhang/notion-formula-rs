@@ -1,6 +1,6 @@
-use analyzer::semantic::{Context, builtins_functions};
-use analyzer::Span;
 use crate::{CompletionConfig, IdeError, TextEdit, apply_edits, format, help};
+use analyzer::Span;
+use analyzer::semantic::{Context, builtins_functions};
 
 #[test]
 fn ide_format_reports_error_on_syntax_errors() {

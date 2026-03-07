@@ -1,7 +1,7 @@
 use crate::completion::{CompletionConfig, CompletionData, complete};
+use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 use analyzer::semantic::Ty;
 use analyzer::semantic::{Context, builtins_functions};
-use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 
 #[test]
 fn completion_after_atom_postfix_if_requires_if_in_context() {

@@ -12,7 +12,9 @@ mod matchers;
 mod ranking;
 
 pub(crate) use items::{after_atom_items, after_dot_items, expr_start_items};
-pub(crate) use ranking::{apply_type_ranking, attach_primary_edits, preferred_indices, rank_by_query};
+pub(crate) use ranking::{
+    apply_type_ranking, attach_primary_edits, preferred_indices, rank_by_query,
+};
 
 /// Default for `CompletionConfig.preferred_limit`.
 pub const DEFAULT_PREFERRED_LIMIT: usize = 5;

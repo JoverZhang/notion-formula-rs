@@ -10,12 +10,15 @@ pub(crate) fn expr_start_items(ctx: &semantic::Context) -> Vec<CompletionItem> {
     items.extend(prop_variable_items(ctx));
     items.extend(builtin_expr_start_items());
     items.extend(ctx.functions.iter().map(|func| {
-        CompletionItem::new(format!("{}()", func.name), CompletionKind::from(func.category))
-            .with_insert_text(format!("{}()", func.name))
-            .with_detail(func.detail.clone())
-            .with_data(CompletionData::Function {
-                name: func.name.clone(),
-            })
+        CompletionItem::new(
+            format!("{}()", func.name),
+            CompletionKind::from(func.category),
+        )
+        .with_insert_text(format!("{}()", func.name))
+        .with_detail(func.detail.clone())
+        .with_data(CompletionData::Function {
+            name: func.name.clone(),
+        })
     }));
     items
 }
