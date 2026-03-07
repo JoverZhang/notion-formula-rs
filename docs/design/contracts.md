@@ -50,3 +50,11 @@ Rule: Unknown top-level fields are rejected.
 Rule: Current schema is `{ properties?: Property[], preferred_limit?: number | null }`.
 Rule: `preferred_limit = null` uses default `5`.
 Rule: `functions` come from Rust built-ins; JS does not provide them.
+
+## Evaluator row-batch runtime
+
+Rule: `Value` is data-only; row errors are externalized via `EvalBlock { ok, errors }`.
+Rule: `ok[i] = false` means `values[i]` is placeholder-only and must not be consumed by callers.
+Rule: `Provider::get_prop` receives full `Property` metadata plus optional row `mask`.
+Rule: `Provider::get_prop` must return a `ColumnBlock` whose length equals batch row count; otherwise evaluation fails with a batch-level `ProviderError`.
+Rule: `if(cond, then, else)`, `&&`, and `||` are mask-driven; right/branch sides are evaluated only for required rows.

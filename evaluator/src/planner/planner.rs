@@ -31,8 +31,8 @@ impl Planner {
             ExprKind::Binary { op, left, right } if is_arithmetic_op(op.node) => {
                 let left_node = self.lower(left, map)?;
                 let right_node = self.lower(right, map)?;
-                let left_ty = map.get(left.id).cloned().unwrap_or(Ty::Unknown);
-                let right_ty = map.get(right.id).cloned().unwrap_or(Ty::Unknown);
+                let left_ty = inferred_ty_for_expr(map, left)?;
+                let right_ty = inferred_ty_for_expr(map, right)?;
                 let plan = select_binary_plan(op.node, &left_ty, &right_ty)?;
 
                 Ok(ExecNode::Binary {
@@ -44,6 +44,12 @@ impl Planner {
             _ => Err(PlanError::InvalidArgument),
         }
     }
+}
+
+fn inferred_ty_for_expr(map: &TypeMap, expr: &Expr) -> Result<Ty, PlanError> {
+    map.get(expr.id)
+        .cloned()
+        .ok_or(PlanError::MissingTypeMapEntry)
 }
 
 fn apply_cast(node: ExecNode, cast: CastPlan) -> ExecNode {

@@ -17,7 +17,7 @@ For the documentation entry point, see `docs/README.md`.
 | `analyzer/` | lexer + parser + AST + diagnostics + semantic | `analyzer/README.md` |
 | `ide/` | format / completion / signature help / edit apply | `ide/README.md` |
 | `analyzer_wasm/` | wasm-bindgen boundary + UTF-16 mapping + DTO v1 | `analyzer_wasm/README.md` |
-| `evaluator/` | WIP | - |
+| `evaluator/` | row-batch runtime evaluation + provider boundary | `evaluator/README.md` |
 | `examples/vite/` | demo integration | `examples/vite/README.md` |
 | `docs/` | design docs + changelog guidance | `docs/README.md` |
 
@@ -68,7 +68,13 @@ Design principles:
 
 ### evaluator
 
-WIP.
+`evaluator` executes formulas over a row batch, with external field values supplied by `Provider`.
+
+Design principles:
+
+- Keep provider integration explicit: `get_prop` receives full `Property` metadata, not just names.
+- Keep row-level failures externalized via `EvalBlock.ok` + `EvalBlock.errors`.
+- Keep branch/logical evaluation mask-aware so only required rows trigger provider work.
 
 ## Language Scope
 

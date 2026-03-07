@@ -10,13 +10,14 @@ pub(crate) use planner::Planner;
 pub(crate) enum PlanError {
     TypeMismatch,
     InvalidArgument,
+    MissingTypeMapEntry,
 }
 
 impl From<PlanError> for EvalError {
     fn from(error: PlanError) -> Self {
         match error {
             PlanError::TypeMismatch => Self::TypeMismatch,
-            PlanError::InvalidArgument => Self::InvalidArgument,
+            PlanError::InvalidArgument | PlanError::MissingTypeMapEntry => Self::InvalidArgument,
         }
     }
 }

@@ -6,3 +6,4 @@ This file tracks unresolved specs, known gaps, and items we still need to conver
 - String escape grammar: escape rules and invalid-character handling still need to be specified precisely.
 - Identifier policy: charset scope and normalization strategy still need to be defined.
 - Postfix parity: postfix validation still needs to converge with inference/completion behavior (see `docs/design/builtins-and-types.md`).
+- Evaluator runtime coverage: only literal evaluation and binary arithmetic (`+`, `-`, `*`, `/`) are implemented; `prop(...)`, `if(...)`, `&&`, `||`, comparisons, unary ops, and builtin function calls still need convergence.
