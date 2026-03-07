@@ -239,3 +239,87 @@ fn test_member_call_extra_dot_recovers() {
     assert!(matches!(&args[0].kind, ExprKind::Ident(sym) if sym.text == "b"));
     assert!(matches!(&args[1].kind, ExprKind::Ident(sym) if sym.text == "c"));
 }
+
+// ---------------------------------------------------------------------------
+// String escape unescaping in AST
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_string_escape_newline_unescaped_in_ast() {
+    let parsed = analyze_syntax(r#""hello\nworld""#);
+    assert!(parsed.diagnostics.is_empty());
+    assert_lit_str!(parsed.expr, "hello\nworld");
+}
+
+#[test]
+fn test_string_escape_tab_unescaped_in_ast() {
+    let parsed = analyze_syntax(r#""a\tb""#);
+    assert!(parsed.diagnostics.is_empty());
+    assert_lit_str!(parsed.expr, "a\tb");
+}
+
+#[test]
+fn test_string_escape_quote_unescaped_in_ast() {
+    let parsed = analyze_syntax(r#""say \"hi\"""#);
+    assert!(parsed.diagnostics.is_empty());
+    assert_lit_str!(parsed.expr, "say \"hi\"");
+}
+
+#[test]
+fn test_string_escape_backslash_unescaped_in_ast() {
+    let parsed = analyze_syntax(r#""a\\b""#);
+    assert!(parsed.diagnostics.is_empty());
+    assert_lit_str!(parsed.expr, "a\\b");
+}
+
+// ---------------------------------------------------------------------------
+// Decimal and scientific notation in parser
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_decimal_number_in_expression() {
+    let parsed = analyze_syntax("3.14 + 2.0");
+    assert!(
+        parsed.diagnostics.is_empty(),
+        "diags: {:?}",
+        parsed.diagnostics
+    );
+    let (left, right) = assert_bin!(parsed.expr, BinOpKind::Plus);
+    assert_lit_num!(left, "3.14");
+    assert_lit_num!(right, "2.0");
+}
+
+#[test]
+fn test_scientific_notation_in_expression() {
+    let parsed = analyze_syntax("1e10 + 2.5e-3");
+    assert!(
+        parsed.diagnostics.is_empty(),
+        "diags: {:?}",
+        parsed.diagnostics
+    );
+    let (left, right) = assert_bin!(parsed.expr, BinOpKind::Plus);
+    assert_lit_num!(left, "1e10");
+    assert_lit_num!(right, "2.5e-3");
+}
+
+#[test]
+fn test_number_dot_method_call_disambiguation() {
+    // `3.abs()` should parse as a member call on the number 3.
+    let parsed = analyze_syntax("3.abs()");
+    assert!(
+        parsed.diagnostics.is_empty(),
+        "diags: {:?}",
+        parsed.diagnostics
+    );
+    let ExprKind::MemberCall {
+        receiver,
+        method,
+        args,
+    } = &parsed.expr.kind
+    else {
+        panic!("expected member-call, got {:?}", parsed.expr.kind);
+    };
+    assert_lit_num!(receiver.as_ref(), 3);
+    assert_eq!(method.text, "abs");
+    assert_eq!(args.len(), 0);
+}

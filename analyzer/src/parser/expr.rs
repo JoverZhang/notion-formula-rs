@@ -4,10 +4,10 @@
 //! `[start, end)`.
 
 use super::{ParseOutput, Parser};
-use crate::Token;
 use crate::ast::{AssocOp, Expr, ExprKind, NotKind, UnOp};
 use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
+use crate::Token;
 
 impl<'a> Parser<'a> {
     /// Parser's entry point
@@ -220,11 +220,15 @@ impl<'a> Parser<'a> {
             ""
         };
 
+        // Process escape sequences: \n, \t, \", \\
+        // Invalid escapes are kept verbatim (the lexer already emitted a diagnostic).
+        let unescaped = unescape_string(inner);
+
         self.mk_expr(
             tok.span,
             ExprKind::Lit(Lit {
                 kind: LitKind::String,
-                symbol: Symbol { text: inner.into() },
+                symbol: Symbol { text: unescaped },
             }),
         )
     }
@@ -970,4 +974,36 @@ enum RecoverScanResult {
     HitEof,
     Stopped,
     Consumed,
+}
+
+/// Unescape a string literal's inner content.
+///
+/// Recognised escapes: `\n` -> newline, `\t` -> tab, `\"` -> double quote, `\\` -> backslash.
+/// Invalid escape sequences (e.g. `\x`) are kept verbatim -- the lexer already emitted a
+/// diagnostic for them.
+fn unescape_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('"') => out.push('"'),
+                Some('\\') => out.push('\\'),
+                Some(other) => {
+                    // Invalid escape -- keep verbatim.
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => {
+                    // Trailing backslash -- keep it.
+                    out.push('\\');
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }

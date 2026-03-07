@@ -1,5 +1,7 @@
 === INPUT ===
 😀 + 1 *
 === OUTPUT ===
-error: expected expression after `*`
-  --> <input>:1:7 [9..10]
+error: unexpected char '😀'
+  --> <input>:1:1 [0..4]
+error: expected expression, found end of input
+  --> <input>:2:1 [11..11]
