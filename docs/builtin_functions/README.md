@@ -15,8 +15,8 @@ This document lists the builtin functions known to the analyzer (**type signatur
 - **Binder/literal variable semantics are not supported**
   - `let` / `lets` style variable-binding semantics are not modeled yet.
 - **Some APIs require “shape-level typing” that we do not model**
-  - Example: `flat(list)` conceptually depends on the flattening depth (or on the element nesting level) to compute the precise return type.
-  - We currently do **not** model this “depth/level” relationship. The signature is therefore intentionally approximate.
+  - Example: `flat(list)` conceptually depends on flattening behavior and element nesting level to compute the precise return type.
+  - `flat` now uses a custom `SigResolver` to fully flatten nested list element types (collecting non-list leaf types into a union), so common nested cases are handled.
 
 ### Status markers used below
 
@@ -27,7 +27,6 @@ This document is **spec-first**. We keep target signatures in stable order and a
 - `TODO-type`: blocked by missing type-model support (`DateRange`, `Link`, `StyledText`, etc.).
 - `TODO-lambda`: blocked by missing lambda/function expression typing.
 - `TODO-binder`: blocked by missing variable-binder semantics.
-- `TODO-flat`: blocked by missing depth-sensitive `flat` typing.
 - Unmarked signatures: no known model-level blocker.
 
 ### Notation and philosophy
@@ -129,7 +128,6 @@ upper(text: string) -> string
 trim(text: string) -> string
 repeat(text: string, times: number) -> string
 
-// TODO-missing
 padStart(text: string | number, length: number, pad: string) -> string
 padEnd(text: string | number, length: number, pad: string) -> string
 
@@ -152,7 +150,6 @@ split(text: string, separator: string) -> string[]
 ## Number (26)
 
 ```rust
-// TODO-missing
 formatNumber(value: number, format: string, precision: number) -> string
 
 add(a: number, b: number) -> number
@@ -236,7 +233,6 @@ first(list: any[]) -> any
 last(list: any[]) -> any
 slice(list: any[], start: number, end?: number) -> any[]
 
-// TODO-missing
 splice(list: any[], startIndex: number, deleteCount: number, ...items: any[]) -> any[]
 
 sort(list: any[]) -> any[]
@@ -255,7 +251,7 @@ every(list: any[], expr: (current: any) -> boolean) -> boolean
 map(list: any[], expr: (current: any) -> any) -> any[]
 
 // `flat(list)` is the only supported call form.
-// TODO-flat: precise nesting-depth -> return-depth typing is not modeled.
+// Uses a custom SigResolver to fully flatten nested list element types.
 flat(list: any[]) -> any[]
 
 // TODO-lambda: requires lambda/function expression typing.

@@ -1,7 +1,7 @@
 use crate::semantic::{
     self, Context, FunctionCategory, FunctionSig, GenericId, ParamShape, ParamSig, Property, Ty,
 };
-use crate::{Span, analyze_syntax};
+use crate::{analyze_syntax, Span};
 
 fn p(name: &str, ty: Ty) -> ParamSig {
     ParamSig {
@@ -203,6 +203,7 @@ fn validate_call_does_not_wildcard_inferred_actual_generic() {
         category: FunctionCategory::General,
         detail: "foo(x)".into(),
         generics: vec![],
+        resolver: None,
     };
 
     let ctx = Context {
@@ -237,6 +238,7 @@ fn required_min_args_repeat_group_counts_all_non_optional_in_head_and_tail() {
         category: FunctionCategory::General,
         detail: "rg(...)".into(),
         generics: vec![],
+        resolver: None,
     };
 
     assert_eq!(sig.required_min_args(), 3);

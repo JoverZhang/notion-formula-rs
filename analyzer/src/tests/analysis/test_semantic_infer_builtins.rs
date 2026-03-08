@@ -1,5 +1,5 @@
-use crate::semantic::{self, Context, Ty, builtins_functions};
-use crate::{Span, analyze_syntax};
+use crate::semantic::{self, builtins_functions, Context, Ty};
+use crate::{analyze_syntax, Span};
 
 fn infer_ok(source: &str, ctx: &Context) -> Ty {
     let output = analyze_syntax(source);

@@ -27,6 +27,37 @@ async function expectSourceText(
     .toBe(expected);
 }
 
+async function expectSelectedItemInView(
+  page: Parameters<typeof gotoDebug>[0],
+  id: FormulaId,
+  epsilonPx = 1,
+) {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(
+          ({ formulaId, epsilon }) => {
+            const list = document.querySelector<HTMLElement>(
+              `[data-testid="completion-panel"][data-formula-id="${formulaId}"] .completion-items`,
+            );
+            if (!list) return false;
+            const selected = list.querySelector<HTMLElement>(".completion-item.is-selected");
+            if (!selected) return false;
+
+            const listRect = list.getBoundingClientRect();
+            const selectedRect = selected.getBoundingClientRect();
+            return (
+              selectedRect.y >= listRect.y - epsilon &&
+              selectedRect.y + selectedRect.height <= listRect.y + listRect.height + epsilon
+            );
+          },
+          { formulaId: id, epsilon: epsilonPx },
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
+}
+
 test.beforeEach(async ({ page }) => {
   await gotoDebug(page);
 });
@@ -84,17 +115,7 @@ test("selected completion item is scrolled into view", async ({ page }) => {
   await expect
     .poll(async () => list.evaluate((el) => el.scrollTop), { timeout: 5_000 })
     .toBeGreaterThan(0);
-
-  const listBox = await list.boundingBox();
-  const selectedBox = await selected.boundingBox();
-  expect(listBox).not.toBeNull();
-  expect(selectedBox).not.toBeNull();
-  if (!listBox || !selectedBox) return;
-
-  expect(selectedBox.y).toBeGreaterThanOrEqual(listBox.y - EDGE_EPSILON_PX);
-  expect(selectedBox.y + selectedBox.height).toBeLessThanOrEqual(
-    listBox.y + listBox.height + EDGE_EPSILON_PX,
-  );
+  await expectSelectedItemInView(page, FORMULA_ID, EDGE_EPSILON_PX);
 
   // If the list is manually scrolled away from the selection, the next selection update should
   // re-scroll the selected item into view.
@@ -116,16 +137,7 @@ test("selected completion item is scrolled into view", async ({ page }) => {
     },
     { formulaId: FORMULA_ID, label: targetLabel },
   );
-
-  const listBox2 = await list.boundingBox();
-  const selectedBox2 = await selected.boundingBox();
-  expect(listBox2).not.toBeNull();
-  expect(selectedBox2).not.toBeNull();
-  if (!listBox2 || !selectedBox2) return;
-  expect(selectedBox2.y).toBeGreaterThanOrEqual(listBox2.y - EDGE_EPSILON_PX);
-  expect(selectedBox2.y + selectedBox2.height).toBeLessThanOrEqual(
-    listBox2.y + listBox2.height + EDGE_EPSILON_PX,
-  );
+  await expectSelectedItemInView(page, FORMULA_ID, EDGE_EPSILON_PX);
 });
 
 test("cursor remains correct after multiple completion-driven edits", async ({ page }) => {

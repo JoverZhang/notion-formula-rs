@@ -11,7 +11,7 @@ use super::{ParamShape, ParamSig};
 /// Returns `None` if `total` cannot fit the repeat shape, or if there is no repeat section.
 /// If more than one split fits, it prefers the largest `tail_used`.
 pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
-    resolve_repeat_tail_used_with_min_groups(params, total, 1)
+    resolve_repeat_tail_used_with_min_groups(params, total, params.repeat_min_groups)
 }
 
 fn resolve_repeat_tail_used_with_min_groups(
@@ -76,6 +76,7 @@ mod tests {
             head: vec![],
             repeat: vec![p("x", false), p("y", false)],
             tail: vec![p("t1", true), p("t2", true)],
+            repeat_min_groups: 1,
         };
 
         // total=4 can be:

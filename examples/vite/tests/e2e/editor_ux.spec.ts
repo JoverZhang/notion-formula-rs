@@ -135,7 +135,9 @@ test("undo reverts recent editor input", async ({ page }) => {
 
 test("editor height grows with content", async ({ page }) => {
   const HEIGHT_EPSILON_PX = 1;
-  await setEditorContent(page, "f1", "a\nb\nc\nd\ne\nf\ng\nh");
+  const multiline = "a\nb\nc\nd\ne\nf\ng\nh";
+  await setEditorContent(page, "f1", multiline);
+  await expectEditorText(page, "f1", multiline);
 
   await page.waitForFunction(() => {
     const scroller = document.querySelector<HTMLElement>(

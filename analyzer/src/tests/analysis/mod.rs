@@ -10,3 +10,5 @@ mod test_normalize_union;
 mod test_semantic;
 #[cfg(test)]
 mod test_semantic_infer_builtins;
+#[cfg(test)]
+mod test_sig_resolver;

@@ -110,3 +110,11 @@ macro_rules! func_g {
         )
     };
 }
+
+macro_rules! func_gr {
+    ($category:expr, $detail:expr, $generics:expr, $name:literal, $params:expr, $ret:expr, $resolver:expr $(,)?) => {
+        $crate::semantic::FunctionSig::new_builtin_with_resolver(
+            $category, $detail, $name, $params, $ret, $generics, $resolver,
+        )
+    };
+}

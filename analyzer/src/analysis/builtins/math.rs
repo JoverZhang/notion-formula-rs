@@ -3,7 +3,17 @@ use super::super::{FunctionCategory, FunctionSig, GenericId, Ty};
 pub(super) fn builtins() -> Vec<FunctionSig> {
     let t0 = GenericId(0);
     vec![
-        // TODO(spec): `formatNumber(value, format, precision)` is not modeled yet.
+        func!(
+            FunctionCategory::Number,
+            "formatNumber(value, format, precision)",
+            "formatNumber",
+            params!(
+                p!("value", Ty::Number),
+                p!("format", Ty::String),
+                p!("precision", Ty::Number)
+            ),
+            Ty::String,
+        ),
         func!(
             FunctionCategory::Number,
             "add(a, b)",

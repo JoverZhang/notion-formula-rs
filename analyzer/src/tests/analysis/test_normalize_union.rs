@@ -1,4 +1,4 @@
-use crate::semantic::{Ty, normalize_union};
+use crate::semantic::{normalize_union, Ty};
 
 #[test]
 fn normalize_union_is_deterministic() {

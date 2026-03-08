@@ -68,20 +68,19 @@ pub(super) fn complete_repeat_shape(
     params: &semantic::ParamShape,
     total: usize,
 ) -> Option<CompletedRepeatShape> {
-    const REPEAT_MIN_GROUPS: usize = 1;
-
     if params.repeat.is_empty() {
         return None;
     }
 
     let head_len = params.head.len();
     let repeat_len = params.repeat.len();
+    let repeat_min_groups = params.repeat_min_groups;
     if repeat_len == 0 {
         return None;
     }
 
     if let Some(tail_used) =
-        resolve_repeat_tail_used_with_min_groups(params, total, REPEAT_MIN_GROUPS)
+        resolve_repeat_tail_used_with_min_groups(params, total, repeat_min_groups)
     {
         let tail_start = total.saturating_sub(tail_used);
         let middle = total.saturating_sub(head_len + tail_used);
@@ -93,7 +92,7 @@ pub(super) fn complete_repeat_shape(
     }
 
     let tail_min = required_tail_prefix_len(&params.tail);
-    let min_middle = repeat_len.saturating_mul(REPEAT_MIN_GROUPS);
+    let min_middle = repeat_len.saturating_mul(repeat_min_groups);
 
     let mut best: Option<(usize /* total */, usize /* tail_used */)> = None;
     for tail_used in tail_min..=params.tail.len() {

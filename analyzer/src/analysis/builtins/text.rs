@@ -85,8 +85,28 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             params!(p!("text", Ty::String), p!("times", Ty::Number)),
             Ty::String,
         ),
-        // TODO(spec): `padStart(text, length, pad)` is not modeled yet.
-        // TODO(spec): `padEnd(text, length, pad)` is not modeled yet.
+        func!(
+            FunctionCategory::Text,
+            "padStart(text, length, pad)",
+            "padStart",
+            params!(
+                p!("text", Ty::Union(vec![Ty::String, Ty::Number])),
+                p!("length", Ty::Number),
+                p!("pad", Ty::String)
+            ),
+            Ty::String,
+        ),
+        func!(
+            FunctionCategory::Text,
+            "padEnd(text, length, pad)",
+            "padEnd",
+            params!(
+                p!("text", Ty::Union(vec![Ty::String, Ty::Number])),
+                p!("length", Ty::Number),
+                p!("pad", Ty::String)
+            ),
+            Ty::String,
+        ),
         // TODO(type-model): `link(label, url) -> Link` is blocked on rich text types.
         // TODO(type-model): `style(text, styles1, styles2, ...) -> StyledText` is blocked on rich text types.
         // TODO(type-model): `unstyle(text, styles?) -> string` with `StyledText` input is blocked on rich text types.

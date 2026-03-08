@@ -26,7 +26,9 @@ export async function setEditorContent(page: Page, id: FormulaId, content: strin
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.press("Backspace");
   if (content) {
-    await page.keyboard.type(content);
+    // Insert plain text atomically so multiline content does not trigger keymap handlers
+    // (e.g. Enter applying completion items in active completion UI).
+    await page.keyboard.insertText(content);
   }
 }
 

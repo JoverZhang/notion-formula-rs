@@ -4,7 +4,6 @@
 //! invariants required for stable validation and signature help.
 
 use super::{FunctionCategory, GenericId, Ty};
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// How a generic parameter binds during inference.
@@ -13,22 +12,21 @@ use std::collections::HashSet;
 /// current rules.
 ///
 /// `Variant` is stricter around `Unknown` participation than `Plain`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GenericParamKind {
     Plain,
     Variant,
 }
 
 /// Declaration of a generic parameter used by a [`FunctionSig`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenericParam {
     pub id: GenericId,
     pub kind: GenericParamKind,
 }
 
 /// A single parameter slot in a function signature.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParamSig {
     pub name: String,
     pub ty: Ty,
@@ -38,12 +36,15 @@ pub struct ParamSig {
 /// Parameter shape for a signature: `head`, optional repeating `repeat` group, and `tail`.
 ///
 /// This shape is designed to make arity/shape validation and signature-help presentation stable.
-/// Repeat shapes assume at least one repeat group.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// By default, repeat shapes assume at least one repeat group (`repeat_min_groups = 1`).
+/// Set `repeat_min_groups = 0` for truly optional variadic args (e.g. `splice(...items)`).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParamShape {
     pub head: Vec<ParamSig>,
     pub repeat: Vec<ParamSig>,
     pub tail: Vec<ParamSig>,
+    /// Minimum number of repeat-group cycles required. Defaults to `1`.
+    pub repeat_min_groups: usize,
 }
 
 impl ParamShape {
@@ -85,16 +86,37 @@ impl ParamShape {
             }
         }
 
-        Self { head, repeat, tail }
+        Self { head, repeat, tail, repeat_min_groups: 1 }
+    }
+
+    /// Set the minimum number of repeat-group cycles. Default is `1`.
+    ///
+    /// Use `0` for truly optional variadic args (e.g. `splice(list, start, count, ...items)`
+    /// where the `items` group can be omitted entirely).
+    pub fn with_repeat_min_groups(mut self, min: usize) -> Self {
+        self.repeat_min_groups = min;
+        self
     }
 }
+
+/// Custom type resolution function for builtins whose return type cannot be
+/// expressed by the standard generic unification system.
+///
+/// Receives the base signature and the actual inferred argument types.
+/// Returns a fully resolved signature with concrete types.
+///
+/// This is used by:
+/// - The analyser's type inference (`infer.rs`) to compute return types
+/// - The evaluator's runtime type validation (in test builds) to verify
+///   function implementations return correct types
+pub type SigResolver = fn(&FunctionSig, &[Ty]) -> FunctionSig;
 
 /// A function signature used for semantic validation and editor tooling.
 ///
 /// Builtin signatures also carry:
 /// - `category` for UI grouping
 /// - `detail` for completion/signature help display
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct FunctionSig {
     pub name: String,
     pub params: ParamShape,
@@ -102,7 +124,25 @@ pub struct FunctionSig {
     pub category: FunctionCategory,
     pub detail: String,
     pub generics: Vec<GenericParam>,
+    /// Optional custom type resolver. When set, type inference uses this
+    /// instead of the standard generic unification path.
+    pub resolver: Option<SigResolver>,
 }
+
+/// Equality compares all fields except `resolver` (function pointer address comparison is
+/// unreliable across codegen units).
+impl PartialEq for FunctionSig {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.params == other.params
+            && self.ret == other.ret
+            && self.category == other.category
+            && self.detail == other.detail
+            && self.generics == other.generics
+    }
+}
+
+impl Eq for FunctionSig {}
 
 impl FunctionSig {
     /// Create a signature without additional validation.
@@ -121,6 +161,7 @@ impl FunctionSig {
             detail: detail.into(),
             category,
             generics,
+            resolver: None,
         }
     }
 
@@ -138,6 +179,25 @@ impl FunctionSig {
         generics: Vec<GenericParam>,
     ) -> Self {
         let sig = Self::new(category, detail, name, params, ret, generics);
+        sig.validate_builtin();
+        sig
+    }
+
+    /// Create a builtin signature with a custom type resolver.
+    ///
+    /// # Panics
+    /// Same as [`new_builtin`](Self::new_builtin).
+    pub fn new_builtin_with_resolver(
+        category: FunctionCategory,
+        detail: impl Into<String>,
+        name: impl Into<String>,
+        params: ParamShape,
+        ret: Ty,
+        generics: Vec<GenericParam>,
+        resolver: SigResolver,
+    ) -> Self {
+        let mut sig = Self::new(category, detail, name, params, ret, generics);
+        sig.resolver = Some(resolver);
         sig.validate_builtin();
         sig
     }
@@ -244,7 +304,7 @@ impl FunctionSig {
 
         let head_required = self.params.head.iter().filter(|p| !p.optional).count();
         let tail_required = self.params.tail.iter().filter(|p| !p.optional).count();
-        head_required + self.params.repeat.len() + tail_required
+        head_required + self.params.repeat.len() * self.params.repeat_min_groups + tail_required
     }
 
     /// Best-effort mapping from argument index to a parameter slot.

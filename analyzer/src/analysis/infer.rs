@@ -7,7 +7,7 @@ use crate::ast::{Expr, ExprKind, UnOp};
 use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
-use super::{Context, FunctionSig, GenericId, GenericParamKind, Ty, normalize_union};
+use super::{normalize_union, Context, FunctionSig, GenericId, GenericParamKind, Ty};
 
 /// Identifier for an expression node used as the key in [`TypeMap`].
 pub type ExprId = NodeId;
@@ -342,6 +342,13 @@ fn infer_call(
     let mut arg_tys = Vec::with_capacity(args.len());
     for arg in args {
         arg_tys.push(infer_expr_with_map(arg, ctx, map));
+    }
+
+    // If the signature has a custom resolver, use it instead of standard
+    // generic unification.
+    if let Some(resolver) = sig.resolver {
+        let resolved = resolver(sig, &arg_tys);
+        return resolved.ret;
     }
 
     let mut subst = Subst::new();

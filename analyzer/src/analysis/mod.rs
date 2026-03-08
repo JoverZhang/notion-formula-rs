@@ -14,7 +14,7 @@ use std::sync::LazyLock;
 mod builtins;
 pub use builtins::builtins_functions;
 mod signature;
-pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig};
+pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig, SigResolver};
 mod infer;
 mod param_shape;
 pub use infer::{ExprId, TypeMap, infer_expr_with_map};
@@ -206,7 +206,7 @@ pub struct Property {
 ///
 /// - `properties` are supplied externally (e.g. by the WASM layer via JSON) and used by `prop(...)`.
 /// - `functions` are sourced from Rust builtins at the WASM boundary (JS cannot supply them).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     pub properties: Vec<Property>,
     pub functions: Vec<FunctionSig>,
