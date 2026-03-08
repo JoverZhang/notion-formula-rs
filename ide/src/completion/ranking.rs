@@ -5,9 +5,7 @@
 use std::cmp::Ordering;
 
 use crate::completion::matchers::{FuzzyScore, fuzzy_score, fuzzy_score_cmp, normalize_for_match};
-use crate::completion::{
-    CompletionConfig, CompletionData, CompletionItem, CompletionKind, CompletionOutput, TextEdit,
-};
+use crate::completion::{CompletionData, CompletionItem, CompletionKind, TextEdit};
 use crate::context::PositionKind;
 use analyzer::Span;
 use analyzer::semantic;
@@ -137,32 +135,8 @@ fn apply_query_ranking(query_norm: &str, items: &mut Vec<CompletionItem>, mode: 
     *items = ranked.into_iter().map(|r| r.item).collect();
 }
 
-pub(crate) fn finalize_output(
-    mut output: CompletionOutput,
-    query: Option<&str>,
-    config: CompletionConfig,
-    position_kind: PositionKind,
-) -> CompletionOutput {
-    attach_primary_edits(output.replace, &mut output.items);
-
-    let Some(query) = query else {
-        output.preferred_indices = Vec::new();
-        return output;
-    };
-
-    let query_norm = normalize_for_match(query);
-    let mode = if matches!(position_kind, PositionKind::AfterDot) {
-        RankMode::Postfix
-    } else {
-        RankMode::Normal
-    };
-    apply_query_ranking(&query_norm, &mut output.items, mode);
-    output.preferred_indices =
-        preferred_indices_for_items(&output.items, &query_norm, config.preferred_limit);
-    output
-}
-
-fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
+/// Fills in `primary_edit` and `cursor` for each item based on the replace span.
+pub(crate) fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
     for item in items {
         if item.is_disabled {
             item.primary_edit = None;
@@ -202,16 +176,35 @@ fn attach_primary_edits(output_replace: Span, items: &mut [CompletionItem]) {
     }
 }
 
-/// Picks “smart” item indices that match the query, up to `preferred_limit`.
-pub(crate) fn preferred_indices_for_items(
+/// Sorts and filters items by a query string.
+///
+/// In `AfterDot` position, items that don't match the query are removed entirely.
+/// In other positions, items are sorted by match quality but kept.
+pub(crate) fn rank_by_query(
+    query: &str,
+    items: &mut Vec<CompletionItem>,
+    position_kind: PositionKind,
+) {
+    let query_norm = normalize_for_match(query);
+    let mode = if matches!(position_kind, PositionKind::AfterDot) {
+        RankMode::Postfix
+    } else {
+        RankMode::Normal
+    };
+    apply_query_ranking(&query_norm, items, mode);
+}
+
+/// Picks "smart" item indices that match the query, up to `preferred_limit`.
+pub(crate) fn preferred_indices(
     items: &[CompletionItem],
-    query_norm: &str,
+    query: &str,
     preferred_limit: usize,
 ) -> Vec<usize> {
     if preferred_limit == 0 {
         return Vec::new();
     }
 
+    let query_norm = normalize_for_match(query);
     let mut out = Vec::with_capacity(preferred_limit);
     for (idx, item) in items.iter().enumerate() {
         if out.len() >= preferred_limit {
@@ -226,7 +219,7 @@ pub(crate) fn preferred_indices_for_items(
             &item.label
         };
         if (item.kind == CompletionKind::Property || item.kind.is_function())
-            && match_class_for_norm_label(query_norm, &normalize_for_match(label))
+            && match_class_for_norm_label(&query_norm, &normalize_for_match(label))
                 != MatchClass::None
         {
             out.push(idx);

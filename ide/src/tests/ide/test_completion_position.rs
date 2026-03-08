@@ -1,7 +1,7 @@
-use analyzer::semantic::Ty;
-use analyzer::Span;
-use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
 use crate::CompletionConfig;
+use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
+use analyzer::Span;
+use analyzer::semantic::Ty;
 
 #[test]
 fn completion_when_expecting_separator_in_call_shows_after_atom_operators() {

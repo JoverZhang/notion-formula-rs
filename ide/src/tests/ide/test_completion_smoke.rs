@@ -1,6 +1,6 @@
 use crate::completion::CompletionData;
-use analyzer::semantic::Ty;
 use crate::tests::completion_dsl::{Builtin, Func, Item, Prop, ctx, t};
+use analyzer::semantic::Ty;
 
 #[test]
 fn completion_at_document_start() {

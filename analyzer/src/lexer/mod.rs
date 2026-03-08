@@ -4,8 +4,8 @@ mod token;
 
 pub use crate::span::{Span, Spanned};
 pub use token::{
-    CommentKind, Lit, LitKind, NodeId, Symbol, Token, TokenIdx, TokenKind, TokenRange,
-    tokens_in_span,
+    tokens_in_span, CommentKind, Lit, LitKind, NodeId, Symbol, Token, TokenIdx, TokenKind,
+    TokenRange,
 };
 
 pub struct LexOutput {
@@ -15,9 +15,13 @@ pub struct LexOutput {
 
 /// Lex the input into tokens.
 ///
-/// - Numbers: ASCII digits only (no decimals).
-/// - Strings: double-quoted, no escapes.
-/// - Identifiers: ASCII letters/`_` and any non-ASCII codepoint.
+/// - Numbers: integers, floating-point decimals, and scientific notation.
+///   Dot is consumed as decimal only when followed by a digit (`3.14` is one token,
+///   `3.method()` stays as three tokens: `3`, `.`, `method`).
+/// - Strings: double-quoted with escapes: `\n`, `\t`, `\"`, `\\`.
+///   Invalid escapes emit a diagnostic but are kept verbatim.
+/// - Identifiers: `_` or Unicode letter (`is_alphabetic`), followed by `_` or
+///   Unicode alphanumeric (`is_alphanumeric`).
 pub fn lex(input: &str) -> LexOutput {
     let mut tokens = Vec::new();
     let mut diagnostics = Vec::new();
@@ -200,13 +204,38 @@ pub fn lex(input: &str) -> LexOutput {
             ']' => TokenKind::CloseBracket,
 
             '"' => {
-                // Read string until next quote (no escapes in v1).
+                // Double-quoted string with escape support.
+                // Recognised escapes: \n, \t, \", \\
+                // Invalid escapes (e.g. \x) emit a diagnostic but are kept verbatim.
                 let mut end: Option<usize> = None;
-                for (i, c) in iter.by_ref() {
-                    if c == '"' {
+                let mut has_invalid_escape = false;
+                let mut invalid_escape_spans: Vec<Span> = Vec::new();
+
+                while let Some((i, c)) = iter.next() {
+                    if c == '\\' {
+                        // Consume the next character as part of the escape.
+                        if let Some((esc_i, esc_c)) = iter.next() {
+                            match esc_c {
+                                'n' | 't' | '"' | '\\' => {
+                                    // Valid escape -- keep going.
+                                }
+                                _ => {
+                                    has_invalid_escape = true;
+                                    invalid_escape_spans.push(Span {
+                                        start: i as u32,
+                                        end: (esc_i + esc_c.len_utf8()) as u32,
+                                    });
+                                }
+                            }
+                        } else {
+                            // Backslash at end of input -- unterminated string.
+                            break;
+                        }
+                    } else if c == '"' {
                         end = Some(i + 1);
                         break;
                     }
+                    // else: normal character, continue.
                 }
 
                 let end = match end {
@@ -223,6 +252,16 @@ pub fn lex(input: &str) -> LexOutput {
                     }
                 };
 
+                for esc_span in invalid_escape_spans {
+                    diagnostics.push(make_error(
+                        esc_span,
+                        format!(
+                            "invalid escape sequence '{}'",
+                            &input[esc_span.start as usize..esc_span.end as usize]
+                        ),
+                    ));
+                }
+
                 tokens.push(Token {
                     kind: TokenKind::Literal(Lit {
                         kind: LitKind::String,
@@ -235,11 +274,19 @@ pub fn lex(input: &str) -> LexOutput {
                         end: end as u32,
                     },
                 });
+                let _ = has_invalid_escape;
                 continue;
             }
 
             c if c.is_ascii_digit() => {
-                // integer number literal (v1)
+                // Number literal: integer, decimal, or scientific notation.
+                //
+                // Grammar:
+                //   digits ('.' digits)? ([eE] [+-]? digits)?
+                //
+                // Lookahead disambiguation: a dot is consumed as part of the number only
+                // when it is immediately followed by an ASCII digit. This keeps `3.method()`
+                // lexing as `Number("3")`, `Dot`, `Ident("method")`.
                 let mut end = start + c.len_utf8();
                 while let Some(&(i, c2)) = iter.peek() {
                     if c2.is_ascii_digit() {
@@ -247,6 +294,67 @@ pub fn lex(input: &str) -> LexOutput {
                         end = i + c2.len_utf8();
                     } else {
                         break;
+                    }
+                }
+
+                // Decimal part: consume '.' only if followed by a digit.
+                if let Some(&(dot_i, '.')) = iter.peek() {
+                    // Peek two chars ahead: need a digit after the dot.
+                    let mut lookahead = iter.clone();
+                    lookahead.next(); // consume '.'
+                    if let Some(&(_, c2)) = lookahead.peek() {
+                        if c2.is_ascii_digit() {
+                            iter.next(); // consume '.'
+                            end = dot_i + 1;
+                            while let Some(&(i, c2)) = iter.peek() {
+                                if c2.is_ascii_digit() {
+                                    iter.next();
+                                    end = i + c2.len_utf8();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Exponent part: 'e' or 'E', optional '+'/'-', then digits.
+                if let Some(&(_, ec)) = iter.peek() {
+                    if ec == 'e' || ec == 'E' {
+                        let mut lookahead = iter.clone();
+                        lookahead.next(); // consume 'e'/'E'
+
+                        let mut has_digits = false;
+                        if let Some(&(_, sc)) = lookahead.peek() {
+                            if sc == '+' || sc == '-' {
+                                lookahead.next(); // consume sign
+                            }
+                            if let Some(&(_, dc)) = lookahead.peek() {
+                                has_digits = dc.is_ascii_digit();
+                            }
+                        }
+
+                        if has_digits {
+                            // Commit: consume e/E
+                            let (ei, _) = iter.next().unwrap();
+                            end = ei + 1;
+                            // Consume optional sign
+                            if let Some(&(si, sc)) = iter.peek() {
+                                if sc == '+' || sc == '-' {
+                                    iter.next();
+                                    end = si + 1;
+                                }
+                            }
+                            // Consume exponent digits
+                            while let Some(&(i, c2)) = iter.peek() {
+                                if c2.is_ascii_digit() {
+                                    iter.next();
+                                    end = i + c2.len_utf8();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -347,11 +455,11 @@ pub fn lex(input: &str) -> LexOutput {
 }
 
 fn is_ident_start(c: char) -> bool {
-    c == '_' || c.is_ascii_alphabetic() || c.len_utf8() > 1
+    c == '_' || c.is_alphabetic()
 }
 
 fn is_ident_continue(c: char) -> bool {
-    c == '_' || c.is_ascii_alphanumeric() || c.len_utf8() > 1
+    c == '_' || c.is_alphanumeric()
 }
 
 fn make_error(span: Span, message: String) -> Diagnostic {
