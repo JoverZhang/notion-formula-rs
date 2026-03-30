@@ -27,14 +27,18 @@ impl<'a, P: Provider> Evaluator<'a, P> {
         }
     }
 
-    pub async fn eval(&self, expr: &Expr, batch: RowBatch<'_>) -> Result<EvalBlock, ProviderError> {
+    pub async fn eval(
+        &self,
+        expr: &mut Expr,
+        batch: RowBatch<'_>,
+    ) -> Result<EvalBlock, ProviderError> {
         self.eval_with_mask(expr, batch, vec![true; batch.rows.len()])
             .await
     }
 
     pub async fn eval_with_mask(
         &self,
-        expr: &Expr,
+        expr: &mut Expr,
         batch: RowBatch<'_>,
         mask: Mask,
     ) -> Result<EvalBlock, ProviderError> {
@@ -52,7 +56,7 @@ impl<'a, P: Provider> Evaluator<'a, P> {
 
     pub async fn eval_simple_fail_batch(
         &self,
-        expr: &Expr,
+        expr: &mut Expr,
         batch: RowBatch<'_>,
     ) -> Result<ColumnBlock, SimpleEvalError> {
         let out = self

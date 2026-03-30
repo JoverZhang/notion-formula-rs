@@ -112,6 +112,13 @@ fn unify(
                 unify(subst, registry, branch, actual);
             }
         }
+        semantic::Ty::Fn { ret, .. } => {
+            // For Fn-typed params, unify the return type with the actual arg type.
+            unify(subst, registry, ret, actual);
+        }
+        semantic::Ty::Ident(inner) => {
+            unify(subst, registry, inner, actual);
+        }
         _ => {}
     }
 }
@@ -123,6 +130,14 @@ fn apply(subst: &Subst, ty_template: &semantic::Ty) -> semantic::Ty {
         semantic::Ty::Union(members) => {
             semantic::normalize_union(members.iter().map(|m| apply(subst, m)))
         }
+        semantic::Ty::Fn { params, ret } => semantic::Ty::Fn {
+            params: params
+                .iter()
+                .map(|(lp, ty)| (lp.clone(), apply(subst, ty)))
+                .collect(),
+            ret: Box::new(apply(subst, ret)),
+        },
+        semantic::Ty::Ident(inner) => semantic::Ty::Ident(Box::new(apply(subst, inner))),
         other => other.clone(),
     }
 }

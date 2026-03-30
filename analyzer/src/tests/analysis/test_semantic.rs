@@ -20,13 +20,13 @@ fn opt(name: &str, ty: Ty) -> ParamSig {
 }
 
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
-    let output = analyze_syntax(source);
+    let mut output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
         output.diagnostics
     );
-    let (_, diags) = semantic::analyze_expr(&output.expr, &ctx);
+    let (_, diags) = semantic::analyze_expr(&mut output.expr, &ctx);
     diags
 }
 
@@ -183,7 +183,7 @@ fn test_sum_accepts_number_list_property() {
 
 #[test]
 fn validate_call_does_not_wildcard_inferred_actual_generic() {
-    let output = analyze_syntax("foo(prop(\"x\"))");
+    let mut output = analyze_syntax("foo(prop(\"x\"))");
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
@@ -215,7 +215,7 @@ fn validate_call_does_not_wildcard_inferred_actual_generic() {
         functions: vec![sig],
     };
 
-    let (_, diags) = semantic::analyze_expr(&output.expr, &ctx);
+    let (_, diags) = semantic::analyze_expr(&mut output.expr, &ctx);
 
     assert_eq!(diags.len(), 1, "unexpected diagnostics: {:?}", diags);
     assert!(diags[0].message.contains("argument type mismatch"));

@@ -69,6 +69,9 @@ fn assert_tree_invariants(expr: &Expr) {
             assert_tree_invariants(otherwise);
         }
         ExprKind::Ident(_) | ExprKind::Lit(_) | ExprKind::Error => {}
+        ExprKind::ImplicitLambda { body, .. } => {
+            assert_tree_invariants(body);
+        }
     }
 }
 

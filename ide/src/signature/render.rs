@@ -13,11 +13,29 @@ fn ty_contains_generic(ty: &semantic::Ty) -> bool {
         semantic::Ty::Generic(_) => true,
         semantic::Ty::List(inner) => ty_contains_generic(inner),
         semantic::Ty::Union(members) => members.iter().any(ty_contains_generic),
+        semantic::Ty::Fn { params, ret } => {
+            params.iter().any(|(_, t)| ty_contains_generic(t)) || ty_contains_generic(ret)
+        }
+        semantic::Ty::Ident(inner) => ty_contains_generic(inner),
         _ => false,
     }
 }
 
+/// Unwrap `Ty::Fn` and `Ty::Ident` wrappers for user-facing display.
+///
+/// `Fn { params, ret }` → `ret` (the user writes the expression, not the lambda wrapper)
+/// `Ident(inner)` → shows as the inner type for display
+/// Everything else → unchanged.
+fn unwrap_for_display(ty: &semantic::Ty) -> &semantic::Ty {
+    match ty {
+        semantic::Ty::Fn { ret, .. } => ret.as_ref(),
+        semantic::Ty::Ident(inner) => inner.as_ref(),
+        other => other,
+    }
+}
+
 fn format_ty_with_optional(ty: &semantic::Ty, optional: bool) -> String {
+    let ty = unwrap_for_display(ty);
     let mut out = ty.to_string();
     if optional {
         out.push('?');
@@ -30,31 +48,36 @@ fn choose_display_ty<'a>(
     declared_template: &'a semantic::Ty,
     instantiated_expected: &'a semantic::Ty,
 ) -> &'a semantic::Ty {
+    // Unwrap Fn/Ident wrappers for the declared template check — the wrapper is an
+    // internal artifact; the user-facing type is the ret / inner type.
+    let unwrapped_template = unwrap_for_display(declared_template);
+    let unwrapped_inst = unwrap_for_display(instantiated_expected);
+
     // If the declared parameter includes generics, prefer the inferred actual type when the
     // argument expression is non-empty. This helps show instantiated generics (incl `unknown`)
     // at the call site.
-    if ty_contains_generic(declared_template) {
-        return actual.unwrap_or(instantiated_expected);
+    if ty_contains_generic(unwrapped_template) {
+        return actual.unwrap_or(unwrapped_inst);
     }
 
     let Some(actual) = actual else {
-        return instantiated_expected;
+        return unwrapped_inst;
     };
 
     // Avoid "unknown" overriding useful expected types (especially for hard-constrained params).
     if matches!(actual, semantic::Ty::Unknown) {
-        return instantiated_expected;
+        return unwrapped_inst;
     }
 
     // For union-typed params (e.g. `number | number[]`), the actual argument type is often more
     // helpful than repeating the full union at every slot.
-    if matches!(instantiated_expected, semantic::Ty::Union(_))
-        && semantic::ty_accepts(instantiated_expected, actual)
+    if matches!(unwrapped_inst, semantic::Ty::Union(_))
+        && semantic::ty_accepts(unwrapped_inst, actual)
     {
         return actual;
     }
 
-    instantiated_expected
+    unwrapped_inst
 }
 
 pub(super) fn render_signature(

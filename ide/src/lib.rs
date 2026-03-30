@@ -190,10 +190,10 @@ impl<'a> HelpSession<'a> {
             return semantic::Ty::Unknown;
         }
 
-        let parsed = analyzer::analyze_syntax(receiver_source);
+        let mut parsed = analyzer::analyze_syntax(receiver_source);
 
         let mut map = analyzer::TypeMap::default();
-        analyzer::infer_expr_with_map(&parsed.expr, self.ctx, &mut map)
+        analyzer::infer_expr_with_map(&mut parsed.expr, self.ctx, &mut map)
     }
 }
 

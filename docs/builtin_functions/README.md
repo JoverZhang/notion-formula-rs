@@ -85,10 +85,10 @@ For some builtins, `receiver.fn(a, b)` is analyzed like `fn(receiver, a, b)`.
 ## General (12)
 
 ```rust
-if<T: Variant>(condition: boolean, then: T, else: T) -> T
+if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T
 
 // Repeat group: (conditionN, valueN) repeated 1+ times, followed by else.
-ifs<T: Variant>(condition1: boolean, value1: T, ..., else: T) -> T
+ifs<T: Variant>(condition1: boolean, value1: () -> T, ..., else: () -> T) -> T
 
 // TODO-op: currently represented by operators (`&&` / `||`) instead of builtin call signatures.
 and(condition1: boolean, ...) -> boolean
@@ -104,11 +104,10 @@ format(value: any) -> string
 equal(a: any, b: any) -> boolean
 unequal(a: any, b: any) -> boolean
 
-// TODO-binder: Ident/binder semantics are not modeled yet.
-let(var: Ident<any>, value: any, expr: (var: any) -> any) -> any
+let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U
 
 // Repeat group: (varN, valueN) repeated 1+ times, then expr.
-// TODO-binder: precise binder typing is not modeled yet.
+// TODO-binder: precise binder typing requires multi-generic variadic support.
 lets(var1: Ident<any>, value1: any, var2: Ident<any>, value2: any, ..., expr: (var1: any, var2: any, ...) -> any) -> any
 ```
 
@@ -240,22 +239,17 @@ reverse(list: any[]) -> any[]
 unique(list: any[]) -> any[]
 includes(list: any[], value: any) -> boolean
 
-// TODO-lambda: requires lambda/function expression typing.
-find(list: any[], expr: (current: any) -> boolean) -> any
-findIndex(list: any[], expr: (current: any) -> boolean) -> number
-filter(list: any[], expr: (current: any) -> boolean) -> any[]
-some(list: any[], expr: (current: any) -> boolean) -> boolean
-every(list: any[], expr: (current: any) -> boolean) -> boolean
-
-// TODO-lambda: requires lambda/function expression typing.
-map(list: any[], expr: (current: any) -> any) -> any[]
+map<T, U>(list: T[], mapper: (current: T) -> U) -> U[]
+filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[]
+find<T>(list: T[], predicate: (current: T) -> boolean) -> T
+findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number
+some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean
+every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean
+count<T>(list: T[], predicate: (current: T) -> boolean) -> number
 
 // `flat(list)` is the only supported call form.
 // Uses a custom SigResolver to fully flatten nested list element types.
 flat(list: any[]) -> any[]
-
-// TODO-lambda: requires lambda/function expression typing.
-count(list: any[], expr: (current: any) -> boolean) -> number
 ```
 
 ---

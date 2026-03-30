@@ -149,6 +149,7 @@ fn find_call_expr_by_lparen<'a>(
                 }
             }
             ExprKind::Ident(_) | ExprKind::Lit(_) | ExprKind::Error => {}
+            ExprKind::ImplicitLambda { body, .. } => visit_child(body),
         }
 
         let matches_call = match &expr.kind {
@@ -188,9 +189,9 @@ fn infer_one_arg(expr_source: &str, ctx: &semantic::Context) -> Option<semantic:
         _ => {}
     }
 
-    let parsed = analyzer::analyze_syntax(trimmed);
+    let mut parsed = analyzer::analyze_syntax(trimmed);
     let mut map = analyzer::TypeMap::default();
-    Some(analyzer::infer_expr_with_map(&parsed.expr, ctx, &mut map))
+    Some(analyzer::infer_expr_with_map(&mut parsed.expr, ctx, &mut map))
 }
 
 /// Splits the token stream after `lparen_idx` into per-argument byte spans,
@@ -266,23 +267,23 @@ fn infer_call_arg_tys_best_effort(
 
     // If this is a member call, try to include the receiver type as the leading argument.
     if include_receiver_as_arg {
-        let parsed = analyzer::analyze_syntax(source);
+        let mut parsed = analyzer::analyze_syntax(source);
         if let Some(call_expr) =
             find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
             && let ExprKind::MemberCall { receiver, .. } = &call_expr.kind
         {
+            let receiver_id = receiver.id;
+            let receiver_is_bool_ident = matches!(
+                &receiver.kind,
+                ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
+            );
             let mut map = analyzer::TypeMap::default();
-            let _ = analyzer::infer_expr_with_map(&parsed.expr, ctx, &mut map);
+            let _ = analyzer::infer_expr_with_map(&mut parsed.expr, ctx, &mut map);
             let mut ty = map
-                .get(receiver.id)
+                .get(receiver_id)
                 .cloned()
                 .unwrap_or(semantic::Ty::Unknown);
-            if matches!(ty, semantic::Ty::Unknown)
-                && matches!(
-                    &receiver.kind,
-                    ExprKind::Ident(sym) if sym.text == "true" || sym.text == "false"
-                )
-            {
+            if matches!(ty, semantic::Ty::Unknown) && receiver_is_bool_ident {
                 ty = semantic::Ty::Boolean;
             }
             arg_tys.push(Some(ty));

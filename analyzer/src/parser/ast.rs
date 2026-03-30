@@ -1,6 +1,6 @@
 use crate::{
-    Token, TokenKind,
     lexer::{Lit, NodeId, Span, Spanned, Symbol},
+    Token, TokenKind,
 };
 
 pub enum AssocOp {
@@ -203,6 +203,18 @@ pub enum ExprKind {
         cond: Box<Expr>,
         then: Box<Expr>,
         otherwise: Box<Expr>,
+    },
+    /// An implicit lambda inserted by the inference pass.
+    ///
+    /// The parser never produces this variant. It is created in-place by `infer_call`
+    /// when a call argument occupies a `Ty::Fn`-typed parameter position.
+    ///
+    /// `params` contains the resolved binding names (e.g. `["current"]` for list builtins,
+    /// `["a"]` for `let(a, ...)`). Empty for nullary thunks.
+    /// `body` is the original expression that was at this argument position.
+    ImplicitLambda {
+        params: Vec<String>,
+        body: Box<Expr>,
     },
     Error,
 }

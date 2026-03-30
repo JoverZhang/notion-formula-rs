@@ -13,14 +13,14 @@ fn p(name: &str, ty: Ty) -> ParamSig {
 }
 
 fn infer(source: &str, ctx: &Context) -> (Ty, TypeMap, crate::ast::Expr) {
-    let output = analyze_syntax(source);
+    let mut output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
         output.diagnostics
     );
     let mut map = TypeMap::default();
-    let ty = infer_expr_with_map(&output.expr, ctx, &mut map);
+    let ty = infer_expr_with_map(&mut output.expr, ctx, &mut map);
     (ty, map, output.expr)
 }
 

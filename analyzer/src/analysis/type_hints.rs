@@ -60,5 +60,7 @@ fn ty_sort_key(ty: &Ty) -> (u8, String) {
         // By the time we sort, unions should already be flattened.
         Ty::Union(_) => (7, "union".into()),
         Ty::Unknown => (8, "unknown".into()),
+        Ty::Fn { .. } => (9, "fn".into()),
+        Ty::Ident(inner) => (10, format!("ident<{}>", ty_sort_key(inner).1)),
     }
 }

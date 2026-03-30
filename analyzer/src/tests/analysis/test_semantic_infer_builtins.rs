@@ -2,13 +2,13 @@ use crate::semantic::{self, builtins_functions, Context, Ty};
 use crate::{analyze_syntax, Span};
 
 fn infer_ok(source: &str, ctx: &Context) -> Ty {
-    let output = analyze_syntax(source);
+    let mut output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
         output.diagnostics
     );
-    let (ty, diags) = semantic::analyze_expr(&output.expr, ctx);
+    let (ty, diags) = semantic::analyze_expr(&mut output.expr, ctx);
     assert!(
         diags.is_empty(),
         "unexpected semantic diagnostics: {:?}",
@@ -18,13 +18,13 @@ fn infer_ok(source: &str, ctx: &Context) -> Ty {
 }
 
 fn assert_single_diag(source: &str, ctx: &Context, message: &str, span: Span) {
-    let output = analyze_syntax(source);
+    let mut output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
         output.diagnostics
     );
-    let (_, diags) = semantic::analyze_expr(&output.expr, ctx);
+    let (_, diags) = semantic::analyze_expr(&mut output.expr, ctx);
     assert_eq!(diags.len(), 1, "unexpected diagnostics: {:?}", diags);
     assert_eq!(diags[0].message, message);
     assert_eq!(diags[0].span, span);

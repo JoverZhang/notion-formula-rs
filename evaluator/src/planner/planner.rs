@@ -1,18 +1,18 @@
-use analyzer::analysis::{Context as SemaContext, Ty, TypeMap, infer_expr_with_map};
+use analyzer::analysis::{infer_expr_with_map, Context as SemaContext, Ty, TypeMap};
 use analyzer::ast::{BinOpKind, Expr, ExprKind};
 
 use crate::core::context::EvalContext;
 use crate::ir::nodes::{CastPlan, ExecNode, ExecPlan};
 
-use super::PlanError;
 use super::lower_lit::{lower_const_value, lower_lit};
 use super::selectors::select_binary_plan;
+use super::PlanError;
 
 #[derive(Debug, Default)]
 pub(crate) struct Planner;
 
 impl Planner {
-    pub(crate) fn build(&self, expr: &Expr, ctx: &EvalContext) -> Result<ExecPlan, PlanError> {
+    pub(crate) fn build(&self, expr: &mut Expr, ctx: &EvalContext) -> Result<ExecPlan, PlanError> {
         let sema_ctx = SemaContext {
             properties: ctx.properties.clone(),
             functions: vec![],

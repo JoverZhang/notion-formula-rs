@@ -89,6 +89,47 @@ impl ParamShape {
         Self { head, repeat, tail, repeat_min_groups: 1 }
     }
 
+    /// Resolve which [`ParamSig`] maps to each argument position for `total` arguments.
+    ///
+    /// Returns a `Vec` of length `total` where each element is the corresponding parameter
+    /// slot. Uses the same head/repeat/tail logic as `param_for_arg_index_with_total` in
+    /// `analysis::mod`. Falls back to `param_for_arg_index` (no tail awareness) when the
+    /// total cannot fit the repeat shape.
+    pub fn resolve_params(&self, total: usize) -> Vec<&ParamSig> {
+        let tail_used = super::resolve_repeat_tail_used(self, total);
+
+        let mut out = Vec::with_capacity(total);
+        let head_len = self.head.len();
+        let tail_used = tail_used.unwrap_or(self.tail.len());
+        let tail_start = total.saturating_sub(tail_used);
+
+        for idx in 0..total {
+            let param = if idx < head_len {
+                self.head.get(idx)
+            } else if idx >= tail_start && tail_used > 0 {
+                self.tail.get(idx - tail_start)
+            } else if !self.repeat.is_empty() {
+                let r_idx = (idx - head_len) % self.repeat.len();
+                self.repeat.get(r_idx)
+            } else {
+                // Overflow beyond head with no repeat — try tail directly.
+                self.tail.get(idx.saturating_sub(head_len))
+            };
+
+            if let Some(p) = param {
+                out.push(p);
+            }
+        }
+
+        debug_assert!(
+            out.len() <= total,
+            "resolve_params: resolved {} params but total was {}",
+            out.len(),
+            total
+        );
+        out
+    }
+
     /// Set the minimum number of repeat-group cycles. Default is `1`.
     ///
     /// Use `0` for truly optional variadic args (e.g. `splice(list, start, count, ...items)`
@@ -342,6 +383,13 @@ fn collect_generics_in_ty(ty: &Ty) -> Vec<GenericId> {
                 }
             }
             Ty::Number | Ty::String | Ty::Boolean | Ty::Date | Ty::Null | Ty::Unknown => {}
+            Ty::Fn { params, ret } => {
+                for (_, lp_ty) in params {
+                    walk(lp_ty, out);
+                }
+                walk(ret, out);
+            }
+            Ty::Ident(inner) => walk(inner, out),
         }
     }
 
@@ -356,5 +404,10 @@ fn find_unknown_in_ty(ty: &Ty) -> Option<&Ty> {
         Ty::List(inner) => find_unknown_in_ty(inner),
         Ty::Union(members) => members.iter().find_map(find_unknown_in_ty),
         Ty::Number | Ty::String | Ty::Boolean | Ty::Date | Ty::Null | Ty::Generic(_) => None,
+        Ty::Fn { params, ret } => {
+            params.iter().find_map(|(_, lp_ty)| find_unknown_in_ty(lp_ty))
+                .or_else(|| find_unknown_in_ty(ret))
+        }
+        Ty::Ident(inner) => find_unknown_in_ty(inner),
     }
 }

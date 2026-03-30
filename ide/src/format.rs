@@ -224,6 +224,7 @@ impl<'a> Formatter<'a> {
                 otherwise,
             } => self.format_ternary(expr, indent, cond, then, otherwise),
             ExprKind::Error => Rendered::single(indent, "<error>"),
+            ExprKind::ImplicitLambda { body, .. } => self.format_expr_kind(body, indent),
         }
     }
 

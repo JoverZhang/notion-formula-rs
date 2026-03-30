@@ -1,7 +1,8 @@
-use super::super::{FunctionCategory, FunctionSig, GenericId, Ty};
+use super::super::{FunctionCategory, FunctionSig, GenericId, LambdaParam, Ty};
 
 pub(super) fn builtins() -> Vec<FunctionSig> {
     let t0 = GenericId(0);
+    let t1 = GenericId(1);
     vec![
         func_g!(
             FunctionCategory::General,
@@ -10,8 +11,20 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             "if",
             params!(
                 p!("condition", Ty::Boolean),
-                p!("then", Ty::Generic(t0)),
-                p!("else", Ty::Generic(t0))
+                p!(
+                    "then",
+                    Ty::Fn {
+                        params: vec![],
+                        ret: Box::new(Ty::Generic(t0)),
+                    }
+                ),
+                p!(
+                    "else",
+                    Ty::Fn {
+                        params: vec![],
+                        ret: Box::new(Ty::Generic(t0)),
+                    }
+                )
             ),
             Ty::Generic(t0),
         ),
@@ -22,8 +35,23 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             "ifs",
             repeat_params!(
                 head!(),
-                repeat!(p!("condition1", Ty::Boolean), p!("value1", Ty::Generic(t0))),
-                tail!(p!("else", Ty::Generic(t0))),
+                repeat!(
+                    p!("condition1", Ty::Boolean),
+                    p!(
+                        "value1",
+                        Ty::Fn {
+                            params: vec![],
+                            ret: Box::new(Ty::Generic(t0)),
+                        }
+                    )
+                ),
+                tail!(p!(
+                    "else",
+                    Ty::Fn {
+                        params: vec![],
+                        ret: Box::new(Ty::Generic(t0)),
+                    }
+                )),
             ),
             Ty::Generic(t0),
         ),
@@ -72,7 +100,24 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             params!(p!("a", Ty::Generic(t0)), p!("b", Ty::Generic(t0))),
             Ty::Boolean,
         ),
-        // TODO(binder): `let(var, value, expr)` binder semantics are not modeled yet.
-        // TODO(binder): `lets(var1, value1, ..., expr)` binder semantics are not modeled yet.
+        // TODO(binder): `lets(var1, value1, ..., expr)` binder semantics need multi-generic variadic support.
+        func_g!(
+            FunctionCategory::General,
+            "let(ident, value, body)",
+            generics!(g!(0, Plain), g!(1, Plain)),
+            "let",
+            params!(
+                p!("ident", Ty::Ident(Box::new(Ty::Generic(t0)))),
+                p!("value", Ty::Generic(t0)),
+                p!(
+                    "body",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::ParamRef("ident".into()), Ty::Generic(t0))],
+                        ret: Box::new(Ty::Generic(t1)),
+                    }
+                )
+            ),
+            Ty::Generic(t1),
+        ),
     ]
 }

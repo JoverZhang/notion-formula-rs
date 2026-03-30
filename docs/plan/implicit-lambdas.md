@@ -159,8 +159,10 @@ The acceptance function (`analyzer/src/analysis/mod.rs`) gains two new arms:
 // During validation the wrapped ImplicitLambda's body type is checked against ret.
 (Ty::Fn { ret: expected_ret, .. }, actual) => ty_accepts(expected_ret, actual),
 
-// An Ident-typed param accepts Unknown (bare identifiers infer to Unknown today).
-(Ty::Ident(_), Ty::Unknown) => true,
+// Ident-typed positions are internal annotations — accept any type.
+// validate_call short-circuits before reaching ty_accepts for Ident params,
+// but IDE callers may hit this path.
+(Ty::Ident(_), _) => true,
 ```
 
 ---
@@ -766,63 +768,63 @@ These questions are deferred to the evaluator-builtins plan update.
 
 ### Phase 1: Type System Foundation
 
-- [ ] Add `LambdaParam` enum to `analyzer/src/analysis/mod.rs`
-- [ ] Add `Ty::Fn { params, ret }` variant to `Ty` enum
-- [ ] Add `Ty::Ident(Box<Ty>)` variant to `Ty` enum
-- [ ] Update `Ty::precedence()` — `Fn` gets 0, `Ident` gets 3
-- [ ] Update `Ty::fmt_with_prec()` — display for `Fn` and `Ident`
-- [ ] Add `Serialize`/`Deserialize` for `LambdaParam`
-- [ ] Update `ty_accepts` with `Fn` and `Ident` arms
+- [x] Add `LambdaParam` enum to `analyzer/src/analysis/mod.rs`
+- [x] Add `Ty::Fn { params, ret }` variant to `Ty` enum
+- [x] Add `Ty::Ident(Box<Ty>)` variant to `Ty` enum
+- [x] Update `Ty::precedence()` — `Fn` gets 0, `Ident` gets 3
+- [x] Update `Ty::fmt_with_prec()` — display for `Fn` and `Ident`
+- [x] Add `Serialize`/`Deserialize` for `LambdaParam`
+- [x] Update `ty_accepts` with `Fn` and `Ident` arms
 - [ ] Update snapshot tests for `Ty` display
 
 ### Phase 2: AST Extension
 
-- [ ] Add `ExprKind::ImplicitLambda { params, body }` variant to `ast.rs`
-- [ ] Update all `ExprKind` match arms across the codebase (exhaustiveness)
-- [ ] Add `ExprId::next()` method if not already present (for fresh wrapper ids)
+- [x] Add `ExprKind::ImplicitLambda { params, body }` variant to `ast.rs`
+- [x] Update all `ExprKind` match arms across the codebase (exhaustiveness)
+- [x] Add `ExprId::next()` method if not already present (for fresh wrapper ids)
 
 ### Phase 3: Inference Pass Rewrite
 
-- [ ] Change `infer_expr_with_map` signature from `&Expr` to `&mut Expr`
-- [ ] Propagate `&mut` through all recursive inference functions
-- [ ] Update all call sites in `analyze_expr` and validation
-- [ ] Add `InferState` struct with scope stack
-- [ ] Thread `InferState` through all inference functions
-- [ ] Update `ExprKind::Ident` arm to check scope stack
-- [ ] Implement two-pass `infer_call` (non-lambda first, then lambda)
-- [ ] Implement `resolve_param_ref` helper
-- [ ] Implement in-place `ImplicitLambda` wrapping in `infer_call`
-- [ ] Handle `MemberCall` lambda wrapping (clone-and-infer approach)
+- [x] Change `infer_expr_with_map` signature from `&Expr` to `&mut Expr`
+- [x] Propagate `&mut` through all recursive inference functions
+- [x] Update all call sites in `analyze_expr` and validation
+- [x] Add `InferState` struct with scope stack
+- [x] Thread `InferState` through all inference functions
+- [x] Update `ExprKind::Ident` arm to check scope stack
+- [x] Implement two-pass `infer_call` (non-lambda first, then lambda)
+- [x] Implement `resolve_param_ref` helper
+- [x] Implement in-place `ImplicitLambda` wrapping in `infer_call`
+- [x] Handle `MemberCall` lambda wrapping (clone-and-infer approach)
 
 ### Phase 4: Signature Updates
 
-- [ ] Update `if` signature to use `Ty::Fn` thunks
-- [ ] Update `ifs` signature to use `Ty::Fn` thunks
-- [ ] Add `let` signature with `Ty::Ident` and `Ty::Fn`
+- [x] Update `if` signature to use `Ty::Fn` thunks
+- [x] Update `ifs` signature to use `Ty::Fn` thunks
+- [x] Add `let` signature with `Ty::Ident` and `Ty::Fn`
 - [ ] Add `lets` signature (simplified or with custom resolver)
-- [ ] Add `map` signature with `Ty::Fn` + `LambdaParam::Current`
-- [ ] Add `filter` signature
-- [ ] Add `find` signature
-- [ ] Add `findIndex` signature
-- [ ] Add `some` signature
-- [ ] Add `every` signature
-- [ ] Add `count` signature
-- [ ] Remove TODO comments from `general.rs` and `list.rs`
+- [x] Add `map` signature with `Ty::Fn` + `LambdaParam::Current`
+- [x] Add `filter` signature
+- [x] Add `find` signature
+- [x] Add `findIndex` signature
+- [x] Add `some` signature
+- [x] Add `every` signature
+- [x] Add `count` signature
+- [x] Remove TODO comments from `general.rs` and `list.rs`
 - [ ] Update `docs/builtin_functions/README.md` spec entries
 
 ### Phase 5: Testing
 
-- [ ] Unit tests: `Ty::Fn` display and equality
-- [ ] Unit tests: `ty_accepts` with `Fn` and `Ident` types
-- [ ] Inference tests: `if(true, 1, "2")` infers to `Number | String`
-- [ ] Inference tests: `if(true, 1, 2)` infers to `Number`
-- [ ] Inference tests: `let(a, 123, a + 1)` infers to `Number`
-- [ ] Inference tests: `[1,2,3].map(current + 1)` infers to `List<Number>`
-- [ ] Inference tests: `[1,2,3].filter(current > 1)` infers to `List<Number>`
-- [ ] Inference tests: nested `let(a, 1, let(b, a + 1, b))` infers to `Number`
-- [ ] AST mutation tests: verify `ImplicitLambda` nodes are inserted at correct positions
-- [ ] Scope isolation tests: `current` does not leak outside lambda body
-- [ ] Validation tests: wrong-type lambda body produces diagnostic
+- [x] Unit tests: `Ty::Fn` display and equality
+- [x] Unit tests: `ty_accepts` with `Fn` and `Ident` types
+- [x] Inference tests: `if(true, 1, "2")` infers to `Number | String`
+- [x] Inference tests: `if(true, 1, 2)` infers to `Number`
+- [x] Inference tests: `let(a, 123, a + 1)` infers to `Number`
+- [x] Inference tests: `[1,2,3].map(current + 1)` infers to `List<Number>`
+- [x] Inference tests: `[1,2,3].filter(current > 1)` infers to `List<Number>`
+- [x] Inference tests: nested `let(a, 1, let(b, a + 1, b))` infers to `Number`
+- [x] AST mutation tests: verify `ImplicitLambda` nodes are inserted at correct positions
+- [x] Scope isolation tests: `current` does not leak outside lambda body
+- [x] Validation tests: wrong-type lambda body produces diagnostic
 
 ### Phase 6: Evaluator Integration (deferred)
 

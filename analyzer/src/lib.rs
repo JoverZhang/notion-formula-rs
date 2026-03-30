@@ -35,7 +35,7 @@ pub fn analyze_syntax(text: &str) -> SyntaxResult {
 
 pub fn analyze(text: &str, ctx: &analysis::Context) -> AnalyzeResult {
     let mut syntax = analyze_syntax(text);
-    let (output_type, sema_diags) = analysis::analyze_expr(&syntax.expr, ctx);
+    let (output_type, sema_diags) = analysis::analyze_expr(&mut syntax.expr, ctx);
     syntax.diagnostics.extend(sema_diags);
 
     AnalyzeResult {

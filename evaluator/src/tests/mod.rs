@@ -45,14 +45,14 @@ fn number_literal_produces_f64_column() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr("1");
+    let mut expr = parse_expr("1");
     let rows = [1_u64, 2, 3];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![true, true, true]);
     assert!(out.errors.is_empty());
@@ -68,14 +68,14 @@ fn add_runs_f64_specialized_kernel() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr("1 + 2");
+    let mut expr = parse_expr("1 + 2");
     let rows = [1_u64, 2, 3];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![true, true, true]);
     assert!(out.errors.is_empty());
@@ -91,14 +91,14 @@ fn nested_arithmetic_expression_works() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr("(1 + 2) * 3 - 4 / 2");
+    let mut expr = parse_expr("(1 + 2) * 3 - 4 / 2");
     let rows = [1_u64, 2, 3, 4];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![true, true, true, true]);
     assert!(out.errors.is_empty());
@@ -114,14 +114,14 @@ fn divide_by_zero_marks_rows_invalid() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr("1 / 0");
+    let mut expr = parse_expr("1 / 0");
     let rows = [1_u64, 2, 3];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![false, false, false]);
     assert_eq!(out.values.nulls, vec![true, true, true]);
@@ -140,14 +140,14 @@ fn planner_rejects_invalid_subtraction_shape() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr("1 - \"x\"");
+    let mut expr = parse_expr("1 - \"x\"");
     let rows = [1_u64, 2];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![false, false]);
     assert_eq!(
@@ -162,14 +162,14 @@ fn add_any_supports_string_number() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr(r#""x" + 2"#);
+    let mut expr = parse_expr(r#""x" + 2"#);
     let rows = [1_u64, 2, 3];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![true, true, true]);
     assert!(out.errors.is_empty());
@@ -192,14 +192,14 @@ fn add_any_supports_string_list() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr(r#""x" + [1, 2]"#);
+    let mut expr = parse_expr(r#""x" + [1, 2]"#);
     let rows = [1_u64, 2];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval(&expr, batch)).unwrap();
+    let out = block_on(evaluator.eval(&mut expr, batch)).unwrap();
 
     assert_eq!(out.ok, vec![true, true]);
     assert!(out.errors.is_empty());
@@ -242,14 +242,14 @@ fn mask_disables_rows_for_binary_arith() {
     let ctx = EvalContext::new(vec![]);
     let provider = DummyProvider;
     let evaluator = Evaluator::new(&ctx, &provider);
-    let expr = parse_expr("1 + 2");
+    let mut expr = parse_expr("1 + 2");
     let rows = [1_u64, 2, 3, 4];
     let batch = RowBatch {
         rows: &rows,
         batch_id: 1,
     };
 
-    let out = block_on(evaluator.eval_with_mask(&expr, batch, vec![true, false, true, false]))
+    let out = block_on(evaluator.eval_with_mask(&mut expr, batch, vec![true, false, true, false]))
         .unwrap();
 
     assert_eq!(out.ok, vec![true, false, true, false]);

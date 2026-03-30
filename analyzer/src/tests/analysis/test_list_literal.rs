@@ -2,7 +2,7 @@ use crate::analyze_syntax;
 use crate::semantic::{self, Context, Ty};
 
 fn infer_ok(source: &str) -> Ty {
-    let output = analyze_syntax(source);
+    let mut output = analyze_syntax(source);
     assert!(
         output.diagnostics.is_empty(),
         "unexpected parser diagnostics: {:?}",
@@ -14,7 +14,7 @@ fn infer_ok(source: &str) -> Ty {
         functions: vec![],
     };
 
-    let (ty, diags) = semantic::analyze_expr(&output.expr, &ctx);
+    let (ty, diags) = semantic::analyze_expr(&mut output.expr, &ctx);
     assert!(
         diags.is_empty(),
         "unexpected semantic diagnostics: {:?}",

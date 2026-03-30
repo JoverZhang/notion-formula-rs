@@ -1,4 +1,4 @@
-use super::super::{normalize_union, FunctionCategory, FunctionSig, GenericId, Ty};
+use super::super::{normalize_union, FunctionCategory, FunctionSig, GenericId, LambdaParam, Ty};
 
 /// Custom resolver for `flat(list)`.
 ///
@@ -43,6 +43,7 @@ fn collect_leaf_types(ty: &Ty, out: &mut Vec<Ty>) {
 
 pub(super) fn builtins() -> Vec<FunctionSig> {
     let t0 = GenericId(0);
+    let t1 = GenericId(1);
     vec![
         func_g!(
             FunctionCategory::List,
@@ -135,15 +136,127 @@ pub(super) fn builtins() -> Vec<FunctionSig> {
             ),
             Ty::Boolean,
         ),
-        // TODO(lambda-typing): Intentionally removed until we have a real lambda/function type system.
-        // NOTE: Notion’s predicate/mapper DSL may include (current, index) etc.; keep minimal forms here.
-        // TODO(lambda-typing): find<T>(list: T[], predicate: (current) -> boolean) -> T
-        // TODO(lambda-typing): findIndex<T>(list: T[], predicate: (current) -> boolean) -> number
-        // TODO(lambda-typing): filter<T>(list: T[], predicate: (current) -> boolean) -> T[]
-        // TODO(lambda-typing): some<T>(list: T[], predicate: (current) -> boolean) -> boolean
-        // TODO(lambda-typing): every<T>(list: T[], predicate: (current) -> boolean) -> boolean
-        // TODO(lambda-typing): map<T, U>(list: T[], mapper: (current) -> U) -> U[]
-        // TODO(lambda-typing): count<T>(list: T[], predicate: (current) -> boolean) -> number
+        // Lambda-taking list builtins. Each uses LambdaParam::Current to bind the
+        // iteration variable `current` with type T0 (the list element type).
+        func_g!(
+            FunctionCategory::List,
+            "map(list, mapper)",
+            generics!(g!(0, Plain), g!(1, Plain)),
+            "map",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "mapper",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Generic(t1)),
+                    }
+                )
+            ),
+            Ty::List(Box::new(Ty::Generic(t1))),
+        ),
+        func_g!(
+            FunctionCategory::List,
+            "filter(list, predicate)",
+            generics!(g!(0, Plain)),
+            "filter",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "predicate",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Boolean),
+                    }
+                )
+            ),
+            Ty::List(Box::new(Ty::Generic(t0))),
+        ),
+        func_g!(
+            FunctionCategory::List,
+            "find(list, predicate)",
+            generics!(g!(0, Plain)),
+            "find",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "predicate",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Boolean),
+                    }
+                )
+            ),
+            Ty::Generic(t0),
+        ),
+        func_g!(
+            FunctionCategory::List,
+            "findIndex(list, predicate)",
+            generics!(g!(0, Plain)),
+            "findIndex",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "predicate",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Boolean),
+                    }
+                )
+            ),
+            Ty::Number,
+        ),
+        func_g!(
+            FunctionCategory::List,
+            "some(list, predicate)",
+            generics!(g!(0, Plain)),
+            "some",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "predicate",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Boolean),
+                    }
+                )
+            ),
+            Ty::Boolean,
+        ),
+        func_g!(
+            FunctionCategory::List,
+            "every(list, predicate)",
+            generics!(g!(0, Plain)),
+            "every",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "predicate",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Boolean),
+                    }
+                )
+            ),
+            Ty::Boolean,
+        ),
+        func_g!(
+            FunctionCategory::List,
+            "count(list, predicate)",
+            generics!(g!(0, Plain)),
+            "count",
+            params!(
+                p!("list", Ty::List(Box::new(Ty::Generic(t0)))),
+                p!(
+                    "predicate",
+                    Ty::Fn {
+                        params: vec![(LambdaParam::Current, Ty::Generic(t0))],
+                        ret: Box::new(Ty::Boolean),
+                    }
+                )
+            ),
+            Ty::Number,
+        ),
         func_gr!(
             FunctionCategory::List,
             "flat(list)",

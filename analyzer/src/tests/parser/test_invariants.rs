@@ -1,6 +1,6 @@
 use crate::ast::{Expr, ExprKind};
 use crate::lexer::lex;
-use crate::lexer::{Span, Token, tokens_in_span};
+use crate::lexer::{tokens_in_span, Span, Token};
 use crate::parser::{Parser, TokenCursor};
 
 fn assert_child_range(child: &Expr, parent: &Expr, tokens: &[Token]) {
@@ -61,6 +61,9 @@ fn check_invariants(expr: &Expr, tokens: &[Token]) {
             check_invariants(right, tokens);
         }
         ExprKind::Ident(_) | ExprKind::Lit(_) | ExprKind::Error => {}
+        ExprKind::ImplicitLambda { body, .. } => {
+            check_invariants(body, tokens);
+        }
         ExprKind::Ternary {
             cond,
             then,
