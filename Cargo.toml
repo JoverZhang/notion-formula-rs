@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "builtin_fn",
     "analyzer",
     "evaluator",
     "analyzer_wasm",

@@ -7,6 +7,7 @@ version = 4
 name = "analyzer"
 version = "0.1.0"
 dependencies = [
+ "builtin_fn",
  "serde",
 ]
 
@@ -40,6 +41,13 @@ name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+
+[[package]]
+name = "builtin_fn"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bumpalo"

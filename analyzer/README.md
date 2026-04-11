@@ -5,6 +5,9 @@ Core analyzer for a Notion-like formula language.
 IDE/editor helpers (formatter/completion/signature help/edit application) live in the sibling
 `ide` crate.
 
+Builtin function signatures and the shared builtin type model live in the sibling
+`builtin_fn` crate and are re-exported through `analyzer::semantic`.
+
 ## Coordinates (hard rule)
 
 - `Span { start, end }` is UTF-8 byte offsets into source.
@@ -37,7 +40,7 @@ Quick fixes are represented as diagnostic actions, not as a separate parse-outpu
 | `analyzer/src/lexer/` | Tokens + trivia + EOF + lex diagnostics |
 | `analyzer/src/parser/` | Pratt parser, AST, recovery |
 | `analyzer/src/diagnostics.rs` | Diagnostic model + deterministic formatting |
-| `analyzer/src/analysis/` | Type inference + semantic diagnostics |
+| `analyzer/src/analysis/` | Type inference + semantic diagnostics + semantic re-exports from `builtin_fn` |
 | `analyzer/src/text_edit.rs` | Core `TextEdit` model (byte ranges) |
 
 ## Invariants

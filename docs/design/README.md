@@ -14,6 +14,7 @@ For the documentation entry point, see `docs/README.md`.
 
 | Module | Summary | Primary doc |
 | --- | --- | --- |
+| `builtin_fn/` | builtin signature model + parser + registry | `builtin_fn/README.md` |
 | `analyzer/` | lexer + parser + AST + diagnostics + semantic | `analyzer/README.md` |
 | `ide/` | format / completion / signature help / edit apply | `ide/README.md` |
 | `analyzer_wasm/` | wasm-bindgen boundary + UTF-16 mapping + DTO v1 | `analyzer_wasm/README.md` |
@@ -49,6 +50,7 @@ Key tradeoffs:
 - Keep trivia such as `group`, `newlines`, and `comments` in the AST so formatting can reuse the same structure. This avoids maintaining a separate CST in `ide`; for this lightweight grammar, the extra analysis cost is acceptable.
 - During parsing, insert `ErrorExpr` placeholders and emit diagnostics to improve one-pass diagnostic quality.
 - Some diagnostics carry code actions (for example missing parentheses or commas) for lightweight quick fixes.
+- Builtin signature ownership is delegated to `builtin_fn`; `analyzer::semantic` re-exports the shared types to preserve downstream API stability.
 
 ### ide
 

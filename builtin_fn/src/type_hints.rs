@@ -1,15 +1,8 @@
 //! Helpers for deterministic union normalization.
 
-use super::Ty;
+use crate::Ty;
 
 /// Normalize a union-like set of types into a deterministic [`Ty`].
-///
-/// Currently this:
-/// - flattens nested `Union` members,
-/// - deduplicates members,
-/// - sorts members deterministically (so outputs are stable across runs),
-/// - returns the single member directly when only one remains,
-/// - returns [`Ty::Unknown`] when given an empty iterator.
 pub fn normalize_union(members: impl IntoIterator<Item = Ty>) -> Ty {
     normalize_union_impl(members).unwrap_or(Ty::Unknown)
 }
@@ -20,7 +13,6 @@ fn normalize_union_impl(members: impl IntoIterator<Item = Ty>) -> Option<Ty> {
         push_flattened_union_member(&mut flat, member);
     }
 
-    // Deduplicate while preserving (later) deterministic ordering.
     let mut unique = Vec::<Ty>::new();
     for ty in flat {
         if !unique.contains(&ty) {
@@ -57,7 +49,6 @@ fn ty_sort_key(ty: &Ty) -> (u8, String) {
         Ty::Date => (4, "date".into()),
         Ty::List(inner) => (5, format!("list<{}>", ty_sort_key(inner).1)),
         Ty::Generic(id) => (6, format!("T{}", id.0)),
-        // By the time we sort, unions should already be flattened.
         Ty::Union(_) => (7, "union".into()),
         Ty::Unknown => (8, "unknown".into()),
         Ty::Fn { .. } => (9, "fn".into()),

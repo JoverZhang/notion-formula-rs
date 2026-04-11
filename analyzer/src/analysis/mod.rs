@@ -8,20 +8,16 @@ use crate::diagnostics::{Diagnostic, DiagnosticCode, DiagnosticKind};
 use crate::{LitKind, Span};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::fmt;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-mod builtins;
-pub use builtins::builtins_functions;
 mod desugar;
-mod signature;
-pub use signature::{FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig, SigResolver};
 mod infer;
-mod param_shape;
+pub use builtin_fn::{
+    FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, LambdaParam,
+    ParamShape, ParamSig, SigResolver, Ty, builtins_functions, normalize_union,
+};
 pub use infer::{ExprId, TypeMap, infer_expr_with_map};
-mod type_hints;
-pub use type_hints::normalize_union;
 
 /// Global counter for synthetic expression IDs created during inference (e.g. `ImplicitLambda`
 /// wrapper nodes). Starts at `u32::MAX / 2` to avoid collisions with parser-allocated IDs.
@@ -73,153 +69,6 @@ pub fn is_postfix_capable(sig: &FunctionSig) -> bool {
     false
 }
 
-/// Identifier for a generic type parameter in [`Ty::Generic`].
-///
-/// Currently the UI-facing generic names are derived from this numeric id (e.g. `T0`, `T1`, ...).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct GenericId(pub u32);
-
-/// Describes the origin of an implicit lambda parameter binding.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LambdaParam {
-    /// The implicit `current` binding injected by list builtins (`map`, `filter`, etc.).
-    Current,
-    /// A binding whose name comes from the value of another argument position.
-    ///
-    /// The string is the `name` field of the `ParamSig` whose runtime value supplies the
-    /// identifier text. For example, in `let(ident, value, body)` the body's lambda param
-    /// is `ParamRef("ident")` — the analyzer reads the bare identifier from the `ident`
-    /// argument to determine the binding name.
-    ParamRef(String),
-}
-
-/// Formula type used by inference, validation, and editor tooling.
-///
-/// - [`Ty::Unknown`] represents “unknown / could not be inferred”.
-/// - [`Ty::Generic`] represents a type parameter (see [`GenericId`]) and is instantiated via generic
-///   unification (see `infer::instantiate_sig`).
-///
-/// See [`ty_accepts`] for validation acceptance rules.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum Ty {
-    Number,
-    String,
-    Boolean,
-    Date,
-    Null,
-    Unknown,
-    Generic(GenericId),
-    List(Box<Ty>),
-    Union(Vec<Ty>),
-    /// A function type representing an implicit lambda.
-    ///
-    /// `params` describes the bindings the lambda introduces (empty for nullary thunks).
-    /// `ret` is the return type of the lambda body.
-    Fn {
-        params: Vec<(LambdaParam, Ty)>,
-        ret: Box<Ty>,
-    },
-    /// A bare-identifier parameter position (used by `let`/`lets`).
-    ///
-    /// The inner `Ty` is the type of the value that will be bound to this identifier.
-    Ident(Box<Ty>),
-}
-
-impl Ty {
-    fn precedence(&self) -> u8 {
-        match self {
-            Ty::Fn { .. } => 0,
-            Ty::Union(_) => 1,
-            Ty::List(_) => 2,
-            Ty::Number
-            | Ty::String
-            | Ty::Boolean
-            | Ty::Date
-            | Ty::Null
-            | Ty::Unknown
-            | Ty::Generic(_)
-            | Ty::Ident(_) => 3,
-        }
-    }
-
-    fn fmt_with_prec(&self, f: &mut fmt::Formatter<'_>, parent_prec: u8) -> fmt::Result {
-        let my_prec = self.precedence();
-        let needs_parens = my_prec < parent_prec;
-        if needs_parens {
-            f.write_str("(")?;
-        }
-
-        match self {
-            Ty::Number => f.write_str("number")?,
-            Ty::String => f.write_str("string")?,
-            Ty::Boolean => f.write_str("boolean")?,
-            Ty::Date => f.write_str("date")?,
-            Ty::Null => f.write_str("null")?,
-            Ty::Unknown => f.write_str("unknown")?,
-            Ty::Generic(id) => write!(f, "T{}", id.0)?,
-            Ty::List(inner) => {
-                inner.fmt_with_prec(f, my_prec)?;
-                f.write_str("[]")?;
-            }
-            Ty::Union(members) => {
-                for (idx, m) in members.iter().enumerate() {
-                    if idx > 0 {
-                        f.write_str(" | ")?;
-                    }
-                    m.fmt_with_prec(f, my_prec)?;
-                }
-            }
-            Ty::Fn { params, ret } => {
-                f.write_str("(")?;
-                for (idx, (lp, lp_ty)) in params.iter().enumerate() {
-                    if idx > 0 {
-                        f.write_str(", ")?;
-                    }
-                    let name = match lp {
-                        LambdaParam::Current => "current",
-                        LambdaParam::ParamRef(s) => s.as_str(),
-                    };
-                    write!(f, "{name}: ")?;
-                    lp_ty.fmt_with_prec(f, 0)?;
-                }
-                f.write_str(") -> ")?;
-                ret.fmt_with_prec(f, 0)?;
-            }
-            Ty::Ident(inner) => {
-                f.write_str("ident<")?;
-                inner.fmt_with_prec(f, 0)?;
-                f.write_str(">")?;
-            }
-        };
-
-        if needs_parens {
-            f.write_str(")")?;
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Display for Ty {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt_with_prec(f, 0)
-    }
-}
-
-/// Category bucket for builtin functions (used for editor grouping).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum FunctionCategory {
-    General,
-    Text,
-    Number,
-    Date,
-    People,
-    List,
-    Special,
-}
-
 /// Returns whether `actual` is accepted by `expected` for semantic validation.
 ///
 /// Currently:
@@ -240,7 +89,12 @@ pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
     match (expected, actual) {
         // A Fn-typed param accepts any expression — the inference pass handles wrapping.
         // During validation the wrapped ImplicitLambda's body type is checked against ret.
-        (Ty::Fn { ret: expected_ret, .. }, actual) => ty_accepts(expected_ret, actual),
+        (
+            Ty::Fn {
+                ret: expected_ret, ..
+            },
+            actual,
+        ) => ty_accepts(expected_ret, actual),
         // Ident-typed positions are internal annotations for binder names — they should
         // not participate in user-visible type matching. validate_call short-circuits
         // before reaching ty_accepts for Ident params, but IDE callers may hit this path.
@@ -444,10 +298,7 @@ fn validate_call(
                 emit_error(
                     diags,
                     arg.span,
-                    format!(
-                        "{}() expects a variable name for `{}`",
-                        name, param.name
-                    ),
+                    format!("{}() expects a variable name for `{}`", name, param.name),
                 );
             }
             continue;
@@ -580,7 +431,7 @@ fn param_for_arg_index_with_total(
 }
 
 pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
-    param_shape::resolve_repeat_tail_used(params, total)
+    builtin_fn::resolve_repeat_tail_used(params, total)
 }
 
 fn emit_error(diags: &mut Vec<Diagnostic>, span: Span, message: impl Into<String>) {
