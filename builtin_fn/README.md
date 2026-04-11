@@ -23,4 +23,6 @@ the existing API surface while the ownership boundary lives here.
 
 - The parser is intentionally narrow: it only supports the signature language
   needed by the builtin registry.
+- Parse errors report byte offsets at the offending token so signature authoring
+  failures can be traced back to the source string.
 - `SigResolver` remains the escape hatch for builtins such as `flat`.

@@ -230,6 +230,7 @@ fn unknown_generic_reference_is_reported() {
         err.kind,
         BuiltinSigParseErrorKind::UnknownGenericReference { name: "T".into() }
     );
+    assert_eq!(err.position, 10);
 }
 
 #[test]

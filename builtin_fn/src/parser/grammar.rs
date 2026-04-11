@@ -60,7 +60,7 @@ enum ParsedTy {
     Date,
     Null,
     Any,
-    GenericRef(String),
+    GenericRef { name: String, position: usize },
     List(Box<ParsedTy>),
     Union(Vec<ParsedTy>),
     Fn {
@@ -253,7 +253,10 @@ impl<'a> Parser<'a> {
                         position,
                     ));
                 }
-                ParsedTy::GenericRef(ident)
+                ParsedTy::GenericRef {
+                    name: ident,
+                    position,
+                }
             }
         };
 
@@ -450,7 +453,7 @@ impl LowerCtx {
             ParsedTy::Date => Ok(Ty::Date),
             ParsedTy::Null => Ok(Ty::Null),
             ParsedTy::Any => Ok(Ty::Generic(self.any_generic())),
-            ParsedTy::GenericRef(name) => self
+            ParsedTy::GenericRef { name, position } => self
                 .explicit_generics
                 .get(name)
                 .copied()
@@ -458,7 +461,7 @@ impl LowerCtx {
                 .ok_or_else(|| {
                     BuiltinSigParseError::new(
                         BuiltinSigParseErrorKind::UnknownGenericReference { name: name.clone() },
-                        0,
+                        *position,
                     )
                 }),
             ParsedTy::List(inner) => Ok(Ty::List(Box::new(self.lower_ty(inner)?))),
