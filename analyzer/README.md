@@ -2,17 +2,21 @@
 
 Core analyzer for a Notion-like formula language.
 
+Design rationale: [`docs/design/analyzer.md`](../docs/design/analyzer.md).
+Cross-crate contracts: [`docs/design/contracts.md`](../docs/design/contracts.md).
+
 IDE/editor helpers (formatter/completion/signature help/edit application) live in the sibling
 `ide` crate.
 
 Builtin function signatures and the shared builtin type model live in the sibling
 `builtin_fn` crate and are re-exported through `analyzer::semantic`.
 
-## Coordinates (hard rule)
+## Coordinates
 
 - `Span { start, end }` is UTF-8 byte offsets into source.
 - Half-open everywhere: `[start, end)`.
 - UTF-16 conversion does not happen in this crate.
+- See `docs/design/contracts.md` for full span/offset rules.
 
 ## Entry points
 
@@ -45,9 +49,7 @@ Quick fixes are represented as diagnostic actions, not as a separate parse-outpu
 
 ## Invariants
 
-- Parser and semantic diagnostics are deterministic and stable.
-- Diagnostic actions use byte ranges.
-- No UTF-16 offsets are stored in core data structures.
+See `docs/design/contracts.md` for full contract listing.
 
 ## Testing
 

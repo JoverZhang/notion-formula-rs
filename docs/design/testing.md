@@ -2,15 +2,38 @@
 
 Where regression coverage lives, what each layer validates, and how to refresh snapshots.
 
-## Rust unit tests (`analyzer/`)
+## builtin_fn
+
+- Location: `builtin_fn/src/` (inline tests) + `builtin_fn/src/parser/` (parser tests)
+- Coverage: signature parsing, param shape validation, type model, union normalization
+
+Run:
+
+```bash
+cargo test -p builtin_fn
+```
+
+## analyzer
+
+### Unit tests
 
 - Location: `analyzer/src/tests/`
-- Coverage includes:
+- Coverage:
   - lexer/parser/AST behavior
   - parser recovery + diagnostics priority/deconfliction
   - diagnostic actions (quick-fix actions attached to diagnostics)
   - span/token invariants (`Span`, `tokens_in_span`, `TokenQuery`)
   - semantic checks and builtin/type behavior
+
+### Golden tests (diagnostics)
+
+- Runner: `analyzer/tests/diagnostics_golden.rs`
+- Fixtures: `analyzer/tests/diagnostics/*.formula` -> `*.snap`
+- Update snapshots:
+
+```bash
+BLESS=1 cargo test -p analyzer
+```
 
 Run:
 
@@ -18,14 +41,26 @@ Run:
 cargo test -p analyzer
 ```
 
-## Rust unit tests (`ide/`)
+## ide
+
+### Unit tests
 
 - Location: `ide/src/tests/`
-- Coverage includes:
+- Coverage:
   - formatter behavior + idempotence
   - completion ranking/position behavior
   - signature-help behavior
   - edit application/validation behavior
+
+### Golden tests (format)
+
+- Runner: `ide/tests/format_golden.rs`
+- Fixtures: `ide/tests/format/*.formula` -> `*.snap`
+- Update snapshots:
+
+```bash
+BLESS=1 cargo test -p ide format_golden
+```
 
 Run:
 
@@ -33,44 +68,10 @@ Run:
 cargo test -p ide
 ```
 
-## Rust golden tests
+## analyzer_wasm
 
-Diagnostics golden (`analyzer/`):
-
-Runners:
-
-- `analyzer/tests/diagnostics_golden.rs`
-
-Fixtures:
-
-- `analyzer/tests/diagnostics/*.formula` -> `*.snap`
-
-Update snapshots:
-
-```bash
-BLESS=1 cargo test -p analyzer
-```
-
-Format golden (`ide/`):
-
-Runners:
-
-- `ide/tests/format_golden.rs`
-
-Fixtures:
-
-- `ide/tests/format/*.formula` -> `*.snap`
-
-Update snapshots:
-
-```bash
-BLESS=1 cargo test -p ide format_golden
-```
-
-## WASM tests (`analyzer_wasm/`)
-
-- `analyzer_wasm/tests/analyze.rs`
-- Validates:
+- Location: `analyzer_wasm/tests/analyze.rs`
+- Coverage:
   - UTF-16 span/offset correctness (including emoji edge cases)
   - diagnostics + diagnostic action conversion
   - line/column projection on diagnostic DTOs
@@ -85,18 +86,29 @@ cargo test -p analyzer_wasm
 wasm-pack test --node analyzer_wasm
 ```
 
-Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test`
-integration tests under `analyzer_wasm/tests/`.
+Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test` integration tests.
 
-## Vite demo tests (`examples/vite/`)
+## evaluator
 
-- Unit tests: `examples/vite/tests/unit/` (Vitest)
-- E2E tests: `examples/vite/tests/e2e/` (Playwright)
+- Location: `evaluator/src/` (inline tests)
+- Coverage: literal evaluation, binary arithmetic, type coercion, divide-by-zero, mask propagation
 
-Precondition:
+Run:
 
-- Unit tests import the generated wasm package under `examples/vite/src/pkg/`.
-- Run `pnpm -C examples/vite wasm:build` at least once before `pnpm -C examples/vite test`.
+```bash
+cargo test -p evaluator
+```
+
+## Vite demo (examples/vite/)
+
+### Unit tests (Vitest)
+
+- Location: `examples/vite/tests/unit/`
+- Precondition: run `pnpm -C examples/vite wasm:build` at least once.
+
+### E2E tests (Playwright)
+
+- Location: `examples/vite/tests/e2e/`
 
 Regression coverage (non-exhaustive):
 
@@ -115,4 +127,13 @@ Run:
 pnpm -C examples/vite wasm:build
 pnpm -C examples/vite test
 pnpm -C examples/vite test:e2e
+```
+
+## All-crate shortcuts
+
+```bash
+just test       # all Rust tests
+just check      # cargo check
+just fmt         # cargo fmt
+cargo test       # all workspace tests
 ```

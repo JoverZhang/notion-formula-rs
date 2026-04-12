@@ -2,14 +2,18 @@
 
 IDE/editor helpers for notion-formula-rs.
 
+Design rationale: [`docs/design/ide.md`](../docs/design/ide.md).
+Cross-crate contracts: [`docs/design/contracts.md`](../docs/design/contracts.md).
+
 This crate owns formatter, completion, signature help, and byte-edit application.
 It depends on `analyzer` for core syntax/semantic structures and analysis entry points.
 
-## Coordinates (hard rule)
+## Coordinates
 
 - `Span { start, end }` is UTF-8 byte offsets into source.
 - Half-open everywhere: `[start, end)`.
 - UTF-16 conversion stays in `analyzer_wasm`.
+- See `docs/design/contracts.md` for full span/offset rules.
 
 ## Entry points
 

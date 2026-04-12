@@ -4,8 +4,15 @@ Start at: [`docs/design/README.md`](design/README.md).
 
 ## What lives where
 
-- `docs/design/README.md`: repo map + contracts/drift tracker index.
-- `docs/design/contracts.md`: design contracts (hard rules).
+- `docs/design/README.md`: pipeline overview + design docs index.
+- `docs/design/contracts.md`: cross-crate hard rules (spans, tokens, determinism, edits).
+- `docs/design/builtin-fn.md`: type model, signatures, param shapes (builtin_fn crate).
+- `docs/design/analyzer.md`: lexer, parser, semantic pipeline (analyzer crate).
+- `docs/design/ide.md`: completion, signature help, formatting (ide crate).
+- `docs/design/wasm-boundary.md`: WASM facade, DTOs, UTF-16 (analyzer_wasm crate).
+- `docs/design/evaluator.md`: IR, planner, kernels, row-batch (evaluator crate).
+- `docs/design/testing.md`: test inventory across all crates.
+- `docs/design/demo-vite.md`: Vite example app UI/UX.
 - `docs/design/drift-tracker.md`: open questions and known gaps.
 - `README.md` next to code: module/crate docs (e.g. `analyzer/README.md`).
 - `docs/changelogs/YYYYMMDD-short-slug.md`: user-visible changes.

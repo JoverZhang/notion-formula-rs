@@ -2,6 +2,9 @@
 
 Row-batch formula evaluation runtime.
 
+Design rationale: [`docs/design/evaluator.md`](../docs/design/evaluator.md).
+Cross-crate contracts: [`docs/design/contracts.md`](../docs/design/contracts.md).
+
 ## Responsibility
 
 `evaluator` resolves expression values for a batch of rows with provider-backed property access.
@@ -19,22 +22,7 @@ Expr (AST)  -->  Planner  -->  ExecPlan (IR)  -->  Evaluator  -->  EvalBlock
             (from analyzer)
 ```
 
-1. **Planner** receives a parsed `Expr` and an `EvalContext`. It runs the analyser's
-   type inference (`infer_expr_with_map`) to produce a `TypeMap`, then lowers the
-   AST into an `ExecPlan` -- a tree of `ExecNode` variants.
-2. **Evaluator** walks the `ExecPlan` recursively, dispatching binary operations
-   through the **kernel registry** (a static lookup table keyed by `BinaryExecKey`).
-3. Results are collected into an `EvalBlock` per expression: a `ColumnBlock` of
-   values, a `Mask` of ok/fail flags, and a `Vec<(usize, EvalError)>` of row-level
-   errors.
-
-## Core contracts
-
-- `Value` does not carry errors.
-- Row failures are externalised via `EvalBlock.ok` and `EvalBlock.errors`.
-- `ok[i] = false` means `values[i]` is placeholder-only (`Null`) and must not be consumed.
-- Provider receives `Property` directly (`get_prop(&Property, ...)`).
-- Branching/short-circuit paths pass `mask` so provider work is limited to required rows.
+See `docs/design/evaluator.md` for design rationale (why IR, why async Provider).
 
 ## Current runtime scope
 

@@ -2,6 +2,8 @@
 
 Builtin function signature definitions and parsing infrastructure.
 
+Design rationale: [`docs/design/builtin-fn.md`](../docs/design/builtin-fn.md).
+
 This crate owns:
 
 - the shared formula type model used by builtin signatures

@@ -6,15 +6,47 @@ If a contract changes, it needs tests + docs + changelog.
 ## Spans and offsets
 
 Rule: Core spans/offsets use UTF-8 bytes, with half-open ranges `[start, end)`.
+Rule: `Span { start: u32, end: u32 }` -- UTF-8 byte offsets into source.
+Rule: With valid boundaries, slicing is `&source[start..end]`.
 Rule: DTO spans/edits use UTF-16 code units, with half-open ranges `[start, end)`.
 Rule: Coordinate conversion only happens at the WASM boundary layer.
 Rule: `Diagnostic.line`/`col` are computed from byte offsets during WASM conversion.
-Where: `analyzer/src/lexer/token.rs`, `analyzer_wasm/src/dto/v1.rs`, `analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`, `analyzer_wasm/src/converter/shared.rs`.
+Where: `analyzer/src/span.rs`, `analyzer/src/lexer/token.rs`, `analyzer_wasm/src/dto/v1.rs`, `analyzer_wasm/src/offsets.rs`, `analyzer_wasm/src/span.rs`, `analyzer_wasm/src/converter/shared.rs`.
 
 ## Token stream
 
 Rule: The token stream includes trivia (`DocComment`, `Newline`) and explicit `Eof`.
-Rule: `TokenQuery` is the trivia-aware source-of-truth API.
+Rule: `Eof` has an empty span.
+Rule: `TokenQuery` is the trivia-aware source-of-truth API for span-to-token mapping.
+
+Trivia token kinds:
+
+- `TokenKind::DocComment(CommentKind, Symbol)`:
+  - `// ...` -> `CommentKind::Line`
+  - `/* ... */` -> `CommentKind::Block`
+- `TokenKind::Newline`
+
+`TokenRange` and `tokens_in_span`:
+
+- `tokens_in_span(tokens, span)` maps a byte span to a half-open token index range `[lo, hi)`.
+- Handles empty spans (stable insertion-point behavior), trivia tokens, and EOF.
+- Where: `analyzer/src/lexer/token.rs`
+
+`TokenQuery` API surface (stable):
+
+- `range_for_span(span) -> TokenRange`
+- `prev_nontrivia(idx)` / `next_nontrivia(idx)`
+- `first_in_range(range)` / `last_in_range(range)`
+- `leading_trivia_before(idx)` / `trailing_trivia_until_newline_or_nontrivia(idx)`
+- `bounds_usize(range)`
+- Design intent: one place for trivia/neighbor scanning; avoids duplicated index math in formatter/comment attachment.
+- Where: `analyzer/src/parser/tokenstream.rs`
+
+Tests:
+
+- `tokens_in_span`: `analyzer/src/tests/lexer/test_tokens_in_span.rs`
+- Span/token invariants: `analyzer/src/tests/parser/test_invariants.rs`
+- `TokenQuery`: `analyzer/src/tests/parser/test_token_query.rs`
 
 ## AST + syntax invariants
 

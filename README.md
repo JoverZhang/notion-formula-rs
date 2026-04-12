@@ -317,9 +317,11 @@ If you only read three docs, read these first:
 
 More focused docs:
 
+- [`docs/design/builtin-fn.md`](docs/design/builtin-fn.md)
+- [`docs/design/analyzer.md`](docs/design/analyzer.md)
 - [`docs/design/ide.md`](docs/design/ide.md)
-- [`docs/design/tokens-spans.md`](docs/design/tokens-spans.md)
 - [`docs/design/wasm-boundary.md`](docs/design/wasm-boundary.md)
+- [`docs/design/evaluator.md`](docs/design/evaluator.md)
 - [`examples/vite/README.md`](examples/vite/README.md)
 
 ## Contributing

@@ -1,8 +1,34 @@
 # Design (notion-formula-rs)
 
-This file only covers stable architecture, cross-crate contracts, and drift tracking.
-For implementation details, read each module README, such as `analyzer/README.md`, `ide/README.md`, `analyzer_wasm/README.md`, and `examples/vite/README.md`.
+Stable architecture, cross-crate contracts, and design rationale.
+For implementation details, read each module README (e.g. `analyzer/README.md`).
 For the documentation entry point, see `docs/README.md`.
+
+## Pipeline
+
+```
+  Source (UTF-8 string)
+       |
+       v
+  Lexer ──> Tokens + Trivia + Lex diagnostics
+       |         (analyzer/src/lexer/)
+       v
+  Parser (Pratt) ──> AST + Parse diagnostics
+       |              (analyzer/src/parser/)
+       v
+  Semantic Analysis ──> TypeMap + Semantic diagnostics
+       |                 (analyzer/src/analysis/
+       |                  + builtin_fn/ type model)
+       |
+       +──> IDE (format, complete, signature help)
+       |         (ide/src/)
+       |
+       +──> WASM boundary (UTF-8 -> UTF-16, DTOs)
+       |         (analyzer_wasm/src/)
+       |
+       +──> Evaluator (AST -> IR -> row-batch)
+                 (evaluator/src/)
+```
 
 ## Goals
 
@@ -12,7 +38,7 @@ For the documentation entry point, see `docs/README.md`.
 
 ## Module Summary
 
-| Module | Summary | Primary doc |
+| Module | Summary | Module README |
 | --- | --- | --- |
 | `builtin_fn/` | builtin signature model + parser + registry | `builtin_fn/README.md` |
 | `analyzer/` | lexer + parser + AST + diagnostics + semantic | `analyzer/README.md` |
@@ -21,6 +47,20 @@ For the documentation entry point, see `docs/README.md`.
 | `evaluator/` | row-batch runtime evaluation + provider boundary | `evaluator/README.md` |
 | `examples/vite/` | demo integration | `examples/vite/README.md` |
 | `docs/` | design docs + changelog guidance | `docs/README.md` |
+
+## Design Docs Index
+
+| Doc | Scope |
+| --- | --- |
+| [`contracts.md`](contracts.md) | Cross-crate hard rules (spans, determinism, tokens, edits) |
+| [`builtin-fn.md`](builtin-fn.md) | Type model, signatures, param shapes, generic binding |
+| [`analyzer.md`](analyzer.md) | Lexer, parser, AST, semantic analysis, postfix sugar |
+| [`ide.md`](ide.md) | Completion, signature help, formatting, edit application |
+| [`wasm-boundary.md`](wasm-boundary.md) | WASM facade, DTOs, UTF-16 conversion, JS API |
+| [`evaluator.md`](evaluator.md) | IR, planner, kernels, row-batch evaluation |
+| [`testing.md`](testing.md) | Test inventory across all crates |
+| [`demo-vite.md`](demo-vite.md) | Vite example app UI/UX |
+| [`drift-tracker.md`](drift-tracker.md) | Open questions and known gaps |
 
 ## Design Philosophy
 
@@ -39,48 +79,9 @@ For the documentation entry point, see `docs/README.md`.
 - `span`: a source range represented as a half-open interval `[start, end)`.
 - `cursor`: a source position in `[0, length)`. In tests we mark it as `$0` (same naming style as rustc tests).
 
-## Design (Keep It Simple)
-
-### analyzer
-
-The core goal of `analyzer` is a recovering compiler: parsing does not stop because of local errors, and still produces AST + diagnostics for IDE use and downstream semantic analysis.
-
-Key tradeoffs:
-
-- Keep trivia such as `group`, `newlines`, and `comments` in the AST so formatting can reuse the same structure. This avoids maintaining a separate CST in `ide`; for this lightweight grammar, the extra analysis cost is acceptable.
-- During parsing, insert `ErrorExpr` placeholders and emit diagnostics to improve one-pass diagnostic quality.
-- Some diagnostics carry code actions (for example missing parentheses or commas) for lightweight quick fixes.
-- Builtin signature ownership is delegated to `builtin_fn`; `analyzer::semantic` re-exports the shared types to preserve downstream API stability.
-
-### ide
-
-The core job of `ide` is to provide modern editor behaviors: format, completion, and signature help.
-The design direction is to reuse `analyzer` structures and keep output stable and explainable.
-
-See [`docs/design/ide.md`](ide.md).
-
-### analyzer_wasm
-
-`analyzer_wasm` is the JS/TS-facing facade for `analyzer` and `ide`, and also provides a lightweight DTO anti-corruption layer.
-
-Design principles:
-
-- Only expose the APIs and coordinate conversions we actually need; avoid extra logic.
-- UTF-8 byte <-> UTF-16 code unit span conversion only happens here.
-
-### evaluator
-
-`evaluator` executes formulas over a row batch, with external field values supplied by `Provider`.
-
-Design principles:
-
-- Keep provider integration explicit: `get_prop` receives full `Property` metadata, not just names.
-- Keep row-level failures externalized via `EvalBlock.ok` + `EvalBlock.errors`.
-- Keep branch/logical evaluation mask-aware so only required rows trigger provider work.
-
 ## Language Scope
 
-- Syntax follows Notion’s official guide: <https://www.notion.com/help/formula-syntax>.
+- Syntax follows Notion's official guide: <https://www.notion.com/help/formula-syntax>.
 
 Syntax summary:
 
