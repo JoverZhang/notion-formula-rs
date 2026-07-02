@@ -1,2 +1,3 @@
 /target
 analyzer_wasm/bindings/
+.pnpm-store/

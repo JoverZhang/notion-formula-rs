@@ -132,8 +132,9 @@ pnpm -C examples/vite test:e2e
 ## All-crate shortcuts
 
 ```bash
-just test       # all Rust tests
-just check      # cargo check
-just fmt         # cargo fmt
-cargo test       # all workspace tests
+just test        # repo test suite
+just verify      # deps + static checks + tests
+just docker-test # run verify inside the CI Docker image
+just check       # format check + Rust/frontend static checks
+cargo test       # workspace Rust tests
 ```

@@ -1,7 +1,7 @@
 use crate::analyze_syntax;
 use crate::semantic::{
-    infer_expr_with_map, Context, FunctionCategory, FunctionSig, GenericId, GenericParam,
-    GenericParamKind, ParamShape, ParamSig, Ty, TypeMap,
+    Context, FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, ParamShape,
+    ParamSig, Ty, TypeMap, infer_expr_with_map,
 };
 
 fn p(name: &str, ty: Ty) -> ParamSig {

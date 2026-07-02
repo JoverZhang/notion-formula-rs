@@ -1,6 +1,6 @@
 use crate::ast::{Expr, ExprKind};
 use crate::lexer::lex;
-use crate::lexer::{tokens_in_span, Span, Token};
+use crate::lexer::{Span, Token, tokens_in_span};
 use crate::parser::{Parser, TokenCursor};
 
 fn assert_child_range(child: &Expr, parent: &Expr, tokens: &[Token]) {

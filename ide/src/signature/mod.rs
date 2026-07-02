@@ -191,7 +191,11 @@ fn infer_one_arg(expr_source: &str, ctx: &semantic::Context) -> Option<semantic:
 
     let mut parsed = analyzer::analyze_syntax(trimmed);
     let mut map = analyzer::TypeMap::default();
-    Some(analyzer::infer_expr_with_map(&mut parsed.expr, ctx, &mut map))
+    Some(analyzer::infer_expr_with_map(
+        &mut parsed.expr,
+        ctx,
+        &mut map,
+    ))
 }
 
 /// Splits the token stream after `lparen_idx` into per-argument byte spans,
@@ -226,11 +230,7 @@ fn arg_spans(tokens: &[Token], lparen_idx: usize, source_len: u32) -> Vec<analyz
                     paren_depth -= 1;
                 }
             }
-            TokenKind::CloseBracket => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
-            }
+            TokenKind::CloseBracket if bracket_depth > 0 => bracket_depth -= 1,
             TokenKind::Comma if paren_depth == 0 && bracket_depth == 0 => {
                 spans.push(analyzer::Span {
                     start,

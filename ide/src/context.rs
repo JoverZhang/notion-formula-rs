@@ -345,21 +345,9 @@ pub(crate) fn detect_call_context(tokens: &[Token], cursor: u32) -> Option<CallC
         match token.kind {
             TokenKind::OpenParen => paren_depth += 1,
             TokenKind::OpenBracket => bracket_depth += 1,
-            TokenKind::CloseParen => {
-                if paren_depth > 0 {
-                    paren_depth -= 1;
-                }
-            }
-            TokenKind::CloseBracket => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
-            }
-            TokenKind::Comma => {
-                if paren_depth == 0 && bracket_depth == 0 {
-                    arg_index += 1;
-                }
-            }
+            TokenKind::CloseParen if paren_depth > 0 => paren_depth -= 1,
+            TokenKind::CloseBracket if bracket_depth > 0 => bracket_depth -= 1,
+            TokenKind::Comma if paren_depth == 0 && bracket_depth == 0 => arg_index += 1,
             _ => {}
         }
     }

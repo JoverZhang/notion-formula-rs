@@ -42,8 +42,10 @@ From repo root:
 
 ```bash
 just test
+just verify
+just deps
 just check
-just fmt
+just fix
 just gen-ts
 
 cargo test

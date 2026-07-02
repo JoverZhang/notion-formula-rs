@@ -96,8 +96,12 @@ pub(crate) fn eval_add(left: RowValue<'_>, right: RowValue<'_>) -> Result<Value,
     match (left, right) {
         (RowValue::Number(left), RowValue::Number(right)) => Ok(Value::Number(left + right)),
         (RowValue::Text(left), RowValue::Text(right)) => Ok(Value::Text(format!("{left}{right}"))),
-        (RowValue::Text(left), RowValue::Number(right)) => Ok(Value::Text(format!("{left}{right}"))),
-        (RowValue::Number(left), RowValue::Text(right)) => Ok(Value::Text(format!("{left}{right}"))),
+        (RowValue::Text(left), RowValue::Number(right)) => {
+            Ok(Value::Text(format!("{left}{right}")))
+        }
+        (RowValue::Number(left), RowValue::Text(right)) => {
+            Ok(Value::Text(format!("{left}{right}")))
+        }
         (RowValue::Text(left), RowValue::List(right)) => {
             Ok(Value::Text(format!("{left}{}", stringify_list(right))))
         }

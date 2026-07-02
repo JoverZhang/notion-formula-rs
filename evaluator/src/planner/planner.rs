@@ -1,12 +1,12 @@
-use analyzer::analysis::{infer_expr_with_map, Context as SemaContext, Ty, TypeMap};
+use analyzer::analysis::{Context as SemaContext, Ty, TypeMap, infer_expr_with_map};
 use analyzer::ast::{BinOpKind, Expr, ExprKind};
 
 use crate::core::context::EvalContext;
 use crate::ir::nodes::{CastPlan, ExecNode, ExecPlan};
 
+use super::PlanError;
 use super::lower_lit::{lower_const_value, lower_lit};
 use super::selectors::select_binary_plan;
-use super::PlanError;
 
 #[derive(Debug, Default)]
 pub(crate) struct Planner;

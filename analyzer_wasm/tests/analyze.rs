@@ -197,18 +197,26 @@ fn analyze_chinese_spans() {
 
 #[wasm_bindgen_test]
 fn analyze_emoji_spans_and_diagnostics() {
-    let source = "😀+1";
+    let source = "x😀";
     let result = analyze_value(source);
 
     let ident = &result.tokens[0];
     assert_eq!(ident.kind, "Ident");
     assert_eq!(ident.span.start, 0);
-    assert_eq!(ident.span.end, 2);
+    assert_eq!(ident.span.end, 1);
 
-    let plus = &result.tokens[1];
-    assert_eq!(plus.kind, "Plus");
-    assert_eq!(plus.span.start, 2);
-    assert_eq!(plus.span.end, 3);
+    let eof = &result.tokens[1];
+    assert_eq!(eof.kind, "Eof");
+    assert_eq!(eof.span.start, 3);
+    assert_eq!(eof.span.end, 3);
+
+    let diag = &result.diagnostics[0];
+    assert_eq!(diag.kind, "error");
+    assert!(diag.message.contains("unexpected char"));
+    assert_eq!(diag.span.start, 1);
+    assert_eq!(diag.span.end, 3);
+    assert_eq!(diag.line, 1);
+    assert_eq!(diag.col, 2);
 
     let error_source = "1 +";
     let error_result = analyze_value(error_source);

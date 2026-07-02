@@ -1,4 +1,5 @@
 mod lower_lit;
+#[allow(clippy::module_inception)]
 mod planner;
 mod selectors;
 

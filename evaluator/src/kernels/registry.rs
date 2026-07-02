@@ -9,7 +9,8 @@ use super::prepared::{PreparedArgs, prepare_any_args, prepare_f64_args};
 
 pub(crate) type PrepareBinaryFn =
     for<'a> fn(&'a EvalBlock, &'a EvalBlock, &Mask) -> Result<PreparedArgs<'a>, EvalBlock>;
-pub(crate) type ExecBinaryFn = for<'a> fn(PreparedArgs<'a>, &Mask, Vec<(usize, EvalError)>) -> EvalBlock;
+pub(crate) type ExecBinaryFn =
+    for<'a> fn(PreparedArgs<'a>, &Mask, Vec<(usize, EvalError)>) -> EvalBlock;
 
 #[derive(Clone, Copy)]
 pub(crate) struct KernelEntry {

@@ -1,0 +1,13 @@
+target/
+**/target/
+.pnpm-store/
+
+examples/vite/node_modules/
+examples/vite/dist/
+examples/vite/src/pkg/
+examples/vite/test-results/
+
+analyzer_wasm/bindings/
+
+.git/
+.github/

@@ -7,7 +7,7 @@ use crate::ast::{Expr, ExprKind, UnOp};
 use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
-use super::{normalize_union, Context, FunctionSig, GenericId, GenericParamKind, LambdaParam, Ty};
+use super::{Context, FunctionSig, GenericId, GenericParamKind, LambdaParam, Ty, normalize_union};
 
 /// Identifier for an expression node used as the key in [`TypeMap`].
 pub type ExprId = NodeId;
@@ -399,10 +399,10 @@ fn resolve_param_ref(
 ) -> String {
     for (i, param) in resolved_params.iter().enumerate() {
         if param.name == ref_name {
-            if let Some(arg) = args.get(i) {
-                if let ExprKind::Ident(sym) = &arg.kind {
-                    return sym.text.to_string();
-                }
+            if let Some(arg) = args.get(i)
+                && let ExprKind::Ident(sym) = &arg.kind
+            {
+                return sym.text.to_string();
             }
             break;
         }

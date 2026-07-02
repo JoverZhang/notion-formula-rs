@@ -10,8 +10,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: "20"
-  PNPM_VERSION: "10.28.0"
+  CI_IMAGE: notion-formula-rs-ci:local
 
 jobs:
   ci:
@@ -20,48 +19,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---- Rust toolchain ----
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build CI image
+        uses: docker/build-push-action@v6
         with:
-          targets: wasm32-unknown-unknown
+          context: .
+          file: Dockerfile.ci
+          tags: ${{ env.CI_IMAGE }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
-      - name: Install just
-        run: cargo install just --locked
-
-      # ---- Node + pnpm (pinned) ----
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: examples/vite/pnpm-lock.yaml
-
-      - name: Show tool versions
+      - name: Run checks and tests in CI image
         run: |
-          node -v
-          pnpm -v
-
-      - name: Install Vite deps
-        working-directory: examples/vite
-        run: pnpm i --frozen-lockfile
-
-      - name: Install Playwright browsers
-        working-directory: examples/vite
-        run: pnpm exec playwright install --with-deps
-
-      - name: Run tests via just
-        run: just test
+          docker run --rm --ipc=host \
+            -e CI=true \
+            -v "$PWD:/work" \
+            -w /work \
+            "$CI_IMAGE" \
+            just verify
 
   deploy:
     name: Deploy Pages
@@ -78,42 +56,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build CI image
+        uses: docker/build-push-action@v6
         with:
-          targets: wasm32-unknown-unknown
+          context: .
+          file: Dockerfile.ci
+          tags: ${{ env.CI_IMAGE }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
-      # ---- Node + pnpm (pinned) ----
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: examples/vite/pnpm-lock.yaml
-
-      - name: Install Vite deps
-        working-directory: examples/vite
-        run: pnpm i --frozen-lockfile
-
-      - name: Build WASM
-        working-directory: examples/vite
-        run: pnpm -s run wasm:build
-
-      - name: Build Vite (GitHub Pages base)
-        working-directory: examples/vite
-        env:
-          GITHUB_PAGES: "true"
-        run: pnpm -s run build
+      - name: Build Vite in CI image
+        run: |
+          docker run --rm \
+            -e GITHUB_PAGES=true \
+            -v "$PWD:/work" \
+            -w /work \
+            "$CI_IMAGE" \
+            just build
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

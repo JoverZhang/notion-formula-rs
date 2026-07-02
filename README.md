@@ -110,6 +110,16 @@ Open the URL printed by Vite (usually `http://127.0.0.1:5173`).
 just test
 ```
 
+### 5) Run the full CI gate locally
+
+```bash
+# native
+just verify
+
+# inside the CI Docker image
+just docker-test
+```
+
 ## API Surface
 
 There is no end-user CLI compiler here. You normally integrate through Rust APIs or WASM exports.
@@ -281,13 +291,17 @@ cd examples/vite && pnpm -s run wasm:build && pnpm -s run test && pnpm -s run te
 
 ```bash
 # just
-just build     # build demo bundle (wasm build + install + vite build)
-just check    # cargo check + clippy + frontend checks
-just fmt      # rustfmt + frontend format
-just fix      # clippy --fix + frontend lint fixes
-just gen-ts   # export TS DTO types from analyzer_wasm
-just test     # repo test suite
+just deps      # fetch Rust crates + install frontend deps
+just build     # build demo bundle
+just check     # format check + Rust/frontend static checks
+just fix       # clippy/eslint fixes + Rust/frontend formatting
+just verify    # deps + check + test
+just docker-test # build CI image, then run verify inside it
+just gen-ts    # export TS DTO types from analyzer_wasm
+just test      # repo test suite
+just test-builtin_fn
 just test-analyzer
+just test-evaluator
 just test-ide
 just test-analyzer_wasm
 just test-analyzer-bless

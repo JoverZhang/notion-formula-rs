@@ -1,6 +1,6 @@
 use crate::ast::ExprKind;
-use crate::semantic::{self, builtins_functions, Context, LambdaParam, Ty};
-use crate::{analyze_syntax, Span};
+use crate::semantic::{self, Context, LambdaParam, Ty, builtins_functions};
+use crate::{Span, analyze_syntax};
 
 fn builtins_ctx() -> Context {
     Context {
