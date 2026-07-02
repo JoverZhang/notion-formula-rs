@@ -230,11 +230,7 @@ fn arg_spans(tokens: &[Token], lparen_idx: usize, source_len: u32) -> Vec<analyz
                     paren_depth -= 1;
                 }
             }
-            TokenKind::CloseBracket => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
-            }
+            TokenKind::CloseBracket if bracket_depth > 0 => bracket_depth -= 1,
             TokenKind::Comma if paren_depth == 0 && bracket_depth == 0 => {
                 spans.push(analyzer::Span {
                     start,

@@ -399,10 +399,10 @@ fn resolve_param_ref(
 ) -> String {
     for (i, param) in resolved_params.iter().enumerate() {
         if param.name == ref_name {
-            if let Some(arg) = args.get(i) {
-                if let ExprKind::Ident(sym) = &arg.kind {
-                    return sym.text.to_string();
-                }
+            if let Some(arg) = args.get(i)
+                && let ExprKind::Ident(sym) = &arg.kind
+            {
+                return sym.text.to_string();
             }
             break;
         }

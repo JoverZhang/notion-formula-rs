@@ -943,16 +943,8 @@ impl DelimDepth {
         match kind {
             TokenKind::OpenParen => self.paren = self.paren.saturating_add(1),
             TokenKind::OpenBracket => self.bracket = self.bracket.saturating_add(1),
-            TokenKind::CloseParen => {
-                if self.paren > 0 {
-                    self.paren -= 1;
-                }
-            }
-            TokenKind::CloseBracket => {
-                if self.bracket > 0 {
-                    self.bracket -= 1;
-                }
-            }
+            TokenKind::CloseParen if self.paren > 0 => self.paren -= 1,
+            TokenKind::CloseBracket if self.bracket > 0 => self.bracket -= 1,
             _ => {}
         }
     }

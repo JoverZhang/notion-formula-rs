@@ -302,57 +302,57 @@ pub fn lex(input: &str) -> LexOutput {
                     // Peek two chars ahead: need a digit after the dot.
                     let mut lookahead = iter.clone();
                     lookahead.next(); // consume '.'
-                    if let Some(&(_, c2)) = lookahead.peek() {
-                        if c2.is_ascii_digit() {
-                            iter.next(); // consume '.'
-                            end = dot_i + 1;
-                            while let Some(&(i, c2)) = iter.peek() {
-                                if c2.is_ascii_digit() {
-                                    iter.next();
-                                    end = i + c2.len_utf8();
-                                } else {
-                                    break;
-                                }
+                    if let Some(&(_, c2)) = lookahead.peek()
+                        && c2.is_ascii_digit()
+                    {
+                        iter.next(); // consume '.'
+                        end = dot_i + 1;
+                        while let Some(&(i, c2)) = iter.peek() {
+                            if c2.is_ascii_digit() {
+                                iter.next();
+                                end = i + c2.len_utf8();
+                            } else {
+                                break;
                             }
                         }
                     }
                 }
 
                 // Exponent part: 'e' or 'E', optional '+'/'-', then digits.
-                if let Some(&(_, ec)) = iter.peek() {
-                    if ec == 'e' || ec == 'E' {
-                        let mut lookahead = iter.clone();
-                        lookahead.next(); // consume 'e'/'E'
+                if let Some(&(_, ec)) = iter.peek()
+                    && (ec == 'e' || ec == 'E')
+                {
+                    let mut lookahead = iter.clone();
+                    lookahead.next(); // consume 'e'/'E'
 
-                        let mut has_digits = false;
-                        if let Some(&(_, sc)) = lookahead.peek() {
-                            if sc == '+' || sc == '-' {
-                                lookahead.next(); // consume sign
-                            }
-                            if let Some(&(_, dc)) = lookahead.peek() {
-                                has_digits = dc.is_ascii_digit();
-                            }
+                    let mut has_digits = false;
+                    if let Some(&(_, sc)) = lookahead.peek() {
+                        if sc == '+' || sc == '-' {
+                            lookahead.next(); // consume sign
                         }
+                        if let Some(&(_, dc)) = lookahead.peek() {
+                            has_digits = dc.is_ascii_digit();
+                        }
+                    }
 
-                        if has_digits {
-                            // Commit: consume e/E
-                            let (ei, _) = iter.next().unwrap();
-                            end = ei + 1;
-                            // Consume optional sign
-                            if let Some(&(si, sc)) = iter.peek() {
-                                if sc == '+' || sc == '-' {
-                                    iter.next();
-                                    end = si + 1;
-                                }
-                            }
-                            // Consume exponent digits
-                            while let Some(&(i, c2)) = iter.peek() {
-                                if c2.is_ascii_digit() {
-                                    iter.next();
-                                    end = i + c2.len_utf8();
-                                } else {
-                                    break;
-                                }
+                    if has_digits {
+                        // Commit: consume e/E
+                        let (ei, _) = iter.next().unwrap();
+                        end = ei + 1;
+                        // Consume optional sign
+                        if let Some(&(si, sc)) = iter.peek()
+                            && (sc == '+' || sc == '-')
+                        {
+                            iter.next();
+                            end = si + 1;
+                        }
+                        // Consume exponent digits
+                        while let Some(&(i, c2)) = iter.peek() {
+                            if c2.is_ascii_digit() {
+                                iter.next();
+                                end = i + c2.len_utf8();
+                            } else {
+                                break;
                             }
                         }
                     }

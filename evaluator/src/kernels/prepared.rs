@@ -62,8 +62,8 @@ pub(crate) fn prepare_any_args<'a>(
 fn type_mismatch_prepare_block(mask: &Mask, left: &EvalBlock, right: &EvalBlock) -> EvalBlock {
     let len = mask.len();
     let mut errors = Vec::new();
-    for idx in 0..len {
-        if !mask[idx] || !left.ok[idx] || !right.ok[idx] {
+    for (idx, active) in mask.iter().copied().enumerate().take(len) {
+        if !active || !left.ok[idx] || !right.ok[idx] {
             continue;
         }
         if left.values.nulls[idx] || right.values.nulls[idx] {
