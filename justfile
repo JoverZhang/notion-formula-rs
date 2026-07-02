@@ -25,10 +25,14 @@ docker-test: _docker-build-ci
 
 # Checks and fixes
 
-check:
+check: check-rust check-example-vite
+
+check-rust:
   cargo fmt --all -- --check
   cargo check
   cargo clippy
+
+check-example-vite: wasm
   pnpm -C examples/vite -s run check
 
 typecheck:
