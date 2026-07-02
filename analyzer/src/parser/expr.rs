@@ -4,10 +4,10 @@
 //! `[start, end)`.
 
 use super::{ParseOutput, Parser};
+use crate::Token;
 use crate::ast::{AssocOp, Expr, ExprKind, NotKind, UnOp};
 use crate::diagnostics::{DiagnosticCode, Label, ParseDiagnostic};
 use crate::lexer::{Lit, LitKind, Span, Symbol, TokenKind};
-use crate::Token;
 
 impl<'a> Parser<'a> {
     /// Parser's entry point

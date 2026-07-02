@@ -60,7 +60,10 @@ enum ParsedTy {
     Date,
     Null,
     Any,
-    GenericRef { name: String, position: usize },
+    GenericRef {
+        name: String,
+        position: usize,
+    },
     List(Box<ParsedTy>),
     Union(Vec<ParsedTy>),
     Fn {

@@ -1,7 +1,7 @@
 use crate::semantic::{
     self, Context, FunctionCategory, FunctionSig, GenericId, ParamShape, ParamSig, Property, Ty,
 };
-use crate::{analyze_syntax, Span};
+use crate::{Span, analyze_syntax};
 
 fn p(name: &str, ty: Ty) -> ParamSig {
     ParamSig {

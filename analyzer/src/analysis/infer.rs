@@ -7,7 +7,7 @@ use crate::ast::{Expr, ExprKind, UnOp};
 use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
-use super::{normalize_union, Context, FunctionSig, GenericId, GenericParamKind, LambdaParam, Ty};
+use super::{Context, FunctionSig, GenericId, GenericParamKind, LambdaParam, Ty, normalize_union};
 
 /// Identifier for an expression node used as the key in [`TypeMap`].
 pub type ExprId = NodeId;

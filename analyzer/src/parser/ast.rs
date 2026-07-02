@@ -1,6 +1,6 @@
 use crate::{
-    lexer::{Lit, NodeId, Span, Spanned, Symbol},
     Token, TokenKind,
+    lexer::{Lit, NodeId, Span, Spanned, Symbol},
 };
 
 pub enum AssocOp {

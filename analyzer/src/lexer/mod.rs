@@ -4,8 +4,8 @@ mod token;
 
 pub use crate::span::{Span, Spanned};
 pub use token::{
-    tokens_in_span, CommentKind, Lit, LitKind, NodeId, Symbol, Token, TokenIdx, TokenKind,
-    TokenRange,
+    CommentKind, Lit, LitKind, NodeId, Symbol, Token, TokenIdx, TokenKind, TokenRange,
+    tokens_in_span,
 };
 
 pub struct LexOutput {

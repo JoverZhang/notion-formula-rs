@@ -3,8 +3,8 @@
 //! - `flat()` uses a custom resolver for depth-sensitive return types.
 //! - `padStart`, `padEnd`, `formatNumber`, `splice` are new builtins added alongside the resolver.
 
-use crate::semantic::{self, builtins_functions, Context, Ty};
-use crate::{analyze_syntax, Span};
+use crate::semantic::{self, Context, Ty, builtins_functions};
+use crate::{Span, analyze_syntax};
 
 fn infer_ok(source: &str, ctx: &Context) -> Ty {
     let mut output = analyze_syntax(source);

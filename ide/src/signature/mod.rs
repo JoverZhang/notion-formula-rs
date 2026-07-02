@@ -191,7 +191,11 @@ fn infer_one_arg(expr_source: &str, ctx: &semantic::Context) -> Option<semantic:
 
     let mut parsed = analyzer::analyze_syntax(trimmed);
     let mut map = analyzer::TypeMap::default();
-    Some(analyzer::infer_expr_with_map(&mut parsed.expr, ctx, &mut map))
+    Some(analyzer::infer_expr_with_map(
+        &mut parsed.expr,
+        ctx,
+        &mut map,
+    ))
 }
 
 /// Splits the token stream after `lparen_idx` into per-argument byte spans,
