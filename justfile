@@ -1,38 +1,84 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
-build:
-  cd examples/vite && pnpm -s run wasm:build && pnpm -s i && pnpm -s run build
+ci-image := "notion-formula-rs-ci:local"
+
+# Dependencies
+
+deps: deps-rust deps-node
+
+deps-rust:
+  cargo fetch --locked
+  cargo fetch --locked --target wasm32-unknown-unknown
+
+deps-node:
+  pnpm -C examples/vite install --frozen-lockfile
+
+# CI
+
+verify: deps check test
+
+_docker-build-ci:
+  docker buildx build --load -f Dockerfile.ci -t {{ci-image}} .
+
+docker-test: _docker-build-ci
+  docker run --rm --ipc=host -e CI=true -v "$PWD:/work" -w /work {{ci-image}} just verify
+
+# Checks and fixes
 
 check:
-  cargo check && cargo clippy && cd examples/vite && pnpm -s run check
+  cargo fmt --all -- --check
+  cargo check
+  cargo clippy
+  pnpm -C examples/vite -s run check
 
 typecheck:
   cargo check
 
-wasm:
-  cd examples/vite && pnpm -s run wasm:build
-
 fix:
-  cargo clippy --fix --allow-dirty --allow-staged && cd examples/vite && pnpm -s run lint:fix
+  cargo clippy --fix --allow-dirty --allow-staged
+  cargo fmt --all
+  pnpm -C examples/vite -s run lint:fix
+  pnpm -C examples/vite -s run format:fix
 
-fmt:
-  cargo fmt --all && cd examples/vite && pnpm -s run format:fix
+# Build and dev
 
 gen-ts:
   cargo run -p analyzer_wasm --bin export_ts
 
-test: test-analyzer test-ide test-analyzer_wasm test-example-vite
+wasm:
+  pnpm -C examples/vite -s run wasm:build
 
-verify: test-analyzer test-ide test-analyzer_wasm
+build: deps-node wasm
+  pnpm -C examples/vite -s run build
+
+run-example-vite: deps-node wasm
+  pnpm -C examples/vite -s run dev
+
+clean:
+  cargo clean
+  cd examples/vite && rm -rf node_modules dist src/pkg test-results
+
+# Tests
+
+test: test-rust test-example-vite
+
+test-rust: test-builtin_fn test-analyzer test-evaluator test-ide test-analyzer_wasm
+
+test-builtin_fn:
+  cargo test -p builtin_fn
 
 test-analyzer:
   cargo test -p analyzer
+
+test-evaluator:
+  cargo test -p evaluator
 
 test-ide:
   cargo test -p ide
 
 test-analyzer_wasm:
   cargo test -p analyzer_wasm
+  wasm-pack test --node analyzer_wasm
 
 test-analyzer-bless:
   BLESS=1 cargo test -p analyzer
@@ -42,12 +88,6 @@ test-ide-bless:
 
 bless: test-analyzer-bless test-ide-bless
 
-test-example-vite:
-  cd examples/vite && pnpm -s run wasm:build && pnpm -s run test && pnpm -s run test:e2e
-
-run-example-vite:
-  cd examples/vite && pnpm -s run wasm:build && npm run dev
-
-clean:
-  cargo clean
-  cd examples/vite && rm -rf node_modules dist src/pkg test-results
+test-example-vite: deps-node wasm
+  pnpm -C examples/vite -s run test
+  pnpm -C examples/vite -s run test:e2e
