@@ -23,7 +23,9 @@ Builtin function signatures and the shared builtin type model live in the siblin
 - `analyzer::analyze_syntax(text) -> SyntaxResult` (`lex + parse`)
 - `analyzer::analyze(text, ctx) -> AnalyzeResult` (`lex + parse + sema`)
 - `analyzer::semantic::analyze_expr(expr, ctx) -> (Ty, Vec<Diagnostic>)`
+- `analyzer::semantic::analyze_expr_with_semantic_map(expr, ctx) -> (Ty, SemanticMap, Vec<Diagnostic>)`
 - `analyzer::infer_expr_with_map(expr, ctx, map) -> Ty`
+- `analyzer::infer_expr_with_semantic_map(expr, ctx, map) -> Ty`
 - `analyzer::format_diagnostics(source, diags) -> String`
 
 ## Key output types
@@ -33,8 +35,16 @@ Builtin function signatures and the shared builtin type model live in the siblin
 - `Diagnostic { kind, code, message, span, labels, notes, actions }`
 - `CodeAction { title, edits: Vec<TextEdit> }`
 - `TextEdit { range, new_text }`
+- `SemanticMap { expression_types, builtin_calls }`
 
 Quick fixes are represented as diagnostic actions, not as a separate parse-output list.
+
+`SemanticMap::builtin_calls` retains the final `ResolvedFunctionSig` for each executable
+builtin call. Lambda calls keep only the final resolution after body inference. The shared
+`builtin_fn::resolve_call_signature` engine owns shape projection, generic binding,
+argument compatibility, staged lambda inference, and return resolvers; Analyzer diagnostics
+consume that result instead of maintaining another resolver. `SemanticMap` exposes the same
+final records to downstream consumers without requiring them to bind a call again.
 
 ## Module map
 
@@ -44,7 +54,7 @@ Quick fixes are represented as diagnostic actions, not as a separate parse-outpu
 | `analyzer/src/lexer/` | Tokens + trivia + EOF + lex diagnostics |
 | `analyzer/src/parser/` | Pratt parser, AST, recovery |
 | `analyzer/src/diagnostics.rs` | Diagnostic model + deterministic formatting |
-| `analyzer/src/analysis/` | Type inference + semantic diagnostics + semantic re-exports from `builtin_fn` |
+| `analyzer/src/analysis/` | Type inference, final resolved-call handoff, semantic diagnostics, and `builtin_fn` re-exports |
 | `analyzer/src/text_edit.rs` | Core `TextEdit` model (byte ranges) |
 
 ## Invariants

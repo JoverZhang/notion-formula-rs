@@ -1,13 +1,9 @@
 //! Signature help for calls under the cursor.
 //! Uses UTF-8 byte offsets (via tokens/spans) and best-effort type inference.
 //!
-//! Sub-modules:
-//! - [`generics`]: Generic substitution / unification.
-//! - [`param_shape`]: Repeat-parameter shape resolution and active-parameter mapping.
-//! - [`render`]: Signature rendering into display slots.
+//! Shape projection and generic binding come from `builtin_fn` through Analyzer's
+//! semantic re-exports; this module only adapts syntax observations to display slots.
 
-mod generics;
-mod param_shape;
 mod render;
 
 use crate::context::{CallContext, prev_non_trivia_before};
@@ -16,8 +12,6 @@ use analyzer::ast::{Expr, ExprKind};
 use analyzer::semantic;
 use analyzer::{Token, TokenKind};
 
-use generics::instantiate_sig;
-use param_shape::active_parameter_for_call;
 use render::render_signature;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +62,10 @@ pub(crate) fn compute_signature_help_if_in_call(
         let (_, receiver_token) = prev_non_trivia_before(tokens, dot_idx)?;
         matches!(
             receiver_token.kind,
-            TokenKind::Ident(_) | TokenKind::Literal(_) | TokenKind::CloseParen
+            TokenKind::Ident(_)
+                | TokenKind::Literal(_)
+                | TokenKind::CloseParen
+                | TokenKind::CloseBracket
         )
         .then_some(())
     };
@@ -78,30 +75,62 @@ pub(crate) fn compute_signature_help_if_in_call(
         && semantic::postfix_capable_builtin_names().contains(func.name.as_str())
         && semantic::is_postfix_capable(func);
 
-    let arg_tys = infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
-    let (inst_param_tys, inst_ret) = instantiate_sig(func, arg_tys.as_slice());
-
     // `receiver.fn(arg1, ...)` is treated as `fn(receiver, arg1, ...)` internally.
     let arg_index_full = call_ctx.arg_index.saturating_add(is_method_style as usize);
-    let total_args_for_shape = arg_tys.len().max(arg_index_full + 1);
-    let rendered = render_signature(
+    let mut arg_tys =
+        infer_call_arg_tys_best_effort(source, tokens, ctx, call_ctx, is_method_style);
+    arg_tys.resize(arg_tys.len().max(arg_index_full + 1), None);
+    let observations = arg_tys
+        .into_iter()
+        .map(|ty| match ty {
+            Some(ty) => semantic::ArgumentObservation::Typed(ty),
+            None => semantic::ArgumentObservation::Empty,
+        })
+        .collect::<Vec<_>>();
+    let resolved = semantic::resolve_call_signature(
         func,
-        arg_tys.as_slice(),
-        total_args_for_shape,
-        inst_param_tys.as_slice(),
-        is_method_style,
+        semantic::CallSignatureInput {
+            arguments: &observations,
+        },
     );
+    let rendered = render_signature(func, &observations, &resolved, is_method_style);
 
     let active_parameter =
-        active_parameter_for_call(func, arg_index_full, total_args_for_shape, is_method_style);
-    let segments =
-        build_signature_segments(func.name.as_str(), &rendered, &inst_ret, is_method_style);
+        active_parameter_for_projection(&resolved, arg_index_full, is_method_style, &rendered);
+    let segments = build_signature_segments(
+        func.name.as_str(),
+        &rendered,
+        &resolved.return_ty,
+        is_method_style,
+    );
 
     Some(SignatureHelp {
         signatures: vec![SignatureItem { segments }],
         active_signature: 0,
         active_parameter,
     })
+}
+
+fn active_parameter_for_projection(
+    resolved: &semantic::ResolvedFunctionSig,
+    argument_index: usize,
+    is_method_style: bool,
+    rendered: &crate::display::RenderedSignature,
+) -> usize {
+    let semantic_index = resolved
+        .projection
+        .iter()
+        .position(|slot| slot.argument_index == Some(argument_index));
+    let rendered_count = rendered
+        .slots
+        .iter()
+        .filter(|slot| matches!(slot, crate::display::ParamSlot::Param { .. }))
+        .count();
+
+    semantic_index
+        .map(|index| index.saturating_sub(is_method_style as usize))
+        .filter(|index| *index < rendered_count)
+        .unwrap_or_else(|| rendered_count.saturating_sub(1))
 }
 
 // ---------------------------------------------------------------------------
@@ -265,8 +294,10 @@ fn infer_call_arg_tys_best_effort(
 
     let mut arg_tys: Vec<Option<semantic::Ty>> = Vec::new();
 
-    // If this is a member call, try to include the receiver type as the leading argument.
+    // A method-style call always reserves the leading semantic receiver slot, even when
+    // best-effort parsing cannot recover a receiver type.
     if include_receiver_as_arg {
+        let mut inferred_receiver = None;
         let mut parsed = analyzer::analyze_syntax(source);
         if let Some(call_expr) =
             find_call_expr_by_lparen(&parsed.expr, &call_ctx.callee, lparen_token.span.start)
@@ -286,8 +317,9 @@ fn infer_call_arg_tys_best_effort(
             if matches!(ty, semantic::Ty::Unknown) && receiver_is_bool_ident {
                 ty = semantic::Ty::Boolean;
             }
-            arg_tys.push(Some(ty));
+            inferred_receiver = Some(ty);
         }
+        arg_tys.push(inferred_receiver);
     }
 
     for span in spans {

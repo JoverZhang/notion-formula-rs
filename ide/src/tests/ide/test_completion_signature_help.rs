@@ -98,6 +98,43 @@ fn signature_help_sum_prefers_known_actual_types_for_union_slots() {
 }
 
 #[test]
+fn signature_help_concat_uses_minimum_two_group_projection() {
+    let c = ctx().build();
+
+    t("concat($0")
+        .ctx(c.clone())
+        .expect_sig_active(0)
+        .expect_sig_active_param_name("lists1")
+        .expect_sig_label("concat(lists1: unknown[], lists2: unknown[], ...) -> unknown[]");
+
+    t("concat([1], $0)")
+        .ctx(c)
+        .expect_sig_active(1)
+        .expect_sig_active_param_name("lists2")
+        .expect_sig_label("concat(lists1: number[], lists2: number[], ...) -> number[]");
+}
+
+#[test]
+fn signature_help_concat_postfix_keeps_the_receiver_as_group_one() {
+    let c = ctx().build();
+
+    t("[1].concat($0)")
+        .ctx(c)
+        .expect_sig_active(0)
+        .expect_sig_active_param_name("lists2")
+        .expect_sig_label("(lists1: number[]).concat(lists2: number[], ...) -> number[]");
+}
+
+#[test]
+fn signature_help_flat_uses_the_shared_dynamic_return_resolver() {
+    let c = ctx().build();
+
+    t("flat([[[1]]]$0)")
+        .ctx(c)
+        .expect_sig_label("flat(list: number[][][]) -> number[]");
+}
+
+#[test]
 fn signature_help_postfix_if_label_format() {
     let c = ctx().build();
     t("true.if($0, 1)")

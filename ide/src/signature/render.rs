@@ -1,46 +1,41 @@
-//! Signature rendering into display slots.
-//!
-//! Converts a function signature + inferred argument types into a
-//! [`RenderedSignature`] that the display layer can format.
+//! Presentation adapter for a shared resolved call projection.
 
 use crate::display::{ParamSlot, RenderedSignature};
 use analyzer::semantic;
 
-use super::param_shape::complete_repeat_shape;
-
 fn ty_contains_generic(ty: &semantic::Ty) -> bool {
     match ty {
         semantic::Ty::Generic(_) => true,
-        semantic::Ty::List(inner) => ty_contains_generic(inner),
+        semantic::Ty::List(inner) | semantic::Ty::Ident(inner) => ty_contains_generic(inner),
         semantic::Ty::Union(members) => members.iter().any(ty_contains_generic),
         semantic::Ty::Fn { params, ret } => {
-            params.iter().any(|(_, t)| ty_contains_generic(t)) || ty_contains_generic(ret)
+            params.iter().any(|(_, ty)| ty_contains_generic(ty)) || ty_contains_generic(ret)
         }
-        semantic::Ty::Ident(inner) => ty_contains_generic(inner),
         _ => false,
     }
 }
 
-/// Unwrap `Ty::Fn` and `Ty::Ident` wrappers for user-facing display.
-///
-/// `Fn { params, ret }` → `ret` (the user writes the expression, not the lambda wrapper)
-/// `Ident(inner)` → shows as the inner type for display
-/// Everything else → unchanged.
 fn unwrap_for_display(ty: &semantic::Ty) -> &semantic::Ty {
     match ty {
-        semantic::Ty::Fn { ret, .. } => ret.as_ref(),
-        semantic::Ty::Ident(inner) => inner.as_ref(),
+        semantic::Ty::Fn { ret, .. } => ret,
+        semantic::Ty::Ident(inner) => inner,
         other => other,
     }
 }
 
 fn format_ty_with_optional(ty: &semantic::Ty, optional: bool) -> String {
-    let ty = unwrap_for_display(ty);
-    let mut out = ty.to_string();
+    let mut output = unwrap_for_display(ty).to_string();
     if optional {
-        out.push('?');
+        output.push('?');
     }
-    out
+    output
+}
+
+fn observed_ty(observation: Option<&semantic::ArgumentObservation>) -> Option<&semantic::Ty> {
+    match observation {
+        Some(semantic::ArgumentObservation::Typed(ty)) => Some(ty),
+        Some(semantic::ArgumentObservation::Empty) | None => None,
+    }
 }
 
 fn choose_display_ty<'a>(
@@ -48,174 +43,69 @@ fn choose_display_ty<'a>(
     declared_template: &'a semantic::Ty,
     instantiated_expected: &'a semantic::Ty,
 ) -> &'a semantic::Ty {
-    // Unwrap Fn/Ident wrappers for the declared template check — the wrapper is an
-    // internal artifact; the user-facing type is the ret / inner type.
-    let unwrapped_template = unwrap_for_display(declared_template);
-    let unwrapped_inst = unwrap_for_display(instantiated_expected);
+    let template = unwrap_for_display(declared_template);
+    let expected = unwrap_for_display(instantiated_expected);
 
-    // If the declared parameter includes generics, prefer the inferred actual type when the
-    // argument expression is non-empty. This helps show instantiated generics (incl `unknown`)
-    // at the call site.
-    if ty_contains_generic(unwrapped_template) {
-        return actual.unwrap_or(unwrapped_inst);
+    if ty_contains_generic(template) {
+        return actual.unwrap_or(expected);
     }
-
     let Some(actual) = actual else {
-        return unwrapped_inst;
+        return expected;
     };
-
-    // Avoid "unknown" overriding useful expected types (especially for hard-constrained params).
     if matches!(actual, semantic::Ty::Unknown) {
-        return unwrapped_inst;
+        return expected;
     }
-
-    // For union-typed params (e.g. `number | number[]`), the actual argument type is often more
-    // helpful than repeating the full union at every slot.
-    if matches!(unwrapped_inst, semantic::Ty::Union(_))
-        && semantic::ty_accepts(unwrapped_inst, actual)
-    {
+    if matches!(expected, semantic::Ty::Union(_)) && semantic::type_accepts(expected, actual) {
         return actual;
     }
-
-    unwrapped_inst
+    expected
 }
 
 pub(super) fn render_signature(
-    sig: &semantic::FunctionSig,
-    arg_tys: &[Option<semantic::Ty>],
-    total_args_for_shape: usize,
-    inst_param_tys: &[semantic::Ty],
+    signature: &semantic::FunctionSig,
+    observations: &[semantic::ArgumentObservation],
+    resolved: &semantic::ResolvedFunctionSig,
     is_method_style: bool,
 ) -> RenderedSignature {
-    let mut receiver: Option<(String, String)> = None;
-    let mut slots = Vec::<ParamSlot>::new();
-    let mut next_param_index = 0u32;
+    let mut receiver = None;
+    let mut slots = Vec::new();
+    let mut next_parameter_index = 0u32;
+    let mut ellipsis_inserted = false;
 
-    fn repeat_name(base: &str, n: usize) -> String {
-        if let Some(prefix) = base.strip_suffix('N') {
-            return format!("{prefix}{n}");
-        }
-
-        let digits_len = base
-            .chars()
-            .rev()
-            .take_while(|c| c.is_ascii_digit())
-            .count();
-        if digits_len > 0 {
-            let split = base.len().saturating_sub(digits_len);
-            let (prefix, suffix) = base.split_at(split);
-            if suffix == "1" {
-                return format!("{prefix}{n}");
-            }
-        }
-
-        format!("{base}{n}")
-    }
-
-    fn push_param(
-        receiver: &mut Option<(String, String)>,
-        slots: &mut Vec<ParamSlot>,
-        next_param_index: &mut u32,
-        is_method_style: bool,
-        name: String,
-        ty: String,
-    ) {
-        if is_method_style && receiver.is_none() {
-            *receiver = Some((name, ty));
-            return;
-        }
-
-        let idx = *next_param_index;
-        *next_param_index += 1;
-        slots.push(ParamSlot::Param {
-            name,
-            ty,
-            param_index: idx,
-        });
-    }
-
-    fn push_ellipsis(slots: &mut Vec<ParamSlot>) {
-        slots.push(ParamSlot::Ellipsis);
-    }
-
-    if sig.params.repeat.is_empty() {
-        for (idx, p) in sig
-            .params
-            .head
-            .iter()
-            .chain(sig.params.tail.iter())
-            .enumerate()
+    for slot in &resolved.projection {
+        if !signature.params.repeat.is_empty()
+            && !ellipsis_inserted
+            && matches!(slot.logical_param, semantic::ParamRef::Tail(_))
         {
-            let instantiated_expected = inst_param_tys.get(idx).unwrap_or(&p.ty);
-            let actual = arg_tys.get(idx).and_then(|t| t.as_ref());
-            let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-            push_param(
-                &mut receiver,
-                &mut slots,
-                &mut next_param_index,
-                is_method_style,
-                p.name.clone(),
-                format_ty_with_optional(ty, p.optional),
-            );
+            slots.push(ParamSlot::Ellipsis);
+            ellipsis_inserted = true;
         }
-        return RenderedSignature { receiver, slots };
-    }
 
-    for (idx, p) in sig.params.head.iter().enumerate() {
-        let ty = inst_param_tys.get(idx).unwrap_or(&p.ty);
-        push_param(
-            &mut receiver,
-            &mut slots,
-            &mut next_param_index,
-            is_method_style,
-            p.name.clone(),
-            format_ty_with_optional(ty, p.optional),
+        let parameter = semantic::param_for_ref(signature, slot.logical_param);
+        let actual = slot
+            .argument_index
+            .and_then(|index| observed_ty(observations.get(index)));
+        let ty = choose_display_ty(actual, &parameter.ty, &slot.expected_ty);
+        let name = slot.repeat_group.map_or_else(
+            || parameter.name.clone(),
+            |group| format!("{}{group}", parameter.name),
         );
-    }
+        let rendered_ty = format_ty_with_optional(ty, parameter.optional);
 
-    // Show the repeat pattern for each entered repeat group (numbered), then an ellipsis, then the tail.
-    let repeat_start = sig.params.head.len();
-    let repeat_len = sig.params.repeat.len();
-
-    let (repeat_groups_displayed, tail_start) =
-        complete_repeat_shape(&sig.params, total_args_for_shape)
-            .map(|s| (s.repeat_groups, s.tail_start))
-            .unwrap_or((1, usize::MAX));
-
-    for n in 1..=repeat_groups_displayed {
-        for (r_idx, p) in sig.params.repeat.iter().enumerate() {
-            let name = repeat_name(p.name.as_str(), n);
-            let cycle = n - 1;
-            let actual_idx = repeat_start + cycle * repeat_len + r_idx;
-            let inst_idx = repeat_start + r_idx;
-            let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
-            let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
-            let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-            push_param(
-                &mut receiver,
-                &mut slots,
-                &mut next_param_index,
-                is_method_style,
+        if is_method_style && receiver.is_none() {
+            receiver = Some((name, rendered_ty));
+        } else {
+            slots.push(ParamSlot::Param {
                 name,
-                format_ty_with_optional(ty, p.optional),
-            );
+                ty: rendered_ty,
+                param_index: next_parameter_index,
+            });
+            next_parameter_index += 1;
         }
     }
-    push_ellipsis(&mut slots);
-    for (t_idx, p) in sig.params.tail.iter().enumerate() {
-        let actual_idx = tail_start.saturating_add(t_idx);
-        let inst_idx = repeat_start + repeat_len + t_idx;
-        let instantiated_expected = inst_param_tys.get(inst_idx).unwrap_or(&p.ty);
-        let actual = arg_tys.get(actual_idx).and_then(|t| t.as_ref());
-        let ty = choose_display_ty(actual, &p.ty, instantiated_expected);
-        push_param(
-            &mut receiver,
-            &mut slots,
-            &mut next_param_index,
-            is_method_style,
-            p.name.clone(),
-            format_ty_with_optional(ty, p.optional),
-        );
+
+    if !signature.params.repeat.is_empty() && !ellipsis_inserted {
+        slots.push(ParamSlot::Ellipsis);
     }
 
     RenderedSignature { receiver, slots }

@@ -11,14 +11,6 @@ fn p(name: &str, ty: Ty) -> ParamSig {
     }
 }
 
-fn opt(name: &str, ty: Ty) -> ParamSig {
-    ParamSig {
-        name: name.into(),
-        ty,
-        optional: true,
-    }
-}
-
 fn run_semantic(source: &str, ctx: Context) -> Vec<crate::Diagnostic> {
     let mut output = analyze_syntax(source);
     assert!(
@@ -223,23 +215,4 @@ fn validate_call_does_not_wildcard_inferred_actual_generic() {
     assert!(diags[0].message.contains("Number"));
     assert!(diags[0].message.contains("Generic"));
     assert_eq!(diags[0].span, arg_span);
-}
-
-#[test]
-fn required_min_args_repeat_group_counts_all_non_optional_in_head_and_tail() {
-    let sig = FunctionSig {
-        name: "rg".into(),
-        params: ParamShape::new(
-            vec![opt("h_opt", Ty::Number), p("h_req", Ty::Number)],
-            vec![p("r", Ty::Number)],
-            vec![p("t_req", Ty::Number)],
-        ),
-        ret: Ty::Number,
-        category: FunctionCategory::General,
-        detail: "rg(...)".into(),
-        generics: vec![],
-        resolver: None,
-    };
-
-    assert_eq!(sig.required_min_args(), 3);
 }

@@ -6,7 +6,7 @@ Start at: [`docs/design/README.md`](design/README.md).
 
 - `docs/design/README.md`: pipeline overview + design docs index.
 - `docs/design/contracts.md`: cross-crate hard rules (spans, tokens, determinism, edits).
-- `docs/design/builtin-fn.md`: type model, signatures, param shapes (builtin_fn crate).
+- `docs/design/builtin-fn.md`: builtin declaration DSL, call-signature resolution, catalog, and evaluator contracts.
 - `docs/design/analyzer.md`: lexer, parser, semantic pipeline (analyzer crate).
 - `docs/design/ide.md`: completion, signature help, formatting (ide crate).
 - `docs/design/wasm-boundary.md`: WASM facade, DTOs, UTF-16 (analyzer_wasm crate).

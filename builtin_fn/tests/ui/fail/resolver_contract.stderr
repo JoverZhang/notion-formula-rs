@@ -1,0 +1,29 @@
+error[E0433]: cannot find module or crate `path` in this scope
+  --> tests/ui/fail/resolver_contract.rs:14:20
+   |
+14 |         #[resolver(path::that::does_not_exist)]
+   |                    ^^^^ use of unresolved module or unlinked crate `path`
+   |
+   = help: if you wanted to use a crate named `path`, use `cargo add path` to add it to your `Cargo.toml`
+
+error[E0308]: mismatched types
+  --> tests/ui/fail/resolver_contract.rs:11:20
+   |
+ 8 |       let _ = builtin_functions! {
+   |  _____________-
+ 9 | |         category: List;
+10 | |
+11 | |         #[resolver(wrong_resolver)]
+   | |                    ^^^^^^^^^^^^^^ expected fn pointer, found fn item
+...  |
+15 | |         compact<T>(list: T[]) -> T[];
+16 | |     };
+   | |_____- arguments to this function are incorrect
+   |
+   = note: expected fn pointer `for<'a, 'b> fn(&'b ResolverInput<'a>) -> Ty`
+                 found fn item `for<'a> fn(&'a FunctionSig) -> FunctionSig {wrong_resolver}`
+note: associated function defined here
+  --> src/signature.rs
+   |
+   |     pub fn new_builtin_with_resolver(
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
