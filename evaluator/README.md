@@ -22,7 +22,7 @@ Expr (AST)  -->  Planner  -->  ExecPlan (IR)  -->  Evaluator  -->  EvalBlock
             (from analyzer)
 ```
 
-See `docs/design/evaluator.md` for design rationale (why IR, why async Provider).
+See `docs/design/evaluator.md` for the target IR, prepared-input, and kernel contracts.
 
 ## Current runtime scope
 

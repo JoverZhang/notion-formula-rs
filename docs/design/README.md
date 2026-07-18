@@ -53,7 +53,7 @@ For the documentation entry point, see `docs/README.md`.
 | Doc | Scope |
 | --- | --- |
 | [`contracts.md`](contracts.md) | Cross-crate hard rules (spans, determinism, tokens, edits) |
-| [`builtin-fn.md`](builtin-fn.md) | Type model, signatures, param shapes, generic binding |
+| [`builtin-fn.md`](builtin-fn.md) | Builtin declaration DSL, call-signature resolution, catalog, and evaluator contracts |
 | [`analyzer.md`](analyzer.md) | Lexer, parser, AST, semantic analysis, postfix sugar |
 | [`ide.md`](ide.md) | Completion, signature help, formatting, edit application |
 | [`wasm-boundary.md`](wasm-boundary.md) | WASM facade, DTOs, UTF-16 conversion, JS API |

@@ -1,5 +1,11 @@
 # Evaluator Builtins: Design Plan
 
+> **Status:** Superseded as a design source. The normative contracts now live in
+> [`docs/design/builtin-fn.md`](../design/builtin-fn.md) and
+> [`docs/design/evaluator.md`](../design/evaluator.md). Keep this file only as historical
+> implementation-planning context; where it conflicts with those documents, the design
+> documents take precedence.
+
 This document captures the full design for implementing builtin function evaluation,
 including the new `builtins` crate, codegen pipeline, IR extensions, and runtime execution model.
 
