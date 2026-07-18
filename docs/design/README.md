@@ -40,11 +40,12 @@ For the documentation entry point, see `docs/README.md`.
 
 | Module | Summary | Module README |
 | --- | --- | --- |
-| `builtin_fn/` | builtin signature model + parser + registry | `builtin_fn/README.md` |
+| `builtin_fn/` | category DSL catalog + signature model + shared call resolution | `builtin_fn/README.md` |
+| `builtin_fn_macros/` | procedural implementation of the category DSL | `builtin_fn_macros/README.md` |
 | `analyzer/` | lexer + parser + AST + diagnostics + semantic | `analyzer/README.md` |
 | `ide/` | format / completion / signature help / edit apply | `ide/README.md` |
 | `analyzer_wasm/` | wasm-bindgen boundary + UTF-16 mapping + DTO v1 | `analyzer_wasm/README.md` |
-| `evaluator/` | row-batch runtime evaluation + provider boundary | `evaluator/README.md` |
+| `evaluator/` | synchronous prepared-input row-batch runtime | `evaluator/README.md` |
 | `examples/vite/` | demo integration | `examples/vite/README.md` |
 | `docs/` | design docs + changelog guidance | `docs/README.md` |
 

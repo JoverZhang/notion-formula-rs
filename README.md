@@ -4,14 +4,15 @@
 - **Docs:** [Design docs](./docs/design/README.md)
 - **Status:**
   - Editor tooling (analyzer + completion/assists) is usable today.
-  - Evaluator/runtime execution is the next milestone (host-context contract first).
+  - The synchronous row-batch evaluator accepts caller-prepared typed columns.
 
 ## What is this?
 
 `notion-formula-rs` is a Rust workspace for **Notion-style formula tooling**.
 
-It targets **editor-facing** use cases: parse, diagnostics, formatting, and IDE-style assists.
-It is meant to be embedded in editors/UIs (including browser apps via WASM), not shipped as a standalone product.
+It targets embedded formula tooling: parse, diagnostics, formatting, IDE-style assists, and
+synchronous row-batch execution. Browser editor integrations use the WASM facade; Rust hosts
+can prepare columns and evaluate formulas directly.
 
 You get:
 
@@ -19,6 +20,8 @@ You get:
 - diagnostics with stable spans/offsets
 - deterministic formatting
 - IDE-style assists (completion, signature help, code actions)
+- a compile-time builtin catalog shared by semantic analysis, IDE presentation, and runtime
+- a synchronous evaluator with typed prepared inputs, lazy control flow, and row errors
 - a WASM boundary for browser demos and integrations
 
 ## Predictable, compile-time typing (no runtime magic)
@@ -45,15 +48,19 @@ Example:
 ## What Works Today
 
 - `analyzer/`: parsing + diagnostics + semantic checks
+- `builtin_fn/`: compile-time builtin catalog + shared call-signature resolution
 - `ide/`: formatter + completion/signature help + edit ops
 - `analyzer_wasm/`: WASM/JS API + TypeScript DTOs
+- `evaluator/`: prepared-input synchronous row-batch execution
 - `examples/vite/`: CodeMirror demo + UI test coverage
 
 ## Current Limits
 
-- Evaluator/runtime execution is not implemented yet; it is the next milestone (host-context contract first).
 - Language and type coverage are still expanding. Notion Formula compatibility is the default; extensions are additive and opt-in.
-- Some areas are tracked as TODOs in design docs while the toolchain stabilizes.
+- Unsupported builtin declarations remain documented in the catalog; types such as
+  `DateRange`/rich text and runtime person fields are not modeled yet.
+- The evaluator does not fetch external data. Hosts must load every column returned by
+  `PreparedFormula::required_columns()` before synchronous evaluation.
 
 ## Prerequisites
 
@@ -71,11 +78,15 @@ Run from repository root.
 ```bash
 # just
 just test-analyzer
+just test-builtin_fn
+just test-evaluator
 just test-ide
 just test-analyzer_wasm
 
 # manual
 cargo test -p analyzer
+cargo test -p builtin_fn
+cargo test -p evaluator
 cargo test -p ide
 cargo test -p analyzer_wasm
 ```
@@ -134,17 +145,45 @@ pub fn analyze_syntax(text: &str) -> SyntaxResult;
 pub fn analyze(text: &str, ctx: &semantic::Context) -> AnalyzeResult;
 
 // Type inference + semantic validation using your context.
-pub fn analyze_expr(expr: &ast::Expr, ctx: &semantic::Context) -> (semantic::Ty, Vec<Diagnostic>);
+pub fn analyze_expr(expr: &mut ast::Expr, ctx: &semantic::Context) -> (semantic::Ty, Vec<Diagnostic>);
 
 // Infer expression types for subexpressions (used by IDE/signature-help).
 pub fn infer_expr_with_map(
-    expr: &ast::Expr,
+    expr: &mut ast::Expr,
     ctx: &semantic::Context,
     map: &mut TypeMap,
 ) -> semantic::Ty;
 
 // Deterministic, human-readable diagnostics rendering.
 pub fn format_diagnostics(source: &str, diags: Vec<Diagnostic>) -> String;
+```
+
+### Rust (`builtin_fn`)
+
+```rust
+// Complete ordered declarations, including documented unsupported entries.
+pub fn builtin_categories() -> Vec<BuiltinCategory>;
+
+// Supported semantic/runtime signatures only.
+pub fn builtins_functions() -> Vec<FunctionSig>;
+
+// Shared partial/exact shape projection, generics, lambdas, and return resolvers.
+pub fn resolve_call_signature(
+    signature: &FunctionSig,
+    input: CallSignatureInput<'_>,
+) -> ResolvedFunctionSig;
+```
+
+### Rust (`evaluator`)
+
+```rust
+let prepared = evaluator::prepare_formula(&mut expression, &eval_context)?;
+let mut input_builder = evaluator::EvalInputsBuilder::new(runtime_snapshot);
+for required in prepared.required_columns() {
+    input_builder.insert(required.slot, host_load_column(required)?);
+}
+let inputs = input_builder.finish(&prepared, row_batch.len())?;
+let output = prepared.evaluate(row_batch, inputs)?;
 ```
 
 ### Rust (`ide`)
@@ -314,10 +353,12 @@ just run-example-vite  # build wasm and start demo dev server
 
 | Path | Role |
 |---|---|
+| `builtin_fn/` | Builtin category catalog, signature model, and shared call resolver |
+| `builtin_fn_macros/` | Function-like procedural macro for category declarations |
 | `analyzer/` | Core analyzer logic: lexer/parser/AST/diagnostics/semantic |
 | `ide/` | IDE/editor helpers: format/completion/help/edit-apply |
 | `analyzer_wasm/` | WASM boundary, UTF-16<->UTF-8 conversions, DTO serialization |
-| `evaluator/` | Runtime evaluator TODO (coming soon) |
+| `evaluator/` | Synchronous prepared-input row-batch evaluator |
 | `examples/vite/` | Browser demo (CodeMirror + WASM integration) |
 | `docs/` | Contracts, architecture docs, deep dives, and changelog guidance |
 

@@ -1,24 +1,6 @@
-mod lower_lit;
-#[allow(clippy::module_inception)]
-mod planner;
-mod selectors;
+#[path = "planner.rs"]
+mod lower;
+mod prepared;
 
-use crate::core::errors::EvalError;
-
-pub(crate) use planner::Planner;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum PlanError {
-    TypeMismatch,
-    InvalidArgument,
-    MissingTypeMapEntry,
-}
-
-impl From<PlanError> for EvalError {
-    fn from(error: PlanError) -> Self {
-        match error {
-            PlanError::TypeMismatch => Self::TypeMismatch,
-            PlanError::InvalidArgument | PlanError::MissingTypeMapEntry => Self::InvalidArgument,
-        }
-    }
-}
+pub(crate) use lower::Planner;
+pub use prepared::{PreparedFormula, prepare_formula};

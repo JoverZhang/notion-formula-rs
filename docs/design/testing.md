@@ -4,13 +4,20 @@ Where regression coverage lives, what each layer validates, and how to refresh s
 
 ## builtin_fn
 
-- Location: `builtin_fn/src/` (inline tests) + `builtin_fn/src/parser/` (parser tests)
-- Coverage: signature parsing, param shape validation, type model, union normalization
+- Locations: `builtin_fn/tests/`, `builtin_fn/tests/ui/`, and focused inline tests
+- Coverage:
+  - function-like category DSL compile-pass and compile-fail diagnostics/recovery
+  - fixed, repeat, head + repeat, repeat + tail, and synthetic head + repeat + tail shapes
+  - complete catalog order, cross-category uniqueness, support status, and resolver placement
+  - deterministic README marked-region rendering checked byte-for-byte
+  - shared partial-call projection, generic binding, staged lambda inference, argument
+    compatibility, and `flat` return refinement
 
 Run:
 
 ```bash
 cargo test -p builtin_fn
+cargo run -p builtin_fn --bin builtin_catalog -- --check
 ```
 
 ## analyzer
@@ -24,6 +31,7 @@ cargo test -p builtin_fn
   - diagnostic actions (quick-fix actions attached to diagnostics)
   - span/token invariants (`Span`, `tokens_in_span`, `TokenQuery`)
   - semantic checks and builtin/type behavior
+  - final `ResolvedFunctionSig` records retained in `SemanticMap` for downstream planning
 
 ### Golden tests (diagnostics)
 
@@ -50,6 +58,8 @@ cargo test -p analyzer
   - formatter behavior + idempotence
   - completion ranking/position behavior
   - signature-help behavior
+  - shared incomplete-call projection and resolver output, with IDE-only postfix/presentation
+    adaptation
   - edit application/validation behavior
 
 ### Golden tests (format)
@@ -90,8 +100,21 @@ Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test` i
 
 ## evaluator
 
-- Location: `evaluator/src/` (inline tests)
-- Coverage: literal evaluation, binary arithmetic, type coercion, divide-by-zero, mask propagation
+- Locations: `evaluator/src/tests/`, focused kernel tests, and
+  `evaluator/tests/generated_contract.rs`
+- Coverage:
+  - bounded runtime matrix: `flat`, `concat`, `splice`, mask-lazy `ifs`, and synthetic
+    generated `caseOf`
+  - deterministic catalog-to-contract output, named Args/Plans/repeat groups, catalog order,
+    and absence of explicit generated lifetimes or `dyn BuiltinEvalContext`
+  - generated compile failures for a missing `flat` implementation and an incorrect `ifs`
+    method signature
+  - `flat` dynamic return resolution and explicit generic-to-concrete ABI adapters
+  - all five `InputContractError` classes in one table-driven contract test
+  - independence of execution masks, row `ok`, null validity, and row errors
+  - branch-mask laziness/error isolation for `ifs`, `if`, `&&`, and `||`
+  - frozen time/timezone data, row IDs, shared column fan-out, typed handle moves, and
+    unique-storage in-place computation
 
 Run:
 

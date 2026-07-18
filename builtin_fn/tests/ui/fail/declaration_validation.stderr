@@ -1,0 +1,95 @@
+error: duplicate generic `T`
+ --> tests/ui/fail/declaration_validation.rs:7:22
+  |
+7 |         duplicate<T, T: Mystery>(first?: number, required: MissingType) -> T;
+  |                      ^
+
+error: unknown generic kind `Mystery`; expected `Plain` or `Variant`
+ --> tests/ui/fail/declaration_validation.rs:7:25
+  |
+7 |         duplicate<T, T: Mystery>(first?: number, required: MissingType) -> T;
+  |                         ^^^^^^^
+
+error: required fixed parameter cannot follow an optional parameter
+ --> tests/ui/fail/declaration_validation.rs:7:50
+  |
+7 |         duplicate<T, T: Mystery>(first?: number, required: MissingType) -> T;
+  |                                                  ^^^^^^^^
+
+error: unknown type or generic `MissingType`
+ --> tests/ui/fail/declaration_validation.rs:7:60
+  |
+7 |         duplicate<T, T: Mystery>(first?: number, required: MissingType) -> T;
+  |                                                            ^^^^^^^^^^^
+
+error: duplicate builtin `duplicate`
+ --> tests/ui/fail/declaration_validation.rs:8:9
+  |
+8 |         duplicate() -> number;
+  |         ^^^^^^^^^
+
+error: first declaration is here
+ --> tests/ui/fail/declaration_validation.rs:7:9
+  |
+7 |         duplicate<T, T: Mystery>(first?: number, required: MissingType) -> T;
+  |         ^^^^^^^^^
+
+error: a function may contain at most one repeat block
+  --> tests/ui/fail/declaration_validation.rs:16:13
+   |
+16 |             repeat(min = 0) {},
+   |             ^^^^^^
+
+error: repeat minimum must be a non-negative unsuffixed integer
+  --> tests/ui/fail/declaration_validation.rs:12:26
+   |
+12 |             repeat(min = 1u8) {
+   |                          ^^^
+
+error: repeat members cannot be optional
+  --> tests/ui/fail/declaration_validation.rs:13:17
+   |
+13 |                 values1?: number,
+   |                 ^^^^^^^
+
+error: repeat member names must be logical base names without numeric or `N` suffixes
+  --> tests/ui/fail/declaration_validation.rs:13:17
+   |
+13 |                 values1?: number,
+   |                 ^^^^^^^
+
+error: repeat block cannot be empty
+  --> tests/ui/fail/declaration_validation.rs:16:13
+   |
+16 |             repeat(min = 0) {},
+   |             ^^^^^^
+
+error: fixed parameters cannot be optional when repeat is present
+  --> tests/ui/fail/declaration_validation.rs:11:13
+   |
+11 |             optionalHead?: number,
+   |             ^^^^^^^^^^^^
+
+error: fixed parameters cannot be optional when repeat is present
+  --> tests/ui/fail/declaration_validation.rs:15:13
+   |
+15 |             tail?: number,
+   |             ^^^^
+
+error: `#[unsupported]` declarations require a doc comment
+  --> tests/ui/fail/declaration_validation.rs:19:9
+   |
+19 |         #[unsupported]
+   |         ^
+
+error: `#[unsupported]` cannot be combined with `#[resolver(...)]`
+  --> tests/ui/fail/declaration_validation.rs:23:9
+   |
+23 |         #[resolver(crate::resolver)]
+   |         ^
+
+error: unsupported builtin declaration attribute
+  --> tests/ui/fail/declaration_validation.rs:27:9
+   |
+27 |         #[unknown]
+   |         ^

@@ -1,14 +1,30 @@
+extern crate self as builtin_fn;
+
 mod builtins;
+mod catalog;
+mod catalog_render;
 mod param_shape;
 mod parser;
+mod resolution;
 mod signature;
 mod type_hints;
 mod types;
 
-pub use builtins::builtins_functions;
+pub use builtin_fn_macros::builtin_functions;
+pub use builtins::{builtin_categories, builtins_functions};
+pub use catalog::{BuiltinCatalogEntry, BuiltinCategory};
+pub use catalog_render::{
+    CATALOG_BEGIN_MARKER, CATALOG_END_MARKER, CatalogRegionError, render_builtin_catalog,
+    render_builtin_readme,
+};
 pub use param_shape::resolve_repeat_tail_used;
 pub use parser::{
     BuiltinSigParseError, BuiltinSigParseErrorKind, BuiltinSigParser, GenericKindRegistry,
+};
+pub use resolution::{
+    ArgumentObservation, ArgumentTypeStatus, CallShapeError, CallSignatureInput, ParamRef,
+    ResolvedArgument, ResolvedFunctionSig, ResolvedParamSlot, ResolverInput, ShapeValidity,
+    check_argument_type, param_for_ref, resolve_call_signature, type_accepts,
 };
 pub use signature::{
     FunctionSig, GenericParam, GenericParamKind, ParamShape, ParamSig, SigResolver,

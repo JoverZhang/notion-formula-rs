@@ -1,17 +1,16 @@
-use super::{sig, sig_with_resolver};
-use crate::{BuiltinSigParser, FunctionCategory, FunctionSig, Ty, normalize_union};
+use crate::{
+    ArgumentObservation, BuiltinCategory, ResolverInput, Ty, builtin_functions, normalize_union,
+};
 
-fn resolve_flat(sig: &FunctionSig, arg_tys: &[Ty]) -> FunctionSig {
-    let ret = match arg_tys.first() {
-        Some(Ty::List(inner)) => {
+fn resolve_flat(input: &ResolverInput<'_>) -> Ty {
+    match input.arguments.first() {
+        Some(ArgumentObservation::Typed(Ty::List(element))) => {
             let mut leaves = Vec::new();
-            collect_leaf_types(inner, &mut leaves);
+            collect_leaf_types(element, &mut leaves);
             Ty::List(Box::new(normalize_union(leaves)))
         }
-        _ => Ty::List(Box::new(Ty::Unknown)),
-    };
-
-    FunctionSig { ret, ..sig.clone() }
+        _ => input.default_return_ty.clone(),
+    }
 }
 
 fn collect_leaf_types(ty: &Ty, out: &mut Vec<Ty>) {
@@ -26,93 +25,37 @@ fn collect_leaf_types(ty: &Ty, out: &mut Vec<Ty>) {
     }
 }
 
-pub(super) fn builtins(parser: &BuiltinSigParser) -> Vec<FunctionSig> {
-    vec![
-        sig(
-            parser,
-            FunctionCategory::List,
-            "at<T: Plain>(list: T[], index: number) -> T",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "first<T: Plain>(list: T[]) -> T",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "last<T: Plain>(list: T[]) -> T",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "slice<T: Plain>(list: T[], start: number, end?: number) -> T[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "splice<T: Plain>(list: T[], startIndex: number, deleteCount: number, ...items: T[]) -> T[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "sort<T: Plain>(list: T[]) -> T[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "reverse<T: Plain>(list: T[]) -> T[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "unique<T: Plain>(list: T[]) -> T[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "includes<T: Plain>(list: T[], value: T) -> boolean",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "map<T: Plain, U: Plain>(list: T[], mapper: (current: T) -> U) -> U[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "filter<T: Plain>(list: T[], predicate: (current: T) -> boolean) -> T[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "find<T: Plain>(list: T[], predicate: (current: T) -> boolean) -> T",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "findIndex<T: Plain>(list: T[], predicate: (current: T) -> boolean) -> number",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "some<T: Plain>(list: T[], predicate: (current: T) -> boolean) -> boolean",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "every<T: Plain>(list: T[], predicate: (current: T) -> boolean) -> boolean",
-        ),
-        sig(
-            parser,
-            FunctionCategory::List,
-            "count<T: Plain>(list: T[], predicate: (current: T) -> boolean) -> number",
-        ),
-        sig_with_resolver(
-            parser,
-            FunctionCategory::List,
-            "flat<T: Plain>(list: T[]) -> T[]",
-            resolve_flat,
-        ),
-    ]
+pub(super) fn definitions() -> BuiltinCategory {
+    builtin_functions! {
+        category: List;
+
+        at<T>(list: T[], index: number) -> T;
+        first<T>(list: T[]) -> T;
+        last<T>(list: T[]) -> T;
+        slice<T>(list: T[], start: number, end?: number) -> T[];
+
+        splice<T>(
+            list: T[],
+            startIndex: number,
+            deleteCount: number,
+            repeat(min = 0) {
+                items: T,
+            },
+        ) -> T[];
+
+        sort<T>(list: T[]) -> T[];
+        reverse<T>(list: T[]) -> T[];
+        unique<T>(list: T[]) -> T[];
+        includes<T>(list: T[], value: T) -> boolean;
+        map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
+        filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
+        find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
+        findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+        some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
+        every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
+        count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+
+        #[resolver(resolve_flat)]
+        flat<T>(list: T[]) -> T[];
+    }
 }

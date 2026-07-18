@@ -1,83 +1,46 @@
-use super::{sig, sig_with_detail};
-use crate::{BuiltinSigParser, FunctionCategory, FunctionSig};
+use crate::{BuiltinCategory, builtin_functions};
 
-pub(super) fn builtins(parser: &BuiltinSigParser) -> Vec<FunctionSig> {
-    vec![
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "substring(text: string, start: number, end?: number) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "contains(text: string, search: string) -> boolean",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "test(text: string, regex: string) -> boolean",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "match(text: string, regex: string) -> string[]",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "replace(text: string, regex: string, replacement: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "replaceAll(text: string, regex: string, replacement: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "lower(text: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "upper(text: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "trim(text: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "repeat(text: string, times: number) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "padStart(text: string | number, length: number, pad: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "padEnd(text: string | number, length: number, pad: string) -> string",
-        ),
-        sig_with_detail(
-            parser,
-            FunctionCategory::Text,
-            "concat<T: Plain>(lists1: T[], listsN: T[], ...) -> T[]",
-            "concat(lists1, lists2, ...)",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "join<T: Plain>(list: T[], separator: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Text,
-            "split(text: string, separator: string) -> string[]",
-        ),
-    ]
+pub(super) fn definitions() -> BuiltinCategory {
+    builtin_functions! {
+        category: Text;
+
+        substring(text: string, start: number, end?: number) -> string;
+        contains(text: string, search: string) -> boolean;
+        test(text: string, regex: string) -> boolean;
+        match(text: string, regex: string) -> string[];
+        replace(text: string, regex: string, replacement: string) -> string;
+        replaceAll(text: string, regex: string, replacement: string) -> string;
+        lower(text: string) -> string;
+        upper(text: string) -> string;
+        trim(text: string) -> string;
+        repeat(text: string, times: number) -> string;
+        padStart(text: string | number, length: number, pad: string) -> string;
+        padEnd(text: string | number, length: number, pad: string) -> string;
+
+        #[unsupported]
+        /// The semantic type model does not yet represent `Link`.
+        link(label: string, url: string) -> Link;
+
+        #[unsupported]
+        /// The semantic type model does not yet represent `StyledText`.
+        style(
+            text: string,
+            repeat(min = 1) {
+                styles: string,
+            },
+        ) -> StyledText;
+
+        #[unsupported]
+        /// The semantic type model does not yet represent `StyledText`.
+        unstyle(text: string | StyledText, styles?: string) -> string;
+
+        concat<T>(
+            repeat(min = 2) {
+                lists: T[],
+            },
+        ) -> T[];
+
+        join<T>(list: T[], separator: string) -> string;
+        split(text: string, separator: string) -> string[];
+    }
 }

@@ -46,7 +46,9 @@ pub fn analyze(text: &str, ctx: &analysis::Context) -> AnalyzeResult {
 }
 
 pub use analysis as semantic;
-pub use analysis::{ExprId, TypeMap, infer_expr_with_map};
+pub use analysis::{
+    ExprId, SemanticMap, TypeMap, infer_expr_with_map, infer_expr_with_semantic_map,
+};
 pub use diagnostics::format_diagnostics;
 pub use diagnostics::{
     CodeAction, Diagnostic, DiagnosticCode, DiagnosticKind, Diagnostics, ParseDiagnostic,

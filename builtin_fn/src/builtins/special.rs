@@ -1,10 +1,9 @@
-use super::sig;
-use crate::{BuiltinSigParser, FunctionCategory, FunctionSig};
+use crate::{BuiltinCategory, builtin_functions};
 
-pub(super) fn builtins(parser: &BuiltinSigParser) -> Vec<FunctionSig> {
-    vec![sig(
-        parser,
-        FunctionCategory::Special,
-        "id<T: Plain>(page?: T) -> string",
-    )]
+pub(super) fn definitions() -> BuiltinCategory {
+    builtin_functions! {
+        category: Special;
+
+        id() -> string;
+    }
 }

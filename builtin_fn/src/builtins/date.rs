@@ -1,59 +1,37 @@
-use super::sig;
-use crate::{BuiltinSigParser, FunctionCategory, FunctionSig};
+use crate::{BuiltinCategory, builtin_functions};
 
-pub(super) fn builtins(parser: &BuiltinSigParser) -> Vec<FunctionSig> {
-    vec![
-        sig(parser, FunctionCategory::Date, "now() -> date"),
-        sig(parser, FunctionCategory::Date, "today() -> date"),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "minute(date: date) -> number",
-        ),
-        sig(parser, FunctionCategory::Date, "hour(date: date) -> number"),
-        sig(parser, FunctionCategory::Date, "day(date: date) -> number"),
-        sig(parser, FunctionCategory::Date, "date(date: date) -> number"),
-        sig(parser, FunctionCategory::Date, "week(date: date) -> number"),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "month(date: date) -> number",
-        ),
-        sig(parser, FunctionCategory::Date, "year(date: date) -> number"),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "dateAdd(date: date, amount: number, unit: string) -> date",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "dateSubtract(date: date, amount: number, unit: string) -> date",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "dateBetween(a: date, b: date, unit: string) -> number",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "timestamp(date: date) -> number",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "fromTimestamp(timestamp: number) -> date",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "formatDate(date: date, format: string) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::Date,
-            "parseDate(text: string) -> date",
-        ),
-    ]
+pub(super) fn definitions() -> BuiltinCategory {
+    builtin_functions! {
+        category: Date;
+
+        now() -> date;
+        today() -> date;
+        minute(date: date) -> number;
+        hour(date: date) -> number;
+        day(date: date) -> number;
+        date(date: date) -> number;
+        week(date: date) -> number;
+        month(date: date) -> number;
+        year(date: date) -> number;
+        dateAdd(date: date, amount: number, unit: string) -> date;
+        dateSubtract(date: date, amount: number, unit: string) -> date;
+        dateBetween(a: date, b: date, unit: string) -> number;
+
+        #[unsupported]
+        /// The semantic type model does not yet represent `DateRange`.
+        dateRange(start: date, end: date) -> DateRange;
+
+        #[unsupported]
+        /// The semantic type model does not yet represent `DateRange`.
+        dateStart(range: DateRange) -> date;
+
+        #[unsupported]
+        /// The semantic type model does not yet represent `DateRange`.
+        dateEnd(range: DateRange) -> date;
+
+        timestamp(date: date) -> number;
+        fromTimestamp(timestamp: number) -> date;
+        formatDate(date: date, format: string) -> string;
+        parseDate(text: string) -> date;
+    }
 }

@@ -1,17 +1,15 @@
-use super::sig;
-use crate::{BuiltinSigParser, FunctionCategory, FunctionSig};
+use crate::{BuiltinCategory, builtin_functions};
 
-pub(super) fn builtins(parser: &BuiltinSigParser) -> Vec<FunctionSig> {
-    vec![
-        sig(
-            parser,
-            FunctionCategory::People,
-            "name<T: Plain>(person: T) -> string",
-        ),
-        sig(
-            parser,
-            FunctionCategory::People,
-            "email<T: Plain>(person: T) -> string",
-        ),
-    ]
+pub(super) fn definitions() -> BuiltinCategory {
+    builtin_functions! {
+        category: People;
+
+        #[unsupported]
+        /// Runtime inputs do not currently provide a person's display name.
+        name(person: any) -> string;
+
+        #[unsupported]
+        /// Runtime inputs do not currently provide a person's email address.
+        email(person: any) -> string;
+    }
 }

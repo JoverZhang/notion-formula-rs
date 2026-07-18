@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+builtin_fn_macros = { path = "../builtin_fn_macros" }
 serde = { version = "1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+trybuild = "1"
