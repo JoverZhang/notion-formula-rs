@@ -4,7 +4,8 @@
 - **Docs:** [Design docs](./docs/design/README.md)
 - **Status:**
   - Editor tooling (analyzer + completion/assists) is usable today.
-  - Evaluator/runtime execution is the next milestone (host-context contract first).
+  - The prepared-input evaluator structure and generated builtin ABI are available;
+    builtin behavior is the next milestone.
 
 ## What is this?
 
@@ -47,13 +48,15 @@ Example:
 
 - `analyzer/`: parsing + diagnostics + semantic checks
 - `builtin_fn/`: compile-time builtin catalog + shared call-signature resolution
+- `evaluator/`: prepared-input synchronous runtime structure + generated builtin contracts
 - `ide/`: formatter + completion/signature help + edit ops
 - `analyzer_wasm/`: WASM/JS API + TypeScript DTOs
 - `examples/vite/`: CodeMirror demo + UI test coverage
 
 ## Current Limits
 
-- Evaluator/runtime execution is not implemented yet; it is the next milestone (host-context contract first).
+- Non-builtin literals and operators execute through the synchronous evaluator, but builtin
+  implementation bodies are intentionally pending.
 - Language and type coverage are still expanding. Notion Formula compatibility is the default; extensions are additive and opt-in.
 - Unsupported builtin declarations remain documented in the catalog; types such as
   `DateRange` and rich text are not modeled yet.
@@ -81,6 +84,7 @@ just test-analyzer_wasm
 # manual
 cargo test -p analyzer
 cargo test -p builtin_fn
+cargo test -p evaluator
 cargo test -p ide
 cargo test -p analyzer_wasm
 ```
@@ -166,6 +170,20 @@ pub fn resolve_call_signature(
     signature: &FunctionSig,
     input: CallSignatureInput<'_>,
 ) -> ResolvedFunctionSig;
+```
+
+### Rust (`evaluator`)
+
+```rust
+// Analyze once, lower an owned plan, and expose complete property dependencies.
+pub fn prepare_formula(
+    expression: &mut analyzer::ast::Expr,
+    context: &EvalContext,
+) -> Result<PreparedFormula, PrepareError>;
+
+// Finalize caller-prepared columns, then evaluate synchronously.
+let inputs = EvalInputsBuilder::new(runtime).finish(&prepared, batch.len())?;
+let output = prepared.evaluate(batch, inputs)?;
 ```
 
 ### Rust (`ide`)
@@ -340,7 +358,7 @@ just run-example-vite  # build wasm and start demo dev server
 | `analyzer/` | Core analyzer logic: lexer/parser/AST/diagnostics/semantic |
 | `ide/` | IDE/editor helpers: format/completion/help/edit-apply |
 | `analyzer_wasm/` | WASM boundary, UTF-16<->UTF-8 conversions, DTO serialization |
-| `evaluator/` | Runtime evaluator TODO (coming soon) |
+| `evaluator/` | Prepared-input synchronous runtime and generated builtin ABI; builtin bodies pending |
 | `examples/vite/` | Browser demo (CodeMirror + WASM integration) |
 | `docs/` | Contracts, architecture docs, deep dives, and changelog guidance |
 

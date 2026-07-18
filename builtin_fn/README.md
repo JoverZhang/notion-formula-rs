@@ -34,8 +34,9 @@ implementation obligations once that generator is introduced.
   builtin registry source.
 
 `analyzer` consumes the shared resolver and retains its final result in `SemanticMap`; `ide`
-uses the same projection for Signature Help. The evaluator generation boundary described in
-the design docs will consume the supported catalog in a subsequent change.
+uses the same projection for Signature Help. `evaluator/build.rs` consumes the supported
+catalog to generate typed implementation contracts and dispatch. Handwritten evaluator
+behavior remains independently owned by `evaluator`.
 
 ## Catalog maintenance
 

@@ -81,9 +81,8 @@ PreparedFormula::evaluate (synchronous)
   must not consume.
 - `if`, `ifs`, `&&`, `||`, and lambda builtins remain mask-lazy. Preloading complete columns
   does not permit eager evaluation of unselected expressions.
-- The completed evaluator integration must use generated traits, markers, and dispatch
-  bindings for each supported builtin. Missing implementations or ABI mismatches must fail
-  at compile time.
+- Each supported builtin uses generated traits, markers, and dispatch bindings. Missing
+  implementations or ABI mismatches fail at compile time.
 
 ## Why Use an IR
 
