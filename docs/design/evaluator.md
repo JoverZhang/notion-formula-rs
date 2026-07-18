@@ -1,81 +1,125 @@
-# evaluator (Design)
+# Evaluator Design
 
-Design rationale for the `evaluator` crate.
-For implementation details, see `evaluator/README.md`.
+This document defines the row-batch formula evaluation boundary. See
+[`evaluator/README.md`](../../evaluator/README.md) for the current implementation and
+[`builtin-fn.md`](builtin-fn.md) for the traits, typed ABI, and input manifest generated
+from builtin declarations.
 
-## Purpose
+## Goals
 
-Row-batch formula evaluation. Lowers AST to an IR, dispatches operations through a kernel registry, and returns per-row results with externalized errors.
+The evaluator consumes a semantically analyzed formula, caller-prepared typed columns, and
+a row mask; executes the IR synchronously; and returns per-row values, null state, and
+errors.
 
 ## Pipeline
 
-```
-  Expr (AST) + EvalContext
-       |
-       v
-  Planner ──> ExecPlan (IR tree)
-       |        (evaluator/src/planner/)
-       |
-       |    Runs analyzer's infer_expr_with_map
-       |    to produce TypeMap, then lowers AST
-       |    to ExecNode variants.
-       v
-  Evaluator ──> walks IR, dispatches kernels
-       |         (evaluator/src/runtime/)
-       |
-       |    Binary ops dispatched via static
-       |    BinaryKernelRegistry.
-       v
-  EvalBlock
-       |
-       +── values: ColumnBlock (Column::F64 or Column::Any)
-       +── ok: Mask (row ok/fail flags)
-       +── errors: Vec<(usize, EvalError)>
+```text
+formula + schema + SemanticMap
+          |
+          v
+      Planner
+          |
+          +--> PreparedFormula
+          |      +-- ExecPlan
+          |      +-- RequiredColumn[]
+          |
+          +-----------------------------+
+                                        |
+caller loads complete columns from      |
+RequiredColumn                          |
+          |                             |
+          v                             |
+ EvalInputsBuilder --validate----------+
+          |
+          v
+      EvalInputs
+          |
+          v
+PreparedFormula::evaluate (synchronous)
+          |
+          +--> IR walker
+          +--> generated builtin dispatch
+          +--> handwritten kernels
+          |
+          v
+       EvalBlock
+          +-- values
+          +-- validity
+          +-- ok
+          +-- row errors
 ```
 
-## Key types
+## Core Types
 
-| Type | Location | Role |
-| --- | --- | --- |
-| `EvalContext` | `evaluator/src/core/context.rs` | Batch context for evaluation |
-| `Provider` | `evaluator/src/core/provider.rs` | Async external value source for `prop(...)` |
-| `EvalBlock` | `evaluator/src/core/types.rs` | Row-level result (values, ok, errors) |
-| `ColumnBlock` | `evaluator/src/core/types.rs` | Typed column storage |
-| `Column` | `evaluator/src/core/types.rs` | `F64(Vec<f64>)` or `Any(Vec<Value>)` |
-| `Mask` | `evaluator/src/core/types.rs` | Row ok/fail bitmap |
-| `Value` | `evaluator/src/core/types.rs` | Data-only value (no errors) |
-| `RowBatch` | `evaluator/src/core/types.rs` | Row count for a batch |
-| `ExecPlan` / `ExecNode` | `evaluator/src/ir/nodes.rs` | IR tree (LiteralF64, LiteralAny, CastToF64, Binary) |
-| `BinaryExecKey` | `evaluator/src/kernels/registry.rs` | Kernel lookup key |
-| `Evaluator` | `evaluator/src/runtime/evaluator.rs` | IR walker + kernel dispatch |
+| Type | Purpose |
+| --- | --- |
+| `PreparedFormula` | Resolved execution plan and complete input dependencies |
+| `RequiredColumn` / `InputSlot` | Property columns callers must prepare and their plan-local slots |
+| `EvalInputsBuilder` | Collects and validates inputs against the prepared layout |
+| `EvalInputs` | Finalized complete input columns ready for synchronous evaluation |
+| `InputContractError` | Missing columns, duplicate slots, or incorrect kinds, lengths, or layouts |
+| `KernelColumn<K>` | Typed runtime column with shared ownership |
+| `Validity` | `AllValid`, `AllNull`, or a shared bitmap |
+| `Mask` | Rows the current control-flow step must execute |
+| `EvalBlock` | Column, validity, `ok`, and per-row errors |
+| `BuiltinEvalContext` | Synchronous interface for Controlled builtins to execute typed plans under masks |
 
 ## Contracts
 
-- `Value` is data-only; row errors are externalized via `EvalBlock { ok, errors }`.
-- `ok[i] = false` means `values[i]` is placeholder-only and must not be consumed.
-- `Provider::get_prop` receives full `Property` metadata plus optional row `mask`.
-- `Provider::get_prop` must return a `ColumnBlock` whose length equals batch row count.
-- `if(cond, then, else)`, `&&`, and `||` are mask-driven; branch sides evaluated only for required rows.
-- See `docs/design/contracts.md` for full cross-crate contract listing.
+- The Planner consumes `ResolvedFunctionSig` values stored by the Analyzer and does not
+  bind generics again or execute signature resolvers from batch values.
+- `PreparedFormula::required_columns()` returns the complete, deduplicated manifest of
+  properties statically referenced by the formula, including references in branches that
+  may be unselected.
+- Callers prepare every column before evaluation. External data sources may load
+  asynchronously, but the evaluator contains no Provider, Future, or `block_on`.
+- Before any kernel starts, `EvalInputsBuilder` validates slots, ABI kinds, batch length,
+  and layout. Failure returns `InputContractError` and produces no partial result.
+- Execution masks, `ok`, and `Validity` are independent states. Null is a successful value,
+  not a row error; an inactive row is not null either.
+- `ok[i] = false` means the row's physical value is a placeholder that downstream kernels
+  must not consume.
+- `if`, `ifs`, `&&`, `||`, and lambda builtins remain mask-lazy. Preloading complete columns
+  does not permit eager evaluation of unselected expressions.
+- The completed evaluator integration must use generated traits, markers, and dispatch
+  bindings for each supported builtin. Missing implementations or ABI mismatches must fail
+  at compile time.
 
-## Why: IR instead of direct AST walking
+## Why Use an IR
 
-- Kernel dispatch: binary operations are dispatched through a static registry, allowing f64 fast paths and polymorphic fallbacks.
-- Mask propagation: the IR tree structure makes it natural to thread row masks through conditional branches.
-- Type specialization: the planner selects specialized `ExecNode` variants (e.g. `LiteralF64` vs `LiteralAny`) based on inferred types.
+- The IR fixes builtins, types, and parameter shapes already resolved by semantic analysis
+  into executable nodes.
+- The Planner can select typed column specializations instead of making kernels match on a
+  dynamic `Value`.
+- Execution masks propagate naturally through control-flow branches.
+- `PlanId` and named Args/Plans give Controlled builtins a restricted evaluation interface.
+- Property input nodes reference `InputSlot` directly, avoiding runtime string lookup.
 
-## Why: async Provider
+## Why Callers Prepare Columns
 
-- External data sources (databases, APIs) are inherently async.
-- `Provider` receives `mask` so only required rows trigger external work.
-- The evaluator runtime is currently synchronous; bridging async Provider integration is a known issue (see `evaluator/README.md`).
+External data retrieval and formula computation have different scheduling and error
+boundaries. Callers can load database or API data concurrently from the `RequiredColumn`
+manifest and then construct `EvalInputs` once; the evaluator performs only synchronous,
+deterministic column computation.
 
-## Source pointers
+This boundary means a column referenced by an unselected branch may still be loaded, but
+the branch expression itself remains unevaluated. In return, kernel ABIs stay synchronous,
+async traits do not propagate through the evaluator, and the input contract remains
+explicit.
 
-- Planner: `evaluator/src/planner/planner.rs`
-- IR nodes: `evaluator/src/ir/nodes.rs`
-- Evaluator runtime: `evaluator/src/runtime/evaluator.rs`
-- Kernel registry: `evaluator/src/kernels/registry.rs`
-- Core types: `evaluator/src/core/types.rs`
-- Provider trait: `evaluator/src/core/provider.rs`
-- Error model: `evaluator/src/core/types.rs` (EvalError, ProviderError, SimpleEvalError)
+## Error Boundaries
+
+| Category | Representation | Scope |
+| --- | --- | --- |
+| Input structure error | `InputContractError` | Returned for the whole batch before evaluation |
+| Formula semantic error | `EvalError` + `ok` | One row |
+| Null | `Validity` | Valid row value |
+| Kernel contract error | Debug assertion | Implementation error during development |
+
+## Implementation Entry Points
+
+- Current Planner: `evaluator/src/planner/`
+- Current IR: `evaluator/src/ir/`
+- Current runtime: `evaluator/src/runtime/`
+- Current kernels: `evaluator/src/kernels/`
+- Current implementation status and known differences: `evaluator/README.md`

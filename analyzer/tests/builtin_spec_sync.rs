@@ -149,7 +149,7 @@ fn parse_doc_functions() -> Vec<DocFunction> {
             name,
             detail,
             category: cat,
-            status: status.clone(),
+            status: status.take(),
             line: line_no,
         });
     }
@@ -173,6 +173,9 @@ fn parse_category_header(line: &str) -> Option<FunctionCategory> {
 }
 
 fn parse_todo_status(line: &str) -> Option<String> {
+    if line.starts_with("// Unsupported:") {
+        return Some("Unsupported".to_string());
+    }
     let start = line.find("TODO-")?;
     let tag = line[start..]
         .chars()

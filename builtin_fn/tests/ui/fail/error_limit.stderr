@@ -1,0 +1,200 @@
+error: unknown type or generic `Missing00`
+ --> tests/ui/fail/error_limit.rs:7:20
+  |
+7 |         f00(value: Missing00) -> number;
+  |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing01`
+ --> tests/ui/fail/error_limit.rs:8:20
+  |
+8 |         f01(value: Missing01) -> number;
+  |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing02`
+ --> tests/ui/fail/error_limit.rs:9:20
+  |
+9 |         f02(value: Missing02) -> number;
+  |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing03`
+  --> tests/ui/fail/error_limit.rs:10:20
+   |
+10 |         f03(value: Missing03) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing04`
+  --> tests/ui/fail/error_limit.rs:11:20
+   |
+11 |         f04(value: Missing04) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing05`
+  --> tests/ui/fail/error_limit.rs:12:20
+   |
+12 |         f05(value: Missing05) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing06`
+  --> tests/ui/fail/error_limit.rs:13:20
+   |
+13 |         f06(value: Missing06) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing07`
+  --> tests/ui/fail/error_limit.rs:14:20
+   |
+14 |         f07(value: Missing07) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing08`
+  --> tests/ui/fail/error_limit.rs:15:20
+   |
+15 |         f08(value: Missing08) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing09`
+  --> tests/ui/fail/error_limit.rs:16:20
+   |
+16 |         f09(value: Missing09) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing10`
+  --> tests/ui/fail/error_limit.rs:17:20
+   |
+17 |         f10(value: Missing10) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing11`
+  --> tests/ui/fail/error_limit.rs:18:20
+   |
+18 |         f11(value: Missing11) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing12`
+  --> tests/ui/fail/error_limit.rs:19:20
+   |
+19 |         f12(value: Missing12) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing13`
+  --> tests/ui/fail/error_limit.rs:20:20
+   |
+20 |         f13(value: Missing13) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing14`
+  --> tests/ui/fail/error_limit.rs:21:20
+   |
+21 |         f14(value: Missing14) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing15`
+  --> tests/ui/fail/error_limit.rs:22:20
+   |
+22 |         f15(value: Missing15) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing16`
+  --> tests/ui/fail/error_limit.rs:23:20
+   |
+23 |         f16(value: Missing16) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing17`
+  --> tests/ui/fail/error_limit.rs:24:20
+   |
+24 |         f17(value: Missing17) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing18`
+  --> tests/ui/fail/error_limit.rs:25:20
+   |
+25 |         f18(value: Missing18) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing19`
+  --> tests/ui/fail/error_limit.rs:26:20
+   |
+26 |         f19(value: Missing19) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing20`
+  --> tests/ui/fail/error_limit.rs:27:20
+   |
+27 |         f20(value: Missing20) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing21`
+  --> tests/ui/fail/error_limit.rs:28:20
+   |
+28 |         f21(value: Missing21) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing22`
+  --> tests/ui/fail/error_limit.rs:29:20
+   |
+29 |         f22(value: Missing22) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing23`
+  --> tests/ui/fail/error_limit.rs:30:20
+   |
+30 |         f23(value: Missing23) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing24`
+  --> tests/ui/fail/error_limit.rs:31:20
+   |
+31 |         f24(value: Missing24) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing25`
+  --> tests/ui/fail/error_limit.rs:32:20
+   |
+32 |         f25(value: Missing25) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing26`
+  --> tests/ui/fail/error_limit.rs:33:20
+   |
+33 |         f26(value: Missing26) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing27`
+  --> tests/ui/fail/error_limit.rs:34:20
+   |
+34 |         f27(value: Missing27) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing28`
+  --> tests/ui/fail/error_limit.rs:35:20
+   |
+35 |         f28(value: Missing28) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing29`
+  --> tests/ui/fail/error_limit.rs:36:20
+   |
+36 |         f29(value: Missing29) -> number;
+   |                    ^^^^^^^^^
+
+error: unknown type or generic `Missing30`
+  --> tests/ui/fail/error_limit.rs:37:20
+   |
+37 |         f30(value: Missing30) -> number;
+   |                    ^^^^^^^^^
+
+error: 2 additional declaration errors were suppressed
+  --> tests/ui/fail/error_limit.rs:4:13
+   |
+ 4 |       let _ = builtin_functions! {
+   |  _____________^
+ 5 | |         category: General;
+ 6 | |
+ 7 | |         f00(value: Missing00) -> number;
+...  |
+39 | |         f32(value: Missing32) -> number;
+40 | |     };
+   | |_____^
+   |
+   = note: this error originates in the macro `builtin_functions` (in Nightly builds, run with -Z macro-backtrace for more info)

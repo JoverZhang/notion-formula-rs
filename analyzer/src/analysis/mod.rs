@@ -13,11 +13,14 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 mod desugar;
 mod infer;
+pub use builtin_fn::type_accepts as ty_accepts;
 pub use builtin_fn::{
-    FunctionCategory, FunctionSig, GenericId, GenericParam, GenericParamKind, LambdaParam,
-    ParamShape, ParamSig, SigResolver, Ty, builtins_functions, normalize_union,
+    ArgumentObservation, ArgumentTypeStatus, CallShapeError, CallSignatureInput, FunctionCategory,
+    FunctionSig, GenericId, GenericParam, GenericParamKind, LambdaParam, ParamRef, ParamShape,
+    ParamSig, ResolvedFunctionSig, ResolverInput, ShapeValidity, SigResolver, Ty,
+    builtins_functions, normalize_union, param_for_ref, resolve_call_signature, type_accepts,
 };
-pub use infer::{ExprId, TypeMap, infer_expr_with_map};
+pub use infer::{ExprId, SemanticMap, TypeMap, infer_expr_with_map, infer_expr_with_semantic_map};
 
 /// Global counter for synthetic expression IDs created during inference (e.g. `ImplicitLambda`
 /// wrapper nodes). Starts at `u32::MAX / 2` to avoid collisions with parser-allocated IDs.
@@ -64,51 +67,14 @@ pub fn is_postfix_capable(sig: &FunctionSig) -> bool {
         return sig.display_params_len() >= 2;
     }
     if !sig.params.repeat.is_empty() {
-        return sig.display_params_len() >= 2;
+        // A repeat-only declaration has one logical slot but may require multiple
+        // physical groups. This keeps `concat` postfix-capable after moving from legacy
+        // numbered parameters to `repeat(min = 2)` without making one-group reducers
+        // such as `sum` newly postfix-capable.
+        return sig.display_params_len() >= 2
+            || sig.params.repeat.len() * sig.params.repeat_min_groups >= 2;
     }
     false
-}
-
-/// Returns whether `actual` is accepted by `expected` for semantic validation.
-///
-/// Currently:
-/// - `actual = Unknown` is accepted (avoids cascading mismatch noise when inference is unsure).
-/// - `expected = Generic(_)` is treated as a wildcard (the inferred actual being `Generic(_)` does
-///   *not* imply wildcarding).
-/// - `Union` uses containment semantics (unions are treated as sets for acceptance checks).
-/// - `List` is covariant: `List(E)` accepts `List(A)` iff `E` accepts `A`.
-pub fn ty_accepts(expected: &Ty, actual: &Ty) -> bool {
-    if matches!(actual, Ty::Unknown) {
-        return true;
-    }
-    // Generics wildcard only when the *expected* side is generic.
-    // The inferred "actual" type being Generic(...) must not silently pass validation.
-    if matches!(expected, Ty::Generic(_)) {
-        return true;
-    }
-    match (expected, actual) {
-        // A Fn-typed param accepts any expression — the inference pass handles wrapping.
-        // During validation the wrapped ImplicitLambda's body type is checked against ret.
-        (
-            Ty::Fn {
-                ret: expected_ret, ..
-            },
-            actual,
-        ) => ty_accepts(expected_ret, actual),
-        // Ident-typed positions are internal annotations for binder names — they should
-        // not participate in user-visible type matching. validate_call short-circuits
-        // before reaching ty_accepts for Ident params, but IDE callers may hit this path.
-        (Ty::Ident(_), _) => true,
-        (Ty::Union(_), Ty::Union(actual_members)) => {
-            actual_members.iter().all(|a| ty_accepts(expected, a))
-        }
-        (Ty::Union(branches), actual) => branches.iter().any(|t| ty_accepts(t, actual)),
-        (expected, Ty::Union(actual_members)) => {
-            actual_members.iter().all(|a| ty_accepts(expected, a))
-        }
-        (Ty::List(e), Ty::List(a)) => ty_accepts(e, a),
-        _ => expected == actual,
-    }
 }
 
 /// A property available to `prop("Name")` calls and to editor completion.
@@ -156,22 +122,31 @@ impl Context {
 /// - Postfix member calls may be treated as calls when the callee is a postfix-capable builtin (see
 ///   [`is_postfix_capable`]).
 pub fn analyze_expr(expr: &mut Expr, ctx: &Context) -> (Ty, Vec<Diagnostic>) {
+    let (ty, _, diagnostics) = analyze_expr_with_semantic_map(expr, ctx);
+    (ty, diagnostics)
+}
+
+/// Analyze an expression and retain the final resolved contract for every builtin call.
+pub fn analyze_expr_with_semantic_map(
+    expr: &mut Expr,
+    ctx: &Context,
+) -> (Ty, SemanticMap, Vec<Diagnostic>) {
     desugar::desugar_member_calls(expr);
 
-    let mut map = TypeMap::default();
-    let ty = infer_expr_with_map(expr, ctx, &mut map);
+    let mut map = SemanticMap::default();
+    let ty = infer_expr_with_semantic_map(expr, ctx, &mut map);
 
     let mut diags = Vec::new();
     validate_expr(expr, ctx, &map, &mut diags);
 
-    (ty, diags)
+    (ty, map, diags)
 }
 
 fn lookup_function<'a>(ctx: &'a Context, name: &str) -> Option<&'a FunctionSig> {
     ctx.functions.iter().find(|f| f.name == name)
 }
 
-fn validate_expr(expr: &Expr, ctx: &Context, map: &TypeMap, diags: &mut Vec<Diagnostic>) {
+fn validate_expr(expr: &Expr, ctx: &Context, map: &SemanticMap, diags: &mut Vec<Diagnostic>) {
     match &expr.kind {
         ExprKind::Lit(_) | ExprKind::Ident(_) | ExprKind::Error => {}
         ExprKind::Group { inner } => validate_expr(inner, ctx, map, diags),
@@ -206,7 +181,7 @@ fn validate_expr(expr: &Expr, ctx: &Context, map: &TypeMap, diags: &mut Vec<Diag
                         emit_error(diags, expr.span, format!("unknown function: {}", name));
                         return;
                     };
-                    validate_call(expr.span, name, sig, args, ctx, map, diags);
+                    validate_call(expr, name, sig, args, map, diags);
                 }
             }
         }
@@ -238,15 +213,7 @@ fn validate_expr(expr: &Expr, ctx: &Context, map: &TypeMap, diags: &mut Vec<Diag
             let mut all_args: Vec<Expr> = Vec::with_capacity(1 + args.len());
             all_args.push((**receiver).clone());
             all_args.extend(args.iter().cloned());
-            validate_call(
-                expr.span,
-                method.text.as_str(),
-                sig,
-                &all_args,
-                ctx,
-                map,
-                diags,
-            );
+            validate_call(expr, method.text.as_str(), sig, &all_args, map, diags);
         }
         ExprKind::ImplicitLambda { body, .. } => {
             validate_expr(body, ctx, map, diags);
@@ -275,25 +242,33 @@ fn validate_prop_call(expr: &Expr, args: &[Expr], ctx: &Context, diags: &mut Vec
 }
 
 fn validate_call(
-    call_span: Span,
+    call: &Expr,
     name: &str,
     sig: &FunctionSig,
     args: &[Expr],
-    _ctx: &Context,
-    map: &TypeMap,
+    map: &SemanticMap,
     diags: &mut Vec<Diagnostic>,
 ) {
-    if !validate_arity(call_span, name, sig, args.len(), diags) {
+    let Some(resolved) = map.builtin_calls.get(&call.id) else {
+        return;
+    };
+    if let ShapeValidity::Invalid(error) = &resolved.validity {
+        emit_shape_error(diags, call.span, name, sig, error);
         return;
     }
 
-    for (idx, arg) in args.iter().enumerate() {
-        let Some(param) = param_for_arg_index_with_total(sig, idx, args.len()) else {
+    for (arg, argument) in args.iter().zip(&resolved.arguments) {
+        let Some(reference) = argument.parameter else {
             continue;
         };
+        let param = param_for_ref(sig, reference);
 
         // Ident-typed params require a bare identifier expression.
-        if matches!(param.ty, Ty::Ident(_)) {
+        if argument
+            .expected_ty
+            .as_ref()
+            .is_some_and(|expected| matches!(expected, Ty::Ident(_)))
+        {
             if !matches!(arg.kind, ExprKind::Ident(_)) {
                 emit_error(
                     diags,
@@ -304,134 +279,57 @@ fn validate_call(
             continue;
         }
 
-        let actual = map.get(arg.id).cloned().unwrap_or(Ty::Unknown);
-        if !ty_accepts(&param.ty, &actual) {
-            if name == "sum" {
-                emit_error(diags, arg.span, "sum() expects number arguments");
-            } else {
-                emit_error(
-                    diags,
-                    arg.span,
-                    format!(
-                        "argument type mismatch: expected {:?}, got {:?}",
-                        param.ty, actual
-                    ),
-                );
-            }
+        let ArgumentTypeStatus::Mismatch { actual } = &argument.type_status else {
+            continue;
+        };
+        if name == "sum" {
+            emit_error(diags, arg.span, "sum() expects number arguments");
+        } else {
+            emit_error(
+                diags,
+                arg.span,
+                format!(
+                    "argument type mismatch: expected {:?}, got {:?}",
+                    argument.expected_ty.as_ref().unwrap_or(&param.ty),
+                    actual
+                ),
+            );
         }
     }
 }
 
-/// Returns `true` when the call has a valid arity/shape for `sig`.
-///
-/// On invalid arity/shape, this function emits exactly one error diagnostic and returns `false`
-/// so callers can early-return without producing cascading diagnostics.
-fn validate_arity(
+fn emit_shape_error(
+    diags: &mut Vec<Diagnostic>,
     call_span: Span,
     name: &str,
     sig: &FunctionSig,
-    arg_len: usize,
-    diags: &mut Vec<Diagnostic>,
-) -> bool {
-    let required = sig.required_min_args();
-    let head_len = sig.params.head.len();
-    let repeat_len = sig.params.repeat.len();
-    let tail_len = sig.params.tail.len();
-
-    // Fixed arity: no repeat group.
-    if repeat_len == 0 {
-        let max = head_len + tail_len;
-        if required == max {
-            if arg_len != max {
-                let plural = if max == 1 { "" } else { "s" };
-                emit_error(
-                    diags,
-                    call_span,
-                    format!("{name}() expects exactly {max} argument{plural}"),
-                );
-                return false;
-            }
-            return true;
+    error: &CallShapeError,
+) {
+    let message = match error {
+        CallShapeError::TooFew { minimum, .. }
+            if sig.params.repeat.is_empty()
+                && *minimum == sig.params.head.len() + sig.params.tail.len() =>
+        {
+            let plural = if *minimum == 1 { "" } else { "s" };
+            format!("{name}() expects exactly {minimum} argument{plural}")
         }
-
-        if arg_len < required {
-            let plural = if required == 1 { "" } else { "s" };
-            emit_error(
-                diags,
-                call_span,
-                format!("{name}() expects at least {required} argument{plural}"),
-            );
-            return false;
+        CallShapeError::TooFew { minimum, .. } => {
+            let plural = if *minimum == 1 { "" } else { "s" };
+            format!("{name}() expects at least {minimum} argument{plural}")
         }
-
-        if arg_len > max {
-            let plural = if max == 1 { "" } else { "s" };
-            emit_error(
-                diags,
-                call_span,
-                format!("{name}() expects at most {max} argument{plural}"),
-            );
-            return false;
+        CallShapeError::TooMany { maximum, .. } if sig.required_min_args() == *maximum => {
+            let plural = if *maximum == 1 { "" } else { "s" };
+            format!("{name}() expects exactly {maximum} argument{plural}")
         }
-
-        return true;
-    }
-
-    // Repeat-group: head + (repeat group 1+) + tail (tail may be partially present if optional).
-    if arg_len < required {
-        let plural = if required == 1 { "" } else { "s" };
-        emit_error(
-            diags,
-            call_span,
-            format!("{name}() expects at least {required} argument{plural}"),
-        );
-        return false;
-    }
-
-    if resolve_repeat_tail_used(&sig.params, arg_len).is_none() {
-        emit_error(
-            diags,
-            call_span,
-            format!("{name}() has an invalid argument shape"),
-        );
-        return false;
-    }
-
-    true
-}
-
-fn param_for_arg_index_with_total(
-    sig: &FunctionSig,
-    idx: usize,
-    total: usize,
-) -> Option<&ParamSig> {
-    if sig.params.repeat.is_empty() {
-        if idx < sig.params.head.len() {
-            return sig.params.head.get(idx);
+        CallShapeError::TooMany { maximum, .. } => {
+            let plural = if *maximum == 1 { "" } else { "s" };
+            format!("{name}() expects at most {maximum} argument{plural}")
         }
-        return sig
-            .params
-            .tail
-            .get(idx.saturating_sub(sig.params.head.len()));
-    }
-
-    let head_len = sig.params.head.len();
-    let tail_used = resolve_repeat_tail_used(&sig.params, total)?;
-    let tail_start = total.saturating_sub(tail_used);
-
-    if idx < head_len {
-        return sig.params.head.get(idx);
-    }
-    if idx >= tail_start {
-        return sig.params.tail.get(idx - tail_start);
-    }
-
-    let idx = idx.saturating_sub(head_len);
-    sig.params.repeat.get(idx % sig.params.repeat.len())
-}
-
-pub(crate) fn resolve_repeat_tail_used(params: &ParamShape, total: usize) -> Option<usize> {
-    builtin_fn::resolve_repeat_tail_used(params, total)
+        CallShapeError::InvalidRepeat { .. } => {
+            format!("{name}() has an invalid argument shape")
+        }
+    };
+    emit_error(diags, call_span, message);
 }
 
 fn emit_error(diags: &mut Vec<Diagnostic>, span: Span, message: impl Into<String>) {

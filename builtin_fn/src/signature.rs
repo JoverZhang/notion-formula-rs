@@ -1,6 +1,6 @@
 //! Function signature model used by semantic analysis and editor tooling.
 
-use crate::{FunctionCategory, GenericId, Ty, resolve_repeat_tail_used};
+use crate::{FunctionCategory, GenericId, ResolverInput, Ty, resolve_repeat_tail_used};
 use std::collections::HashSet;
 
 /// How a generic parameter binds during inference.
@@ -39,6 +39,15 @@ impl ParamShape {
         if let Some(param) = repeat.iter().find(|p| p.optional) {
             panic!(
                 "ParamShape invariant violated: repeat params must not be optional (found: {:?})",
+                param
+            );
+        }
+
+        if !repeat.is_empty()
+            && let Some(param) = head.iter().find(|p| p.optional)
+        {
+            panic!(
+                "ParamShape invariant violated: when repeat params exist, head params must be required for determinism (found optional: {:?})",
                 param
             );
         }
@@ -110,7 +119,7 @@ impl ParamShape {
 
 /// Custom type resolution function for builtins whose return type cannot be expressed by the
 /// standard generic unification system.
-pub type SigResolver = fn(&FunctionSig, &[Ty]) -> FunctionSig;
+pub type SigResolver = for<'a> fn(&ResolverInput<'a>) -> Ty;
 
 /// A function signature used for semantic validation and editor tooling.
 #[derive(Debug, Clone)]

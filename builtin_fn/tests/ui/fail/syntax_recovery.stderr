@@ -1,0 +1,11 @@
+error: expected `:`
+ --> tests/ui/fail/syntax_recovery.rs:7:25
+  |
+7 |         malformed(value number) -> number;
+  |                         ^^^^^^
+
+error: unknown type or generic `MissingType`
+ --> tests/ui/fail/syntax_recovery.rs:9:22
+  |
+9 |         later(value: MissingType) -> number;
+  |                      ^^^^^^^^^^^

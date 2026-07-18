@@ -7,7 +7,10 @@ use crate::ast::{Expr, ExprKind, UnOp};
 use crate::{LitKind, NodeId};
 use std::collections::HashMap;
 
-use super::{Context, FunctionSig, GenericId, GenericParamKind, LambdaParam, Ty, normalize_union};
+use super::{
+    ArgumentObservation, CallSignatureInput, Context, FunctionSig, LambdaParam,
+    ResolvedFunctionSig, Ty, normalize_union, param_for_ref, resolve_call_signature,
+};
 
 /// Identifier for an expression node used as the key in [`TypeMap`].
 pub type ExprId = NodeId;
@@ -19,6 +22,13 @@ pub type ExprId = NodeId;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TypeMap {
     inner: HashMap<ExprId, Ty>,
+}
+
+/// Semantic facts retained for downstream planning after inference completes.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct SemanticMap {
+    pub expression_types: TypeMap,
+    pub builtin_calls: HashMap<ExprId, ResolvedFunctionSig>,
 }
 
 impl TypeMap {
@@ -40,13 +50,15 @@ impl TypeMap {
 /// parameter bindings before inferring the body, then pops it afterwards.
 pub(crate) struct InferCtx {
     map: TypeMap,
+    builtin_calls: HashMap<ExprId, ResolvedFunctionSig>,
     scopes: Vec<HashMap<String, Ty>>,
 }
 
 impl InferCtx {
-    fn new(map: TypeMap) -> Self {
+    fn new(map: SemanticMap) -> Self {
         Self {
-            map,
+            map: map.expression_types,
+            builtin_calls: map.builtin_calls,
             scopes: Vec::new(),
         }
     }
@@ -76,160 +88,15 @@ impl InferCtx {
         self.map.insert(id, ty);
     }
 
-    /// Consume the context and return the underlying [`TypeMap`].
-    fn into_map(self) -> TypeMap {
-        self.map
-    }
-}
-
-pub(crate) type Subst = HashMap<GenericId, Ty>;
-type GenericRegistry = HashMap<GenericId, GenericParamKind>;
-
-fn registry_for(sig: &FunctionSig) -> GenericRegistry {
-    sig.generics.iter().map(|g| (g.id, g.kind)).collect()
-}
-
-fn bind_generic(subst: &mut Subst, registry: &GenericRegistry, id: GenericId, actual: &Ty) {
-    let kind = registry
-        .get(&id)
-        .copied()
-        .unwrap_or(GenericParamKind::Plain);
-
-    fn contains_unknown(ty: &Ty) -> bool {
-        match ty {
-            Ty::Unknown => true,
-            Ty::Union(members) => members.iter().any(contains_unknown),
-            _ => false,
-        }
+    fn insert_call(&mut self, id: ExprId, signature: ResolvedFunctionSig) {
+        self.builtin_calls.insert(id, signature);
     }
 
-    match kind {
-        GenericParamKind::Plain => {
-            if matches!(actual, Ty::Unknown) {
-                return;
-            }
-
-            let to_add = vec![actual.clone()];
-            match subst.get(&id).cloned() {
-                None => {
-                    subst.insert(id, normalize_union(to_add));
-                }
-                Some(prev) => {
-                    // Plain generics: permissive accumulation on conflicts.
-                    subst.insert(id, normalize_union(std::iter::once(prev).chain(to_add)));
-                }
-            }
-        }
-        GenericParamKind::Variant => {
-            if contains_unknown(actual) {
-                subst.insert(id, Ty::Unknown);
-                return;
-            }
-
-            // Once a variant generic sees an Unknown, the result stays Unknown.
-            if subst.get(&id).is_some_and(|t| matches!(t, Ty::Unknown)) {
-                return;
-            }
-
-            let mut to_add: Vec<Ty> = Vec::new();
-            match actual {
-                Ty::Union(members) => {
-                    to_add.extend(members.iter().cloned());
-                }
-                other => {
-                    to_add.push(other.clone());
-                }
-            }
-
-            if to_add.is_empty() {
-                return;
-            }
-
-            match subst.get(&id).cloned() {
-                None => {
-                    subst.insert(id, normalize_union(to_add));
-                }
-                Some(prev) => {
-                    // Variant generics: union-accumulate across all bindings.
-                    subst.insert(id, normalize_union(std::iter::once(prev).chain(to_add)));
-                }
-            }
-        }
-    }
-}
-
-pub(crate) fn unify(subst: &mut Subst, registry: &GenericRegistry, expected: &Ty, actual: &Ty) {
-    match expected {
-        Ty::Generic(id) => bind_generic(subst, registry, *id, actual),
-        Ty::List(exp_inner) => {
-            if let Ty::List(act_inner) = actual {
-                unify(subst, registry, exp_inner, act_inner);
-            }
-        }
-        Ty::Union(branches) => {
-            for branch in branches {
-                unify(subst, registry, branch, actual);
-            }
-        }
-        Ty::Fn { ret, .. } => {
-            // For Fn-typed params, unify the return type with the actual arg type.
-            // The actual arg has not been wrapped yet — it's the raw expression type.
-            unify(subst, registry, ret, actual);
-        }
-        Ty::Ident(inner) => {
-            // Ident params carry the type that will be bound. Unify it with actual
-            // (though typically actual is Unknown for bare identifiers).
-            unify(subst, registry, inner, actual);
-        }
-        _ => {}
-    }
-}
-
-pub(crate) fn apply(subst: &Subst, ty_template: &Ty) -> Ty {
-    match ty_template {
-        Ty::Generic(id) => subst.get(id).cloned().unwrap_or(Ty::Unknown),
-        Ty::List(inner) => Ty::List(Box::new(apply(subst, inner))),
-        Ty::Union(members) => normalize_union(members.iter().map(|m| apply(subst, m))),
-        Ty::Fn { params, ret } => Ty::Fn {
-            params: params
-                .iter()
-                .map(|(lp, ty)| (lp.clone(), apply(subst, ty)))
-                .collect(),
-            ret: Box::new(apply(subst, ret)),
-        },
-        Ty::Ident(inner) => Ty::Ident(Box::new(apply(subst, inner))),
-        other => other.clone(),
-    }
-}
-
-fn unify_call_args(sig: &FunctionSig, arg_tys: &[Ty], subst: &mut Subst) {
-    let registry = registry_for(sig);
-
-    if sig.params.repeat.is_empty() {
-        let params = sig.params.head.iter().chain(sig.params.tail.iter());
-        for (param, actual) in params.zip(arg_tys.iter()) {
-            unify(subst, &registry, &param.ty, actual);
-        }
-        return;
-    }
-
-    let head_len = sig.params.head.len();
-    let tail_used = super::resolve_repeat_tail_used(&sig.params, arg_tys.len())
-        .unwrap_or(sig.params.tail.len());
-    let tail_start = arg_tys.len().saturating_sub(tail_used);
-
-    for (idx, actual) in arg_tys.iter().enumerate() {
-        let expected = if idx < head_len {
-            sig.params.head.get(idx)
-        } else if idx >= tail_start {
-            sig.params.tail.get(idx - tail_start)
-        } else {
-            let r_idx = (idx - head_len) % sig.params.repeat.len();
-            sig.params.repeat.get(r_idx)
-        };
-
-        if let Some(param) = expected {
-            unify(subst, &registry, &param.ty, actual);
+    /// Consume the context and return all retained semantic facts.
+    fn into_map(self) -> SemanticMap {
+        SemanticMap {
+            expression_types: self.map,
+            builtin_calls: self.builtin_calls,
         }
     }
 }
@@ -244,6 +111,17 @@ fn unify_call_args(sig: &FunctionSig, arg_tys: &[Ty], subst: &mut Subst) {
 /// - For `Ty::Fn`-typed parameter positions, the argument expression is wrapped in-place in
 ///   an [`ExprKind::ImplicitLambda`] node.
 pub fn infer_expr_with_map(expr: &mut Expr, ctx: &Context, map: &mut TypeMap) -> Ty {
+    let mut semantic_map = SemanticMap {
+        expression_types: std::mem::take(map),
+        builtin_calls: HashMap::new(),
+    };
+    let ty = infer_expr_with_semantic_map(expr, ctx, &mut semantic_map);
+    *map = semantic_map.expression_types;
+    ty
+}
+
+/// Infer expression types and retain final resolved contracts for every builtin call.
+pub fn infer_expr_with_semantic_map(expr: &mut Expr, ctx: &Context, map: &mut SemanticMap) -> Ty {
     let taken_map = std::mem::take(map);
     let mut ictx = InferCtx::new(taken_map);
     let ty = infer_expr(expr, ctx, &mut ictx);
@@ -252,6 +130,7 @@ pub fn infer_expr_with_map(expr: &mut Expr, ctx: &Context, map: &mut TypeMap) ->
 }
 
 fn infer_expr(expr: &mut Expr, ctx: &Context, ictx: &mut InferCtx) -> Ty {
+    let expr_id = expr.id;
     let ty = match &mut expr.kind {
         ExprKind::Lit(lit) => match lit.kind {
             LitKind::Number => Ty::Number,
@@ -346,7 +225,7 @@ fn infer_expr(expr: &mut Expr, ctx: &Context, ictx: &mut InferCtx) -> Ty {
             "prop" => infer_prop(args, ctx, ictx),
             name => {
                 let sig = ctx.functions.iter().find(|f| f.name == name);
-                infer_call(sig, args, ctx, ictx)
+                infer_call(expr_id, sig, args, ctx, ictx)
             }
         },
         ExprKind::MemberCall { receiver, args, .. } => {
@@ -394,11 +273,15 @@ fn infer_prop(args: &mut [Expr], ctx: &Context, ictx: &mut InferCtx) -> Ty {
 /// is not an `Ident`.
 fn resolve_param_ref(
     ref_name: &str,
-    resolved_params: &[&super::ParamSig],
+    signature: &FunctionSig,
+    resolved: &ResolvedFunctionSig,
     args: &[Expr],
 ) -> String {
-    for (i, param) in resolved_params.iter().enumerate() {
-        if param.name == ref_name {
+    for (i, argument) in resolved.arguments.iter().enumerate() {
+        if argument
+            .parameter
+            .is_some_and(|reference| param_for_ref(signature, reference).name == ref_name)
+        {
             if let Some(arg) = args.get(i)
                 && let ExprKind::Ident(sym) = &arg.kind
             {
@@ -412,6 +295,7 @@ fn resolve_param_ref(
 }
 
 fn infer_call(
+    call_id: ExprId,
     sig: Option<&FunctionSig>,
     args: &mut [Expr],
     ctx: &Context,
@@ -424,86 +308,106 @@ fn infer_call(
         return Ty::Unknown;
     };
 
-    // Resolve the parameter signature for each argument position.
-    let resolved_params = sig.params.resolve_params(args.len());
+    let mut observations = vec![ArgumentObservation::Empty; args.len()];
+    let initial = resolve_call_signature(
+        sig,
+        CallSignatureInput {
+            arguments: &observations,
+        },
+    );
 
-    // Check whether any parameter is Fn-typed (lambda). If not, we can use the
-    // simple single-pass path (preserving existing behaviour for non-lambda functions).
-    let has_lambda_params = resolved_params
+    // The shared projection owns positional shape. The Analyzer only interprets the
+    // projected semantic parameter kind to decide which expressions need staged inference.
+    let has_lambda_params = initial
+        .arguments
         .iter()
-        .any(|p| matches!(p.ty, Ty::Fn { .. }));
+        .filter_map(|argument| argument.parameter)
+        .any(|reference| matches!(param_for_ref(sig, reference).ty, Ty::Fn { .. }));
 
     if !has_lambda_params {
-        // ── Simple path: no lambdas ──────────────────────────────────────
-        let mut arg_tys = Vec::with_capacity(args.len());
-        for arg in args.iter_mut() {
-            arg_tys.push(infer_expr(arg, ctx, ictx));
+        for (argument, observation) in args.iter_mut().zip(&mut observations) {
+            *observation = ArgumentObservation::Typed(infer_expr(argument, ctx, ictx));
         }
-
-        if let Some(resolver) = sig.resolver {
-            let resolved = resolver(sig, &arg_tys);
-            return resolved.ret;
-        }
-
-        let mut subst = Subst::new();
-        unify_call_args(sig, arg_tys.as_slice(), &mut subst);
-        return apply(&subst, &sig.ret);
+        let resolved = resolve_call_signature(
+            sig,
+            CallSignatureInput {
+                arguments: &observations,
+            },
+        );
+        let return_ty = resolved.return_ty.clone();
+        ictx.insert_call(call_id, resolved);
+        return return_ty;
     }
 
-    // ── Two-pass path: has lambda params ─────────────────────────────────
-    // Custom resolvers are not supported for lambda-bearing signatures.
-    // If a future signature needs both, this path must be extended.
-    debug_assert!(
-        sig.resolver.is_none(),
-        "two-pass lambda inference does not support custom SigResolver"
-    );
-    let registry = registry_for(sig);
-    let mut subst = Subst::new();
-    let mut arg_tys = vec![Ty::Unknown; args.len()];
-
-    // Pass 1: infer non-Fn, non-Ident arguments to populate generic substitutions.
+    // Phase 1: observe ordinary arguments without entering lambda/binder positions.
     for i in 0..args.len() {
-        let Some(param) = resolved_params.get(i) else {
+        let Some(reference) = initial
+            .arguments
+            .get(i)
+            .and_then(|argument| argument.parameter)
+        else {
+            observations[i] = ArgumentObservation::Typed(infer_expr(&mut args[i], ctx, ictx));
             continue;
         };
+        let param = param_for_ref(sig, reference);
         match &param.ty {
-            Ty::Fn { .. } => continue, // defer to pass 2
-            Ty::Ident(_) => continue,  // bare identifier — skip
+            Ty::Fn { .. } | Ty::Ident(_) => continue,
             _ => {
-                arg_tys[i] = infer_expr(&mut args[i], ctx, ictx);
-                unify(&mut subst, &registry, &param.ty, &arg_tys[i]);
+                observations[i] = ArgumentObservation::Typed(infer_expr(&mut args[i], ctx, ictx));
             }
         }
     }
 
-    // Pass 2: process Ident and Fn-typed arguments with substitutions available.
+    // Phase 2: resolve an immutable partial snapshot, infer each deferred expression with
+    // its instantiated lambda parameters, then resolve again. Re-resolving after each
+    // deferred argument supports signatures whose later lambda inputs depend on earlier
+    // lambda results without retaining mutable generic state in the Analyzer.
+    let mut staged = resolve_call_signature(
+        sig,
+        CallSignatureInput {
+            arguments: &observations,
+        },
+    );
     for i in 0..args.len() {
-        let Some(param) = resolved_params.get(i) else {
+        let Some(reference) = initial
+            .arguments
+            .get(i)
+            .and_then(|argument| argument.parameter)
+        else {
             continue;
         };
+        let param = param_for_ref(sig, reference);
         match &param.ty {
-            Ty::Ident(inner_ty) => {
-                // Record the bound type for downstream ParamRef resolution.
-                let bound_ty = apply(&subst, inner_ty.as_ref());
-                arg_tys[i] = Ty::Ident(Box::new(bound_ty));
-                // Also record in ictx for the arg expression itself.
-                ictx.insert(args[i].id, arg_tys[i].clone());
+            Ty::Ident(_) => {
+                let observed = staged
+                    .arguments
+                    .get(i)
+                    .and_then(|argument| argument.expected_ty.as_ref())
+                    .cloned()
+                    .unwrap_or_else(|| Ty::Ident(Box::new(Ty::Unknown)));
+                observations[i] = ArgumentObservation::Typed(observed.clone());
+                ictx.insert(args[i].id, observed);
             }
-            Ty::Fn {
-                params: fn_params,
-                ret,
-            } => {
-                // Resolve lambda parameter names and types.
+            Ty::Fn { .. } => {
+                let expected = staged
+                    .arguments
+                    .get(i)
+                    .and_then(|argument| argument.expected_ty.as_ref());
+                let Ty::Fn {
+                    params: fn_params, ..
+                } = expected.unwrap_or(&param.ty)
+                else {
+                    unreachable!("Fn template must resolve to Fn expected type")
+                };
                 let mut bindings = HashMap::new();
                 let mut param_names = Vec::new();
 
                 for (lp, lp_ty) in fn_params {
                     let (name, ty) = match lp {
-                        LambdaParam::Current => ("current".to_string(), apply(&subst, lp_ty)),
+                        LambdaParam::Current => ("current".to_string(), lp_ty.clone()),
                         LambdaParam::ParamRef(ref_name) => {
-                            let ident_text = resolve_param_ref(ref_name, &resolved_params, args);
-                            let ty = apply(&subst, lp_ty);
-                            (ident_text, ty)
+                            let ident_text = resolve_param_ref(ref_name, sig, &staged, args);
+                            (ident_text, lp_ty.clone())
                         }
                     };
                     bindings.insert(name.clone(), ty);
@@ -514,39 +418,44 @@ fn infer_call(
                 ictx.push_scope(bindings);
                 let body_ty = infer_expr(&mut args[i], ctx, ictx);
                 ictx.pop_scope();
-
-                // Unify the body type with the return type of the Fn (raw, not applied).
-                // Using the raw ret preserves generic identifiers so bind_generic can
-                // accumulate them (e.g. Variant generics building unions across branches).
-                unify(&mut subst, &registry, ret, &body_ty);
-                arg_tys[i] = body_ty.clone();
+                observations[i] = ArgumentObservation::Typed(body_ty.clone());
 
                 // Wrap the argument in an ImplicitLambda node in-place.
-                let original_arg = std::mem::replace(
-                    &mut args[i],
-                    Expr {
-                        id: 0,
-                        span: crate::Span { start: 0, end: 0 },
-                        kind: ExprKind::Error,
-                    },
-                );
-                args[i] = Expr {
-                    id: super::next_synthetic_id(),
-                    span: original_arg.span,
-                    kind: ExprKind::ImplicitLambda {
-                        params: param_names,
-                        body: Box::new(original_arg),
-                    },
-                };
+                if !matches!(args[i].kind, ExprKind::ImplicitLambda { .. }) {
+                    let original_arg = std::mem::replace(
+                        &mut args[i],
+                        Expr {
+                            id: 0,
+                            span: crate::Span { start: 0, end: 0 },
+                            kind: ExprKind::Error,
+                        },
+                    );
+                    args[i] = Expr {
+                        id: super::next_synthetic_id(),
+                        span: original_arg.span,
+                        kind: ExprKind::ImplicitLambda {
+                            params: param_names,
+                            body: Box::new(original_arg),
+                        },
+                    };
+                }
 
                 // Record the body type for the wrapper node too.
                 ictx.insert(args[i].id, body_ty);
             }
             _ => {} // already inferred in pass 1
         }
+        staged = resolve_call_signature(
+            sig,
+            CallSignatureInput {
+                arguments: &observations,
+            },
+        );
     }
 
-    apply(&subst, &sig.ret)
+    let return_ty = staged.return_ty.clone();
+    ictx.insert_call(call_id, staged);
+    return_ty
 }
 
 fn join_types(a: Ty, b: Ty) -> Ty {

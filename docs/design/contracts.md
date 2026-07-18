@@ -85,8 +85,13 @@ Rule: `functions` come from Rust built-ins; JS does not provide them.
 
 ## Evaluator row-batch runtime
 
+These are the accepted target contracts for the evaluator. Current implementation status
+is recorded in [`evaluator/README.md`](../../evaluator/README.md).
+
 Rule: `Value` is data-only; row errors are externalized via `EvalBlock { ok, errors }`.
 Rule: `ok[i] = false` means `values[i]` is placeholder-only and must not be consumed by callers.
-Rule: `Provider::get_prop` receives full `Property` metadata plus optional row `mask`.
-Rule: `Provider::get_prop` must return a `ColumnBlock` whose length equals batch row count; otherwise evaluation fails with a batch-level `ProviderError`.
+Rule: `PreparedFormula::required_columns()` exposes every statically referenced property as a deduplicated plan-local `InputSlot`.
+Rule: callers prepare every required column before evaluation; external async loading stays outside evaluator.
+Rule: `EvalInputsBuilder` validates slot, ABI kind, batch length, and input layout before any kernel runs; failures return `InputContractError`.
+Rule: execution mask, row `ok`, and null `Validity` are independent states.
 Rule: `if(cond, then, else)`, `&&`, and `||` are mask-driven; right/branch sides are evaluated only for required rows.

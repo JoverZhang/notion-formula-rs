@@ -4,13 +4,20 @@ Where regression coverage lives, what each layer validates, and how to refresh s
 
 ## builtin_fn
 
-- Location: `builtin_fn/src/` (inline tests) + `builtin_fn/src/parser/` (parser tests)
-- Coverage: signature parsing, param shape validation, type model, union normalization
+- Locations: `builtin_fn/tests/`, `builtin_fn/tests/ui/`, and focused inline tests
+- Coverage:
+  - function-like category DSL compile-pass and compile-fail diagnostics/recovery
+  - fixed, repeat, head + repeat, repeat + tail, and synthetic head + repeat + tail shapes
+  - complete catalog order, cross-category uniqueness, support status, and resolver placement
+  - deterministic README marked-region rendering checked byte-for-byte
+  - shared partial-call projection, generic binding, staged lambda inference, argument
+    compatibility, and `flat` return refinement
 
 Run:
 
 ```bash
 cargo test -p builtin_fn
+cargo run -p builtin_fn --bin builtin_catalog -- --check
 ```
 
 ## analyzer
@@ -24,6 +31,7 @@ cargo test -p builtin_fn
   - diagnostic actions (quick-fix actions attached to diagnostics)
   - span/token invariants (`Span`, `tokens_in_span`, `TokenQuery`)
   - semantic checks and builtin/type behavior
+  - final `ResolvedFunctionSig` records retained in `SemanticMap` for downstream consumers
 
 ### Golden tests (diagnostics)
 
@@ -50,6 +58,8 @@ cargo test -p analyzer
   - formatter behavior + idempotence
   - completion ranking/position behavior
   - signature-help behavior
+  - shared incomplete-call projection and resolver output, with IDE-only postfix/presentation
+    adaptation
   - edit application/validation behavior
 
 ### Golden tests (format)

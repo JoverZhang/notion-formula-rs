@@ -9,6 +9,8 @@ mod test_list_literal;
 #[cfg(test)]
 mod test_normalize_union;
 #[cfg(test)]
+mod test_resolved_calls;
+#[cfg(test)]
 mod test_semantic;
 #[cfg(test)]
 mod test_semantic_infer_builtins;
