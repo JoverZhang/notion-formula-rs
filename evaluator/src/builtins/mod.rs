@@ -16,7 +16,7 @@ pub(crate) mod contract {
     use crate::ir::DebugCallContract;
 
     use super::support::{
-        BinderHandle, BuiltinEvalContext, DynamicValueArgs, LambdaPlan, PreparedArgumentError,
+        BinderHandle, BuiltinEvalContext, LambdaPlan, PreparedArgumentError,
         PreparedControlledArguments, PreparedValueArguments, RepeatGroups, ThunkPlan, ValuePlan,
         finish_controlled_result, signature_for_key,
     };

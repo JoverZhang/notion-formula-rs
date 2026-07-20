@@ -228,44 +228,6 @@ pub(crate) struct ConditionSplit {
     pub(crate) when_false: Mask,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct DynamicValueArgs {
-    head: Box<[Option<Column>]>,
-    repeat_groups: Box<[Box<[Option<Column>]>]>,
-    #[allow(dead_code)]
-    tail: Box<[Option<Column>]>,
-}
-
-impl DynamicValueArgs {
-    pub(crate) fn new(
-        head: Vec<Option<Column>>,
-        repeat_groups: Vec<Vec<Option<Column>>>,
-        tail: Vec<Option<Column>>,
-    ) -> Self {
-        Self {
-            head: head.into_boxed_slice(),
-            repeat_groups: repeat_groups
-                .into_iter()
-                .map(Vec::into_boxed_slice)
-                .collect(),
-            tail: tail.into_boxed_slice(),
-        }
-    }
-
-    pub(crate) fn head(&self, index: usize) -> Option<&Column> {
-        self.head.get(index).and_then(Option::as_ref)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn tail(&self, index: usize) -> Option<&Column> {
-        self.tail.get(index).and_then(Option::as_ref)
-    }
-
-    pub(crate) fn repeat_groups(&self) -> &[Box<[Option<Column>]>] {
-        &self.repeat_groups
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PreparedArgumentError {
     Missing {

@@ -102,11 +102,13 @@ Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test` i
 
 - Locations: `evaluator/src/` unit tests and `evaluator/tests/` integration tests
 - Generated-contract coverage: deterministic full-catalog bindings, all five parameter
-  layouts, no generated lifetimes/dynamic context, and compile failures for a missing impl
-  or incorrect method signature
+  layouts, no generated lifetimes/dynamic context or dynamic Value-argument erasure, and compile
+  failures for a missing impl or incorrect method signature
 - Runtime-structure coverage: required-column manifests, all five `InputContractError`
   classes, independent mask/ok/validity, shared fan-out, unique storage recovery, debug
   contracts, and non-builtin operator execution
+- Runtime-behavior coverage: the bounded public matrix (`flat`, `concat`, `splice`, and `ifs`),
+  frozen runtime/row IDs, and focused cases for observed regressions
 
 Run:
 

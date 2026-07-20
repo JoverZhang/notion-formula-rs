@@ -4,8 +4,7 @@
 - **Docs:** [Design docs](./docs/design/README.md)
 - **Status:**
   - Editor tooling (analyzer + completion/assists) is usable today.
-  - The prepared-input evaluator structure and generated builtin ABI are available;
-    builtin behavior is the next milestone.
+  - The prepared-input evaluator and supported builtin catalog execute synchronously.
 
 ## What is this?
 
@@ -48,18 +47,17 @@ Example:
 
 - `analyzer/`: parsing + diagnostics + semantic checks
 - `builtin_fn/`: compile-time builtin catalog + shared call-signature resolution
-- `evaluator/`: prepared-input synchronous runtime structure + generated builtin contracts
+- `evaluator/`: prepared-input synchronous runtime + generated builtin contracts and kernels
 - `ide/`: formatter + completion/signature help + edit ops
 - `analyzer_wasm/`: WASM/JS API + TypeScript DTOs
 - `examples/vite/`: CodeMirror demo + UI test coverage
 
 ## Current Limits
 
-- Non-builtin literals and operators execute through the synchronous evaluator, but builtin
-  implementation bodies are intentionally pending.
 - Language and type coverage are still expanding. Notion Formula compatibility is the default; extensions are additive and opt-in.
 - Unsupported builtin declarations remain documented in the catalog; types such as
-  `DateRange` and rich text are not modeled yet.
+  `DateRange` and rich text are not modeled yet, and person name/email data is not available
+  from runtime inputs.
 
 ## Prerequisites
 
@@ -358,7 +356,7 @@ just run-example-vite  # build wasm and start demo dev server
 | `analyzer/` | Core analyzer logic: lexer/parser/AST/diagnostics/semantic |
 | `ide/` | IDE/editor helpers: format/completion/help/edit-apply |
 | `analyzer_wasm/` | WASM boundary, UTF-16<->UTF-8 conversions, DTO serialization |
-| `evaluator/` | Prepared-input synchronous runtime and generated builtin ABI; builtin bodies pending |
+| `evaluator/` | Prepared-input synchronous runtime, generated builtin ABI, and builtin kernels |
 | `examples/vite/` | Browser demo (CodeMirror + WASM integration) |
 | `docs/` | Contracts, architecture docs, deep dives, and changelog guidance |
 

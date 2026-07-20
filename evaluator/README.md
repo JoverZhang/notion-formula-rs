@@ -44,10 +44,24 @@ Design rationale: [`docs/design/evaluator.md`](../docs/design/evaluator.md) and
 - Debug builds reuse resolved parameter and return types to validate active, successful,
   non-null rows at dispatch boundaries.
 
-All generated-trait implementations currently live in
-`src/builtins/implementations.rs` with intentional `todo!()` bodies. The generated structure
-and non-builtin literal/operator runtime are executable; calling a builtin is not supported
-until the behavior implementation change lands.
+All generated-trait implementations live in `src/builtins/implementations.rs`. Value kernels
+materialize typed arguments once and reuse shared family implementations; Controlled kernels
+retain typed plans so they can evaluate only the rows and branches selected by their masks.
+Unsupported catalog declarations do not generate evaluator obligations.
+
+## Builtin behavior
+
+- Value families cover general, text/regex, numeric, date, eager-list, and special functions.
+  Fixed ABI fields are read directly as typed scalars; top-level dynamic type switches are
+  confined to `AnyKind` fields (list elements remain `Value` by storage design). Null rows
+  propagate through `Validity` unless a function such as `empty()` explicitly interprets null.
+- `if()` and `ifs()` split masks before evaluating thunks. `let()` and list functions apply
+  generated lambda plans with typed binding contracts; unselected branches and later predicates
+  do not contribute errors.
+- `now()` and `today()` read the frozen `BuiltinRuntimeContext`; `id()` reads the matching
+  `RowId` from the current `RowBatch`.
+- `abs()` demonstrates the unique-storage in-place path while shared input columns keep their
+  row buffers and allocate a separate result.
 
 ## Layout
 
@@ -59,9 +73,10 @@ until the behavior implementation change lands.
 | `src/ir/` | owned arena plan and typed controlled-plan metadata |
 | `src/runtime/` | synchronous masked IR execution and non-builtin operators |
 | `src/builtins/` | generated contract inclusion, typed dispatch support, and impl obligations |
-| `src/kernels/` | reusable total, fallible, and null-aware compute helpers |
+| `src/kernels/` | Value-family kernels, Controlled mask/lambda kernels, and reusable helpers |
 | `tests/generated_contract.rs` | deterministic shape and compile-fail ABI contracts |
 | `tests/runtime_structure.rs` | public input, ownership, state, and preparation contracts |
+| `tests/builtin_behavior.rs` | bounded public behavior matrix across builtin families |
 
 ## Flow
 
@@ -86,14 +101,11 @@ borrow runtime state without leaking lifetimes into generated types.
 ```bash
 cargo test -p evaluator --test generated_contract
 cargo test -p evaluator --test runtime_structure
+cargo test -p evaluator --test builtin_behavior
 cargo test -p evaluator
 ```
 
 Tests cover all five parameter layouts, missing/wrong implementations, every
 `InputContractError`, required-column ordering, independent runtime states, shared fan-out,
-unique storage recovery, debug contracts, and preservation of non-builtin operators.
-
-## TODOs
-
-- Replace every intentional `todo!()` in `src/builtins/implementations.rs` with the bounded
-  Value and Controlled builtin behavior matrix.
+unique and in-place storage paths, debug contracts, Value family representatives, Controlled
+branch behavior, generated lambda-binding contracts, and preservation of non-builtin operators.
