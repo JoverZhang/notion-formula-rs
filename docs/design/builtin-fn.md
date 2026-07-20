@@ -817,9 +817,8 @@ shape, and resolver rules from silently diverging between consumers.
 
 ## Evaluator Implementation Contract
 
-This section specifies the required completed evaluator integration; it does not imply that
-the catalog-only implementation already contains the evaluator build step. Every supported
-builtin declaration must generate a compile-time contract that the evaluator implements:
+Every supported builtin declaration generates a compile-time contract that the evaluator
+implements:
 
 ```text
 category proc macro
@@ -843,8 +842,8 @@ $OUT_DIR/builtin_contract.rs
 
 ### Generation boundary
 
-`evaluator` must declare `builtin_fn` as a build dependency. Its build script must call
-`builtin_categories()`, filter `#[unsupported]` entries, and emit evaluator-side contracts
+`evaluator` declares `builtin_fn` as a build dependency. Its build script calls
+`builtin_categories()`, filters `#[unsupported]` entries, and emits evaluator-side contracts
 into `OUT_DIR`:
 
 ```rust,ignore
@@ -854,8 +853,8 @@ mod contract {
 ```
 
 The category procedural macro generates evaluator-independent catalog and signature data;
-the evaluator build step must then convert it into declarations involving evaluator
-runtime types. Therefore, `builtin_fn` never depends on `evaluator`.
+the evaluator build step then converts it into declarations involving evaluator runtime
+types. Therefore, `builtin_fn` never depends on `evaluator`.
 
 Generating trait declarations alone is not enough to require implementations. Each
 generated dispatch binding must also reference its corresponding handwritten
@@ -867,10 +866,9 @@ implementation. Therefore:
 - every supported declaration has a dispatch binding; and
 - unsupported declarations create no evaluator implementation obligation.
 
-`cargo check -p evaluator` must automatically regenerate and compile the contracts once the
-integration is present. Output must be deterministic and is not committed to the source
-repository. Trait granularity and signature-to-runtime-type mapping are defined separately
-below.
+`cargo check -p evaluator` automatically regenerates and compiles the contracts. Output must
+be deterministic and is not committed to the source repository. Trait granularity and
+signature-to-runtime-type mapping are defined separately below.
 
 ### Trait granularity
 

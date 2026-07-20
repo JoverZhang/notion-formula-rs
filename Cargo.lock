@@ -99,6 +99,7 @@ name = "evaluator"
 version = "0.1.0"
 dependencies = [
  "analyzer",
+ "builtin_fn",
 ]
 
 [[package]]
