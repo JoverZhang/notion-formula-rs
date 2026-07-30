@@ -1,6 +1,3 @@
-// The generated ABI is exhaustive even while individual kernels use only their own fields.
-#![allow(dead_code)]
-
 mod implementations;
 mod support;
 

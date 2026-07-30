@@ -151,7 +151,6 @@ impl<'a> Runtime<'a> {
         }
     }
 
-    #[allow(dead_code)]
     fn validate_handle(&self, owner: crate::ir::PlanOwner, mask: &Mask) -> bool {
         owner == self.plan.owner() && mask.len() == self.batch.len()
     }
