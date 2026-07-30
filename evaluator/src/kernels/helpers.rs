@@ -1,6 +1,3 @@
-// Kernel implementations opt into these helper families according to their semantics.
-#![allow(dead_code)]
-
 use crate::core::columns::{ColumnKind, KernelColumn, KernelResult, Validity};
 use crate::core::errors::EvalError;
 use crate::core::types::Mask;
@@ -72,6 +69,9 @@ where
 }
 
 /// Keep null rows eligible and let the handwritten operation define output validity.
+// This is one of the three kernel contracts and is covered directly until a supported
+// null-aware builtin opts into it.
+#[allow(dead_code)]
 pub(crate) fn eval_null_aware<I, O>(
     input: &KernelColumn<I>,
     eligible: &Mask,

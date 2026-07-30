@@ -72,7 +72,6 @@ pub struct BuiltinKernelContext<'a> {
 ///
 /// Generated kernel contracts depend on this interface so a concrete runtime may keep
 /// borrowed storage without leaking its lifetime into the generated trait ABI.
-#[allow(dead_code)]
 pub(crate) trait BuiltinValueContext {
     fn runtime(&self) -> &BuiltinRuntimeContext;
 

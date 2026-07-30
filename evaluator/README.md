@@ -43,11 +43,19 @@ Design rationale: [`docs/design/evaluator.md`](../docs/design/evaluator.md) and
   or `dyn BuiltinEvalContext`.
 - Debug builds reuse resolved parameter and return types to validate active, successful,
   non-null rows at dispatch boundaries.
+- Prepared dispatch arguments share one `ArgumentPool<T>` implementation for logical
+  `(ParamRef, repeat_group)` lookup, destructive and optional takes, duplicate/missing
+  detection, and repeat-group counting. Value and Controlled wrappers retain only their
+  mode-specific mask/error and plan/debug responsibilities.
 
 All generated-trait implementations live in `src/builtins/implementations.rs`. Value kernels
 materialize typed arguments once and reuse shared family implementations; Controlled kernels
 retain typed plans so they can evaluate only the rows and branches selected by their masks.
 Unsupported catalog declarations do not generate evaluator obligations.
+
+Debug contract checks are isolated behind `src/builtins/support/debug.rs`. The module exposes
+the same internal calls in debug and release builds; recursive runtime type inspection and
+stored resolved contracts remain debug-only.
 
 ## Builtin behavior
 
@@ -73,6 +81,9 @@ Unsupported catalog declarations do not generate evaluator obligations.
 | `src/ir/` | owned arena plan and typed controlled-plan metadata |
 | `src/runtime/` | synchronous masked IR execution and non-builtin operators |
 | `src/builtins/` | generated contract inclusion, typed dispatch support, and impl obligations |
+| `src/builtins/support.rs` | dispatch context plus shared conversion and result helpers |
+| `src/builtins/support/arguments.rs` | argument pool, generated decoder surface, and typed plan handles |
+| `src/builtins/support/debug.rs` | debug/release contract-check seam and runtime type observation |
 | `src/kernels/` | Value-family kernels, Controlled mask/lambda kernels, and reusable helpers |
 | `tests/generated_contract.rs` | deterministic shape and compile-fail ABI contracts |
 | `tests/runtime_structure.rs` | public input, ownership, state, and preparation contracts |
@@ -118,6 +129,12 @@ directives make row identity, execution state, and time-dependent results determ
 Snapshots render only observable row states: values, `null`, `error(...)`, or `inactive`.
 The runner checks the complete snapshot, including the source, and mechanically requires a
 baseline fixture for every supported catalog entry.
+
+The generated decoder surface deliberately retains explicit optional
+`take_optional_value`/`take_optional_thunk`/`take_optional_lambda`/`take_optional_binder`
+variants. Some Controlled optional variants are not instantiated by the current catalog and
+therefore carry narrowly scoped dead-code allowances; they remain part of the complete
+generator contract rather than a generic decoder interface.
 
 Update reviewed builtin snapshots with:
 
