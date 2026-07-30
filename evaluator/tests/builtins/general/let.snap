@@ -1,0 +1,4 @@
+=== INPUT ===
+let(x, 5, x + 1)
+=== OUTPUT ===
+row-0: 6

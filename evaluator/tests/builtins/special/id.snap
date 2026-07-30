@@ -1,0 +1,7 @@
+=== INPUT ===
+// @rows = ["page-a", "page-b"]
+
+id()
+=== OUTPUT ===
+page-a: "page-a"
+page-b: "page-b"

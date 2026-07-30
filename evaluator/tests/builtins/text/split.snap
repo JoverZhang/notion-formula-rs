@@ -1,0 +1,4 @@
+=== INPUT ===
+split("a,b,c", ",")
+=== OUTPUT ===
+row-0: ["a", "b", "c"]

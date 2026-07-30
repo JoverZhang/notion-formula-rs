@@ -102,16 +102,27 @@ Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test` i
 
 - Locations: `evaluator/src/` unit tests and `evaluator/tests/` integration tests
 - Generated-contract coverage: deterministic full-catalog bindings, all five parameter
-  layouts, no generated lifetimes/dynamic context, and compile failures for a missing impl
-  or incorrect method signature
+  layouts, no generated lifetimes/dynamic context or dynamic Value-argument erasure, and compile
+  failures for a missing impl or incorrect method signature
 - Runtime-structure coverage: required-column manifests, all five `InputContractError`
   classes, independent mask/ok/validity, shared fan-out, unique storage recovery, debug
   contracts, and non-builtin operator execution
+- Runtime-behavior runner: `evaluator/tests/builtin_golden.rs`
+- Runtime-behavior fixtures: `evaluator/tests/builtins/**/*.formula` -> `*.snap`
+- Runtime-behavior coverage: one readable public-path baseline for every supported catalog
+  builtin, plus focused property-column, mask, frozen-runtime, lazy-evaluation, and regression
+  cases. Catalog checks reject missing, misplaced, or mislabeled baseline fixtures.
 
 Run:
 
 ```bash
 cargo test -p evaluator
+```
+
+Update reviewed builtin snapshots:
+
+```bash
+BLESS=1 cargo test -p evaluator --test builtin_golden
 ```
 
 ## Vite demo (examples/vite/)

@@ -1,0 +1,4 @@
+=== INPUT ===
+padStart("7", 3, "0")
+=== OUTPUT ===
+row-0: "007"

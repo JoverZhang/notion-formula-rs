@@ -1,0 +1,3 @@
+// @prop "Mixed": number | string = [1, "1", null]
+
+equal(prop("Mixed"), 1)

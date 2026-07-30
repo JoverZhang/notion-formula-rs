@@ -1,0 +1,4 @@
+=== INPUT ===
+cbrt(8)
+=== OUTPUT ===
+row-0: 2

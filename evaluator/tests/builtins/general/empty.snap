@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Value": number = [0, 1, null]
+
+empty(prop("Value"))
+=== OUTPUT ===
+row-0: true
+row-1: false
+row-2: true

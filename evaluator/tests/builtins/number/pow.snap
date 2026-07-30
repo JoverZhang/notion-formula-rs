@@ -1,0 +1,4 @@
+=== INPUT ===
+pow(2, 3)
+=== OUTPUT ===
+row-0: 8

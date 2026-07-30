@@ -1,0 +1,3 @@
+// @prop "Value": any = [1, "x", false, null]
+
+format(prop("Value"))

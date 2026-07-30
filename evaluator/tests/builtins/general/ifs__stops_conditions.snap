@@ -1,0 +1,7 @@
+=== INPUT ===
+// @prop "First": boolean = [true, false]
+
+ifs(prop("First"), 10, divide(1, 0) > 0, 20, 30)
+=== OUTPUT ===
+row-0: 10
+row-1: error(DivideByZero)

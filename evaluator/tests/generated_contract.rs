@@ -54,6 +54,8 @@ fn generated_contract_is_deterministic_ordered_and_unique() {
     assert!(!first.contains("todo!"));
     assert!(!first.contains("unreachable!"));
     assert!(!first.contains("placeholder implementation"));
+    assert!(!first.contains("DynamicValueArgs"));
+    assert!(!first.contains("into_dynamic"));
     assert!(first.contains("fn eval<C: BuiltinValueContext>"));
     for line in first.lines().filter(|line| {
         line.starts_with("pub(crate) struct ")
@@ -206,13 +208,7 @@ struct BooleanKind;
 struct TextKind;
 struct DateKind;
 struct ListKind;
-struct Column;
-
 struct KernelColumn<K>(PhantomData<K>);
-
-impl<K> KernelColumn<K> {
-    fn into_column(self) -> Column { Column }
-}
 
 struct KernelResult<K>(PhantomData<K>);
 trait BuiltinValueContext {}
@@ -221,16 +217,6 @@ struct Mask;
 struct EvalBlock;
 struct DebugCallContract;
 struct PreparedArgumentError;
-
-struct DynamicValueArgs;
-
-impl DynamicValueArgs {
-    fn new(
-        _head: Vec<Option<Column>>,
-        _repeat: Vec<Vec<Option<Column>>>,
-        _tail: Vec<Option<Column>>,
-    ) -> Self { Self }
-}
 
 struct RepeatGroups<G>(Vec<G>);
 

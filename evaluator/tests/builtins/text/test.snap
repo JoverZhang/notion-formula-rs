@@ -1,0 +1,4 @@
+=== INPUT ===
+test("abc123", "[0-9]+")
+=== OUTPUT ===
+row-0: true

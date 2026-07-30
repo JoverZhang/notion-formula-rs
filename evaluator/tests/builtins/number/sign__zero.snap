@@ -1,0 +1,7 @@
+=== INPUT ===
+// @prop "Value": number = [0, -0]
+
+sign(prop("Value"))
+=== OUTPUT ===
+row-0: 0
+row-1: 0

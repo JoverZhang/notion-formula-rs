@@ -1,0 +1,8 @@
+// @prop "First": boolean = [true, false, false]
+// @prop "Second": boolean = [true, false, true]
+
+ifs(
+  prop("First"), 10,
+  prop("Second"), divide(1, 0),
+  30
+)

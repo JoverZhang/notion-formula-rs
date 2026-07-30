@@ -1,0 +1,4 @@
+// @prop "Condition": boolean = [true, false]
+// @mask = [true, false]
+
+if(prop("Condition"), 1, 2)

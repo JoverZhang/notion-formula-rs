@@ -1,0 +1,4 @@
+=== INPUT ===
+replace("one two two", "two", "2")
+=== OUTPUT ===
+row-0: "one 2 two"

@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Mixed": number | string = [1, "1", null]
+
+equal(prop("Mixed"), 1)
+=== OUTPUT ===
+row-0: true
+row-1: false
+row-2: false

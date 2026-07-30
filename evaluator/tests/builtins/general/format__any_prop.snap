@@ -1,0 +1,9 @@
+=== INPUT ===
+// @prop "Value": any = [1, "x", false, null]
+
+format(prop("Value"))
+=== OUTPUT ===
+row-0: "1"
+row-1: "x"
+row-2: "false"
+row-3: ""

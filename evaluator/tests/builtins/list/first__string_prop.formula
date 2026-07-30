@@ -1,0 +1,3 @@
+// @prop "Names": string[] = [["Ada", "Lin"], [], null]
+
+first(prop("Names"))

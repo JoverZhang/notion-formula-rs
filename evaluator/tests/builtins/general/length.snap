@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Text": string = ["abc", "中😀", null]
+
+length(prop("Text"))
+=== OUTPUT ===
+row-0: 3
+row-1: 2
+row-2: null

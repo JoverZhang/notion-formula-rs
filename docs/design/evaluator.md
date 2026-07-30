@@ -122,3 +122,16 @@ explicit.
 - Current runtime: `evaluator/src/runtime/`
 - Current kernels: `evaluator/src/kernels/`
 - Current implementation status and known differences: `evaluator/README.md`
+
+## Runtime Behavior Verification
+
+Supported builtin behavior is verified through catalog-complete golden fixtures under
+`evaluator/tests/builtins/`. Each fixture crosses the public evaluator seam: production
+syntax and semantic analysis, `prepare_formula`, required-column construction,
+`EvalInputsBuilder`, and masked row-batch evaluation. The fixture metadata only supplies
+caller-owned property columns, row IDs, masks, and the frozen runtime context.
+
+Every supported catalog declaration requires one baseline fixture in its catalog category.
+Additional fixtures are reserved for readable boundary and regression cases. Snapshots show
+the exact source and only observable row outcomes—value, null, error, or inactive—rather
+than physical placeholders or internal column storage.

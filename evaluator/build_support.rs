@@ -233,10 +233,6 @@ fn emit_function_contract(out: &mut String, signature: &FunctionSig) {
     }
     writeln!(out, "}}").unwrap();
 
-    if mode == Mode::Value {
-        emit_into_dynamic(out, signature, mode, &args_name);
-    }
-
     match mode {
         Mode::Value => {
             writeln!(out, "pub(crate) trait {trait_name} {{").unwrap();
@@ -257,70 +253,6 @@ fn emit_function_contract(out: &mut String, signature: &FunctionSig) {
             writeln!(out, "}}\n").unwrap();
         }
     }
-}
-
-fn emit_into_dynamic(out: &mut String, signature: &FunctionSig, mode: Mode, args_name: &str) {
-    let dynamic = match mode {
-        Mode::Value => "DynamicValueArgs",
-        Mode::Controlled => "DynamicControlledArgs",
-    };
-    writeln!(out, "impl {args_name} {{").unwrap();
-    writeln!(out, "    #[allow(dead_code)]").unwrap();
-    writeln!(out, "    pub(crate) fn into_dynamic(self) -> {dynamic} {{").unwrap();
-    writeln!(out, "        {dynamic}::new(").unwrap();
-    writeln!(out, "            vec![").unwrap();
-    for param in &signature.params.head {
-        writeln!(
-            out,
-            "                {},",
-            erase_field_expr(
-                param,
-                &format!("self.{}", rust_field_name(&param.name)),
-                mode
-            )
-        )
-        .unwrap();
-    }
-    writeln!(out, "            ],").unwrap();
-    if signature.params.repeat.is_empty() {
-        writeln!(out, "            Vec::new(),").unwrap();
-    } else {
-        writeln!(
-            out,
-            "            self.repeat_groups.into_vec().into_iter().map(|group| vec!["
-        )
-        .unwrap();
-        for param in &signature.params.repeat {
-            writeln!(
-                out,
-                "                {},",
-                erase_field_expr(
-                    param,
-                    &format!("group.{}", rust_field_name(&param.name)),
-                    mode
-                )
-            )
-            .unwrap();
-        }
-        writeln!(out, "            ]).collect(),").unwrap();
-    }
-    writeln!(out, "            vec![").unwrap();
-    for param in &signature.params.tail {
-        writeln!(
-            out,
-            "                {},",
-            erase_field_expr(
-                param,
-                &format!("self.{}", rust_field_name(&param.name)),
-                mode
-            )
-        )
-        .unwrap();
-    }
-    writeln!(out, "            ],").unwrap();
-    writeln!(out, "        )").unwrap();
-    writeln!(out, "    }}").unwrap();
-    writeln!(out, "}}\n").unwrap();
 }
 
 fn emit_dispatch(out: &mut String, functions: &[&FunctionSig], selected_mode: Mode) {
@@ -528,22 +460,6 @@ fn field_type(param: &ParamSig, mode: Mode) -> String {
         format!("Option<{base}>")
     } else {
         base
-    }
-}
-
-fn erase_field_expr(param: &ParamSig, expression: &str, mode: Mode) -> String {
-    let erased = match mode {
-        Mode::Value => format!("{expression}.into_column()"),
-        Mode::Controlled => format!("{expression}.into_dynamic()"),
-    };
-    if param.optional {
-        let inner = match mode {
-            Mode::Value => "value.into_column()",
-            Mode::Controlled => "value.into_dynamic()",
-        };
-        format!("{expression}.map(|value| {inner})")
-    } else {
-        format!("::core::option::Option::Some({erased})")
     }
 }
 

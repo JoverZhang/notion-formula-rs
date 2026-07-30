@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Numbers": number[] = [[1, 2], [], null]
+
+first(prop("Numbers"))
+=== OUTPUT ===
+row-0: 1
+row-1: null
+row-2: null

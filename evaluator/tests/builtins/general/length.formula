@@ -1,0 +1,3 @@
+// @prop "Text": string = ["abc", "中😀", null]
+
+length(prop("Text"))

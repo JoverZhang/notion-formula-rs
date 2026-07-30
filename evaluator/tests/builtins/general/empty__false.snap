@@ -1,0 +1,4 @@
+=== INPUT ===
+empty(false)
+=== OUTPUT ===
+row-0: true

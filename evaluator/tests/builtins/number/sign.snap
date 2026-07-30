@@ -1,0 +1,4 @@
+=== INPUT ===
+sign(-42)
+=== OUTPUT ===
+row-0: -1

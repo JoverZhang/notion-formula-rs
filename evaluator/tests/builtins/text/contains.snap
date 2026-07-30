@@ -1,0 +1,4 @@
+=== INPUT ===
+contains("formula", "mul")
+=== OUTPUT ===
+row-0: true

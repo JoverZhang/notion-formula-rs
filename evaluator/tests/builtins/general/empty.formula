@@ -1,0 +1,3 @@
+// @prop "Value": number = [0, 1, null]
+
+empty(prop("Value"))

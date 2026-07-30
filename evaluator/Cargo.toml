@@ -7,6 +7,11 @@ build = "build.rs"
 [dependencies]
 analyzer = { path = "../analyzer" }
 builtin_fn = { path = "../builtin_fn" }
+chrono = { version = "0.4.41", default-features = false, features = ["alloc", "std"] }
+regex = "1.11.1"
 
 [build-dependencies]
 builtin_fn = { path = "../builtin_fn" }
+
+[dev-dependencies]
+serde_json = "1.0.148"

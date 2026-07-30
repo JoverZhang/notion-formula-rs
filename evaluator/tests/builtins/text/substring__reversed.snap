@@ -1,0 +1,4 @@
+=== INPUT ===
+substring("abc", 2, 1)
+=== OUTPUT ===
+row-0: ""

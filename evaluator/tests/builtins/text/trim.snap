@@ -1,0 +1,4 @@
+=== INPUT ===
+trim("  hello  ")
+=== OUTPUT ===
+row-0: "hello"
