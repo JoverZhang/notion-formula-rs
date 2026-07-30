@@ -1,0 +1,4 @@
+=== INPUT ===
+some([1, 2, 3], current > 2)
+=== OUTPUT ===
+row-0: true

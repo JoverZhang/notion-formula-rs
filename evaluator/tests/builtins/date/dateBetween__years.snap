@@ -1,0 +1,6 @@
+=== INPUT ===
+// @runtime = "2024-05-06T12:34:56+08:00"
+
+dateBetween(parseDate("2024-01-01"), parseDate("2023-01-01"), "years")
+=== OUTPUT ===
+row-0: 1

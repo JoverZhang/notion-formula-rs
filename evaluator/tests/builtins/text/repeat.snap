@@ -1,0 +1,4 @@
+=== INPUT ===
+repeat("ab", 3)
+=== OUTPUT ===
+row-0: "ababab"

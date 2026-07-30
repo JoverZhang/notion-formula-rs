@@ -76,7 +76,8 @@ Unsupported catalog declarations do not generate evaluator obligations.
 | `src/kernels/` | Value-family kernels, Controlled mask/lambda kernels, and reusable helpers |
 | `tests/generated_contract.rs` | deterministic shape and compile-fail ABI contracts |
 | `tests/runtime_structure.rs` | public input, ownership, state, and preparation contracts |
-| `tests/builtin_behavior.rs` | bounded public behavior matrix across builtin families |
+| `tests/builtin_golden.rs` | catalog-complete public builtin behavior through readable golden fixtures |
+| `tests/builtins/` | one baseline `.formula` / `.snap` pair per supported builtin plus focused scenarios |
 
 ## Flow
 
@@ -101,11 +102,25 @@ borrow runtime state without leaking lifetimes into generated types.
 ```bash
 cargo test -p evaluator --test generated_contract
 cargo test -p evaluator --test runtime_structure
-cargo test -p evaluator --test builtin_behavior
+cargo test -p evaluator --test builtin_golden
 cargo test -p evaluator
 ```
 
 Tests cover all five parameter layouts, missing/wrong implementations, every
 `InputContractError`, required-column ordering, independent runtime states, shared fan-out,
-unique and in-place storage paths, debug contracts, Value family representatives, Controlled
-branch behavior, generated lambda-binding contracts, and preservation of non-builtin operators.
+unique and in-place storage paths, debug contracts, every supported builtin through the public
+evaluator interface, Controlled branch behavior, generated lambda-binding contracts, and
+preservation of non-builtin operators.
+
+Builtin golden inputs may declare typed row columns with leading directives such as
+`// @prop "Price": number = [10, null]`. Optional `@rows`, `@mask`, and `@runtime`
+directives make row identity, execution state, and time-dependent results deterministic.
+Snapshots render only observable row states: values, `null`, `error(...)`, or `inactive`.
+The runner checks the complete snapshot, including the source, and mechanically requires a
+baseline fixture for every supported catalog entry.
+
+Update reviewed builtin snapshots with:
+
+```bash
+BLESS=1 cargo test -p evaluator --test builtin_golden
+```

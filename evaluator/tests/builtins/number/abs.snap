@@ -1,0 +1,4 @@
+=== INPUT ===
+abs(-3)
+=== OUTPUT ===
+row-0: 3

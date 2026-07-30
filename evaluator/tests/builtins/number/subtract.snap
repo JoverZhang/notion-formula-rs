@@ -1,0 +1,4 @@
+=== INPUT ===
+subtract(7, 2)
+=== OUTPUT ===
+row-0: 5

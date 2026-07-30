@@ -1,0 +1,4 @@
+=== INPUT ===
+divide(8, 2)
+=== OUTPUT ===
+row-0: 4

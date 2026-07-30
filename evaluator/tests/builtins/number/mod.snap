@@ -1,0 +1,4 @@
+=== INPUT ===
+mod(7, 3)
+=== OUTPUT ===
+row-0: 1

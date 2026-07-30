@@ -12,3 +12,6 @@ regex = "1.11.1"
 
 [build-dependencies]
 builtin_fn = { path = "../builtin_fn" }
+
+[dev-dependencies]
+serde_json = "1.0.148"

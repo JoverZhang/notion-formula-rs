@@ -1,0 +1,4 @@
+=== INPUT ===
+if(true, "yes", "no")
+=== OUTPUT ===
+row-0: "yes"

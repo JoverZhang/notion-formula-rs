@@ -1,0 +1,4 @@
+=== INPUT ===
+mean(2, 4, 6)
+=== OUTPUT ===
+row-0: 4

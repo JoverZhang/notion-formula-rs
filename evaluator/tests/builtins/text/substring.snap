@@ -1,0 +1,4 @@
+=== INPUT ===
+substring("notion", 1, 4)
+=== OUTPUT ===
+row-0: "oti"

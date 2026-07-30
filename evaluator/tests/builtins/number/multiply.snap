@@ -1,0 +1,4 @@
+=== INPUT ===
+multiply(3, 4)
+=== OUTPUT ===
+row-0: 12

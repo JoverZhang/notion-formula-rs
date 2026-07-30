@@ -1,0 +1,1 @@
+formatNumber(1234.5, "usd", 2)

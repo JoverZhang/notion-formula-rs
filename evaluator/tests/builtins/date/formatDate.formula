@@ -1,0 +1,3 @@
+// @runtime = "2024-05-06T12:34:56+08:00"
+
+formatDate(parseDate("2024-05-06"), "MMMM D, Y")

@@ -1,0 +1,4 @@
+=== INPUT ===
+format([1, true, "x"])
+=== OUTPUT ===
+row-0: "[1, true, x]"

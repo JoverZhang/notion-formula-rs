@@ -1636,29 +1636,37 @@ every builtin:
    parameters. Add tests at a consumer layer only for behavior unique to that consumer;
    do not replicate the complete matrix at every layer.
 6. The README renderer compares its output byte-for-byte with the committed catalog region.
+7. Evaluator golden fixtures execute through the public prepare/input/evaluate interface.
+   Every supported catalog entry has one baseline `.formula` / `.snap` pair; additional
+   fixtures cover properties, masks, runtime snapshots, lazy execution, and regressions.
 
-Long-term tests do not use a second declaration set or parser as an oracle. Mechanical
-catalog contracts and evaluator compile contracts cover every builtin; end-to-end behavior
-tests remain bounded to the five `ParamShape` representatives above.
+Long-term tests do not use a second declaration set or formula parser as an oracle.
+Mechanical catalog contracts and evaluator compile contracts cover declaration and ABI
+completeness. The five-representative matrix remains the structural oracle for `ParamShape`;
+catalog-complete evaluator goldens separately verify runtime semantics. Fixture directives
+only describe externally prepared row data and runtime context, while the formula itself
+always passes through the production Analyzer and evaluator.
 
-Evaluator behavior is folded into the same representative matrix:
+Structural and runtime behavior use different coverage scopes:
 
 | Layer | Representatives | Core guarantee |
 | --- | --- | --- |
 | DSL / macro | `flat`, `concat`, `splice`, `ifs`, `caseOf` | All five parameter layouts generate correctly |
 | Dynamic signature | `flat`, `ifs` | Resolver behavior, generic binding, and return-type inference |
 | Generated contract | `flat`, `ifs` | Missing impls or incorrect method signatures fail compilation |
-| Value runtime | `flat`, `concat`, `splice` | Typed columns, repeat, nulls, and shared storage |
-| Controlled runtime | `ifs` | Branch masks, lazy evaluation, and error isolation |
+| Value runtime | Every supported Value builtin golden | Public formula-to-row behavior and dispatch wiring |
+| Controlled runtime | Every supported Controlled builtin golden | Lambda behavior, branch masks, and selected values |
 | Complete shape | Synthetic `caseOf` | Generated head + repeat + tail structure |
 | Input contract | One table-driven test | Missing, duplicate, kind, length, and layout errors |
 | Catalog / docs | Iterate every declaration | Unique names, ordering, rendering, and documentation consistency |
 
-Add a dedicated builtin behavior test only when at least one condition holds:
+Every supported builtin keeps exactly one required baseline golden. Add another scenario
+fixture only when at least one condition holds:
 
-- it introduces a new `ParamShape` that the current matrix cannot express;
-- it introduces a new evaluator execution mode; or
-- it protects against an observed regression.
+- it demonstrates property-column, mask, or runtime-context behavior not readable in the
+  baseline;
+- it protects lazy evaluation or row error isolation; or
+- it protects an observed regression or important semantic boundary.
 
 ## Explicitly Rejected Designs
 

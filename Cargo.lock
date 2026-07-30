@@ -120,6 +120,7 @@ dependencies = [
  "builtin_fn",
  "chrono",
  "regex",
+ "serde_json",
 ]
 
 [[package]]

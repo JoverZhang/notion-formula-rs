@@ -1,0 +1,4 @@
+=== INPUT ===
+toNumber("42.5")
+=== OUTPUT ===
+row-0: 42.5

@@ -1,0 +1,4 @@
+=== INPUT ===
+filter([1, 2, 3], current > 1)
+=== OUTPUT ===
+row-0: [2, 3]

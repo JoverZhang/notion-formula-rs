@@ -1,0 +1,4 @@
+=== INPUT ===
+timestamp(fromTimestamp(42))
+=== OUTPUT ===
+row-0: 0

@@ -1,0 +1,4 @@
+=== INPUT ===
+findIndex([1, 2, 3], current > 1)
+=== OUTPUT ===
+row-0: 1

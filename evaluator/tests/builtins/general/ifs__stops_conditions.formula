@@ -1,0 +1,3 @@
+// @prop "First": boolean = [true, false]
+
+ifs(prop("First"), 10, divide(1, 0) > 0, 20, 30)

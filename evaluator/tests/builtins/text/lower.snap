@@ -1,0 +1,4 @@
+=== INPUT ===
+lower("HeLLo")
+=== OUTPUT ===
+row-0: "hello"

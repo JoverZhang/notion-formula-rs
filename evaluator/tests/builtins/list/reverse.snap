@@ -1,0 +1,4 @@
+=== INPUT ===
+reverse([1, 2, 3])
+=== OUTPUT ===
+row-0: [3, 2, 1]

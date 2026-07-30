@@ -107,13 +107,22 @@ Note: `cargo test -p analyzer_wasm` alone does not execute `wasm_bindgen_test` i
 - Runtime-structure coverage: required-column manifests, all five `InputContractError`
   classes, independent mask/ok/validity, shared fan-out, unique storage recovery, debug
   contracts, and non-builtin operator execution
-- Runtime-behavior coverage: the bounded public matrix (`flat`, `concat`, `splice`, and `ifs`),
-  frozen runtime/row IDs, and focused cases for observed regressions
+- Runtime-behavior runner: `evaluator/tests/builtin_golden.rs`
+- Runtime-behavior fixtures: `evaluator/tests/builtins/**/*.formula` -> `*.snap`
+- Runtime-behavior coverage: one readable public-path baseline for every supported catalog
+  builtin, plus focused property-column, mask, frozen-runtime, lazy-evaluation, and regression
+  cases. Catalog checks reject missing, misplaced, or mislabeled baseline fixtures.
 
 Run:
 
 ```bash
 cargo test -p evaluator
+```
+
+Update reviewed builtin snapshots:
+
+```bash
+BLESS=1 cargo test -p evaluator --test builtin_golden
 ```
 
 ## Vite demo (examples/vite/)

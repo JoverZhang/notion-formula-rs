@@ -1,0 +1,3 @@
+// @prop "Numbers": number[] = [[1, 2], [], null]
+
+first(prop("Numbers"))

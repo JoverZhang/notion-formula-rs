@@ -1,0 +1,4 @@
+=== INPUT ===
+every([1, 2, 3], current > 0)
+=== OUTPUT ===
+row-0: true

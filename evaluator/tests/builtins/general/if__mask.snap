@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Condition": boolean = [true, false]
+// @mask = [true, false]
+
+if(prop("Condition"), 1, 2)
+=== OUTPUT ===
+row-0: 1
+row-1: inactive
