@@ -1,4 +1,18 @@
+---
+doc_id: docs.index
+title: "Documentation guide"
+language: en
+source_language: en
+counterpart: ./README.zh-CN.md
+implementation_status: current
+document_status: stable
+translation_status: synced
+last_verified: 2026-08-29
+---
+
 # Docs
+
+[简体中文](README.zh-CN.md)
 
 Start at: [`docs/design/README.md`](design/README.md).
 
@@ -14,8 +28,66 @@ Start at: [`docs/design/README.md`](design/README.md).
 - `docs/design/testing.md`: test inventory across all crates.
 - `docs/design/demo-vite.md`: Vite example app UI/UX.
 - `docs/design/drift-tracker.md`: open questions and known gaps.
+- `docs/glossary.md`: shared Chinese-English terminology and code identifiers.
 - `README.md` next to code: module/crate docs (e.g. `analyzer/README.md`).
 - `docs/changelogs/YYYYMMDD-short-slug.md`: user-visible changes.
+
+## Bilingual documentation
+
+English documentation keeps its existing path. A complete Simplified Chinese counterpart
+uses the adjacent `.zh-CN.md` suffix:
+
+```text
+docs/design/evaluator.md <-> docs/design/evaluator.zh-CN.md
+docs/README.md           <-> docs/README.zh-CN.md
+```
+
+Existing source-only documents do not need an empty or partial counterpart. Once a pair
+exists:
+
+- keep each language as a complete, natural document rather than interleaving translations;
+- link both directions near the title and reuse language-neutral diagrams, code identifiers,
+  schemas, and assets;
+- choose one source language for each editing cycle, verify its technical claims first, and
+  then update the counterpart;
+- preserve scope, lifecycle status, certainty, guarantees, limits, examples, and failure
+  behavior across both versions; and
+- use the canonical terms in [`glossary.md`](glossary.md), preserving code identifiers exactly.
+
+The glossary is intentionally one shared bilingual mapping rather than two counterparts:
+exact term pairing is its interface, and splitting it would create a second source of truth.
+
+Paired architecture and contract documents use this metadata:
+
+```yaml
+---
+doc_id: architecture.example
+title: "Reader-oriented title"
+language: en
+source_language: en
+counterpart: ./example.zh-CN.md
+implementation_status: current
+document_status: stable
+translation_status: synced
+last_verified: YYYY-MM-DD
+---
+```
+
+The counterpart uses the same `doc_id`, sets `language: zh-CN`, and links back to the source.
+Use `translation_status: needs-update` only to make known drift explicit; a stable Current
+architecture or contract change should normally leave both versions `synced`.
+
+Lifecycle labels have fixed meanings:
+
+- **Current**: verified behavior in the current implementation.
+- **Planned**: an accepted direction that is not fully implemented.
+- **Exploratory**: an option under discussion without a commitment.
+- **Deprecated**: still present but being removed or replaced.
+- **Historical**: retained to explain an earlier decision or migration.
+
+Before calling a bilingual document complete, review both versions for technical evidence,
+failure behavior, lifecycle status, terminology, and semantic parity. The delivery summary
+must identify verified claims, remaining uncertainty, and the resulting translation status.
 
 ## When you change code
 

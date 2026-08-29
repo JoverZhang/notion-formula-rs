@@ -1,6 +1,7 @@
 # Evaluator Builtins: Design Plan
 
-> **Status:** Superseded as a design source. The normative contracts now live in
+> **Status: Historical.** Superseded as a design source. The normative Current contracts
+> now live in
 > [`docs/design/builtin-fn.md`](../design/builtin-fn.md) and
 > [`docs/design/evaluator.md`](../design/evaluator.md). Keep this file only as historical
 > implementation-planning context; where it conflicts with those documents, the design

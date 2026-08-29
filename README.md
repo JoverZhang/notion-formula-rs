@@ -1,7 +1,7 @@
 # notion-formula-rs
 
 - **Demo:** https://www.jovers.org/notion-formula-rs
-- **Docs:** [Design docs](./docs/design/README.md)
+- **Docs:** [English](./docs/design/README.md) · [简体中文](./docs/design/README.zh-CN.md)
 - **Status:**
   - Editor tooling (analyzer + completion/assists) is usable today.
   - The prepared-input evaluator and supported builtin catalog execute synchronously.

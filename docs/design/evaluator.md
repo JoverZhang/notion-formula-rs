@@ -1,20 +1,43 @@
+---
+doc_id: architecture.evaluator
+title: "How formula evaluation crosses the prepared-input boundary"
+language: en
+source_language: en
+counterpart: ./evaluator.zh-CN.md
+implementation_status: current
+document_status: stable
+translation_status: synced
+last_verified: 2026-08-29
+---
+
 # Evaluator Design
 
-This document defines the row-batch formula evaluation boundary. See
+[简体中文](evaluator.zh-CN.md)
+
+This Current document answers how a parsed formula is semantically analyzed, prepared, and
+turned into a synchronous row-batch result, and where data-loading, input-contract, null, and
+row-error responsibilities separate. It is for evaluator maintainers and Rust integrators who
+need a working understanding of preparation, execution, and failure behavior.
+
+The scope begins with a parsed expression and caller-owned schema and ends with an `EvalBlock`.
+It does not define external data retrieval or the semantics of individual builtin functions. See
 [`evaluator/README.md`](../../evaluator/README.md) for the current implementation and
 [`builtin-fn.md`](builtin-fn.md) for the traits, typed ABI, and input manifest generated
 from builtin declarations.
 
 ## Goals
 
-The evaluator consumes a semantically analyzed formula, caller-prepared typed columns, and
-a row mask; executes the IR synchronously; and returns per-row values, null state, and
-errors.
+Preparation runs semantic analysis and lowers its final `SemanticMap` into an owned plan. The
+runtime then consumes caller-prepared typed columns and an execution mask, executes the IR
+synchronously, and returns per-row values, null state, and errors.
 
 ## Pipeline
 
 ```text
-formula + schema + SemanticMap
+parsed expression + schema
+          |
+          v
+ Semantic Analysis --> SemanticMap
           |
           v
       Planner
@@ -48,6 +71,10 @@ PreparedFormula::evaluate (synchronous)
           +-- ok
           +-- row errors
 ```
+
+Read the diagram from the parsed expression at the top through caller preparation into synchronous
+execution. It shows the ownership seam and result states; it intentionally omits individual IR
+nodes, builtin algorithms, and external I/O scheduling.
 
 ## Core Types
 
@@ -110,10 +137,19 @@ explicit.
 
 | Category | Representation | Scope |
 | --- | --- | --- |
+| Preparation error | `PrepareError` | Returned before an executable plan exists |
 | Input structure error | `InputContractError` | Returned for the whole batch before evaluation |
-| Formula semantic error | `EvalError` + `ok` | One row |
+| Row evaluation error | `EvalError` + `ok` | One row |
 | Null | `Validity` | Valid row value |
 | Kernel contract error | Debug assertion | Implementation error during development |
+
+A `PrepareError` requires correcting the expression, schema, or unsupported construct before
+building inputs. An `InputContractError` is recoverable only by correcting or rebuilding the
+caller-owned inputs; no kernel has started, so there is no partial evaluator result to merge or
+roll back. A row-level `EvalError` does not abort the batch: unaffected rows continue and the
+failed row is marked through `ok` plus its error entry. Null remains a successful value. A kernel
+debug assertion indicates an implementation contract violation and has no evaluator-level
+recovery guarantee.
 
 ## Implementation Entry Points
 

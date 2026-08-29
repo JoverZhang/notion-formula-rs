@@ -1,5 +1,13 @@
 # Builtin Function Signatures: `builtin_fn` Design Plan
 
+> **Status: Historical.** This file records the migration plan that proposed a runtime parser
+> as the production authoring path. The parser interface and its tests remain, while the shipped
+> production catalog is authored through the category procedural macro in `builtin_fn_macros`;
+> normative Current contracts live in
+> [`docs/design/builtin-fn.md`](../design/builtin-fn.md) and
+> [`builtin_fn/README.md`](../../builtin_fn/README.md). The unchecked tasks below preserve the
+> plan as written and are not a current implementation backlog.
+
 This document describes a staged plan for extracting builtin function signature
 infrastructure from `analyzer` into a new `builtin_fn` crate, replacing the
 current macro-heavy handwritten definitions with a string-driven signature

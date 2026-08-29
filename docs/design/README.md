@@ -1,8 +1,26 @@
+---
+doc_id: architecture.index
+title: "Architecture map for notion-formula-rs"
+language: en
+source_language: en
+counterpart: ./README.zh-CN.md
+implementation_status: current
+document_status: stable
+translation_status: synced
+last_verified: 2026-08-29
+---
+
 # Design (notion-formula-rs)
 
-Stable architecture, cross-crate contracts, and design rationale.
-For implementation details, read each module README (e.g. `analyzer/README.md`).
-For the documentation entry point, see `docs/README.md`.
+[简体中文](README.zh-CN.md)
+
+This Current orientation answers where a contributor should begin when reading the
+architecture and which document owns each kind of design claim. It is intended for new and
+active contributors who need an end-to-end map before reading implementation details.
+
+This index covers stable architecture, cross-crate contracts, and design rationale. For
+implementation details, read each module README (for example, `analyzer/README.md`). For the
+documentation workflow and bilingual policy, see [`docs/README.md`](../README.md).
 
 ## Pipeline
 
@@ -30,6 +48,10 @@ For the documentation entry point, see `docs/README.md`.
                  (evaluator/src/)
 ```
 
+Read the diagram from the source at the top through the shared analyzer pipeline. It shows
+the primary cross-crate data flow and intentionally omits internal calls and error recovery.
+Its labels match code identifiers and the shared glossary.
+
 ## Goals
 
 - Provide stable, reusable formula parsing and diagnostics.
@@ -50,6 +72,9 @@ For the documentation entry point, see `docs/README.md`.
 | `docs/` | design docs + changelog guidance | `docs/README.md` |
 
 ## Design Docs Index
+
+Documents without a Chinese counterpart continue to link to their English source. They are
+source-only, not incomplete translations.
 
 | Doc | Scope |
 | --- | --- |
@@ -73,12 +98,11 @@ For the documentation entry point, see `docs/README.md`.
 
 ## Glossary
 
-- `token`: a syntax unit, such as a number, string, operator, keyword, or identifier.
-- `trivia`: non-semantic tokens, such as newlines, comments, and doc comments.
-- `diagnostic`: an error or warning tied to source code.
-- `code action`: a special diagnostic that carries a quick-fix suggestion.
-- `span`: a source range represented as a half-open interval `[start, end)`.
-- `cursor`: a source position in `[0, length)`. In tests we mark it as `$0` (same naming style as rustc tests).
+Canonical English terms, Chinese counterparts, code identifiers, and concept boundaries live
+in the shared [`Project Glossary`](../glossary.md).
+
+One local notation used throughout parser and IDE tests is `$0`: it marks the cursor, a
+source position in `[0, length)`.
 
 ## Language Scope
 
