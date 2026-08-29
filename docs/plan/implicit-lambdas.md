@@ -1,5 +1,13 @@
 # Implicit Lambdas: Design Plan
 
+> **Status: Historical.** This file preserves the implementation plan and its state at the
+> time it was written. Implicit-lambda analysis and Controlled evaluator execution are now
+> implemented for supported catalog declarations. Normative Current behavior lives in
+> [`docs/design/analyzer.md`](../design/analyzer.md),
+> [`docs/design/builtin-fn.md`](../design/builtin-fn.md), and
+> [`docs/design/evaluator.md`](../design/evaluator.md). Checklists and TODO sections below are
+> historical evidence, not the current gap tracker.
+
 This document captures the design for adding implicit lambda (thunk) support to the
 analyzer. Functions like `if`, `ifs`, `let`, `lets`, `and`, `or`, `map`, `filter`, etc.
 have arguments that must not be eagerly evaluated. Rather than requiring users to write
