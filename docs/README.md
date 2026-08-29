@@ -89,6 +89,23 @@ Before calling a bilingual document complete, review both versions for technical
 failure behavior, lifecycle status, terminology, and semantic parity. The delivery summary
 must identify verified claims, remaining uncertainty, and the resulting translation status.
 
+### Automated checks
+
+Run `just docs-check` to validate the repository's Markdown links and the mechanical parts of
+the bilingual contract. For every document with YAML metadata, the command requires the fields
+shown above, an adjacent and reciprocal counterpart, matching shared metadata, one `en` side and
+one `zh-CN` side, and a body link in each direction.
+
+Accepted metadata values are:
+
+- `implementation_status`: `current`, `planned`, `exploratory`, `deprecated`, or `historical`;
+- `document_status`: `draft` or `stable`; and
+- `translation_status`: `synced` or `needs-update`.
+
+Source-only documents omit the bilingual metadata until a counterpart exists. The automated
+check cannot judge semantic parity: setting `translation_status: synced` still requires a manual
+review of technical meaning, certainty, guarantees, limits, and failure behavior in both files.
+
 ## When you change code
 
 - Update the module README next to the code you touched.
@@ -117,6 +134,7 @@ just test
 just verify
 just deps
 just check
+just docs-check
 just fix
 just gen-ts
 

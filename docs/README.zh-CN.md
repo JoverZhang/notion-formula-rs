@@ -83,6 +83,21 @@ counterpart 使用相同的 `doc_id`，分别设置 `language: en` 或 `language
 双语文档完成前，需要同时检查技术证据、失败行为、生命周期状态、术语和语义一致性。交付说明必须列出
 已经核验的事实、仍然存在的不确定性，以及最终的翻译状态。
 
+### 自动检查
+
+运行 `just docs-check` 可以检查仓库中的 Markdown 链接，以及双语约定中能够机械验证的部分。每个带有
+YAML metadata 的文档都必须包含上面列出的字段；中英文版本必须相邻、通过 metadata 互相指向、共享字段
+一致、分别使用 `en` 和 `zh-CN`，并在正文中提供双向链接。
+
+metadata 字段允许使用以下取值：
+
+- `implementation_status`：`current`、`planned`、`exploratory`、`deprecated` 或 `historical`；
+- `document_status`：`draft` 或 `stable`；
+- `translation_status`：`synced` 或 `needs-update`。
+
+单语源文档在 counterpart 建立前不添加双语 metadata。自动检查无法判断语义一致性：只有人工复核两个版本
+中的技术含义、确定程度、保证、限制和失败行为后，才能设置 `translation_status: synced`。
+
 ## 修改代码时
 
 - 更新被修改模块旁的 README。
@@ -113,6 +128,7 @@ just test
 just verify
 just deps
 just check
+just docs-check
 just fix
 just gen-ts
 
