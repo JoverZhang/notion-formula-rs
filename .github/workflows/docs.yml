@@ -1,0 +1,39 @@
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - "**.md"
+      - "docs/**"
+      - "scripts/check-docs.mjs"
+      - "scripts/check-docs.test.mjs"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [master]
+    paths:
+      - "**.md"
+      - "docs/**"
+      - "scripts/check-docs.mjs"
+      - "scripts/check-docs.test.mjs"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run documentation checks
+        run: |
+          node --test scripts/check-docs.test.mjs
+          node scripts/check-docs.mjs

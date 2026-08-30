@@ -1,9 +1,20 @@
 name: CI + Deploy Vite demo to GitHub Pages
 
+# Documentation-only changes are handled by docs.yml.
 on:
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "scripts/check-docs.mjs"
+      - "scripts/check-docs.test.mjs"
   push:
     branches: [master]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "scripts/check-docs.mjs"
+      - "scripts/check-docs.test.mjs"
   workflow_dispatch:
 
 permissions:
