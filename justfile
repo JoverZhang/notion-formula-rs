@@ -25,7 +25,7 @@ docker-test: _docker-build-ci
 
 # Checks and fixes
 
-check: check-rust check-example-vite
+check: docs-check check-rust check-example-vite
 
 check-rust:
   cargo fmt --all -- --check
@@ -34,6 +34,10 @@ check-rust:
 
 check-example-vite: wasm
   pnpm -C examples/vite -s run check
+
+docs-check:
+  node --test scripts/check-docs.test.mjs
+  node scripts/check-docs.mjs
 
 typecheck:
   cargo check

@@ -7,7 +7,7 @@ counterpart: ./README.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # Docs
@@ -42,8 +42,8 @@ docs/design/evaluator.md <-> docs/design/evaluator.zh-CN.md
 docs/README.md           <-> docs/README.zh-CN.md
 ```
 
-Existing source-only documents do not need an empty or partial counterpart. Once a pair
-exists:
+Existing source-only documents do not need an empty or partial counterpart and omit the
+bilingual metadata below until a pair exists. Once a pair exists:
 
 - keep each language as a complete, natural document rather than interleaving translations;
 - link both directions near the title and reuse language-neutral diagrams, code identifiers,
@@ -89,6 +89,10 @@ Before calling a bilingual document complete, review both versions for technical
 failure behavior, lifecycle status, terminology, and semantic parity. The delivery summary
 must identify verified claims, remaining uncertainty, and the resulting translation status.
 
+Run `just docs-check` to validate local Markdown links and the mechanical bilingual rules—required
+metadata, adjacent reciprocal counterparts, matching shared fields, and allowed status values;
+semantic parity still requires manual review.
+
 ## When you change code
 
 - Update the module README next to the code you touched.
@@ -117,6 +121,7 @@ just test
 just verify
 just deps
 just check
+just docs-check
 just fix
 just gen-ts
 
