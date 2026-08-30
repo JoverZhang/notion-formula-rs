@@ -12,7 +12,7 @@ const IGNORED_DIRECTORIES = new Set([
   "node_modules",
   "target",
 ]);
-const IGNORED_PATHS = new Set(["examples/vite/src/pkg", "scripts/fixtures"]);
+const IGNORED_PATHS = new Set(["examples/vite/src/pkg"]);
 const REQUIRED_METADATA = [
   "doc_id",
   "title",
