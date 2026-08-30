@@ -32,7 +32,7 @@ internal helper without changing the rule does not.
 | `analyzer` | UTF-8 formula source | Tokens, a recoverable AST, diagnostics, and byte spans | Problems become diagnostics; recoverable syntax still produces an AST |
 | `ide` edit operations | Source plus byte-coordinate cursor or edits | Updated source and rebased byte cursor | Invalid input or formatting failure rejects the whole operation |
 | `analyzer_wasm` | JS config, source, and UTF-16 editor coordinates | DTOs whose spans, edits, and cursors use UTF-16 | Constructor and edit-operation errors cross the WASM boundary as errors |
-| `evaluator` | An analyzed expression, schema, row batch, and complete typed inputs | `EvalBlock` with values, validity, row success, and row errors | Preparation and input errors reject the whole operation; evaluation errors stay row-local |
+| `evaluator` | A parsed expression, schema, row batch, and complete typed inputs | `EvalBlock` with values, validity, row success, and row errors | Preparation and input errors reject the whole operation; evaluation errors stay row-local |
 
 The table is an ownership map, not another pipeline description. The following sections define the
 coordinate conversions, recovery guarantees, and failure boundaries that make those handoffs safe.
@@ -62,8 +62,8 @@ Conversion has deterministic boundary behavior:
 - `format` and `apply_edits` use checked cursor conversion and reject a cursor past the UTF-16
   document length. Edit conversion also rejects reversed ranges and ranges whose end is past the
   document; an endpoint inside a surrogate pair is still floored to the scalar start.
-- The core IDE layer rejects byte cursors or edit endpoints that are out of bounds or are not UTF-8
-  character boundaries.
+- Core IDE edit operations reject byte cursors or edit endpoints that are out of bounds or are not
+  UTF-8 character boundaries.
 
 These rules keep conversion panic-free, but they do not make the coordinate systems interchangeable.
 

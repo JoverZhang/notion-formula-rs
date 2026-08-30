@@ -30,7 +30,7 @@ evaluator 的已准备输入。单个 builtin 的语义和模块内部 API 不�
 | `analyzer` | UTF-8 公式源码 | token、可恢复的 AST、诊断和字节 span | 问题表示为诊断；可恢复的语法错误仍会产生 AST |
 | `ide` 编辑操作 | 源码以及字节坐标的 cursor 或编辑 | 更新后的源码和重定位后的字节 cursor | 非法输入或格式化失败会拒绝整个操作 |
 | `analyzer_wasm` | JavaScript 配置、源码和 UTF-16 编辑器坐标 | span、编辑和 cursor 均使用 UTF-16 的 DTO | 构造器和编辑操作错误以错误形式跨越 WASM 边界 |
-| `evaluator` | 已分析表达式、schema、行批次和完整的类型化输入 | 包含值、有效性、行成功状态和行错误的 `EvalBlock` | 准备与输入错误拒绝整个操作；求值错误只影响对应行 |
+| `evaluator` | 已解析表达式、schema、行批次和完整的类型化输入 | 包含值、有效性、行成功状态和行错误的 `EvalBlock` | 准备与输入错误拒绝整个操作；求值错误只影响对应行 |
 
 这张表描述的是职责归属，不是另一份流水线说明。下文会定义让这些交接保持安全的坐标转换、错误恢复保证和
 失败边界。
@@ -57,7 +57,7 @@ API。
 - `format` 和 `apply_edits` 使用带校验的 cursor 转换，并拒绝超过 UTF-16 文档长度的 cursor。编辑转换
   还会拒绝反向区间以及 end 超出文档的区间；落在 surrogate pair 内部的端点仍会向下取整到 scalar
   起点。
-- 核心 IDE 层会拒绝越界或不在 UTF-8 字符边界上的字节 cursor 和编辑端点。
+- 核心 IDE 编辑操作会拒绝越界或不在 UTF-8 字符边界上的字节 cursor 和编辑端点。
 
 这些规则保证转换过程不会 panic，但不意味着两套坐标可以混用。
 
