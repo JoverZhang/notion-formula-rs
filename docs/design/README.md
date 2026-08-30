@@ -7,7 +7,7 @@ counterpart: ./README.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # Design (notion-formula-rs)
@@ -78,7 +78,7 @@ source-only, not incomplete translations.
 
 | Doc | Scope |
 | --- | --- |
-| [`contracts.md`](contracts.md) | Cross-crate hard rules (spans, determinism, tokens, edits) |
+| [`contracts.md`](contracts.md) | Cross-crate coordinates, recovery, determinism, editing, and evaluation boundaries |
 | [`builtin-fn.md`](builtin-fn.md) | Builtin declaration DSL, call-signature resolution, catalog, and evaluator contracts |
 | [`analyzer.md`](analyzer.md) | Lexer, parser, AST, semantic analysis, postfix sugar |
 | [`ide.md`](ide.md) | Completion, signature help, formatting, edit application |
