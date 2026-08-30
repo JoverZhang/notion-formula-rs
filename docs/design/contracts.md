@@ -39,15 +39,15 @@ coordinate conversions, recovery guarantees, and failure boundaries that make th
 
 ## Coordinates change only at the WASM boundary
 
-Inside the Rust analyzer and IDE layers, every source `Span`, `TextEdit.range`, and cursor is measured
-in UTF-8 bytes. Ranges are half-open `[start, end)`, and both endpoints must be valid character
-boundaries in the same source string. A valid `Span` can therefore slice its source directly as
-`&source[start..end]`.
+Inside the Rust analyzer and IDE layers, every source [`Span`](../../analyzer/src/span.rs),
+[`TextEdit.range`](../../analyzer/src/text_edit.rs), and cursor is measured in UTF-8 bytes. Ranges are
+half-open `[start, end)`, and both endpoints must be valid character boundaries in the same source
+string. A valid `Span` can therefore slice its source directly as `&source[start..end]`.
 
-`SourceMap::line_col` is a display location, not a second source-offset system. It returns a 1-based
-line and a 1-based column counted in Unicode scalar values (Rust `char`s), not bytes or UTF-16 code
-units. `Diagnostic.line` and `Diagnostic.col` are derived this way while converting diagnostics for
-WASM.
+[`SourceMap::line_col`](../../analyzer/src/source_map.rs) is a display location, not a second
+source-offset system. It returns a 1-based line and a 1-based column counted in Unicode scalar values
+(Rust `char`s), not bytes or UTF-16 code units. `Diagnostic.line` and `Diagnostic.col` are derived
+this way while converting diagnostics for WASM.
 
 At the JavaScript boundary, DTO spans, edit ranges, and cursors use half-open UTF-16 code-unit
 coordinates. `analyzer_wasm` owns all conversion between those coordinates and Rust byte offsets;
@@ -66,6 +66,9 @@ Conversion has deterministic boundary behavior:
   UTF-8 character boundaries.
 
 These rules keep conversion panic-free, but they do not make the coordinate systems interchangeable.
+Flooring and clamping are covered by unit tests beside the
+[offset converters](../../analyzer_wasm/src/offsets.rs); operation failures are covered by the
+[WASM boundary tests](../../analyzer_wasm/tests/analyze.rs).
 
 ## Tokens and syntax remain usable after local errors
 
@@ -73,24 +76,29 @@ The lexer emits tokens in source order, retains `DocComment` and `Newline` as tr
 explicit `Eof` token with an empty span at the end of the source. Ordinary spaces are not tokens.
 Token ranges are also half-open, but their unit is a token index rather than a byte.
 
-`tokens_in_span` maps a non-empty byte span to every token whose span intersects it. Because `Eof`
-has an empty span, a non-empty source span does not include it. An empty or reversed span maps to the
-stable insertion point before the first token whose start is at or after `span.start`; that insertion
-point may be the `Eof` index. `TokenQuery` is the canonical API for this mapping and for trivia-aware
-neighbor scans, so parser and formatter code should not duplicate token-index arithmetic.
+[`tokens_in_span`](../../analyzer/src/lexer/token.rs) maps a non-empty byte span to every token whose
+span intersects it. Because `Eof` has an empty span, a non-empty source span does not include it. An
+empty or reversed span maps to the stable insertion point before the first token whose start is at or
+after `span.start`; that insertion point may be the `Eof` index.
+[`TokenQuery`](../../analyzer/src/parser/tokenstream.rs) is the canonical API for this mapping and for
+trivia-aware neighbor scans, so parser and formatter code should not duplicate token-index arithmetic.
 
-The parser recovers from local syntax errors by inserting `ExprKind::Error` nodes and continuing.
-AST consumers must therefore handle `Error` nodes instead of assuming that diagnostics imply no tree.
-They must also account for `ExprKind::ImplicitLambda`: the parser never creates it, but semantic
-analysis may insert it for function-typed arguments. Member syntax has one supported form,
-`receiver.method(...)`; bare member access such as `receiver.member` is diagnosed and recovered as an
-error expression.
+The parser recovers from local syntax errors by inserting
+[`ExprKind::Error`](../../analyzer/src/parser/ast.rs) nodes and continuing. AST consumers must
+therefore handle `Error` nodes instead of assuming that diagnostics imply no tree. They must also
+account for `ExprKind::ImplicitLambda`: the parser never creates it, but semantic analysis may insert
+it for function-typed arguments. Member syntax has one supported form, `receiver.method(...)`; bare
+member access such as `receiver.member` is diagnosed and recovered as an error expression.
+Representative span-mapping and recovery cases live in
+[`test_tokens_in_span.rs`](../../analyzer/src/tests/lexer/test_tokens_in_span.rs) and
+[`test_parser_spans.rs`](../../analyzer/src/tests/parser/test_parser_spans.rs).
 
 ## Diagnostics and edits are deterministic
 
-`Diagnostics` retains at most one diagnostic for an exact span. An incoming higher-priority
-diagnostic replaces the existing one. At equal priority, an identical message merges and deduplicates
-labels, notes, and code actions; a different message leaves the existing diagnostic unchanged.
+[`Diagnostics`](../../analyzer/src/diagnostics.rs) retains at most one diagnostic for an exact span.
+An incoming higher-priority diagnostic replaces the existing one. At equal priority, an identical
+message merges and deduplicates labels, notes, and code actions; a different message leaves the
+existing diagnostic unchanged.
 
 `format_diagnostics` orders diagnostics by start, end, descending priority, and message. It also
 sorts labels by start, end, and label message; notes retain their deduplicated emission order. Code
@@ -100,19 +108,22 @@ while converting its edit ranges to UTF-16.
 
 Public edit operations are all-or-nothing:
 
-- `ide::apply_edits` sorts edits in original-source coordinates, validates every cursor and range,
-  rejects overlaps, then applies the complete set and rebases the cursor.
+- [`ide::apply_edits`](../../ide/src/edit.rs) sorts edits in original-source coordinates, validates
+  every cursor and range, rejects overlaps, then applies the complete set and rebases the cursor.
 - `ide::format` rejects source with lexer or parser errors. Otherwise it creates one full-document
   replacement and uses the same validated byte-edit pipeline.
 - WASM `format` and `apply_edits` convert inputs to bytes, call the IDE operation, and convert the
   returned cursor to UTF-16. A conversion or IDE failure is returned as an operation error, not as a
   partial `ApplyResult`.
 
+Overlap rejection, cursor rebasing, and format failures are exercised in
+[`test_edit_ops.rs`](../../ide/src/tests/ide/test_edit_ops.rs).
+
 ## Editor help shares the semantic signature model
 
-`ParamShape` in `builtin_fn` is the canonical parameter model. Its shape consists of `head`, a
-repeat group, `tail`, and `repeat_min_groups`; consumers must use the shared call-signature projection
-rather than re-derive variadic or tail positions.
+[`ParamShape`](../../builtin_fn/src/signature.rs) in `builtin_fn` is the canonical parameter model.
+Its shape consists of `head`, a repeat group, `tail`, and `repeat_min_groups`; consumers must use the
+shared call-signature projection rather than re-derive variadic or tail positions.
 
 Signature help resolves that shared semantic model and returns structured `DisplaySegment` values
 plus `active_parameter`. The WASM DTO mirrors those segments instead of flattening them to one display
@@ -122,23 +133,26 @@ declaration and resolution model lives in [Builtin Function Design](builtin-fn.m
 
 ## The WASM facade owns its configuration boundary
 
-`Analyzer::new` accepts an object and rejects unknown top-level keys. The only accepted keys are
-`properties` and `preferred_limit`; JavaScript cannot supply `functions`, because the constructor
-always installs the Rust builtin catalog.
+[`Analyzer::new`](../../analyzer_wasm/src/lib.rs) accepts an object and rejects unknown top-level
+keys. The only accepted keys are `properties` and `preferred_limit`; JavaScript cannot supply
+`functions`, because the constructor always installs the Rust builtin catalog.
 
 Runtime deserialization accepts an omitted `properties` as an empty list and an omitted or `null`
 `preferred_limit` as the default `5`. The generated TypeScript DTO currently declares both fields
 explicitly as `{ properties: Property[], preferred_limit: number | null }`, so typed integrations
 should pass both fields even though the runtime accepts omission. Invalid object shape or field values
-fail construction with `Invalid analyzer config`.
+fail construction with `Invalid analyzer config`. Constructor rejection and `null` defaulting are
+exercised by the [WASM tests](../../analyzer_wasm/tests/analyze.rs); the stricter generated shape is
+visible in [`wasm_dto.ts`](../../examples/vite/src/analyzer/generated/wasm_dto.ts).
 
 ## Evaluation starts after the caller completes the input contract
 
-`prepare_formula` runs semantic analysis and lowers the expression to an owned execution plan. A
-preparation failure returns `PrepareError` before a `PreparedFormula` exists. On success,
-`PreparedFormula::required_columns()` returns the complete, deduplicated required-column manifest in
-first-seen order. Each `RequiredColumn` carries the property name, expected type, and an `InputSlot`
-that is valid only for that prepared input layout; the method does not return bare `InputSlot` values.
+[`prepare_formula`](../../evaluator/src/planner/prepared.rs) runs semantic analysis and lowers the
+expression to an owned execution plan. A preparation failure returns `PrepareError` before a
+`PreparedFormula` exists. On success, `PreparedFormula::required_columns()` returns the complete,
+deduplicated required-column manifest in first-seen order. Each `RequiredColumn` carries the property
+name, expected type, and an `InputSlot` that is valid only for that prepared input layout; the method
+does not return bare `InputSlot` values.
 
 The caller must load every required column, including columns referenced only by an unselected
 branch, before synchronous evaluation begins. `EvalInputsBuilder::finish` validates missing or
@@ -158,16 +172,6 @@ flow such as `if`, `ifs`, `&&`, `||`, and lambda builtins evaluates branch or ar
 the rows that require them, even though all referenced input columns were prepared up front.
 
 The full ownership rationale, IR design, null semantics, and evaluator failure table live in
-[Evaluator Design](evaluator.md).
-
-## Verification map
-
-| Contract area | Implementation anchors | Verification anchors |
-| --- | --- | --- |
-| Byte spans and display locations | [`analyzer/src/span.rs`](../../analyzer/src/span.rs), [`analyzer/src/source_map.rs`](../../analyzer/src/source_map.rs) | Parser span invariants in [`test_invariants.rs`](../../analyzer/src/tests/parser/test_invariants.rs) |
-| UTF-8/UTF-16 conversion and DTOs | [`analyzer_wasm/src/offsets.rs`](../../analyzer_wasm/src/offsets.rs), [`dto/v1.rs`](../../analyzer_wasm/src/dto/v1.rs) | Offset unit tests and [`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs) |
-| Tokens and recovered AST | [`analyzer/src/lexer/token.rs`](../../analyzer/src/lexer/token.rs), [`parser/tokenstream.rs`](../../analyzer/src/parser/tokenstream.rs), [`parser/ast.rs`](../../analyzer/src/parser/ast.rs) | [`test_tokens_in_span.rs`](../../analyzer/src/tests/lexer/test_tokens_in_span.rs), [`test_parser_spans.rs`](../../analyzer/src/tests/parser/test_parser_spans.rs) |
-| Diagnostics and code actions | [`analyzer/src/diagnostics.rs`](../../analyzer/src/diagnostics.rs) | [`diagnostics_golden.rs`](../../analyzer/tests/diagnostics_golden.rs), [`test_errors.rs`](../../analyzer/src/tests/parser/test_errors.rs) |
-| IDE edits and signature help | [`ide/src/edit.rs`](../../ide/src/edit.rs), [`ide/src/signature/`](../../ide/src/signature/), [`ide/src/display.rs`](../../ide/src/display.rs) | [`test_edit_ops.rs`](../../ide/src/tests/ide/test_edit_ops.rs), [`test_completion_signature_help.rs`](../../ide/src/tests/ide/test_completion_signature_help.rs) |
-| WASM configuration | [`analyzer_wasm/src/lib.rs`](../../analyzer_wasm/src/lib.rs), [`dto/v1.rs`](../../analyzer_wasm/src/dto/v1.rs) | Constructor tests in [`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs) |
-| Prepared evaluator inputs and row states | [`evaluator/src/core/inputs.rs`](../../evaluator/src/core/inputs.rs), [`planner/prepared.rs`](../../evaluator/src/planner/prepared.rs), [`core/types.rs`](../../evaluator/src/core/types.rs) | [`evaluator/tests/runtime_structure.rs`](../../evaluator/tests/runtime_structure.rs) and builtin goldens under [`evaluator/tests/builtins/`](../../evaluator/tests/builtins/) |
+[Evaluator Design](evaluator.md). The required-column manifest and input error classes are exercised
+through the public evaluator seam in
+[`runtime_structure.rs`](../../evaluator/tests/runtime_structure.rs).
