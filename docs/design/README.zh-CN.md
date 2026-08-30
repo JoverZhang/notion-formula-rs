@@ -7,7 +7,7 @@ counterpart: ./README.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # notion-formula-rs 设计
@@ -74,7 +74,7 @@ last_verified: 2026-08-29
 
 | 文档 | 范围 |
 | --- | --- |
-| [`contracts.md`](contracts.md) | 跨 crate 的硬性规则，包括 span、确定性、token 和编辑操作 |
+| [`contracts.zh-CN.md`](contracts.zh-CN.md) | 跨 crate 的坐标、错误恢复、确定性、编辑与求值边界 |
 | [`builtin-fn.md`](builtin-fn.md) | 内置函数声明 DSL、调用签名解析、目录和 evaluator 契约 |
 | [`analyzer.md`](analyzer.md) | lexer、parser、AST、语义分析和后缀语法糖 |
 | [`ide.md`](ide.md) | 补全、签名帮助、格式化和编辑应用 |

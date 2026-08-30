@@ -2,7 +2,7 @@
 
 This document defines the deterministic Signature Help algorithm for functions whose parameters are modeled as:
 
-`ParamShape { head, repeat, tail }`
+`ParamShape { head, repeat, tail, repeat_min_groups }`
 
 It is intended as a concise, code-backed spec for editor integrations (structured display segments + `active_parameter`).
 
@@ -20,7 +20,8 @@ For a shape with `repeat.len() > 0`, define:
 
 - `head_len = head.len()`
 - `repeat_len = repeat.len()`
-- `repeat_min_groups = 1` (this repo’s repeat-group signatures require at least one group)
+- `repeat_min_groups = params.repeat_min_groups` (current builtin signatures use minimums of
+  `0`, `1`, or `2` complete groups)
 - `tail_used` = how many tail params are “in use” at the end of the call
 
 ### `resolve_repeat_tail_used(params, total_args) -> Option<tail_used>`
