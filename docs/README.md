@@ -7,7 +7,7 @@ counterpart: ./README.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # Docs
@@ -42,8 +42,8 @@ docs/design/evaluator.md <-> docs/design/evaluator.zh-CN.md
 docs/README.md           <-> docs/README.zh-CN.md
 ```
 
-Existing source-only documents do not need an empty or partial counterpart. Once a pair
-exists:
+Existing source-only documents do not need an empty or partial counterpart and omit the
+bilingual metadata below until a pair exists. Once a pair exists:
 
 - keep each language as a complete, natural document rather than interleaving translations;
 - link both directions near the title and reuse language-neutral diagrams, code identifiers,
@@ -89,22 +89,9 @@ Before calling a bilingual document complete, review both versions for technical
 failure behavior, lifecycle status, terminology, and semantic parity. The delivery summary
 must identify verified claims, remaining uncertainty, and the resulting translation status.
 
-### Automated checks
-
-Run `just docs-check` to validate the repository's Markdown links and the mechanical parts of
-the bilingual contract. For every document with YAML metadata, the command requires the fields
-shown above, an adjacent and reciprocal counterpart, matching shared metadata, one `en` side and
-one `zh-CN` side, and a body link in each direction.
-
-Accepted metadata values are:
-
-- `implementation_status`: `current`, `planned`, `exploratory`, `deprecated`, or `historical`;
-- `document_status`: `draft` or `stable`; and
-- `translation_status`: `synced` or `needs-update`.
-
-Source-only documents omit the bilingual metadata until a counterpart exists. The automated
-check cannot judge semantic parity: setting `translation_status: synced` still requires a manual
-review of technical meaning, certainty, guarantees, limits, and failure behavior in both files.
+Run `just docs-check` to validate local Markdown links and the mechanical bilingual rules—required
+metadata, adjacent reciprocal counterparts, matching shared fields, and allowed status values;
+semantic parity still requires manual review.
 
 ## When you change code
 

@@ -12,7 +12,7 @@ const IGNORED_DIRECTORIES = new Set([
   "node_modules",
   "target",
 ]);
-const IGNORED_PATHS = new Set(["examples/vite/src/pkg"]);
+const IGNORED_PATHS = new Set(["examples/vite/src/pkg", "scripts/fixtures"]);
 const REQUIRED_METADATA = [
   "doc_id",
   "title",
@@ -150,11 +150,14 @@ function resolveLocalLink(documentPath, destination) {
   }
 }
 
-function loadDocumentation(repositoryRoot) {
-  return discoverMarkdownFiles(repositoryRoot).map((filePath) => {
-    const parsed = parseFrontmatter(repositoryRoot, filePath, readFileSync(filePath, "utf8"));
+function loadRepositoryDocumentation(repositoryRoot) {
+  const root = resolve(repositoryRoot);
+  const documents = discoverMarkdownFiles(root).map((filePath) => {
+    const parsed = parseFrontmatter(root, filePath, readFileSync(filePath, "utf8"));
     return { ...parsed, filePath, links: extractLinks(parsed.body) };
   });
+
+  return { documents, repositoryRoot: root };
 }
 
 function checkLocalLinks(repositoryRoot, documents) {
@@ -286,13 +289,11 @@ function checkBilingualPairs(repositoryRoot, documents) {
   return { errors, pairCount: pairs.size };
 }
 
-export function checkDocumentation(repositoryRoot) {
-  const root = resolve(repositoryRoot);
-  const documents = loadDocumentation(root);
-  const bilingual = checkBilingualPairs(root, documents);
+function validateRepositoryDocumentation({ documents, repositoryRoot }) {
+  const bilingual = checkBilingualPairs(repositoryRoot, documents);
   const errors = [...documents.flatMap((document) => document.errors), ...bilingual.errors];
 
-  errors.push(...checkLocalLinks(root, documents));
+  errors.push(...checkLocalLinks(repositoryRoot, documents));
   return {
     documentCount: documents.length,
     errors: [...new Set(errors)].sort(),
@@ -300,9 +301,11 @@ export function checkDocumentation(repositoryRoot) {
   };
 }
 
-function main() {
-  // Validates repository documentation without changing files or external state.
-  const report = checkDocumentation(process.cwd());
+export function checkDocumentation(repositoryRoot) {
+  return validateRepositoryDocumentation(loadRepositoryDocumentation(repositoryRoot));
+}
+
+function reportDocumentationResult(report) {
   if (report.errors.length === 0) {
     console.log(
       `Documentation checks passed: ${report.documentCount} Markdown files, ${report.pairCount} bilingual pairs.`,
@@ -315,4 +318,15 @@ function main() {
   process.exitCode = 1;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+function main() {
+  // Validates maintained Markdown and reports every actionable failure.
+  const documentation = loadRepositoryDocumentation(process.cwd());
+
+  const report = validateRepositoryDocumentation(documentation);
+
+  reportDocumentationResult(report);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

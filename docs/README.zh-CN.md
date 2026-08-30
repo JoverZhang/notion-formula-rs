@@ -7,7 +7,7 @@ counterpart: ./README.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # 文档
@@ -41,7 +41,7 @@ docs/design/evaluator.md <-> docs/design/evaluator.zh-CN.md
 docs/README.md           <-> docs/README.zh-CN.md
 ```
 
-现有的单语源文档不需要创建空白或不完整的 counterpart。一旦建立双语配对：
+现有的单语源文档不需要创建空白或不完整的 counterpart；建立配对前也不添加下述双语 metadata。一旦建立双语配对：
 
 - 两种语言都必须是完整、自然的独立文档，不采用逐段交错翻译；
 - 在标题附近提供双向链接，并复用与语言无关的图、代码标识符、schema 和资源；
@@ -83,20 +83,8 @@ counterpart 使用相同的 `doc_id`，分别设置 `language: en` 或 `language
 双语文档完成前，需要同时检查技术证据、失败行为、生命周期状态、术语和语义一致性。交付说明必须列出
 已经核验的事实、仍然存在的不确定性，以及最终的翻译状态。
 
-### 自动检查
-
-运行 `just docs-check` 可以检查仓库中的 Markdown 链接，以及双语约定中能够机械验证的部分。每个带有
-YAML metadata 的文档都必须包含上面列出的字段；中英文版本必须相邻、通过 metadata 互相指向、共享字段
-一致、分别使用 `en` 和 `zh-CN`，并在正文中提供双向链接。
-
-metadata 字段允许使用以下取值：
-
-- `implementation_status`：`current`、`planned`、`exploratory`、`deprecated` 或 `historical`；
-- `document_status`：`draft` 或 `stable`；
-- `translation_status`：`synced` 或 `needs-update`。
-
-单语源文档在 counterpart 建立前不添加双语 metadata。自动检查无法判断语义一致性：只有人工复核两个版本
-中的技术含义、确定程度、保证、限制和失败行为后，才能设置 `translation_status: synced`。
+运行 `just docs-check` 可以检查本地 Markdown 链接以及双语约定中可机械验证的部分，包括必填 metadata、相邻且
+互指的 counterpart、一致的共享字段和合法的状态值；语义一致性仍须人工复核。
 
 ## 修改代码时
 

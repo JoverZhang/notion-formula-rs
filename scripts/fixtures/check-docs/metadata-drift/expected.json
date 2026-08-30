@@ -1,0 +1,9 @@
+{
+  "documentCount": 2,
+  "errors": [
+    "docs/example.md: translation_status does not match docs/example.zh-CN.md",
+    "docs/example.zh-CN.md: document body must link to its counterpart",
+    "docs/example.zh-CN.md: translation_status does not match docs/example.md"
+  ],
+  "pairCount": 1
+}
