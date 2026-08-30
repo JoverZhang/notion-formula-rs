@@ -19,8 +19,8 @@ last_verified: 2026-08-30
 同时又不能意外改变可观察行为的维护者和集成方。
 
 本文从源码坐标、token 和错误恢复后的语法树开始，继续说明诊断、编辑操作、签名帮助、WASM 门面和
-evaluator 的已准备输入。单个 builtin 的语义和模块内部 API 不在范围内。这里的每条规则都是兼容性
-接口：若要改变，必须同步修改测试、双语文档和 changelog；只移动内部 helper、且不改变规则，则不算
+evaluator 的已准备输入。单个内置函数的语义和模块内部 API 不在范围内。这里的每条规则都是兼容性
+接口：若要改变，必须同步修改测试、双语文档和 changelog；只移动内部辅助函数、且不改变规则，则不算
 契约变化。
 
 ## 边界地图
@@ -54,7 +54,7 @@ API。
 坐标转换的边界行为是确定的：
 
 - 落在多单元 Unicode scalar 内部的位置会向下取整到该 scalar 的起点。
-- 通用转换 helper（包括 `help` 使用的转换）会把超出源码末尾的位置截断到末尾。
+- 通用转换函数（包括 `help` 使用的转换）会把超出源码末尾的位置截断到末尾。
 - `format` 和 `apply_edits` 使用带校验的 cursor 转换，并拒绝超过 UTF-16 文档长度的 cursor。编辑转换
   还会拒绝反向区间以及 end 超出文档的区间；落在 surrogate pair 内部的端点仍会向下取整到 scalar
   起点。
@@ -92,7 +92,7 @@ parser 遇到局部语法错误时会插入 [`ExprKind::Error`](../../analyzer/s
 
 `format_diagnostics` 依次按起点、终点、优先级降序和消息排序诊断；label 也会按起点、终点和 label
 消息排序，note 则保留去重后的发出顺序。代码操作继续以 `Diagnostic.actions: Vec<CodeAction>` 的形式
-附着在对应诊断上，每个操作包含使用核心字节坐标的 `TextEdit`。WASM converter 会保留代码操作结构，
+附着在对应诊断上，每个操作包含使用核心字节坐标的 `TextEdit`。WASM 转换层会保留代码操作结构，
 同时把其中的编辑区间转换成 UTF-16。
 
 公开编辑操作具有全有或全无的边界：
@@ -109,25 +109,25 @@ parser 遇到局部语法错误时会插入 [`ExprKind::Error`](../../analyzer/s
 
 ## 编辑器帮助共享同一套语义签名模型
 
-`builtin_fn` 中的 [`ParamShape`](../../builtin_fn/src/signature.rs) 是规范参数模型，由 `head`、repeat
-group、`tail` 和 `repeat_min_groups` 组成；消费方必须使用共享的调用签名投影，不能自行重新推导可变
-参数或 tail 的位置。
+`builtin_fn` 中的 [`ParamShape`](../../builtin_fn/src/signature.rs) 是规范参数模型，由 `head`、重复参数组、
+`tail` 和 `repeat_min_groups` 组成；消费方必须使用共享的调用签名投影，不能自行重新推导可变参数或
+`tail` 的位置。
 
 签名帮助解析这套共享语义模型，并返回结构化 `DisplaySegment` 以及 `active_parameter`。WASM DTO 会原样
-映射这些 segment，而不是把它们压平成一个展示字符串，最终渲染方式由调用方决定。详细的投影、活动参数和
+映射这些片段，而不是把它们压平成一个展示字符串，最终渲染方式由调用方决定。详细的投影、活动参数和
 后缀形式展示规则参见[签名帮助规范](../signature-help.md)；更完整的声明与解析模型参见
 [Builtin Function Design](builtin-fn.md)。
 
 ## WASM 门面负责自己的配置边界
 
-[`Analyzer::new`](../../analyzer_wasm/src/lib.rs) 只接受 object，并拒绝未知的顶层 key。允许的 key 只有
-`properties` 和 `preferred_limit`；JavaScript 不能提供 `functions`，因为构造器始终安装 Rust
-builtin 目录。
+[`Analyzer::new`](../../analyzer_wasm/src/lib.rs) 只接受 JavaScript 对象，并拒绝未知的顶层字段。允许的
+字段只有 `properties` 和 `preferred_limit`；JavaScript 不能提供 `functions`，因为构造器始终安装
+Rust 内置函数目录。
 
 运行时反序列化会把缺省的 `properties` 当作空列表，并让缺省或为 `null` 的 `preferred_limit` 使用默认值
 `5`。当前生成的 TypeScript DTO 则显式声明两个字段：
 `{ properties: Property[], preferred_limit: number | null }`。因此，类型化集成应传入两个字段，尽管
-运行时允许省略。object 结构或字段值非法时，构造会以 `Invalid analyzer config` 失败。构造器拒绝行为和
+运行时允许省略。对象结构或字段值非法时，构造会以 `Invalid analyzer config` 失败。构造器拒绝行为和
 `null` 默认值由 [WASM 测试](../../analyzer_wasm/tests/analyze.rs)覆盖；生成类型的严格结构可直接查看
 [`wasm_dto.ts`](../../examples/vite/src/analyzer/generated/wasm_dto.ts)。
 
@@ -140,19 +140,19 @@ builtin 目录。
 不是返回一组裸 `InputSlot`。
 
 同步求值开始前，调用方必须加载所有必需列，包括只在未选中分支中被引用的列。
-`EvalInputsBuilder::finish` 会校验列是否缺失或重复、slot 布局、ABI kind、批次长度和 validity 长度。
+`EvalInputsBuilder::finish` 会校验列是否缺失或重复、输入槽位布局、`AbiKind`、批次长度和有效性长度。
 结构不匹配时返回 `InputContractError`；如果输入、执行掩码或行批次的布局或长度不兼容，求值入口也会拒绝。
-这些整项操作级失败都不会产生 kernel 结果。
+这些整项操作级失败都不会产生内核结果。
 
 求值期间，三种行状态保持相互独立：
 
 - 执行掩码表示某个控制流步骤是否应在该行运行；
 - `EvalBlock.ok` 记录该行是否求值成功；
-- column `Validity` 记录成功行是否包含非 null 值。
+- 列的 `Validity` 记录成功行是否包含非 null 值。
 
-当 `ok[i]` 为 false 时，该行的物理值只是占位符，下游 kernel 不得读取。对应 `EvalError` 只影响该行，
-其他行仍可完成。`if`、`ifs`、`&&`、`||` 和 lambda builtin 等由执行掩码驱动的控制流，只会为确实需要的
-行求值对应分支或参数计划，即使所有被引用输入列已经提前准备完毕。
+当 `ok[i]` 为 false 时，该行的物理值只是占位符，下游内核不得读取。对应 `EvalError` 只影响该行，
+其他行仍可完成。`if`、`ifs`、`&&`、`||` 和 lambda 内置函数等由执行掩码驱动的控制流，只会为确实
+需要的行求值对应分支或参数计划，即使所有被引用输入列已经提前准备完毕。
 
 完整的职责划分理由、IR 设计、null 语义和 evaluator 失败表参见
 [Evaluator Design](evaluator.zh-CN.md)。必需列清单和输入错误类别通过公开 evaluator 边界在
