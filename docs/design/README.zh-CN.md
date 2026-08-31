@@ -76,7 +76,7 @@ last_verified: 2026-08-30
 | --- | --- |
 | [`contracts.zh-CN.md`](contracts.zh-CN.md) | 跨 crate 的坐标、错误恢复、确定性、编辑与求值边界 |
 | [`builtin-fn.md`](builtin-fn.md) | 内置函数声明 DSL、调用签名解析、目录和 evaluator 契约 |
-| [`analyzer.md`](analyzer.md) | lexer、parser、AST、语义分析和后缀语法糖 |
+| [`analyzer.zh-CN.md`](analyzer.zh-CN.md) | 可恢复语法、语义归一化与校验，以及 analyzer 的职责边界 |
 | [`ide.md`](ide.md) | 补全、签名帮助、格式化和编辑应用 |
 | [`wasm-boundary.md`](wasm-boundary.md) | WASM 门面、DTO、UTF-16 转换和 JavaScript 接口 |
 | [`evaluator.zh-CN.md`](evaluator.zh-CN.md) | IR、Planner、kernel 和行批次求值 |

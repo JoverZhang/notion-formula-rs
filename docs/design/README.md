@@ -80,7 +80,7 @@ source-only, not incomplete translations.
 | --- | --- |
 | [`contracts.md`](contracts.md) | Cross-crate coordinates, recovery, determinism, editing, and evaluation boundaries |
 | [`builtin-fn.md`](builtin-fn.md) | Builtin declaration DSL, call-signature resolution, catalog, and evaluator contracts |
-| [`analyzer.md`](analyzer.md) | Lexer, parser, AST, semantic analysis, postfix sugar |
+| [`analyzer.md`](analyzer.md) | Recoverable syntax, semantic normalization and validation, analyzer boundaries |
 | [`ide.md`](ide.md) | Completion, signature help, formatting, edit application |
 | [`wasm-boundary.md`](wasm-boundary.md) | WASM facade, DTOs, UTF-16 conversion, JS API |
 | [`evaluator.md`](evaluator.md) | IR, planner, kernels, row-batch evaluation |
