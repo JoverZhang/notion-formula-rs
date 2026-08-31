@@ -80,29 +80,28 @@ Rules:
 
 ### Postfix sugar (member-call)
 
-The parser only accepts member *calls*: `receiver.method(...)`.
+The parser accepts member *calls*, `receiver.method(...)`, but not bare member access. Semantic
+analysis supports the member-call form only for builtins in `postfix_capable_builtin_names()`.
+That allowlist filters `builtins_functions()` through `is_postfix_capable`, which requires a
+deterministic receiver parameter and at least one additional argument slot.
 
-Inference:
+Before inference, `desugar_member_calls` rewrites an eligible call to
+`method(receiver, ...)`. Type inference, call resolution, and validation then use the same path as
+the prefix form. A receiver type mismatch is therefore reported as an ordinary argument mismatch.
 
-- `receiver.fn(arg1, ...)` may be treated as `fn(receiver, arg1, ...)` when:
-  - `fn` is in `postfix_capable_builtin_names()`, and
-  - `is_postfix_capable(sig)` is true
-- Where: `analyzer/src/analysis/infer.rs`, `analyzer/src/analysis/mod.rs`
+Any `MemberCall` left after desugaring is invalid. Its children are still analyzed, its result type
+is `Unknown`, and validation emits a diagnostic on the full member call:
 
-Validation:
+- a known callable, including the special-cased `prop`, reports that it does not support postfix
+  calls; and
+- an unknown method reports an unknown function.
 
-- Postfix-call validation applies when the builtin has `flat_params()` and `flat.len() > 1`.
-- Where: `analyzer/src/analysis/mod.rs` (`validate_expr` for `ExprKind::MemberCall`)
-
-Postfix allowlist:
-
-- `postfix_capable_builtin_names()` filters `builtins_functions()` with `is_postfix_capable(sig)`.
-- `is_postfix_capable` requires a deterministic "first parameter slot" and at least one additional displayed parameter slot.
-- Where: `analyzer/src/analysis/mod.rs`
+The desugaring pass lives in `analyzer/src/analysis/desugar.rs`; eligibility and validation live in
+`analyzer/src/analysis/mod.rs`.
 
 IDE completion for postfix (`receiver.$0` / `receiver.pre$0`):
 
-- Start from postfix-capable builtins.
+- Start from the same postfix-capable builtin allowlist.
 - Keep only functions where the first postfix parameter accepts receiver type (`ty_accepts`).
 - If receiver infers to `Unknown`, keep the full postfix-capable set.
 - Where: `ide/src/completion/items.rs`

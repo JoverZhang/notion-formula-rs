@@ -151,6 +151,50 @@ fn test_unknown_function_does_not_crash() {
 }
 
 #[test]
+fn test_postfix_capable_builtin_uses_normal_call_validation() {
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("1.if(2, 3)", ctx);
+    assert_single_diag(
+        diags,
+        "argument type mismatch: expected Boolean, got Number",
+        Span { start: 0, end: 1 },
+    );
+}
+
+#[test]
+fn test_non_postfix_capable_builtin_emits_error() {
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("true.sum()", ctx);
+    assert_single_diag(
+        diags,
+        "sum() does not support postfix calls",
+        Span { start: 0, end: 10 },
+    );
+}
+
+#[test]
+fn test_special_cased_prop_emits_unsupported_postfix_error() {
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("true.prop(\"Name\")", ctx);
+    assert_single_diag(
+        diags,
+        "prop() does not support postfix calls",
+        Span { start: 0, end: 17 },
+    );
+}
+
+#[test]
+fn test_unknown_postfix_method_emits_error() {
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("true.noSuchFn()", ctx);
+    assert_single_diag(
+        diags,
+        "unknown function: noSuchFn",
+        Span { start: 0, end: 15 },
+    );
+}
+
+#[test]
 fn test_sum_type_mismatch_emits_error() {
     let ctx = ctx_with_builtins();
     let diags = run_semantic("sum(\"a\")", ctx);
