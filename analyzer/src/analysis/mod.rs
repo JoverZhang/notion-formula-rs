@@ -195,25 +195,14 @@ fn validate_expr(expr: &Expr, ctx: &Context, map: &SemanticMap, diags: &mut Vec<
                 validate_expr(arg, ctx, map, diags);
             }
 
-            let Some(sig) = lookup_function(ctx, method.text.as_str()) else {
-                return;
+            // Postfix-capable builtins were desugared into normal calls before inference.
+            // Any member call left here is therefore unsupported or unknown.
+            let message = if lookup_function(ctx, method.text.as_str()).is_some() {
+                format!("{}() does not support postfix calls", method.text)
+            } else {
+                format!("unknown function: {}", method.text)
             };
-
-            // Postfix form: `receiver.fn(arg1, ...)` is treated like `fn(receiver, arg1, ...)`.
-            if !postfix_capable_builtin_names().contains(sig.name.as_str()) {
-                return;
-            }
-            let Some(flat) = sig.flat_params() else {
-                return;
-            };
-            if flat.len() <= 1 {
-                return;
-            }
-
-            let mut all_args: Vec<Expr> = Vec::with_capacity(1 + args.len());
-            all_args.push((**receiver).clone());
-            all_args.extend(args.iter().cloned());
-            validate_call(expr, method.text.as_str(), sig, &all_args, map, diags);
+            emit_error(diags, expr.span, message);
         }
         ExprKind::ImplicitLambda { body, .. } => {
             validate_expr(body, ctx, map, diags);
