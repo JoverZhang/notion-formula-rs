@@ -92,7 +92,8 @@ the prefix form. A receiver type mismatch is therefore reported as an ordinary a
 Any `MemberCall` left after desugaring is invalid. Its children are still analyzed, its result type
 is `Unknown`, and validation emits a diagnostic on the full member call:
 
-- a known function reports that it does not support postfix calls; and
+- a known callable, including the special-cased `prop`, reports that it does not support postfix
+  calls; and
 - an unknown method reports an unknown function.
 
 The desugaring pass lives in `analyzer/src/analysis/desugar.rs`; eligibility and validation live in

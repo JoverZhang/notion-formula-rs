@@ -197,7 +197,8 @@ fn validate_expr(expr: &Expr, ctx: &Context, map: &SemanticMap, diags: &mut Vec<
 
             // Postfix-capable builtins were desugared into normal calls before inference.
             // Any member call left here is therefore unsupported or unknown.
-            let message = if lookup_function(ctx, method.text.as_str()).is_some() {
+            let method_name = method.text.as_str();
+            let message = if method_name == "prop" || lookup_function(ctx, method_name).is_some() {
                 format!("{}() does not support postfix calls", method.text)
             } else {
                 format!("unknown function: {}", method.text)

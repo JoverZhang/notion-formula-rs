@@ -173,6 +173,17 @@ fn test_non_postfix_capable_builtin_emits_error() {
 }
 
 #[test]
+fn test_special_cased_prop_emits_unsupported_postfix_error() {
+    let ctx = ctx_with_builtins();
+    let diags = run_semantic("true.prop(\"Name\")", ctx);
+    assert_single_diag(
+        diags,
+        "prop() does not support postfix calls",
+        Span { start: 0, end: 17 },
+    );
+}
+
+#[test]
 fn test_unknown_postfix_method_emits_error() {
     let ctx = ctx_with_builtins();
     let diags = run_semantic("true.noSuchFn()", ctx);

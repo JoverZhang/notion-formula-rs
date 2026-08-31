@@ -46,11 +46,11 @@ argument compatibility, staged lambda inference, and return resolvers; Analyzer 
 consume that result instead of maintaining another resolver. `SemanticMap` exposes the same
 final records to downstream consumers without requiring them to bind a call again.
 
-Postfix member calls use the same semantic path as prefix calls. Before inference,
+Postfix-capable member calls use the same semantic path as prefix calls. Before inference,
 `receiver.fn(args...)` is rewritten to `fn(receiver, args...)` only when `fn` is a
 postfix-capable builtin. A member call left after that rewrite produces a semantic diagnostic:
-known functions report that they do not support postfix calls, and unknown names report an
-unknown function.
+known callables, including the special-cased `prop`, report that they do not support postfix
+calls, and unknown names report an unknown function.
 
 ## Module map
 
