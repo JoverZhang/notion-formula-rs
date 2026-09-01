@@ -22,7 +22,7 @@ Builtin function 为公式语言提供 text、number、date、list、control flo
 
 带有 `#[unsupported]` 的声明不会进入 callable set。调用这类名称与调用其他未知函数的可观察结果相同：analysis 报告 unknown function。公式接口中没有单独的 unsupported-function 类别。
 
-Semantic analysis、editor services 和 evaluator contract generation 共用这份 catalog。只有受支持的声明才属于当前公式接口；Rust 中出现一个声明，并不表示这里承诺提供所有语法相似的上游函数。
+受支持的声明共同决定 analysis、editor assistance 和 evaluation 中公式能够看到的 callable set。只有受支持的声明才属于当前公式接口；Rust 中出现一个声明，并不表示这里承诺提供所有语法相似的上游函数。
 
 ## Call 必须符合声明的 argument shape
 
@@ -32,9 +32,9 @@ Signature 可以组合 fixed parameter、optional parameter、重复 parameter g
 
 部分 parameter 会绑定 generic type、接受 union type，或表示 list 与 binding 操作使用的 implicit function。同一次 call 会复用相同的 type binding，因此已经观察到的 argument type 可以进一步约束后续 parameter 和 result type。[`builtin_fn/src/resolution.rs`](../../../builtin_fn/src/resolution.rs) 是这些共用 shape 与 type 规则的实现入口。
 
-## Analysis 有助于编辑，但不是 runtime gate
+## Analysis 先于 evaluation，但不能预判 row outcome
 
-Semantic analysis 会按照解析后的 signature 检查已知 argument type。尚未完成的表达式、未知 value，或仍包含 `unknown` 的 type 会保持 indeterminate，而不是立刻成为 type mismatch。这样可以在公式编写过程中持续提供 editor feedback，但不能证明每个 row 都能成功求值。
+Semantic analysis 会按照解析后的 signature 检查已知 argument type。Best-effort analysis 可以为未完成的 source 返回有用的 type 和 diagnostic，但受支持的 evaluation 只从通过 syntax 与 semantic validation 的公式开始。在 call 内部，未知 value 或仍包含 `unknown` 的 type 会保持 indeterminate，而不是立刻成为 type mismatch。即使 call 通过 analysis，个别 row 仍可能在 runtime 失败。
 
 Shape error 的优先级高于 argument type error。Shape 有效后，已知且不兼容的 argument 才会产生 type diagnostic。Diagnostic 文本用于说明问题，不是 machine-readable compatibility key。
 
@@ -42,7 +42,9 @@ Analyzer 在 [`analyzer/src/analysis/mod.rs`](../../../analyzer/src/analysis/mod
 
 ## Evaluation 可以是 eager，也可以是 controlled
 
-普通 value function 会先求值并 materialize 当前 active arguments，再执行函数。Controlled function 接收尚未求值的 plan，并按 active row 决定实际需要的 branch、binding expression 或 list element。Conditional function 与 callback-based function 因此可以跳过未选中的工作及其中的错误。
+普通 value function 会先求值并 materialize 当前 active arguments，再执行函数。Controlled function 接收尚未求值的 plan，并按 active row 选择 conditional branch、binding body 或 callback application。
+
+List expression 会先为每个 active row 完整构造，然后 controlled list function 才应用 callback，因此构造 list 时的 error 不会被隐藏。Callback 只应用于 active 的 row-element pair。`find`、`findIndex`、`some` 和 `every` 可以在结果确定后停止处理后续 element；其他 callback-based function 不承诺这种提前停止。真正被跳过的 branch 或 callback application 不会产生可观察 error。
 
 Null 与 failure behavior 由各 function family 分别定义，不能假定所有 builtin 都遵循统一的 null propagation。例如，有些函数把 null 解释为空输入，而普通 typed operation 在必需 value 为 null 时通常返回 null。无效 regex、date、numeric domain 或其他 argument 可能让对应 row 失败。
 

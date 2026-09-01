@@ -22,7 +22,7 @@ Builtin functions extend the formula language with text, number, date, list, con
 
 A declaration marked `#[unsupported]` is excluded from the callable set. Calling its name has the same observable result as calling any other unknown function: analysis reports an unknown function. There is no separate unsupported-function category in the formula interface.
 
-The catalog is shared by semantic analysis, editor services, and evaluator contract generation. A function is part of the current formula surface only when its declaration is supported; a Rust declaration alone is not a promise that every syntactically similar upstream function exists here.
+Supported declarations determine the formula-visible callable set across analysis, editor assistance, and evaluation. A function is part of the current formula surface only when its declaration is supported; a Rust declaration alone is not a promise that every syntactically similar upstream function exists here.
 
 ## Calls follow the declared argument shape
 
@@ -32,9 +32,9 @@ Signatures can combine fixed parameters, optional parameters, repeated parameter
 
 Some parameters bind a generic type, accept a union of types, or represent an implicit function used by list and binding operations. The same binding is reused across the call, so observed argument types can refine later parameters and the result type. [`builtin_fn/src/resolution.rs`](../../../builtin_fn/src/resolution.rs) is the implementation anchor for these shared shape and type rules.
 
-## Analysis is useful but not a runtime gate
+## Analysis precedes evaluation but cannot predict row outcomes
 
-Semantic analysis checks known argument types against the resolved signature. An incomplete expression, an unknown value, or a type that still contains `unknown` remains indeterminate rather than becoming an immediate type mismatch. This supports editor feedback while a formula is being written, but it does not prove that every row will evaluate successfully.
+Semantic analysis checks known argument types against the resolved signature. Best-effort analysis can still return useful types and diagnostics for incomplete source, but supported evaluation begins only after syntax and semantic validation succeed. Within a call, an unknown value or a type that still contains `unknown` remains indeterminate rather than becoming an immediate type mismatch. Even a call that passes analysis can still fail for individual rows at runtime.
 
 Shape errors take precedence over argument type errors. Once the shape is valid, a known incompatible argument produces a type diagnostic. Diagnostic prose is descriptive rather than a machine-readable compatibility key.
 
@@ -42,7 +42,9 @@ The analyzer applies these rules in [`analyzer/src/analysis/mod.rs`](../../../an
 
 ## Evaluation may be eager or controlled
 
-Ordinary value functions evaluate and materialize their active arguments before running the function. Controlled functions receive unevaluated plans and decide which branches, bound expressions, or list elements are needed for each active row. This is what lets conditional and callback-based functions avoid errors in work that was not selected.
+Ordinary value functions evaluate and materialize their active arguments before running the function. Controlled functions receive unevaluated plans and can select conditional branches, binding bodies, or callback applications for each active row.
+
+A list expression is fully constructed for every active row before a controlled list function applies its callback, so errors from constructing that list are not hidden. Callback applications run only for active row-element pairs. `find`, `findIndex`, `some`, and `every` can stop applying the callback to later elements after their result is known; other callback-based functions do not promise that early stop. Errors in a branch or callback application that was actually skipped are not observed.
 
 Null and failure behavior is defined by each function family; there is no universal rule that every builtin propagates null. For example, some functions interpret null as empty input, while ordinary typed operations commonly return null when a required value is null. Invalid regexes, dates, numeric domains, or other arguments can fail the affected row.
 
