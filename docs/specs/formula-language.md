@@ -21,7 +21,7 @@ Notion-style syntax is a starting vocabulary, not a compatibility promise. Only 
 ## Write formulas from these source forms
 
 - Boolean literals are `true` and `false`.
-- Number literals contain decimal digits, may have a fractional part whose dot is followed by at least one digit, and may have an `e` or `E` exponent with an optional sign. Examples include `12`, `3.14`, and `2.5e-3`.
+- Number literals contain decimal digits, may have a fractional part whose dot is followed by at least one digit, and may have an `e` or `E` exponent with an optional sign and at least one exponent digit. Examples include `12`, `3.14`, and `2.5e-3`.
 - String literals use double quotes. The supported escapes are `\n`, `\t`, `\"`, and `\\`.
 - List literals contain comma-separated expressions in brackets, such as `[1, "x"]`. A trailing comma is not supported.
 - Identifiers start with `_` or a Unicode alphabetic character, followed by `_` or Unicode alphanumeric characters. `true`, `false`, and `not` are reserved lowercase words.
@@ -69,9 +69,9 @@ After their operands evaluate successfully and are non-null, ordinary operators 
 | `+` | either operand is text | text concatenation after converting the other operand to text |
 | `-`, `*`, `/`, `%`, `^` | two numbers | subtraction, multiplication, division, remainder, or exponentiation |
 | `==`, `!=` | any two non-null values | value equality or inequality; values of different kinds are unequal |
-| `<`, `<=`, `>=`, `>` | two numbers, two texts, two booleans, or two dates | same-kind ordering |
+| `<`, `<=`, `>=`, `>` | two orderable numbers, two texts, two booleans, or two dates | same-kind ordering |
 
-Text concatenation renders integral numbers without a `.0`, booleans as lowercase `true` or `false`, dates as their epoch-millisecond integer, and lists as bracketed comma-separated values whose items use the same conversion. Ordering is numeric for numbers, lexical for text, `false` before `true` for booleans, and chronological for dates.
+Text concatenation renders integral numbers without a `.0`, booleans as lowercase `true` or `false`, dates as their epoch-millisecond integer, and lists as bracketed comma-separated values whose items use the same conversion. Ordering is numeric for numbers, lexical for text, `false` before `true` for booleans, and chronological for dates. `NaN` is not an orderable number; a relational comparison involving it produces a row-level type failure.
 
 Division or remainder by zero fails the affected row. Other unsupported operand combinations produce a row-level type failure. Equality is the exception: different non-null value kinds compare as unequal rather than failing. These rules are implemented in [`evaluator/src/runtime/operators.rs`](../../evaluator/src/runtime/operators.rs).
 

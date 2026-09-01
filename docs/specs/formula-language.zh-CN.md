@@ -21,7 +21,7 @@ Notion-style syntax 只是起始词汇，并不表示兼容性承诺。只有本
 ## 公式 source 只支持这些形式
 
 - Boolean literal 为 `true` 和 `false`。
-- Number literal 由十进制数字组成，可以带小数部分；小数点后必须至少有一位数字。也可以带 `e` 或 `E` exponent，exponent 前可以有正负号。例如 `12`、`3.14` 和 `2.5e-3`。
+- Number literal 由十进制数字组成，可以带小数部分；小数点后必须至少有一位数字。也可以带 `e` 或 `E` exponent，exponent 前可以有正负号，后面必须至少有一位数字。例如 `12`、`3.14` 和 `2.5e-3`。
 - String literal 使用双引号，支持 `\n`、`\t`、`\"` 和 `\\` 四种 escape。
 - List literal 在方括号内放置逗号分隔的 expression，例如 `[1, "x"]`，不支持 trailing comma。
 - Identifier 以 `_` 或 Unicode alphabetic character 开头，后续可以是 `_` 或 Unicode alphanumeric character。小写的 `true`、`false` 和 `not` 是 reserved word。
@@ -51,11 +51,11 @@ Expression 从高到低按以下优先级结合：
 
 ## Analysis 只提供 best-effort 结果
 
-Analysis 需要在 source 尚未写完时继续提供有用结果。Lexer 或 parser diagnostic 可以与 recover 后的 syntax 同时存在；semantic analysis 可以把未绑定 identifier 或无法确定的 operator 标为 `unknown`；两个已知但不同的 branch type 可以形成 union type。
+Analysis 需要在 source 尚未写完时继续提供有用结果。Lexer 或 parser diagnostic 可以与恢复后的 syntax 同时存在；semantic analysis 可以把未绑定 identifier 或无法确定的 operator 标为 `unknown`；两个已知但不同的 branch type 可以形成 union type。
 
 这些结果不是 evaluation 一定成功的编译期证明。例如，`"count: " + 3` 可能推断为 `unknown`，但仍能得到 text；未绑定 identifier 在 analysis 时也可能保持 `unknown`，直到某个 row 真正执行它时才失败。当前 inference 规则的实现入口是 [`analyzer/src/analysis/infer.rs`](../../analyzer/src/analysis/infer.rs)。
 
-受支持的 evaluation 要求 source 没有 lexer 或 parser diagnostic，并且 expression 能通过 semantic preparation。Parser 能够 recover 出 syntax tree，并不表示错误 source 可以进入受支持的 evaluation。反过来，inference 不够精确本身也不等于拒绝。Formula diagnostic 的文字用于解释问题，不是 machine-readable compatibility key；集成方不得依赖某句英文的精确写法来分支。
+受支持的 evaluation 要求 source 没有 lexer 或 parser diagnostic，并且 expression 能通过 semantic preparation。Parser 即使恢复出 syntax tree，也不表示错误 source 可以进入受支持的 evaluation。反过来，inference 不够精确本身也不等于拒绝。Formula diagnostic 的文字用于解释问题，不是 machine-readable compatibility key；集成方不得依赖某句英文的精确写法来分支。
 
 ## 普通 operator 逐 row 求值
 
@@ -69,9 +69,9 @@ Operand 成功求值且非 null 后，普通 operator 遵循以下规则：
 | `+` | 任一 operand 为 text | 把另一个 operand 转为 text 后拼接 |
 | `-`、`*`、`/`、`%`、`^` | 两个 number | 减法、乘法、除法、余数或幂运算 |
 | `==`、`!=` | 任意两个非 null value | value 相等或不等；不同 kind 的 value 不相等 |
-| `<`、`<=`、`>=`、`>` | 两个 number、两个 text、两个 boolean 或两个 date | 同 kind 排序 |
+| `<`、`<=`、`>=`、`>` | 两个可排序的 number、两个 text、两个 boolean 或两个 date | 同 kind 排序 |
 
-Text 拼接时，整数不会带 `.0`，boolean 使用小写 `true` 或 `false`，date 使用 epoch-millisecond integer，list 使用方括号和逗号分隔，其中每个 item 递归使用同一转换。Number 按数值排序，text 按字典序排序，boolean 中 `false` 位于 `true` 之前，date 按时间先后排序。
+Text 拼接时，整数不会带 `.0`，boolean 使用小写 `true` 或 `false`，date 使用 epoch-millisecond integer，list 使用方括号和逗号分隔，其中每个 item 递归使用同一转换。Number 按数值排序，text 按字典序排序，boolean 中 `false` 位于 `true` 之前，date 按时间先后排序。`NaN` 不可排序；只要 relational comparison 的任一 operand 为 `NaN`，对应 row 就会产生 type failure。
 
 除以零或对零取余会让对应 row 失败。其他不受支持的 operand 组合会产生 row-level type failure。Equality 是例外：两个非 null value 的 kind 不同时，结果是不相等，而不是失败。这些规则实现在 [`evaluator/src/runtime/operators.rs`](../../evaluator/src/runtime/operators.rs)。
 
