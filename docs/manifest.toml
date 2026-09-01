@@ -8,7 +8,9 @@ bilingual_directories = [
 
 english_only_files = []
 
-neutral_redirect_files = []
+neutral_redirect_files = [
+  "evaluator/README.md",
+]
 
 control_files = [
   "AGENTS.md",
@@ -61,7 +63,6 @@ legacy_files = [
   "docs/README.md",
   "docs/README.zh-CN.md",
   "docs/signature-help.md",
-  "evaluator/README.md",
   "examples/vite/README.md",
   "ide/README.md",
 ]
