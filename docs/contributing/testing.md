@@ -24,7 +24,8 @@ generated expectations.
 | Changed area | First command | What it exercises |
 | --- | --- | --- |
 | Documentation structure, metadata, translations, or links | `just docs-check` | The checker tests and the repository documentation scan |
-| Builtin declarations, macro syntax, call shapes, or resolution | `cargo test -p builtin_fn` | Runtime resolver tests plus macro pass/fail compilation |
+| Builtin declarations, call shapes, or resolution | `cargo test -p builtin_fn` | Resolver and declaration-DSL behavior, including macro pass/fail compilation |
+| Procedural macro parsing or expansion | `cargo test -p builtin_fn_macros` and `cargo test -p builtin_fn --test macro_ui` | Macro implementation units and the consuming crate's compile-pass/compile-fail contract |
 | Lexing, parsing, semantic analysis, or diagnostics | `cargo test -p analyzer` | Analyzer unit, integration, and diagnostic golden tests |
 | Formula preparation or row evaluation | `cargo test -p evaluator` | Generated contracts, input/runtime invariants, and builtin behavior |
 | Completion, signature help, formatting, or text edits | `cargo test -p ide` | IDE unit, integration, and formatting golden tests |
@@ -41,17 +42,20 @@ dependencies and the generated package first. The scripts in
 [`examples/vite/package.json`](../../examples/vite/package.json) are the authority for the individual
 frontend commands.
 
-For a cross-cutting Rust change, use `just test` after the focused crate test. It runs the Rust
-workspace package suites and the Vite example tests through their repository recipes. Use `just
-verify` when the change also needs the complete dependency, formatting, lint, type-check, documentation,
-and test workflow. `just docker-test` runs that same verification recipe in the repository's CI image.
+For a cross-cutting Rust change, use `just test` after the focused crate test. It runs the
+repository-selected Rust suites and the Vite example tests through their `justfile` recipes. It
+does not mean `cargo test --workspace`; use that Cargo command when every current workspace member,
+including `builtin_fn_macros`, must run. Use `just verify` when the change also needs the complete
+dependency, formatting, lint, type-check, documentation, and test workflow. `just docker-test` runs
+that same verification recipe in the repository's CI image.
 
 ## Match the test shape to the risk
 
 Prefer a test at the narrowest stable public seam that can observe the regression:
 
 - Unit tests isolate algorithms and state transitions inside one crate.
-- Integration tests exercise crate boundaries, generated contracts, or complete service calls.
+- Integration tests exercise crate boundaries, generated contracts, or a prepared formula with
+  caller-supplied inputs.
 - Compile-pass and compile-fail tests protect the builtin declaration macro's Rust-facing contract.
 - Golden fixtures make structured diagnostics, formatted formulas, and row results reviewable as
   text.
@@ -96,7 +100,8 @@ Before handing off a change:
 
 1. Run the focused command for every boundary the change touches.
 2. Run `just docs-check` when Markdown, documentation tooling, or local links changed.
-3. Run `just check` when Rust, WASM, or frontend source changed.
+3. Run `just check` when Rust, WASM, or frontend source changed. On a clean checkout, run `just
+   deps` first, or use `just verify`, which includes dependency preparation.
 4. Run `just test` for a cross-crate or cross-language behavior change; use `just verify` when the
    complete repository workflow is warranted.
 

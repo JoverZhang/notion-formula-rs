@@ -22,7 +22,8 @@ last_verified: 2026-09-01
 | 修改范围 | 优先运行 | 覆盖内容 |
 | --- | --- | --- |
 | 文档结构、metadata、翻译或链接 | `just docs-check` | Checker 自身测试和仓库文档扫描 |
-| 内置函数声明、macro 语法、调用形状或解析 | `cargo test -p builtin_fn` | Runtime resolver 测试，以及 macro 编译成功/失败测试 |
+| 内置函数声明、调用形状或解析 | `cargo test -p builtin_fn` | Resolver 与声明 DSL 行为，包括 macro 编译成功/失败测试 |
+| Procedural macro 的解析或展开 | `cargo test -p builtin_fn_macros` 和 `cargo test -p builtin_fn --test macro_ui` | Macro 实现单元，以及消费方 crate 的编译成功/失败 contract |
 | 词法、语法、语义分析或诊断 | `cargo test -p analyzer` | Analyzer 单元测试、集成测试和诊断 golden 测试 |
 | 公式准备或逐行求值 | `cargo test -p evaluator` | 生成 contract、输入/runtime 不变量和内置函数行为 |
 | 补全、签名帮助、格式化或文本编辑 | `cargo test -p ide` | IDE 单元测试、集成测试和格式化 golden 测试 |
@@ -36,17 +37,18 @@ Vite shortcut 会安装锁定版本的 Node 依赖并重新构建 WASM package�
 `pnpm -C examples/vite test` 或 `test:e2e`，需要先准备依赖和生成的 package。各条前端命令以
 [`examples/vite/package.json`](../../examples/vite/package.json) 中的 script 为准。
 
-修改跨越多个 Rust crate 时，先完成 focused crate 测试，再运行 `just test`。它会通过仓库 recipe 执行
-Rust workspace 中各 package 的测试和 Vite 示例测试。如果还需要完整覆盖依赖准备、格式检查、lint、
-type check、文档检查和测试，运行 `just verify`。`just docker-test` 会在仓库的 CI image 中执行同一套
-verification recipe。
+修改跨越多个 Rust crate 时，先完成 focused crate 测试，再运行 `just test`。它会通过 `justfile` recipe
+执行仓库选定的 Rust 测试和 Vite 示例测试，但并不等于 `cargo test --workspace`。如果需要运行当前所有
+workspace member，包括 `builtin_fn_macros`，应使用这条 Cargo 命令。如果还需要完整覆盖依赖准备、格式
+检查、lint、type check、文档检查和测试，运行 `just verify`。`just docker-test` 会在仓库的 CI image 中
+执行同一套 verification recipe。
 
 ## 根据风险选择测试形态
 
 优先在能够观察到回归的最窄稳定边界上编写测试：
 
 - 单元测试隔离一个 crate 内部的算法和状态变化。
-- 集成测试覆盖 crate 边界、生成 contract 或完整的 service 调用。
+- 集成测试覆盖 crate 边界、生成 contract，或使用调用方输入执行一份 prepared formula。
 - 编译成功/失败测试保护内置函数声明 macro 的 Rust 侧 contract。
 - Golden fixture 把结构化诊断、格式化公式和逐行结果变成可 review 的文本。
 - WASM 与前端测试覆盖 native Rust 测试无法观察的转换和交互行为。
@@ -85,7 +87,8 @@ Bless 完成后，用不带 `BLESS=1` 的同一条测试重新验证。修改过
 
 1. 对修改触及的每个边界运行对应的 focused 命令。
 2. Markdown、文档工具或本地链接变化时，运行 `just docs-check`。
-3. Rust、WASM 或前端源码变化时，运行 `just check`。
+3. Rust、WASM 或前端源码变化时，运行 `just check`。Clean checkout 应先运行 `just deps`；也可以直接
+   使用包含依赖准备的 `just verify`。
 4. 行为变化跨 crate 或语言时，运行 `just test`；确实需要完整仓库流程时，再运行 `just verify`。
 
 把实际运行的命令和结果记录在 PR 中。长期文档维护测试策略，PR 则保留本次修改实际经过了哪些验证。
