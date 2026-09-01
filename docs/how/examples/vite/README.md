@@ -21,12 +21,9 @@ Current TypeScript implementation for maintainers who need to change or debug th
 
 Everything described here about panel identity, debounce delays, grouped rows, chips, focus,
 popover layout, and error fallback is **example policy**. It is not a stable product contract. The
-user-visible guarantees belong to the
-[editor-services specification](https://github.com/JoverZhang/notion-formula-rs/blob/master/docs/specs/editor-services.md)
-and the
-[WASM API specification](https://github.com/JoverZhang/notion-formula-rs/blob/master/docs/specs/wasm-api.md).
-This guide explains how the demo consumes those surfaces; it does not redefine Analyzer, IDE, or
-WASM algorithms.
+user-visible guarantees belong to the editor-services and WASM API specifications, whose repository
+paths are `docs/specs/editor-services.*` and `docs/specs/wasm-api.*`. This guide explains how the
+demo consumes those surfaces; it does not redefine Analyzer, IDE, or WASM algorithms.
 
 ## Startup creates one boundary client and two panel identities
 
@@ -87,8 +84,9 @@ reimplement the Rust operations.
 Help has one additional demo adapter. `buildCompletionState` turns absent completion or signature
 fields into empty JavaScript values and drops non-number preferred-index entries; the row planner
 performs the integer and bounds checks. Its safe wrapper catches any thrown help call and returns an
-empty completion/signature state. This makes suggestion UI disappear on a boundary failure without
-converting that fallback into a WASM guarantee.
+empty completion/signature state. On an active panel, the completion shell stays visible with
+`No suggestions`, and existing diagnostic content can remain. This fallback clears suggestion data;
+it is not a WASM guarantee.
 
 ## One edit drives two independent update loops
 
@@ -121,6 +119,11 @@ formula has its own debounce timer, so editing `f1` does not cancel an `f2` anal
 The help loop is panel-local and runs after either a document or selection change. It always reads
 the current CodeMirror document and selection head when its 120 ms timer fires. Completion state
 can therefore update while a panel is inactive, but only the active panel renders it.
+
+Each `EditorView` installs CodeMirror `history()` and `historyKeymap`. An application keymap handles
+ArrowUp, ArrowDown, Escape, Tab, and Enter for the active completion UI before the history and
+default keymaps run. This preserves ordinary undo/redo while allowing visible suggestions to
+consume their own navigation and apply keys.
 
 JavaScript strings and CodeMirror positions both use UTF-16 code units, matching the example-facing
 WASM DTOs. The TypeScript client passes those positions directly. UTF-16-to-Rust conversion belongs
@@ -204,10 +207,12 @@ interaction rules are UI policy; they do not change property-reference syntax.
 
 [`chip_spans.ts`](../../../../examples/vite/src/chip_spans.ts) validates sorted, non-overlapping,
 in-bounds chip spans and builds a map that compresses each raw chip range to one display position.
-If validation fails, the panel drops the chip map and chip decorations instead of exposing an
-inconsistent coordinate space. Diagnostics intersecting a chip are expanded to the full atomic
-range for CodeMirror and mark that chip in the UI. Valid chips can therefore remain visible even
-when a later syntax error produces diagnostics elsewhere in the source.
+The panel builds and dispatches decorations first; a failure in that stage clears the chip ranges
+and decorations. It then builds the coordinate map separately. A map-validation failure sets only
+that map to `null`, so decorations already dispatched remain while raw-to-chip coordinate mapping
+is unavailable. Diagnostics intersecting a chip are expanded to the full atomic range for
+CodeMirror and mark that chip in the UI. Valid chips can therefore remain visible even when a later
+syntax error produces diagnostics elsewhere in the source.
 
 ## Focus owns suggestion visibility, not analysis
 
@@ -232,9 +237,10 @@ The Current example intentionally uses different fallback policies at different 
 | --- | --- | --- |
 | WASM initialization rejects | `start()` rejects and the entrypoint logs the error; panels never become ready | `main.ts`, `AppVM.start` |
 | Analyze throws after initialization | replace the result with one zero-width `analysis failed` diagnostic, clear tokens/type, and set `error` | `AppVM.runAnalyze` |
-| Help throws | return empty completion and signature state | `safeBuildCompletionState` |
+| Help throws | clear completion/signature data; an active panel shows `No suggestions` | `safeBuildCompletionState` |
 | Format or Quick Fix throws | leave the editor unchanged | button handlers in `formula_panel_view.ts` |
-| Token or chip ranges are invalid | omit the unsafe decoration or chip mapping | `editor_decorations.ts`, `chip_spans.ts` |
+| Token or chip-decoration construction fails | omit the unsafe decorations | `editor_decorations.ts`, `formula_panel_view.ts` |
+| Chip offset-map validation fails | retain dispatched decorations but omit the coordinate map | `chip_spans.ts`, `formula_panel_view.ts` |
 
 These fallbacks keep the demo interactive and make failures observable at useful seams, but their
 messages and silence are not compatibility promises. When a stable editor or WASM behavior is
@@ -278,7 +284,8 @@ Start with the layer that first owns the symptom:
   or Analyzer owner. Do not patch the result in the demo presentation layer.
 
 [`debug/debug_bridge.ts`](../../../../examples/vite/src/debug/debug_bridge.ts) supports browser-level
-inspection. It registers handles by formula ID and exposes source/status, Analyzer and CodeMirror
-diagnostics, token and chip ranges, raw-to-chip coordinate mapping, and selection helpers through
-`window.__nf_debug`. Registration is enabled in development and tests, or explicitly with
-`?debug=1`; a normal production build without that query does not expose the bridge.
+inspection. It registers handles by formula ID. `getState` exposes source, output type, diagnostic
+count, and token count; the rest of `window.__nf_debug` exposes Analyzer and CodeMirror diagnostics,
+token and chip ranges, raw-to-chip coordinate mapping, and selection helpers. Registration is
+enabled in development and tests, or explicitly with `?debug=1`; a normal production build without
+that query does not expose the bridge.
