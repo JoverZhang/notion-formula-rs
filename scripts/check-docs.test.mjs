@@ -369,6 +369,50 @@ const fixtures = [
     },
   },
   {
+    name: "rejects TOML assignments joined on one line",
+    repository: {
+      docs: {
+        "manifest.toml": documentationManifest().replace(
+          "\n\nignored_directories",
+          "ignored_directories",
+        ),
+      },
+    },
+    expected: {
+      documentCount: 0,
+      errors: [
+        "docs/manifest.toml: ignored_directories must contain exactly .agent",
+        "docs/manifest.toml: missing category ignored_directories",
+        "docs/manifest.toml: unexpected syntax after control_files",
+      ],
+      migrationDebt: [],
+      pairCount: 0,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "rejects a TOML key split from its value",
+    repository: {
+      docs: {
+        "manifest.toml": documentationManifest().replace(
+          "ignored_directories = [",
+          "ignored_directories\n= [",
+        ),
+      },
+    },
+    expected: {
+      documentCount: 0,
+      errors: [
+        "docs/manifest.toml: expected = after ignored_directories",
+        "docs/manifest.toml: ignored_directories must contain exactly .agent",
+        "docs/manifest.toml: missing category ignored_directories",
+      ],
+      migrationDebt: [],
+      pairCount: 0,
+      translationDebt: [],
+    },
+  },
+  {
     name: "reports a missing synced counterpart",
     repository: {
       docs: {

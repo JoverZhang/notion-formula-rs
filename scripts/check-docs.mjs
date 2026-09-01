@@ -86,10 +86,20 @@ const APPROVED_LEGACY_FILES = new Set([
   "docs/design/builtin-fn.md",
   "docs/design/demo-vite.md",
   "docs/design/drift-tracker.md",
+  "docs/design/README.md",
+  "docs/design/README.zh-CN.md",
+  "docs/design/analyzer.md",
+  "docs/design/analyzer.zh-CN.md",
+  "docs/design/contracts.md",
+  "docs/design/contracts.zh-CN.md",
+  "docs/design/evaluator.md",
+  "docs/design/evaluator.zh-CN.md",
   "docs/design/ide.md",
   "docs/design/testing.md",
   "docs/design/wasm-boundary.md",
   "docs/glossary.md",
+  "docs/README.md",
+  "docs/README.zh-CN.md",
   "docs/signature-help.md",
   "evaluator/README.md",
   "examples/vite/README.md",
@@ -182,7 +192,7 @@ function parseTomlArray(arraySource, category) {
 }
 
 function parseManifest(contents) {
-  const source = stripTomlComments(contents);
+  const source = stripTomlComments(contents).replaceAll("\r\n", "\n");
   const manifest = Object.fromEntries(MANIFEST_CATEGORIES.map((category) => [category, []]));
   const errors = [];
   const seenCategories = new Set();
@@ -199,13 +209,13 @@ function parseManifest(contents) {
     }
     const category = keyMatch[1];
     index += keyMatch[0].length;
-    while (/\s/.test(source[index] ?? "")) index += 1;
+    while (/[ \t]/.test(source[index] ?? "")) index += 1;
     if (source[index] !== "=") {
       errors.push(`${MANIFEST_PATH}: expected = after ${category}`);
       break;
     }
     index += 1;
-    while (/\s/.test(source[index] ?? "")) index += 1;
+    while (/[ \t]/.test(source[index] ?? "")) index += 1;
     if (source[index] !== "[") {
       errors.push(`${MANIFEST_PATH}: ${category} must be an array`);
       break;
@@ -246,6 +256,11 @@ function parseManifest(contents) {
       seenCategories.add(category);
     }
     index += 1;
+    while (/[ \t]/.test(source[index] ?? "")) index += 1;
+    if (index < source.length && source[index] !== "\n") {
+      errors.push(`${MANIFEST_PATH}: unexpected syntax after ${category}`);
+      break;
+    }
   }
 
   for (const category of REQUIRED_MANIFEST_CATEGORIES) {
