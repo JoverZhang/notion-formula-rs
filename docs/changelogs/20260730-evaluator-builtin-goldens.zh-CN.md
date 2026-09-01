@@ -33,5 +33,5 @@ context。
 
 ## Links
 
-- `docs/design/builtin-fn.md`
-- `docs/design/evaluator.md`
+- [Builtin declaration 实现](../how/builtin_fn/README.zh-CN.md)
+- [Evaluator 实现](../how/evaluator/README.zh-CN.md)

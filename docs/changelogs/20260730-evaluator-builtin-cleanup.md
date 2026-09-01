@@ -38,5 +38,5 @@ remain unchanged.
 
 ## Links
 
-- `docs/design/builtin-fn.md`
-- `docs/design/evaluator.md`
+- [Builtin declaration implementation](../how/builtin_fn/README.md)
+- [Evaluator implementation](../how/evaluator/README.md)

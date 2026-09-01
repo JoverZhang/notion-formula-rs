@@ -12,16 +12,11 @@ const MANIFEST_CATEGORIES = [
   "neutral_redirect_files",
   "control_files",
   "ignored_directories",
-  "legacy_files",
 ];
-const REQUIRED_MANIFEST_CATEGORIES = MANIFEST_CATEGORIES.filter(
-  (category) => category !== "legacy_files",
-);
 const EXACT_CATEGORIES = [
   "english_only_files",
   "neutral_redirect_files",
   "control_files",
-  "legacy_files",
 ];
 const TOOL_IGNORED_DIRECTORY_NAMES = new Set([
   ".agent",
@@ -60,50 +55,6 @@ const ALLOWED_VALUES = {
   translation_status: ["pending", "needs-update", "synced"],
 };
 const APPROVED_IGNORED_DIRECTORIES = [".agent"];
-const APPROVED_LEGACY_FILES = new Set([
-  "README.md",
-  "analyzer/README.md",
-  "analyzer_wasm/README.md",
-  "builtin_fn/README.md",
-  "builtin_fn_macros/README.md",
-  "docs/_description_templates/changelog_entry_template.md",
-  "docs/_description_templates/design_contract_template.md",
-  "docs/_description_templates/module_README_template.md",
-  "docs/changelog_entry_guidelines.md",
-  "docs/changelogs/20260207-add-docs-system.md",
-  "docs/changelogs/20260210-disable-partial-format-on-syntax-errors.md",
-  "docs/changelogs/20260211-decouple-analyze-format-quick-fixes.md",
-  "docs/changelogs/20260213-refactor-analyzer-ide-wasm-entrypoints.md",
-  "docs/changelogs/20260213-wasm-stateful-analyzer-config-and-offset-renames.md",
-  "docs/changelogs/20260215-wasm-api-remove-ide-prefix.md",
-  "docs/changelogs/20260718-builtin-function-catalog.md",
-  "docs/changelogs/20260718-evaluator-generated-structure.md",
-  "docs/changelogs/20260720-builtin-function-runtime.md",
-  "docs/changelogs/20260730-evaluator-builtin-cleanup.md",
-  "docs/changelogs/20260730-evaluator-builtin-goldens.md",
-  "docs/changelogs/20260831-postfix-call-validation.md",
-  "docs/design/builtin-fn.md",
-  "docs/design/demo-vite.md",
-  "docs/design/drift-tracker.md",
-  "docs/design/README.md",
-  "docs/design/README.zh-CN.md",
-  "docs/design/analyzer.md",
-  "docs/design/analyzer.zh-CN.md",
-  "docs/design/contracts.md",
-  "docs/design/contracts.zh-CN.md",
-  "docs/design/evaluator.md",
-  "docs/design/evaluator.zh-CN.md",
-  "docs/design/ide.md",
-  "docs/design/testing.md",
-  "docs/design/wasm-boundary.md",
-  "docs/glossary.md",
-  "docs/README.md",
-  "docs/README.zh-CN.md",
-  "docs/signature-help.md",
-  "evaluator/README.md",
-  "examples/vite/README.md",
-  "ide/README.md",
-]);
 
 function displayPath(repositoryRoot, filePath) {
   return relative(repositoryRoot, filePath).split(sep).join("/");
@@ -262,7 +213,7 @@ function parseManifest(contents) {
     }
   }
 
-  for (const category of REQUIRED_MANIFEST_CATEGORIES) {
+  for (const category of MANIFEST_CATEGORIES) {
     if (!seenCategories.has(category)) {
       errors.push(`${MANIFEST_PATH}: missing category ${category}`);
     }
@@ -305,14 +256,6 @@ function validateManifestPaths(manifest) {
       }
       if (category === "bilingual_files" && path.endsWith(".zh-CN.md")) {
         errors.push(`${MANIFEST_PATH}: bilingual_files must use the base .md path: ${path}`);
-      }
-      if (
-        category === "legacy_files" &&
-        extname(path).toLowerCase() === ".md" &&
-        !/[*?[\]{}]/.test(path) &&
-        !APPROVED_LEGACY_FILES.has(path)
-      ) {
-        errors.push(`${MANIFEST_PATH}: legacy_files cannot add new legacy path ${path}`);
       }
     }
   }
@@ -789,14 +732,10 @@ function validateDocumentation(repositoryRoot, classification, manifestErrors) {
   }
 
   errors.push(...checkLocalLinks(repositoryRoot, documents));
-  const migrationDebt = documents
-    .filter((document) => document.category === "legacy_files")
-    .map((document) => `${document.path}: legacy document has not been migrated`);
 
   return {
     documentCount: documents.length,
     errors: [...new Set(errors)].sort(),
-    migrationDebt: [...new Set(migrationDebt)].sort(),
     pairCount: bilingual.pairCount,
     translationDebt: [...new Set(bilingual.translationDebt)].sort(),
   };
@@ -811,7 +750,6 @@ export function checkDocumentation(repositoryRoot) {
     return {
       documentCount: 0,
       errors: manifestResult.errors,
-      migrationDebt: [],
       pairCount: 0,
       translationDebt: [],
     };
@@ -847,11 +785,10 @@ function reportDocumentationResult(report) {
   }
 
   reportDebt("Translation debt", report.translationDebt);
-  reportDebt("Migration debt", report.migrationDebt);
 }
 
 function main() {
-  // Validates all maintained Markdown and reports errors, translation debt, and migration debt.
+  // Validates all maintained Markdown and reports structural errors and translation debt.
   const report = checkDocumentation(process.cwd());
 
   reportDocumentationResult(report);

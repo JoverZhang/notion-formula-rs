@@ -33,5 +33,5 @@ masks, and a frozen runtime context alongside the formula and per-row result.
 
 ## Links
 
-- `docs/design/builtin-fn.md`
-- `docs/design/evaluator.md`
+- [Builtin declaration implementation](../how/builtin_fn/README.md)
+- [Evaluator implementation](../how/evaluator/README.md)

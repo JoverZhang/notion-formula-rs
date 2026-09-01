@@ -37,5 +37,5 @@ Formatting behavior was tightened:
 
 ## Links
 
-- `docs/design/wasm-boundary.md`
-- `docs/design/demo-vite.md`
+- [WASM boundary implementation](../how/analyzer_wasm/README.md)
+- [Vite example implementation](../how/examples/vite/README.md)

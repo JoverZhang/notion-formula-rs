@@ -51,7 +51,7 @@ and dispatch contracts during compilation.
 
 ## Links
 
-- [`docs/design/builtin-fn.md`](../design/builtin-fn.md)
-- [`docs/design/evaluator.md`](../design/evaluator.md)
-- [`docs/design/contracts.md`](../design/contracts.md)
+- [Builtin declaration implementation](../how/builtin_fn/README.md)
+- [Evaluator implementation](../how/evaluator/README.md)
+- [Builtin function specification](../specs/builtin-functions/README.md)
 - [`evaluator/README.md`](../../evaluator/README.md)

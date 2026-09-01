@@ -50,7 +50,7 @@ These commands record verification at the landing date; they are not the Current
 
 ## Links
 
-- [`docs/design/builtin-fn.md`](../design/builtin-fn.md)
-- [`docs/design/evaluator.md`](../design/evaluator.md)
-- [`docs/design/contracts.md`](../design/contracts.md)
+- [Builtin declaration implementation](../how/builtin_fn/README.md)
+- [Evaluator implementation](../how/evaluator/README.md)
+- [Builtin function specification](../specs/builtin-functions/README.md)
 - [`builtin_fn/README.md`](../../builtin_fn/README.md)
