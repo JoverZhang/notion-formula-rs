@@ -115,4 +115,4 @@ parser 和 IDE 测试还会使用一个局部记号 `$0`，表示 `[0, length)` 
 - 支持普通函数调用和成员方法调用。
   - 普通函数调用：`name(arg1, ...)`。
   - 成员方法调用：`receiver.name(arg1, ...)`。
-  - 内置函数支持状态参见 `docs/builtin_functions/README.md`。
+  - 内置函数行为和支持状态参见[内置函数规格](../specs/builtin-functions/README.zh-CN.md)。

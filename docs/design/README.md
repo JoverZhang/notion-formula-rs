@@ -120,4 +120,4 @@ Syntax summary:
 - Function calls: regular function calls and member method calls are supported.
   - Regular function call: `name(arg1, ...)`.
   - Member method call: `receiver.name(arg1, ...)`.
-  - Built-in function support status: `docs/builtin_functions/README.md`.
+  - Built-in function behavior and support status: [Builtin function specification](../specs/builtin-functions/README.md).
