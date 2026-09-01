@@ -14,14 +14,14 @@ depth, but it should keep these names and preserve code identifiers exactly.
 
 | Term | Code anchor or example | Meaning | Avoid |
 | --- | --- | --- | --- |
-| formula | `prepare_formula` | Formula source together with an analyzed or prepared representation. A formula is not a persisted record with its own ID. | equation |
+| formula | `prepare_formula` | The expression or program represented at a lifecycle stage as source, an analyzed expression, or a prepared plan. A formula is not a persisted record with its own ID. | equation |
 | formula source | `source: &str` | The formula text supplied to the analyzer. Rust components store it as UTF-8; an external interface may define another coordinate system for offsets. | content when formula text is intended |
 | token | `Token` | A syntax unit emitted by the lexer. | word |
 | trivia | comments and newlines | Tokens retained for source fidelity but skipped when they do not participate in syntax or semantic analysis. | whitespace when comments are included |
-| diagnostic | `Diagnostic` | A syntax or semantic problem associated with a source span. | exception |
-| code action | `CodeAction` | An edit attached to a diagnostic that can implement a quick fix. | fix when no edit is provided |
+| diagnostic | `Diagnostic` | A lexical, syntactic, or semantic problem associated with a source span. | exception |
+| code action | `CodeAction` | An action attached to a diagnostic whose `TextEdit` list implements a quick fix. | edit; fix when no edit is provided |
 | span | `Span` | A half-open source range `[start, end)`. The interface that exposes it must define its coordinate unit. | interval without a coordinate unit |
-| semantic analysis | `SemanticMap` | Type inference and call validation performed after parsing. | parsing |
+| semantic analysis | `SemanticMap` | AST normalization, type inference, and call validation performed after parsing. | parsing |
 | execution plan | `ExecPlan` | Evaluator-owned intermediate representation lowered from an analyzed expression. | AST |
 | row batch | `RowBatch` | Ordered rows evaluated under one prepared formula and one runtime snapshot. | table |
 | execution mask | `Mask` | Rows active for a particular control-flow step. | null bitmap |
