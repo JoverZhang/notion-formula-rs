@@ -24,7 +24,11 @@ Rust evaluator API，也不规定演示应用的 UI 策略。
 
 ## 复用一个已配置的 Analyzer
 
-模块导出一个有状态的 `Analyzer` 类，提供以下同步接口：
+本契约从生成的 web package 完成加载和初始化后开始。Current package 还会导出 wasm-bindgen
+生成的异步 default initializer 和 `initSync`；它们的具体 signature 与加载行为属于生成的
+lifecycle surface，不是项目的稳定契约。
+
+模块导出一个有状态的 `Analyzer` 类，提供以下同步 domain 接口：
 
 ```ts
 new Analyzer(config: AnalyzerConfig)
@@ -39,11 +43,14 @@ analyzer.apply_edits(
 analyzer.help(source: string, cursor_utf16: number): HelpResult
 ```
 
+Current 生成类还提供 `free()` 与 `[Symbol.dispose]()`。通过其中任一机制释放实例后，调用方不得
+再调用该实例的 domain method；此时产生的 null-pointer error 不受兼容性保证约束。
+
 实例会保留属性 schema 和补全优选项数量上限，且没有方法可在创建后修改这些配置。它不会
 保留源码、分析结果、编辑历史或光标位置；每次操作都接收完整源码。因此，多个文档如果共享
 同一份配置，应用可以复用同一个实例。
 
-这个边界不允许配置函数。每个实例都从 Rust 声明取得项目支持的规范内置函数集合。顶层的
+该边界不允许配置函数。每个实例都从 Rust 声明取得项目支持的规范内置函数集合。顶层的
 `functions` 字段会被拒绝，不会扩充或替换该集合。导出接口的实现入口是
 [`analyzer_wasm/src/lib.rs`](../../analyzer_wasm/src/lib.rs)。
 
@@ -74,10 +81,11 @@ type AnalyzerConfig = {
 | `preferred_limit` | 可以省略，也可以传 `undefined` 或 `null`，此时采用默认值 `5` |
 | `preferred_limit: 0` | 可以传入，并会禁用 `preferred_indices` |
 
-如果提供 `properties`，它必须是数组；每个元素必须包含字符串 `name` 和有效的 `type`。
-因此，显式传入 `properties: undefined` 是无效输入，并不等同于省略该字段。如果提供优选项
-上限，它必须能反序列化成 WASM `usize` 范围内的非负整数。属性缺少必需字段、类型变体无效
-或值的结构不正确，都会使整份配置被拒绝。
+如果提供 `properties`，受支持的表示是数组；每个元素必须包含字符串 `name` 和有效的 `type`。
+因此，显式传入 `properties: undefined` 是无效输入，并不等同于省略该字段。Current serde
+runtime 也会接受其他 JavaScript iterable sequence，例如 `Set<Property>`；生成类型没有这项
+兼容性，它也不属于稳定的输入保证。如果提供优选项上限，它必须能反序列化成 WASM `usize`
+范围内的非负整数。属性缺少必需字段、类型变体无效或值的结构不正确，都会使整份配置被拒绝。
 
 `AnalyzerConfig` 顶层的未知字段会被拒绝；单个 `Property` 对象中的额外未知字段目前会被
 忽略。通过 schema 校验不代表重复属性名是受支持的输入。公式引用规格要求属性名唯一，
@@ -108,12 +116,18 @@ type ApplyResult = {
 };
 ```
 
+所有 cursor 和 span endpoint 支持的 numeric domain 都是 `0` 至 `4_294_967_295` 之间的有限整数，
+也就是 unsigned 32-bit range。Direct cursor argument 会先经过 wasm-bindgen ABI，再进入 Rust 校验；
+小数、non-finite value 以及范围外的 number 可能在实现收到之前被强制转换，因此不属于受支持输入。
+Edit DTO 中不合法的 numeric field 会在反序列化时抛出 `Invalid edits`。下文的位置规则只适用于
+受支持的 numeric input。
+
 所有 span、编辑端点、输入光标和返回光标都以 UTF-16 code unit 计数。span 和编辑范围采用
 左闭右开区间：包含 `start`，不包含 `end`。`ApplyResult.cursor` 指向它一同返回的更新后
 `source`；输入编辑范围则指向调用时提供的原始源码。
 
 如果一个位置落在占两个 UTF-16 code unit 的 Unicode scalar 内部，它会向下取整到该
-scalar 的起点。这个规则适用于 `help`、`format`、`apply_edits` 的光标，也适用于编辑范围的
+scalar 的起点。该规则适用于 `help`、`format`、`apply_edits` 的光标，也适用于编辑范围的
 **两个**端点。因此，落在 scalar 内部的端点不会一概被拒绝；取整还可能把一个非空 UTF-16
 范围折叠为内部的空范围。转换契约的实现入口是
 [`offsets.rs`](../../analyzer_wasm/src/offsets.rs)。
@@ -180,7 +194,7 @@ type AnalyzeResult = {
 
 ## Help 返回补全和可选的签名数据
 
-`help` 返回以下确切序列化结构：
+`help` 的 generated TypeScript declaration 如下：
 
 ```ts
 type CompletionItemKind =
@@ -253,23 +267,24 @@ type HelpResult = {
 
 两个修改源码的操作都返回 `ApplyResult`，不会修改 Analyzer 内部保留的文档状态。
 
-`format(source, cursor_utf16)` 会先检查光标，再检查源码语法。因此，光标超过末尾时会返回
+`format(source, cursor_utf16)` 会先检查光标，再检查源码语法。因此，光标超过末尾时会抛出
 `Invalid cursor`，即使公式同时也无法格式化。成功时，它返回完整的格式化源码和该新源码
-中的光标位置。存在词法或语法问题的源码会产生 `Format error`；格式布局和光标重定位由
+中的光标位置。存在词法或语法问题的源码会抛出 `Format error`；格式布局和光标重定位由
 编辑器服务规格定义。
 
-`apply_edits(source, edits, cursor_utf16)` 要求 `edits` 能反序列化为 `Array<TextEdit>`。
-它先按原始源码转换每个范围，再检查光标，最后校验并应用整批编辑。成功时，它返回完整的
-更新后源码和重定位后的光标。原始坐标排序、重叠行为和光标重定位由编辑器服务规格定义。
+`apply_edits(source, edits, cursor_utf16)` 支持 `Array<TextEdit>`。Current serde runtime 也接受
+其他 JavaScript iterable sequence，例如 `Set<TextEdit>`；这不属于稳定的输入契约。该方法先按
+原始源码转换每个范围，再检查光标，最后校验并应用整批编辑。成功时，它返回完整的更新后源码
+和重定位后的光标。原始坐标排序、重叠行为和光标重定位由编辑器服务规格定义。
 
 ## 依赖受控错误消息与校验顺序
 
-构造函数以原始字符串 `Invalid analyzer config` 拒绝无效配置。各操作失败时会返回
-JavaScript `Error` 对象，其 `message` 为以下值之一：
+构造函数会抛出 JavaScript 字符串原始值 `Invalid analyzer config`，而不是 `Error` 对象。各操作
+失败时会抛出 JavaScript `Error` 对象，其 `message` 为以下值之一：
 
 | 消息 | 含义 |
 | --- | --- |
-| `Invalid edits` | `edits` 无法反序列化为 `Array<TextEdit>` |
+| `Invalid edits` | `edits` 无法反序列化为一组 `TextEdit` |
 | `Invalid cursor` | 需要严格校验的光标超过原始源码末尾 |
 | `Invalid edit range` | 编辑范围反向，或其结束位置超过源码末尾 |
 | `Overlapping edits` | 转换后的原始文档范围互相重叠 |
@@ -293,11 +308,12 @@ JavaScript `Error` 对象，其 `message` 为以下值之一：
 阶段，早于重叠检查，因此用于检查重叠的范围可能和原始 UTF-16 端点不同。
 
 确切错误消息和方法顺序定义在
-[`analyzer_wasm/src/lib.rs`](../../analyzer_wasm/src/lib.rs)，导出边界行为由
-[`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs) 覆盖。
+[`analyzer_wasm/src/lib.rs`](../../analyzer_wasm/src/lib.rs)。
+[`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs) 会在导出边界覆盖部分错误消息
+和成功路径；并非每条消息或每种 validation precedence 组合都有专门的 exported-boundary regression test。
 
-## Evaluator 与 UI 行为不属于这个 API
+## Evaluator 与 UI 行为不属于该 API
 
 WASM 模块只导出分析与编辑器服务。它不导出公式求值、prepared plan、row input、evaluator
 结果或 Rust crate API，也不承诺补全组件、quick fix 选择、popover 布局、focus 或公式面板
-identity 的任何行为。这些属于应用策略，不是这个边界的字段或行为。
+identity 的任何行为。这些属于应用策略，不是该边界的字段或行为。

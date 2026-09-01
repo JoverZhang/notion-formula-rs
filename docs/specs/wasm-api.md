@@ -25,7 +25,11 @@ algorithms. It does not expose the Rust evaluator API or specify any demo UI pol
 
 ## Reuse one configured Analyzer
 
-The module exports one stateful `Analyzer` class with this synchronous surface:
+This contract starts after the generated web package has been loaded and initialized. The Current
+package also exports wasm-bindgen's asynchronous default initializer and `initSync`; their exact
+signatures and loading behavior are generated lifecycle surface, not a stable project contract.
+
+The module exports one stateful `Analyzer` class with this synchronous domain surface:
 
 ```ts
 new Analyzer(config: AnalyzerConfig)
@@ -39,6 +43,10 @@ analyzer.apply_edits(
 ): ApplyResult
 analyzer.help(source: string, cursor_utf16: number): HelpResult
 ```
+
+The Current generated class also provides `free()` and `[Symbol.dispose]()`. After either mechanism
+disposes an instance, callers must not invoke its domain methods; the resulting null-pointer error
+is uncontrolled and has no compatibility guarantee.
 
 An instance retains its property schema and completion preference limit. It has no method to change
 that configuration. It does not retain source text, analysis output, edit history, or a cursor;
@@ -77,11 +85,13 @@ is deliberately more permissive:
 | `preferred_limit` | may be omitted, `undefined`, or `null`, which selects the default `5` |
 | `preferred_limit: 0` | accepted and disables `preferred_indices` |
 
-When present, `properties` must be an array and each entry must contain a string `name` and a valid
-`type`; an explicit `properties: undefined` is therefore invalid rather than equivalent to
-omission. A supplied preference limit must deserialize as a nonnegative integer in the WASM
-`usize` range. Missing required property fields, invalid type variants, or a wrong value shape
-reject the whole configuration.
+When present, the supported `properties` representation is an array whose entries contain a string
+`name` and a valid `type`; an explicit `properties: undefined` is therefore invalid rather than
+equivalent to omission. The Current serde runtime also accepts other JavaScript iterable sequences,
+such as a `Set<Property>`, but that compatibility is absent from the generated type and is not a
+stable input guarantee. A supplied preference limit must deserialize as a nonnegative integer in
+the WASM `usize` range. Missing required property fields, invalid type variants, or a wrong value
+shape reject the whole configuration.
 
 Unknown fields at the `AnalyzerConfig` top level are rejected. Unknown extra fields inside an
 individual `Property` object are currently ignored. Passing schema validation does not make
@@ -114,6 +124,13 @@ type ApplyResult = {
   cursor: number;
 };
 ```
+
+The supported numeric domain for every cursor and span endpoint is a finite integer from `0` through
+`4_294_967_295`, the unsigned 32-bit range. Direct cursor arguments pass through the wasm-bindgen
+ABI before Rust validation; fractional values, non-finite values, and numbers outside that range can
+be coerced before the implementation sees them and are unsupported. Invalid numeric fields inside
+an edit DTO fail deserialization as `Invalid edits`. The position rules below apply to supported
+numeric inputs.
 
 Every span, edit endpoint, input cursor, and returned cursor is measured in UTF-16 code units.
 Spans and edit ranges are half-open: `start` is included and `end` is excluded. An `ApplyResult`
@@ -189,7 +206,7 @@ though controlled boundary-error messages below are. The boundary projection is 
 
 ## Help returns completion and optional signature data
 
-`help` returns the following exact serialized surface:
+`help` has the following generated TypeScript declaration:
 
 ```ts
 type CompletionItemKind =
@@ -268,22 +285,24 @@ Analyzer.
 `format(source, cursor_utf16)` checks the cursor before it checks source syntax. A past-end cursor
 therefore produces `Invalid cursor` even when the formula also cannot be formatted. On success it
 returns the complete formatted source and a cursor in that new source. Syntactically invalid source
-produces `Format error`; formatting layout and cursor rebasing are owned by the editor-services
+throws `Format error`; formatting layout and cursor rebasing are owned by the editor-services
 specification.
 
-`apply_edits(source, edits, cursor_utf16)` expects `edits` to deserialize as `Array<TextEdit>`. It
-converts every range against the original source, checks the cursor, then validates and applies the
-batch. On success it returns the complete updated source and rebased cursor. Original-coordinate
-sorting, overlap behavior, and cursor rebasing are owned by the editor-services specification.
+`apply_edits(source, edits, cursor_utf16)` supports `Array<TextEdit>`. The Current serde runtime also
+accepts other JavaScript iterable sequences, such as a `Set<TextEdit>`; this is not part of the
+stable input contract. The method converts every range against the original source, checks the
+cursor, then validates and applies the batch. On success it returns the complete updated source and
+rebased cursor. Original-coordinate sorting, overlap behavior, and cursor rebasing are owned by the
+editor-services specification.
 
 ## Rely on controlled messages and validation order
 
-The constructor rejects with the primitive string `Invalid analyzer config`. Operation failures are
-JavaScript `Error` objects whose `message` is one of:
+The constructor throws the primitive string `Invalid analyzer config`, not an `Error` object.
+Operation failures throw JavaScript `Error` objects whose `message` is one of:
 
 | Message | Meaning |
 | --- | --- |
-| `Invalid edits` | the `edits` value cannot deserialize as `Array<TextEdit>` |
+| `Invalid edits` | the `edits` value cannot deserialize as a sequence of `TextEdit` values |
 | `Invalid cursor` | a checked cursor is past the original source end |
 | `Invalid edit range` | an edit is reversed or its end is past the source end |
 | `Overlapping edits` | converted original-document ranges overlap |
@@ -308,8 +327,10 @@ overlap detection. Scalar-interior flooring happens during conversion before ove
 the ranges used for overlap detection can differ from the raw UTF-16 endpoints.
 
 The exact messages and method order are defined in
-[`analyzer_wasm/src/lib.rs`](../../analyzer_wasm/src/lib.rs) and exercised at the exported boundary
-by [`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs).
+[`analyzer_wasm/src/lib.rs`](../../analyzer_wasm/src/lib.rs). Selected messages and successful paths
+are exercised at the exported boundary by
+[`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs); not every message or
+validation-precedence combination has a dedicated exported-boundary regression test.
 
 ## Keep evaluator and UI behavior outside this API
 
