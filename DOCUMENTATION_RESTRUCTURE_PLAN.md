@@ -26,6 +26,7 @@ CLAUDE.md
 DOCUMENTATION.md
 DOCUMENTATION.zh-CN.md
 DOCUMENTATION_RESTRUCTURE_PLAN.md
+GLOSSARY.md
 
 docs/
 ├── manifest.toml
@@ -61,10 +62,9 @@ docs/
 │   └── examples/
 │       └── vite/
 │           └── README.*
-├── reference/
-│   └── glossary.md
-├── operations/
+├── contributing/
 │   ├── testing.*
+│   ├── coding.*
 │   └── changelogs.*
 ├── changelogs/
 │   └── <entries and counterparts>
@@ -73,7 +73,7 @@ docs/
 └── assets/
 ```
 
-`.*` 表示相邻的英文 `.md` 与简体中文 `.zh-CN.md`。它不表示把两种语言交错写在一个文件里。
+`.*` 表示相邻的英文 `.md` 与简体中文 `.zh-CN.md`。它不表示把两种语言交错写在一个文件里。`contributing/coding.*` 是条件项：只有审计确认项目存在需要文字说明的特有 coding rules 时才保留。
 
 ### 三个阅读入口
 
@@ -124,6 +124,12 @@ Inventory 至少从 WASM exports、公式语法与运算符、Rust builtin decla
 
 内部 crate API、IR、trait、算法、数据结构、调试入口和跨 crate 协作都属于 how，不属于 specs。跨 crate 事实优先由真正拥有它的 crate 维护，其他文档链接到该位置。确实没有单一 owner 的系统级实现机制才由 `how/README.md` 维护。
 
+### Contributing 与 glossary
+
+`docs/contributing/` 说明贡献者如何正确修改和验证项目，维护 testing、project-specific coding 和 changelog writing 规范。它不描述产品契约或实现机制；没有项目特有规则时，不用通用 Rust 建议填充 `coding.*`。
+
+项目只有一份规范术语表，因此使用根目录 `GLOSSARY.md`，不为单个文件建立 `reference/` 目录。它由 `docs/README.*` 链接，供整个仓库共同引用。
+
 ## 文档权限与 code review
 
 `DOCUMENTATION.*`、`docs/intent/` 和 `docs/specs/` 是 human-controlled 区域：
@@ -149,7 +155,7 @@ Front matter 中不使用 `owners` 控制编辑权限。目录决定内容层级
 
 根目录的 `DOCUMENTATION.md` 与 `DOCUMENTATION.zh-CN.md` 是唯一文档维护标准。两份文件都保持精简，只维护：
 
-1. `intent/`、`specs/`、`how/` 和正交目录的职责；
+1. `intent/`、`specs/`、`how/`、`contributing/`、changelogs 和 glossary 的职责；
 2. human-controlled 与 agent-maintainable 的权限边界；
 3. 代码变更触发哪一层文档更新；
 4. 双语编辑和翻译状态；
@@ -187,7 +193,7 @@ Human writing 至少要求：
 
 明确例外包括：
 
-- `docs/reference/glossary.md` 只维护规范英文术语；
+- 根 `GLOSSARY.md` 只维护规范英文术语；
 - crate 和 example 根目录的 README 是中性跳转文件；
 - `AGENTS.md`、`CLAUDE.md` 和本 review goal 是控制文件；
 - 图片、schema 和其他无自然语言资产由两种语言共享；
@@ -210,7 +216,7 @@ bilingual_directories = [
 ]
 
 english_only_files = [
-  "docs/reference/glossary.md",
+  "GLOSSARY.md",
 ]
 
 neutral_redirect_files = [
@@ -303,9 +309,10 @@ Checker 最后分别输出 errors、translation debt 和 migration debt。只有
 | `docs/signature-help.md` | `ParamShape` 机制进入 builtin_fn how；IDE 呈现和 active parameter 逻辑进入 ide how |
 | WASM 设计文档与 crate README | 使用者边界进入 wasm spec；实现进入 `how/analyzer_wasm/README.*` |
 | demo 设计文档与 example README | 合并为 `how/examples/vite/README.*` |
-| `docs/design/testing.md` | 迁入 `operations/testing.*` |
-| `docs/changelog_entry_guidelines.md` | 迁入 `operations/changelogs.*` |
-| `docs/glossary.md` | 迁入 English-only `reference/glossary.md` |
+| `docs/design/testing.md` | 迁入 `contributing/testing.*` |
+| `docs/changelog_entry_guidelines.md` | 迁入 `contributing/changelogs.*` |
+| 项目特有的 coding rules | 经核验后进入 `contributing/coding.*`；不复制通用 Rust 建议或工具配置 |
+| `docs/glossary.md` | 迁入根目录 English-only `GLOSSARY.md` |
 | `docs/changelogs/` | 保留历史内容并逐步补齐 counterpart |
 | `docs/assets/` | 继续共享；最终未被引用的资产才删除 |
 | `docs/design/drift-tracker.md` | 删除；已解决内容不进入 current docs |
@@ -368,12 +375,13 @@ Evaluator contract generation 仍然从 Rust builtin declarations 工作，不�
 
 ### 4. 迁移正交内容
 
-- 迁移 English-only glossary。
-- 迁移 testing 和 changelog maintenance 文档。
+- 将 English-only glossary 迁到根目录。
+- 将 testing 和 changelog maintenance 文档迁入 `contributing/`。
+- 只有存在已确认的项目特有规则时才建立 `contributing/coding.*`。
 - 保留并精简 changelog template。
 - 补齐历史 changelog counterpart。
 
-完成条件：查询资料、维护方法和历史记录没有被强行塞入 intent/specs/how；所有应双语的正交文档均为 `synced`。
+完成条件：术语、贡献规范和历史记录没有被强行塞入 intent/specs/how；所有应双语的正交文档均为 `synced`，且没有为了补齐目录而创建空泛的 coding 规范。
 
 ### 5. 清理旧结构
 
