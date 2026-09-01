@@ -22,6 +22,7 @@
 README.md
 README.zh-CN.md
 AGENTS.md
+CLAUDE.md
 DOCUMENTATION.md
 DOCUMENTATION.zh-CN.md
 DOCUMENTATION_RESTRUCTURE_PLAN.md
@@ -107,6 +108,14 @@ Rust crate consumer 暂不属于稳定 API 使用者。Rust 中的 `pub` 不自�
 
 这些主题可以在审计后合并或拆分。验收标准是每项使用者契约只有一个明确的权威文档，而不是文件名与本计划完全一致。
 
+Specs PR 必须在 PR 描述或 review record 中维护一次性的 contract inventory，不把核验过程写进长期正文：
+
+| Surface or claim | Evidence | Spec owner or explicit exclusion |
+|---|---|---|
+| `<user-visible behavior>` | `<code, test, schema, or runtime observation>` | `<spec path or exclusion reason>` |
+
+Inventory 至少从 WASM exports、公式语法与运算符、Rust builtin declarations、IDE 输出、formula reference 行为以及对外 evaluator 输入和结果边界逐项展开。只有每个发现的使用者 surface 都被分配给一个 spec，或以明确理由排除，契约审计才算完成。
+
 ### How
 
 `how/README.md` 用一条简短的端到端路径说明各阶段由哪个 crate 负责、跨 crate 数据在哪里转换，并链接到各 crate 文档。
@@ -174,13 +183,13 @@ Human writing 至少要求：
 - `pending`：counterpart 尚未创建；
 - `needs-update`：两个版本都存在，但其中一个已经落后。
 
-`pending` 和 `needs-update` 是可见的翻译债务，不让 `just docs-check` 失败。结构错误、无效 metadata、错误配对和断链仍然失败。
+`pending` 和 `needs-update` 是中间 PR 可接受的可见翻译债务，不让 `just docs-check` 失败。结构错误、无效 metadata、错误配对和断链仍然失败。整个 review goal 完成时，除明确例外外，translation debt 必须清零。
 
 明确例外包括：
 
 - `docs/reference/glossary.md` 只维护规范英文术语；
 - crate 和 example 根目录的 README 是中性跳转文件；
-- `AGENTS.md` 和本 review goal 是控制文件；
+- `AGENTS.md`、`CLAUDE.md` 和本 review goal 是控制文件；
 - 图片、schema 和其他无自然语言资产由两种语言共享；
 - `.agent/` 是 ignored legacy。
 
@@ -213,6 +222,7 @@ Human writing 至少要求：
   ],
   "control_files": [
     "AGENTS.md",
+    "CLAUDE.md",
     "DOCUMENTATION_RESTRUCTURE_PLAN.md"
   ],
   "ignored_directories": [
@@ -257,7 +267,7 @@ Checker 按以下顺序分类：
 
 Checker 最后分别输出 errors、translation debt 和 migration debt。只有 errors 导致非零退出码，但最终 review 不允许保留 migration debt。
 
-`scripts/check-docs.mjs` 应按照一个工作流组织：加载 manifest、发现文档、分类、验证、报告。I/O、front matter 解析、链接解析和错误格式化放在有明确意图的 action 中，不把入口写成零散 helper 的调用堆栈。
+`scripts/check-docs.mjs` 应按照一个工作流组织：加载 manifest、发现文档、分类、验证、报告。多步骤入口用一行注释说明最终 outcome，顶层 action calls 之间保留空行。I/O、front matter 解析、链接解析和错误格式化放在有明确意图的 action 中，不把入口写成零散 helper 的调用堆栈。
 
 `scripts/check-docs.test.mjs` 使用测试文件内嵌的目录树 fixtures。每个 case 应让路径和文件内容同时可读，不创建外部 fixture 目录，也不使用无法说明用途的占位文件名。测试至少覆盖：
 
@@ -297,6 +307,9 @@ Checker 最后分别输出 errors、translation debt 和 migration debt。只有
 | `docs/glossary.md` | 迁入 English-only `reference/glossary.md` |
 | `docs/changelogs/` | 保留历史内容并逐步补齐 counterpart |
 | `docs/assets/` | 继续共享；最终未被引用的资产才删除 |
+| `docs/design/drift-tracker.md` | 删除；已解决内容不进入 current docs |
+| `docs/builtin_functions/` | 在 builtin spec 和 how 落位后删除整个目录及其历史 prototype |
+| design contract 与 module README templates | 删除；只保留并精简 changelog template |
 
 每个 crate 根 `README.md` 保留为普通 Markdown 跳转文件，不使用 filesystem symlink，也不保留 API、命令、设计摘要或测试清单。保留文件可以继续满足 Cargo 自动识别 package README 的现有行为。`examples/vite/README.md` 使用同样的中性跳转方式。
 
@@ -320,21 +333,6 @@ Checker 最后分别输出 errors、translation debt 和 migration debt。只有
 - 对应 exports、recipes、命令和文档引用。
 
 Evaluator contract generation 仍然从 Rust builtin declarations 工作，不属于删除范围。
-
-## 删除与保留
-
-以下内容在替代信息落位后删除：
-
-- 整个旧 `docs/design/`；
-- 已解决的 drift tracker；
-- Markdown builtin catalog 和 renderer；
-- `docs/builtin_functions/` 下的 C++ prototype、局部 justfile 和 compile flags；
-- `design_contract_template.md`；
-- `module_README_template.md`。
-
-Changelog template 保留、精简并迁入 `docs/_templates/`。`.agent/` 完整保留且不修改，它只通过 `AGENTS.md` 被标记为 legacy。
-
-删除旧文件前，reviewer 必须能指出其中每项仍然有效的事实在新结构中的唯一 owner。无法归类的事实不能为了清空旧目录而直接丢弃。
 
 ## 渐进交付
 
@@ -362,25 +360,24 @@ Changelog template 保留、精简并迁入 `docs/_templates/`。`.agent/` 完�
 
 - 获得相应 human 授权。
 - 写一篇精简 intent。
-- 审计代码、测试、schema 和现有契约，确定最终 spec 边界。
+- 审计代码、测试、schema 和现有契约，完成 contract inventory 并确定最终 spec 边界。
 - 先完成并核验每轮 source language，再建立或更新 counterpart。
 
-完成条件：使用者契约覆盖完整，当前与未来没有混写，任何规范修改都处于明确授权范围内。
+完成条件：contract inventory 中的每个 surface 都指向唯一 spec 或明确 exclusion；当前与未来没有混写；任何规范修改都处于明确授权范围内。
 
 ### 4. 迁移正交内容
 
 - 迁移 English-only glossary。
 - 迁移 testing 和 changelog maintenance 文档。
 - 保留并精简 changelog template。
-- 逐步补齐历史 changelog counterpart。
+- 补齐历史 changelog counterpart。
 
-完成条件：查询资料、维护方法和历史记录没有被强行塞入 intent/specs/how。
+完成条件：查询资料、维护方法和历史记录没有被强行塞入 intent/specs/how；所有应双语的正交文档均为 `synced`。
 
 ### 5. 清理旧结构
 
 - 更新 Markdown 链接以及 code span 和普通文本中的旧路径。
-- 删除已被替代的 design、catalog、prototype 和模板内容。
-- 删除 Markdown catalog renderer 与同步测试。
+- 完成“Builtin functions”和迁移表中列出的删除范围。
 
 完成条件：旧路径不再被引用；manifest 不再包含 `legacy_files`；没有仍然有效的事实随旧文件丢失；产品运行时行为未改变。
 
@@ -388,29 +385,23 @@ Changelog template 保留、精简并迁入 `docs/_templates/`。`.agent/` 完�
 
 - 运行 `just docs-check` 和受代码删除影响的 Rust checks。
 - 检查 crate package README 仍指向根跳转文件。
-- 检查所有 `pending` 和 `needs-update` 项均准确登记。
+- 确认不存在 `pending`、`needs-update` 或 migration debt。
 - 对照本 review goal 检查每项阻塞条件。
 
-完成条件：所有结构和代码检查通过，剩余翻译债务被完整报告，reviewer 没有未解决的阻塞项。
+完成条件：所有结构和代码检查通过；除明确例外外，全部正式文档均为 `synced`；reviewer 没有未解决的阻塞项。
 
 ## Review 阻塞条件
 
 出现以下任一情况，文档重构不能视为完成：
 
-- 未获用户授权修改 documentation policy、intent 或 specs；
-- specs 按 crate 镜像 how，或包含内部算法和源码清单；
-- 同一技术事实由多个正文维护；
-- Current spec 描述 planned、exploratory 或 historical 行为；
-- 仍有未分类 Markdown；
-- manifest 仍有临时 `legacy_files` 或其他 migration debt；
-- `synced` 文档缺少 counterpart 或存在语义漂移；
-- crate 根 README 继续维护实质内容；
-- Markdown builtin catalog 或对应 renderer 仍然存在；
-- 旧 `docs/design/` 在迁移完成后仍充当事实来源；
-- `.agent/` 中的文件发生修改；
-- checker tests 依赖外部 fixture 目录或目录结构难以从测试文件读出；
-- 文档重构顺带改变公式、分析、IDE、WASM 或 evaluator 的产品行为；
-- 为本次文档工作修改 CI 配置。
+- 违反“文档权限与 code review”中的 human-controlled 规则；
+- contract inventory 未完整闭合，或同一技术事实仍有多个权威正文；
+- specs 与 how 的边界、Current-only 规则或 crate-independent 组织方式没有落实；
+- 任一 Markdown 未分类，或仍有 translation debt、migration debt、无效 metadata、错误配对或断链；
+- crate 和 example 根 README 仍有跳转以外的实质内容；
+- “Builtin functions”与迁移表中的删除和保留边界没有完成；
+- checker workflow 或内嵌目录树 fixtures 不满足本计划定义；
+- 任何非目标被纳入本次重构。
 
 ## 非目标
 
@@ -418,11 +409,7 @@ Changelog template 保留、精简并迁入 `docs/_templates/`。`.agent/` 完�
 
 - 将 Rust crate API 承诺为稳定公共规格；
 - 建立 docs site 或新的发布工具链；
-- 为 builtin 生成 Markdown catalog；
-- 把验证过程长期写入每篇文章；
-- 用 `owners` metadata 代替 human 授权；
-- 把历史设计过程保留在 current specs；
-- 修改 `.agent/` legacy 内容；
+- 改变公式、分析、IDE、WASM 或 evaluator 的产品行为；
 - 修改 CI。
 
 本文件在重构期间保持为 control file。只有用户确认整个 review goal 已完成后，才另行决定是否删除；它不会迁入正式文档结构。
