@@ -59,6 +59,42 @@ const ALLOWED_VALUES = {
   document_status: ["draft", "stable"],
   translation_status: ["pending", "needs-update", "synced"],
 };
+const APPROVED_IGNORED_DIRECTORIES = [".agent"];
+const APPROVED_LEGACY_FILES = new Set([
+  "README.md",
+  "analyzer/README.md",
+  "analyzer_wasm/README.md",
+  "builtin_fn/README.md",
+  "builtin_fn_macros/README.md",
+  "docs/_description_templates/changelog_entry_template.md",
+  "docs/_description_templates/design_contract_template.md",
+  "docs/_description_templates/module_README_template.md",
+  "docs/builtin_functions/README.md",
+  "docs/changelog_entry_guidelines.md",
+  "docs/changelogs/20260207-add-docs-system.md",
+  "docs/changelogs/20260210-disable-partial-format-on-syntax-errors.md",
+  "docs/changelogs/20260211-decouple-analyze-format-quick-fixes.md",
+  "docs/changelogs/20260213-refactor-analyzer-ide-wasm-entrypoints.md",
+  "docs/changelogs/20260213-wasm-stateful-analyzer-config-and-offset-renames.md",
+  "docs/changelogs/20260215-wasm-api-remove-ide-prefix.md",
+  "docs/changelogs/20260718-builtin-function-catalog.md",
+  "docs/changelogs/20260718-evaluator-generated-structure.md",
+  "docs/changelogs/20260720-builtin-function-runtime.md",
+  "docs/changelogs/20260730-evaluator-builtin-cleanup.md",
+  "docs/changelogs/20260730-evaluator-builtin-goldens.md",
+  "docs/changelogs/20260831-postfix-call-validation.md",
+  "docs/design/builtin-fn.md",
+  "docs/design/demo-vite.md",
+  "docs/design/drift-tracker.md",
+  "docs/design/ide.md",
+  "docs/design/testing.md",
+  "docs/design/wasm-boundary.md",
+  "docs/glossary.md",
+  "docs/signature-help.md",
+  "evaluator/README.md",
+  "examples/vite/README.md",
+  "ide/README.md",
+]);
 
 function displayPath(repositoryRoot, filePath) {
   return relative(repositoryRoot, filePath).split(sep).join("/");
@@ -256,7 +292,24 @@ function validateManifestPaths(manifest) {
       if (category === "bilingual_files" && path.endsWith(".zh-CN.md")) {
         errors.push(`${MANIFEST_PATH}: bilingual_files must use the base .md path: ${path}`);
       }
+      if (
+        category === "legacy_files" &&
+        extname(path).toLowerCase() === ".md" &&
+        !/[*?[\]{}]/.test(path) &&
+        !APPROVED_LEGACY_FILES.has(path)
+      ) {
+        errors.push(`${MANIFEST_PATH}: legacy_files cannot add new legacy path ${path}`);
+      }
     }
+  }
+
+  if (
+    manifest.ignored_directories.length !== APPROVED_IGNORED_DIRECTORIES.length ||
+    manifest.ignored_directories.some(
+      (directory, index) => directory !== APPROVED_IGNORED_DIRECTORIES[index],
+    )
+  ) {
+    errors.push(`${MANIFEST_PATH}: ignored_directories must contain exactly .agent`);
   }
 
   return errors;
@@ -280,12 +333,11 @@ function pathIsWithinDirectory(path, directory) {
   return path === directory || path.startsWith(`${directory}/`);
 }
 
-function shouldIgnoreDirectory(repositoryRoot, directoryPath, directoryName, ignoredDirectories) {
+function shouldIgnoreDirectory(repositoryRoot, directoryPath, directoryName) {
   const path = displayPath(repositoryRoot, directoryPath);
   return (
     TOOL_IGNORED_DIRECTORY_NAMES.has(directoryName) ||
-    TOOL_IGNORED_PATHS.has(path) ||
-    ignoredDirectories.some((directory) => pathIsWithinDirectory(path, directory))
+    TOOL_IGNORED_PATHS.has(path)
   );
 }
 
@@ -366,16 +418,15 @@ function extractLinks(contents) {
   return links;
 }
 
-function discoverRepositoryDocumentation(repositoryRoot, manifest) {
+function discoverRepositoryDocumentation(repositoryRoot) {
   const documents = [];
-  const ignoredDirectories = manifest.ignored_directories;
 
   function visit(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const entryPath = resolve(directory, entry.name);
       if (
         entry.isDirectory() &&
-        shouldIgnoreDirectory(repositoryRoot, entryPath, entry.name, ignoredDirectories)
+        shouldIgnoreDirectory(repositoryRoot, entryPath, entry.name)
       ) {
         continue;
       }
@@ -661,12 +712,11 @@ function checkEnglishOnlyDocumentation(documents) {
   return errors;
 }
 
-function targetIsIgnored(repositoryRoot, targetPath, ignoredDirectories) {
+function targetIsIgnored(repositoryRoot, targetPath) {
   const path = displayPath(repositoryRoot, targetPath);
   return (
     path.split("/").some((segment) => TOOL_IGNORED_DIRECTORY_NAMES.has(segment)) ||
-    [...TOOL_IGNORED_PATHS].some((directory) => pathIsWithinDirectory(path, directory)) ||
-    ignoredDirectories.some((directory) => pathIsWithinDirectory(path, directory))
+    [...TOOL_IGNORED_PATHS].some((directory) => pathIsWithinDirectory(path, directory))
   );
 }
 
@@ -678,7 +728,7 @@ function isPendingCounterpart(document, targetPath) {
   return expected === targetPath;
 }
 
-function checkLocalLinks(repositoryRoot, documents, ignoredDirectories) {
+function checkLocalLinks(repositoryRoot, documents) {
   const errors = [];
   for (const document of documents) {
     for (const link of document.links) {
@@ -690,7 +740,7 @@ function checkLocalLinks(repositoryRoot, documents, ignoredDirectories) {
         errors.push(`${prefix}: local link escapes the repository: ${link.destination}`);
       } else if (
         target &&
-        !targetIsIgnored(repositoryRoot, target, ignoredDirectories) &&
+        !targetIsIgnored(repositoryRoot, target) &&
         !existsSync(target) &&
         !isPendingCounterpart(document, target)
       ) {
@@ -701,7 +751,7 @@ function checkLocalLinks(repositoryRoot, documents, ignoredDirectories) {
   return errors;
 }
 
-function validateDocumentation(repositoryRoot, manifest, classification, manifestErrors) {
+function validateDocumentation(repositoryRoot, classification, manifestErrors) {
   const { documents, errors: classificationErrors } = classification;
   const errors = [...manifestErrors, ...classificationErrors];
   const bilingual = checkBilingualDocumentation(
@@ -724,7 +774,7 @@ function validateDocumentation(repositoryRoot, manifest, classification, manifes
     }
   }
 
-  errors.push(...checkLocalLinks(repositoryRoot, documents, manifest.ignored_directories));
+  errors.push(...checkLocalLinks(repositoryRoot, documents));
   const migrationDebt = documents
     .filter((document) => document.category === "legacy_files")
     .map((document) => `${document.path}: legacy document has not been migrated`);
@@ -753,13 +803,12 @@ export function checkDocumentation(repositoryRoot) {
     };
   }
 
-  const documents = discoverRepositoryDocumentation(root, manifestResult.manifest);
+  const documents = discoverRepositoryDocumentation(root);
 
   const classification = classifyDocumentation(root, manifestResult.manifest, documents);
 
   return validateDocumentation(
     root,
-    manifestResult.manifest,
     classification,
     manifestResult.errors,
   );
@@ -788,7 +837,7 @@ function reportDocumentationResult(report) {
 }
 
 function main() {
-  // Validates all maintained Markdown and reports errors and migration debt separately.
+  // Validates all maintained Markdown and reports errors, translation debt, and migration debt.
   const report = checkDocumentation(process.cwd());
 
   reportDocumentationResult(report);

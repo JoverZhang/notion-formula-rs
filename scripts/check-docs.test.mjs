@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { checkDocumentation } from "./check-docs.mjs";
+
+const checkerPath = fileURLToPath(new URL("./check-docs.mjs", import.meta.url));
 
 const manifestCategories = [
   "bilingual_files",
@@ -15,12 +19,15 @@ const manifestCategories = [
   "ignored_directories",
   "legacy_files",
 ];
+const defaultManifestEntries = {
+  ignored_directories: [".agent"],
+};
 
 function documentationManifest(categories = {}) {
   return manifestCategories
     .filter((category) => category !== "legacy_files" || category in categories)
     .map((category) => {
-      const entries = categories[category] ?? [];
+      const entries = categories[category] ?? defaultManifestEntries[category] ?? [];
       const values = entries.map((entry) => `  ${JSON.stringify(entry)},`).join("\n");
       return values ? `${category} = [\n${values}\n]` : `${category} = []`;
     })
@@ -218,20 +225,83 @@ const fixtures = [
     },
   },
   {
+    name: "requires the manifest to declare the ignored legacy directory",
+    repository: {
+      ".agent": {
+        nested: {
+          "legacy.md": "[Missing](nowhere.md)\n",
+        },
+      },
+      docs: {
+        "manifest.toml": documentationManifest({
+          ignored_directories: [],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 0,
+      errors: ["docs/manifest.toml: ignored_directories must contain exactly .agent"],
+      migrationDebt: [],
+      pairCount: 0,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "rejects an extra ignored directory without hiding its Markdown",
+    repository: {
+      hidden: {
+        "notes.md": "# Notes\n",
+      },
+      docs: {
+        "manifest.toml": documentationManifest({
+          ignored_directories: [".agent", "hidden"],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 1,
+      errors: [
+        "docs/manifest.toml: ignored_directories must contain exactly .agent",
+        "hidden/notes.md: Markdown file is not classified by docs/manifest.toml",
+      ],
+      migrationDebt: [],
+      pairCount: 0,
+      translationDebt: [],
+    },
+  },
+  {
     name: "reports each exact legacy file as migration debt",
     repository: {
       docs: {
-        "legacy-guide.md": "# Legacy guide\n",
+        "glossary.md": "# Legacy glossary\n",
         "manifest.toml": documentationManifest({
           bilingual_directories: ["docs"],
-          legacy_files: ["docs/legacy-guide.md"],
+          legacy_files: ["docs/glossary.md"],
         }),
       },
     },
     expected: {
       documentCount: 1,
       errors: [],
-      migrationDebt: ["docs/legacy-guide.md: legacy document has not been migrated"],
+      migrationDebt: ["docs/glossary.md: legacy document has not been migrated"],
+      pairCount: 0,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "rejects a new file added to the frozen legacy baseline",
+    repository: {
+      docs: {
+        "new-legacy.md": "# New legacy document\n",
+        "manifest.toml": documentationManifest({
+          legacy_files: ["docs/new-legacy.md"],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 1,
+      errors: ["docs/manifest.toml: legacy_files cannot add new legacy path docs/new-legacy.md"],
+      migrationDebt: ["docs/new-legacy.md: legacy document has not been migrated"],
       pairCount: 0,
       translationDebt: [],
     },
@@ -286,6 +356,7 @@ const fixtures = [
     expected: {
       documentCount: 0,
       errors: [
+        "docs/manifest.toml: legacy_files cannot add new legacy path docs/future.md",
         "docs/manifest.toml: legacy_files entry must be a Markdown file: docs",
         "docs/manifest.toml: legacy_files must use exact paths, got docs/*.md",
         "docs/manifest.toml: legacy_files references missing Markdown file docs",
@@ -416,14 +487,29 @@ function materializeRepositoryTree(directory, tree) {
   }
 }
 
-function checkFixtureRepository(repository) {
+function withFixtureRepository(repository, operation) {
   const repositoryRoot = mkdtempSync(join(tmpdir(), "check-docs-"));
   try {
     materializeRepositoryTree(repositoryRoot, repository);
-    return checkDocumentation(repositoryRoot);
+    return operation(repositoryRoot);
   } finally {
     rmSync(repositoryRoot, { force: true, recursive: true });
   }
+}
+
+function checkFixtureRepository(repository) {
+  return withFixtureRepository(repository, (repositoryRoot) =>
+    checkDocumentation(repositoryRoot),
+  );
+}
+
+function runChecker(repository) {
+  return withFixtureRepository(repository, (repositoryRoot) =>
+    spawnSync(process.execPath, [checkerPath], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    }),
+  );
 }
 
 for (const fixture of fixtures) {
@@ -433,3 +519,39 @@ for (const fixture of fixtures) {
     assert.deepEqual(actual, fixture.expected);
   });
 }
+
+test("CLI exits nonzero when documentation has structural errors", () => {
+  const result = runChecker({
+    "notes.md": "# Unclassified notes\n",
+    docs: {
+      "manifest.toml": documentationManifest(),
+    },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Documentation checks failed \(1\)/);
+});
+
+test("CLI exits zero while reporting translation and migration debt", () => {
+  const result = runChecker({
+    "README.md": bilingualDocument({
+      body: "# Project\n\n[简体中文](README.zh-CN.md)",
+      counterpart: "./README.zh-CN.md",
+      docId: "project.readme",
+      language: "en",
+      title: "Project",
+      translationStatus: "pending",
+    }),
+    docs: {
+      "glossary.md": "# Legacy glossary\n",
+      "manifest.toml": documentationManifest({
+        bilingual_files: ["README.md"],
+        legacy_files: ["docs/glossary.md"],
+      }),
+    },
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /Translation debt \(1\)/);
+  assert.match(result.stdout, /Migration debt \(1\)/);
+});

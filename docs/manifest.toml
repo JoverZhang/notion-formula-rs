@@ -6,15 +6,7 @@ bilingual_directories = [
 
 english_only_files = []
 
-neutral_redirect_files = [
-  "analyzer/README.md",
-  "analyzer_wasm/README.md",
-  "builtin_fn/README.md",
-  "builtin_fn_macros/README.md",
-  "evaluator/README.md",
-  "examples/vite/README.md",
-  "ide/README.md",
-]
+neutral_redirect_files = []
 
 control_files = [
   "AGENTS.md",
@@ -28,6 +20,10 @@ ignored_directories = [
 
 legacy_files = [
   "README.md",
+  "analyzer/README.md",
+  "analyzer_wasm/README.md",
+  "builtin_fn/README.md",
+  "builtin_fn_macros/README.md",
   "docs/_description_templates/changelog_entry_template.md",
   "docs/_description_templates/design_contract_template.md",
   "docs/_description_templates/module_README_template.md",
@@ -53,4 +49,7 @@ legacy_files = [
   "docs/design/wasm-boundary.md",
   "docs/glossary.md",
   "docs/signature-help.md",
+  "evaluator/README.md",
+  "examples/vite/README.md",
+  "ide/README.md",
 ]
