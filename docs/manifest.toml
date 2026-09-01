@@ -1,0 +1,65 @@
+bilingual_files = []
+
+bilingual_directories = [
+  "docs",
+]
+
+english_only_files = []
+
+neutral_redirect_files = []
+
+control_files = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  "DOCUMENTATION_RESTRUCTURE_PLAN.md",
+]
+
+ignored_directories = [
+  ".agent",
+]
+
+legacy_files = [
+  "README.md",
+  "analyzer/README.md",
+  "analyzer_wasm/README.md",
+  "builtin_fn/README.md",
+  "builtin_fn_macros/README.md",
+  "docs/_description_templates/changelog_entry_template.md",
+  "docs/_description_templates/design_contract_template.md",
+  "docs/_description_templates/module_README_template.md",
+  "docs/builtin_functions/README.md",
+  "docs/changelog_entry_guidelines.md",
+  "docs/changelogs/20260207-add-docs-system.md",
+  "docs/changelogs/20260210-disable-partial-format-on-syntax-errors.md",
+  "docs/changelogs/20260211-decouple-analyze-format-quick-fixes.md",
+  "docs/changelogs/20260213-refactor-analyzer-ide-wasm-entrypoints.md",
+  "docs/changelogs/20260213-wasm-stateful-analyzer-config-and-offset-renames.md",
+  "docs/changelogs/20260215-wasm-api-remove-ide-prefix.md",
+  "docs/changelogs/20260718-builtin-function-catalog.md",
+  "docs/changelogs/20260718-evaluator-generated-structure.md",
+  "docs/changelogs/20260720-builtin-function-runtime.md",
+  "docs/changelogs/20260730-evaluator-builtin-cleanup.md",
+  "docs/changelogs/20260730-evaluator-builtin-goldens.md",
+  "docs/changelogs/20260831-postfix-call-validation.md",
+  "docs/design/builtin-fn.md",
+  "docs/design/demo-vite.md",
+  "docs/design/drift-tracker.md",
+  "docs/design/README.md",
+  "docs/design/README.zh-CN.md",
+  "docs/design/analyzer.md",
+  "docs/design/analyzer.zh-CN.md",
+  "docs/design/contracts.md",
+  "docs/design/contracts.zh-CN.md",
+  "docs/design/evaluator.md",
+  "docs/design/evaluator.zh-CN.md",
+  "docs/design/ide.md",
+  "docs/design/testing.md",
+  "docs/design/wasm-boundary.md",
+  "docs/glossary.md",
+  "docs/README.md",
+  "docs/README.zh-CN.md",
+  "docs/signature-help.md",
+  "evaluator/README.md",
+  "examples/vite/README.md",
+  "ide/README.md",
+]
