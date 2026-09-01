@@ -44,9 +44,10 @@ analyzer.apply_edits(
 analyzer.help(source: string, cursor_utf16: number): HelpResult
 ```
 
-The Current generated class also provides `free()` and `[Symbol.dispose]()`. After either mechanism
-disposes an instance, callers must not invoke its domain methods; the resulting null-pointer error
-is uncontrolled and has no compatibility guarantee.
+The Current generated class always provides `free()`. When the host defines `Symbol.dispose`, the
+glue also installs `[Symbol.dispose]()` as a disposal method. After either mechanism disposes an
+instance, callers must not invoke its domain methods; the build-dependent generated failure is
+uncontrolled and has no compatibility guarantee.
 
 An instance retains its property schema and completion preference limit. It has no method to change
 that configuration. It does not retain source text, analysis output, edit history, or a cursor;
@@ -124,6 +125,11 @@ type ApplyResult = {
   cursor: number;
 };
 ```
+
+Supported string inputs—including source text, property names, and `TextEdit.new_text`—must be
+well-formed Unicode without isolated UTF-16 surrogates. JavaScript permits isolated surrogates, but
+the Current generated boundary replaces them with `U+FFFD` before Rust receives the value. Inputs
+that depend on that normalization are outside this contract.
 
 The supported numeric domain for every cursor and span endpoint is a finite integer from `0` through
 `4_294_967_295`, the unsigned 32-bit range. Direct cursor arguments pass through the wasm-bindgen

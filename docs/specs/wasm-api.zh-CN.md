@@ -43,8 +43,9 @@ analyzer.apply_edits(
 analyzer.help(source: string, cursor_utf16: number): HelpResult
 ```
 
-Current 生成类还提供 `free()` 与 `[Symbol.dispose]()`。通过其中任一机制释放实例后，调用方不得
-再调用该实例的 domain method；此时产生的 null-pointer error 不受兼容性保证约束。
+Current 生成类始终提供 `free()`。Host 定义 `Symbol.dispose` 时，glue 还会安装
+`[Symbol.dispose]()` 作为 disposal method。通过其中任一机制释放实例后，调用方不得再调用该实例的
+domain method；生成的失败会随 build 而变化，不受兼容性保证约束。
 
 实例会保留属性 schema 和补全优选项数量上限，且没有方法可在创建后修改这些配置。它不会
 保留源码、分析结果、编辑历史或光标位置；每次操作都接收完整源码。因此，多个文档如果共享
@@ -115,6 +116,10 @@ type ApplyResult = {
   cursor: number;
 };
 ```
+
+受支持的 string input 包括 source text、property name 和 `TextEdit.new_text`，它们必须是没有 isolated
+UTF-16 surrogate 的 well-formed Unicode。JavaScript 允许 isolated surrogate，但 Current 生成边界会在
+Rust 收到值之前把它替换为 `U+FFFD`。依赖该 normalization 的输入不属于本契约。
 
 所有 cursor 和 span endpoint 支持的 numeric domain 都是 `0` 至 `4_294_967_295` 之间的有限整数，
 也就是 unsigned 32-bit range。Direct cursor argument 会先经过 wasm-bindgen ABI，再进入 Rust 校验；
