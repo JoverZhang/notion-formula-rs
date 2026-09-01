@@ -133,6 +133,14 @@ work and allocates a result when storage is shared.
 physical value in a null, failed, or inactive slot is an implementation placeholder. Kernel code
 must consult the corresponding state before reading it.
 
+[`abi_kind_for_ty`](../../../evaluator/src/core/inputs.rs) maps semantic types onto these physical
+variants. After removing `Null`, a union with at least one remaining member retains an ABI kind
+when every member maps to that kind; a heterogeneous union falls back to `Any`. `Unknown`,
+generics, `Fn`, and `Ident` also use `Any`. Null itself has no column variant and remains in
+`Validity`. The builtin generator applies the same mapping in
+[`build_support.rs`](../../../evaluator/build_support.rs), keeping prepared inputs and generated
+argument and return types on the same ABI boundary.
+
 ## Builtin declarations generate an evaluator ABI
 
 The complete builtin inventory remains in
@@ -191,6 +199,16 @@ the active mask as work completes.
 Plan handles carry an owner token, so a Controlled kernel cannot accidentally execute a node from
 another `ExecPlan`. Generated plan structures contain no borrowed AST lifetime, and dispatch is
 static through a generic context rather than `dyn` trait objects.
+
+### Golden fixtures prove catalog wiring, not every failure path
+
+The builtin golden suite requires one baseline fixture for every supported declaration. Each
+fixture enters through production syntax and semantic analysis, then crosses `prepare_formula`,
+required-column construction, `EvalInputsBuilder`, and masked evaluation before comparing row
+outcomes. The invariant in [`builtin_golden.rs`](../../../evaluator/tests/builtin_golden.rs) and its
+[`support module`](../../../evaluator/tests/support/builtin_golden.rs) proves nominal catalog
+coverage and dispatch wiring. It does not claim that one baseline exhausts each function's null,
+error, mask, or boundary behavior; focused fixtures and lower-level tests cover selected cases.
 
 ## Failures stop at the boundary that owns them
 

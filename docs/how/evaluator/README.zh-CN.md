@@ -114,6 +114,13 @@ Null 不是错误，未激活行也不是 null。未激活的物理 slot 会被�
 `EvalBlock` 把物理 `Column`、`ok` 掩码和带行 index 的 `EvalError` 组合在一起。Null、失败或未激活 slot
 中的物理值都是实现占位符，kernel 必须先检查相应状态，才能读取它。
 
+[`abi_kind_for_ty`](../../../evaluator/src/core/inputs.rs) 负责把语义类型映射到这些物理 variant。移除
+`Null` 后，如果 union 至少还有一个成员，并且所有成员都映射到同一种 ABI kind，就继续使用该 kind；
+异构 union 则降级为 `Any`。`Unknown`、泛型、`Fn` 和 `Ident` 也使用 `Any`。Null 本身没有 column
+variant，仍由 `Validity` 表示。内置函数生成器在
+[`build_support.rs`](../../../evaluator/build_support.rs) 中使用同一映射，使已准备输入与生成参数、返回值
+落在一致的 ABI 边界上。
+
 ## 内置函数声明会生成 evaluator ABI
 
 完整的内置函数清单只维护在
@@ -162,6 +169,15 @@ handle，还会收到受限的 `BuiltinEvalContext`，可以在指定掩码下�
 
 Plan handle 带有 owner token，因此 Controlled kernel 不会误执行另一份 `ExecPlan` 的节点。生成的计划
 结构也不携带 AST 借用 lifetime；dispatch 通过泛型 context 静态完成，而不是使用 `dyn` trait object。
+
+### Golden fixture 证明 catalog 接线完整，不代表穷尽失败路径
+
+Builtin golden suite 要求每个受支持声明都有一份基线 fixture。每个 fixture 都从生产语法和语义分析进入，
+依次跨过 `prepare_formula`、必需列构造、`EvalInputsBuilder` 和带掩码的求值，再比较逐行结果。
+[`builtin_golden.rs`](../../../evaluator/tests/builtin_golden.rs) 及其
+[`support module`](../../../evaluator/tests/support/builtin_golden.rs) 中的不变量证明 catalog 的名义覆盖和
+dispatch 接线完整，但不表示一份基线已经穷尽每个函数的 null、错误、掩码或其他边界行为；focused
+fixture 与较低层测试只针对其中选定场景补充覆盖。
 
 ## 失败会停在负责该问题的边界
 
