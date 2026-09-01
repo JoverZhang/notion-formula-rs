@@ -16,7 +16,7 @@ last_verified: 2026-09-01
 
 ## 为什么建设这个项目
 
-交互式公式体验需要语法反馈、编辑辅助和求值对公式含义保持一致。`notion-formula-rs` 围绕同一套语言模型提供这些能力，使集成方不必自行协调彼此独立的 parser、type rule 和 runtime。
+交互式公式体验需要语法反馈、编辑辅助和求值对公式含义保持一致。`notion-formula-rs` 围绕同一套公式语言定义提供这些能力，使集成方不必自行协调彼此独立的 parser、type rule 和 runtime。
 
 项目优先保证行为确定、过程可理解、支持边界明确。Notion-style formula 是语言词汇的起点，但项目更重视在已声明范围内保持正确，不以宣称完整复刻其他产品为目标。
 
@@ -26,9 +26,9 @@ last_verified: 2026-09-01
 
 ## 目标与非目标
 
-项目的目标是提供一致的公式语言、编写过程中的有效 analysis、行为可预期的 editor services，以及对受支持公式的同步 evaluation。
+项目的目标是提供一致的公式语言、编写过程中的有效 analysis、行为可预期的 editor services，以及对受支持公式进行求值的能力。
 
-项目不是独立的终端产品，也不负责公式存储、持久 formula identity、rename transaction、部署或运维。完整 Notion compatibility 不是目标，Rust `pub` item 也不会自动成为稳定的 integration contract。
+项目不是面向终端用户的独立产品，也不负责公式存储、持久 formula identity、rename transaction、部署或运维。完整 Notion compatibility 不是目标，Rust `pub` item 也不会自动成为稳定的 integration contract。
 
 ## 边界与重新评估
 

@@ -16,7 +16,7 @@ last_verified: 2026-09-01
 
 ## Why this project exists
 
-Interactive formula experiences need syntax feedback, editor assistance, and evaluation to agree on what a formula means. `notion-formula-rs` brings those capabilities together around one language model so an integration does not have to reconcile separate parsers, type rules, and runtimes.
+Interactive formula experiences need syntax feedback, editor assistance, and evaluation to agree on what a formula means. `notion-formula-rs` brings those capabilities together around one shared definition of the formula language so an integration does not have to reconcile separate parsers, type rules, and runtimes.
 
 The project favors deterministic, inspectable behavior and explicit support boundaries. Notion-style formulas provide the starting vocabulary, but correctness within the documented surface matters more than claiming complete parity with another product.
 
@@ -26,7 +26,7 @@ The project serves teams that embed formula authoring in an editor or applicatio
 
 ## Goals and non-goals
 
-The goals are to provide one coherent formula language, useful analysis while a formula is being written, predictable editor services, and synchronous evaluation of supported formulas.
+The goals are to provide one coherent formula language, useful analysis while a formula is being written, predictable editor services, and evaluation of supported formulas.
 
 The project is not a standalone end-user product. It does not own formula storage, persistent formula identity, rename transactions, deployment, or operations. Complete Notion compatibility is not a goal, and Rust `pub` items are not automatically stable integration contracts.
 
