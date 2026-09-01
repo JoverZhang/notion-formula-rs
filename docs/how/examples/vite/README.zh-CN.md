@@ -34,6 +34,9 @@ Vite 示例通过浏览器调用 stateful WASM Analyzer。它展示一个应用�
 为空，所以入口会在初始化完成后通过 `setSource` 提交两份示例源码。此后，待分析状态以 view model 为准，
 不再只取自初始 DOM。
 
+[`app/context.ts`](../../../../examples/vite/src/app/context.ts) 统一定义 `PROPERTY_SCHEMA` 以及由它构造的
+`ANALYZER_CONFIG`。入口把这份配置交给共享 Analyzer，panel 则把同一份 property schema 用作 chip allowlist。
+
 ```text
 main.ts
   |
@@ -162,8 +165,9 @@ structure。
 Unwrapped layout 保持 segment 的原始顺序。Wrapped layout 会在 return arrow 之前寻找左右括号，再以 comma
 segment 为界断开 parameter line，并使用两个空格缩进；找不到括号时仍使用 unwrapped layout。
 [`signature_popover.ts`](../../../../examples/vite/src/ui/signature_popover.ts) 先绘制 unwrapped 版本，在下一帧
-测量 overflow，必要时再以 wrapped mode 重绘。宽度取 viewport 的 28%，限制在 240–360 px；左侧放得下时
-优先放左侧，否则尝试右侧，最后选择空间更大的一侧。
+测量 overflow，必要时再以 wrapped mode 重绘。Viewport 宽于 760 px 时，popover 宽度取 viewport 的 28%，
+限制在 240–360 px；左侧放得下时优先放左侧，否则尝试右侧，最后选择空间更大的一侧。Viewport 不超过
+760 px 时，CSS 会把它静态放在 panel 内并占满宽度。
 
 同一个 popover 还可以在 signature 下方显示 diagnostic text。
 [`model/diagnostics.ts`](../../../../examples/vite/src/model/diagnostics.ts) 会把 range 限制在 CodeMirror
@@ -175,9 +179,9 @@ document 内，转换已知 severity，并在 lint message 为空时显示 `(no 
 
 Token decoration 和 property chip 由 CodeMirror state field 管理，分别定义在
 [`editor_decorations.ts`](../../../../examples/vite/src/editor_decorations.ts) 和
-[`editor/chip_decorations.ts`](../../../../examples/vite/src/editor/chip_decorations.ts)。在下一轮分析替换数据前，
-state field 会随着期间发生的 document change 映射已有 range，让编辑器在 analysis debounce 期间仍保持
-一致。
+[`editor/chip_decorations.ts`](../../../../examples/vite/src/editor/chip_decorations.ts)。State field 会随着
+CodeMirror document transaction 映射已有 range。每当 `AppVM` 发出状态，`FormulaPanelView.update` 都会重新
+构造这些 range；源码刚变化以及分析完成时都会执行这一步。
 
 示例只把 exact token pattern `prop("Name")` 识别为 chip，而且 `Name` 必须存在于配置的 property set。完整
 range 会被替换成 atomic CodeMirror widget；点击 chip 会选择它的 raw start，并把焦点交还编辑器。这些识别和
@@ -212,7 +216,8 @@ Current 示例在不同层采用不同的降级方式：
 | 初始化完成后 analyze 抛错 | 生成一个 zero-width `analysis failed` diagnostic，清空 token/type，并设为 `error` | `AppVM.runAnalyze` |
 | Help 抛错 | 清空 completion/signature data；active panel 显示 `No suggestions` | `safeBuildCompletionState` |
 | Format 或 Quick Fix 抛错 | 保持编辑器不变 | `formula_panel_view.ts` 中的 button handler |
-| Token 或 chip decoration 构造失败 | 省略不安全的 decoration | `editor_decorations.ts`、`formula_panel_view.ts` |
+| 单个 token span 非法 | 跳过该 span，保留其他 token decoration | `computeTokenDecorationRanges` |
+| Chip decoration 构造抛错 | 清空 chip range 与 decoration | `formula_panel_view.ts` |
 | Chip offset map 校验失败 | 保留已提交的 decoration，但不建立 coordinate map | `chip_spans.ts`、`formula_panel_view.ts` |
 
 这些降级方式让 demo 能继续交互，也把失败留在方便观察的接缝。相关 message 或静默行为不属于 compatibility
@@ -237,8 +242,9 @@ mapping、signature layout 和 WASM error adapter；
 popover placement、UTF-16 cursor flow、decoration rendering 和 build 后的 WASM module。
 
 [`playwright.config.ts`](../../../../examples/vite/playwright.config.ts) 会为测试 suite build 并启动 preview
-server。没有设置 `PW_PORT` 时，它根据 checkout path 计算 port，降低并行 worktree 撞端口的概率。测试用
-`?debug=1` 打开应用，并等到 `window.__nf_debug` 出现后再检查 panel。
+server。`PW_HOST` 同时控制 Playwright base URL 和 preview bind address，默认值为 `127.0.0.1`。没有设置
+`PW_PORT` 时，配置会根据 checkout path 计算 port，降低并行 worktree 撞端口的概率。测试用 `?debug=1`
+打开应用，并等到 `window.__nf_debug` 出现后再检查 panel。
 
 ## 从呈现边界向内调试
 

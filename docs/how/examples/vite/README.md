@@ -38,6 +38,10 @@ recorded in the view model. In the Current startup those records are still empty
 sends both sample sources through `setSource` after initialization. The view model, rather than the
 initial DOM alone, thereby becomes the source of analyzed state.
 
+[`app/context.ts`](../../../../examples/vite/src/app/context.ts) owns `PROPERTY_SCHEMA` and the
+`ANALYZER_CONFIG` built from it. The entrypoint passes that configuration to the shared Analyzer,
+while the panel uses the same property schema as its chip allowlist.
+
 ```text
 main.ts
   |
@@ -112,13 +116,13 @@ document change
 selection-only change -----------------------+
 ```
 
-The analysis loop updates durable `FormulaState`. Immediately before the WASM call, `AppVM` emits
-`analyzing`; a successful call replaces diagnostics, tokens, and output type and emits `ok`. Each
-formula has its own debounce timer, so editing `f1` does not cancel an `f2` analysis.
+The analysis loop updates analysis-facing `FormulaState`. Immediately before the WASM call, `AppVM`
+emits `analyzing`; a successful call replaces diagnostics, tokens, and output type and emits `ok`.
+Each formula has its own debounce timer, so editing `f1` does not cancel an `f2` analysis.
 
 The help loop is panel-local and runs after either a document or selection change. It always reads
 the current CodeMirror document and selection head when its 120 ms timer fires. Completion state
-can therefore update while a panel is inactive, but only the active panel renders it.
+can therefore update while a panel is inactive, but only the active panel displays it.
 
 Each `EditorView` installs CodeMirror `history()` and `historyKeymap`. An application keymap handles
 ArrowUp, ArrowDown, Escape, Tab, and Enter for the active completion UI before the history and
@@ -182,8 +186,9 @@ return arrow for an opening and closing parenthesis, then breaks parameter lines
 with a two-space indent. If those delimiters are absent it keeps the unwrapped layout.
 [`signature_popover.ts`](../../../../examples/vite/src/ui/signature_popover.ts) first paints the
 unwrapped form, measures overflow on the next animation frame, and repaints in wrapped mode when
-needed. Its width is 28% of the viewport clamped to 240–360 px; it prefers the left side when that
-side fits, otherwise the right side, then the side with more room.
+needed. Above 760 px, its width is 28% of the viewport clamped to 240–360 px; it prefers the left side
+when that side fits, otherwise the right side, then the side with more room. At 760 px or below, CSS
+places it statically in the panel at full width.
 
 The same popover can show diagnostic text below the signature. Diagnostic presentation in
 [`model/diagnostics.ts`](../../../../examples/vite/src/model/diagnostics.ts) clamps ranges to the
@@ -196,9 +201,10 @@ diagnostic ordering or de-duplication pass.
 
 Token decorations and property chips are CodeMirror state fields defined in
 [`editor_decorations.ts`](../../../../examples/vite/src/editor_decorations.ts) and
-[`editor/chip_decorations.ts`](../../../../examples/vite/src/editor/chip_decorations.ts). State
-fields map existing ranges through intervening document changes until the next analysis replaces
-them, which keeps the editor coherent during the analysis debounce.
+[`editor/chip_decorations.ts`](../../../../examples/vite/src/editor/chip_decorations.ts). Their state
+fields map existing ranges through CodeMirror document transactions. `FormulaPanelView.update`
+rebuilds them whenever `AppVM` emits state, including immediately after a source change and after an
+analysis completes.
 
 The example recognizes a chip only for the exact token pattern `prop("Name")` when `Name` is in
 the configured property set. It replaces that complete range with an atomic CodeMirror widget.
@@ -239,7 +245,8 @@ The Current example intentionally uses different fallback policies at different 
 | Analyze throws after initialization | replace the result with one zero-width `analysis failed` diagnostic, clear tokens/type, and set `error` | `AppVM.runAnalyze` |
 | Help throws | clear completion/signature data; an active panel shows `No suggestions` | `safeBuildCompletionState` |
 | Format or Quick Fix throws | leave the editor unchanged | button handlers in `formula_panel_view.ts` |
-| Token or chip-decoration construction fails | omit the unsafe decorations | `editor_decorations.ts`, `formula_panel_view.ts` |
+| An individual token span is invalid | skip that span while retaining other token decorations | `computeTokenDecorationRanges` |
+| Chip-decoration construction throws | clear the chip ranges and decorations | `formula_panel_view.ts` |
 | Chip offset-map validation fails | retain dispatched decorations but omit the coordinate map | `chip_spans.ts`, `formula_panel_view.ts` |
 
 These fallbacks keep the demo interactive and make failures observable at useful seams, but their
@@ -266,8 +273,9 @@ error adapters under
 popover placement, UTF-16 cursor flow, decoration rendering, and the built WASM module.
 
 [`playwright.config.ts`](../../../../examples/vite/playwright.config.ts) builds and serves a preview
-for the suite. Unless `PW_PORT` is set, it hashes the checkout path into a port so parallel
-worktrees are less likely to collide. Tests open the app with `?debug=1` and wait for
+for the suite. `PW_HOST` controls both the Playwright base URL and the preview binding, and defaults
+to `127.0.0.1`. Unless `PW_PORT` is set, the configuration hashes the checkout path into a port so
+parallel worktrees are less likely to collide. Tests open the app with `?debug=1` and wait for
 `window.__nf_debug` before inspecting a panel.
 
 ## Debug from the presentation boundary inward
