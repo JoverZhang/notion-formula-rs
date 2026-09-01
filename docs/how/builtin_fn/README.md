@@ -122,9 +122,14 @@ The model supports five layouts without inferring repetition from names:
 For a repeating signature, an exact call shape satisfies:
 
 ```text
-total = head.len + repeat.len * groups + tail.len
+total = head.len + repeat.len * groups + tail_used
 groups >= repeat_min_groups
 ```
+
+`tail_used` is the number of tail slots selected for that projection. Production DSL
+declarations require every tail parameter when repeat is present, so
+`tail_used == tail.len` for them. A `ParamShape` constructed directly with optional tail
+slots may select fewer.
 
 `min` counts complete groups rather than individual parameters. It must be an unsuffixed,
 non-negative integer literal. A repeat group cannot be empty or optional, and a declaration

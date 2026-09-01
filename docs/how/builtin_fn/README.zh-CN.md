@@ -116,9 +116,13 @@ override。Unsupported declaration 仍会生成有序的 catalog metadata，但
 对于 repeating signature，精确匹配的调用满足：
 
 ```text
-total = head.len + repeat.len * groups + tail.len
+total = head.len + repeat.len * groups + tail_used
 groups >= repeat_min_groups
 ```
+
+`tail_used` 表示这次 projection 选中的 tail slot 数量。生产 DSL 要求 repeat 后的所有
+tail parameter 都是 required，因此其中 `tail_used == tail.len`。如果直接构造带 optional
+tail slot 的 `ParamShape`，则可能选用更少的 slot。
 
 `min` 计算完整 group 的数量，而不是单个参数的数量；它必须是不带 suffix 的非负整数
 literal。Repeat group 不能为空，成员不能 optional，并且一个声明只能出现一次
