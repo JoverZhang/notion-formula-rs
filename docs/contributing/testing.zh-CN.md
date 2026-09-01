@@ -23,7 +23,7 @@ last_verified: 2026-09-01
 | --- | --- | --- |
 | 文档结构、metadata、翻译或链接 | `just docs-check` | Checker 自身测试和仓库文档扫描 |
 | 内置函数声明、调用形状或解析 | `cargo test -p builtin_fn` | Resolver 与声明 DSL 行为，包括 macro 编译成功/失败测试 |
-| Procedural macro 的解析或展开 | `cargo test -p builtin_fn_macros` 和 `cargo test -p builtin_fn --test macro_ui` | Macro 实现单元，以及消费方 crate 的编译成功/失败 contract |
+| Procedural macro 的解析或展开 | `cargo test -p builtin_fn_macros` 和 `cargo test -p builtin_fn` | Macro 实现单元，以及消费方 crate 的声明 DSL 与编译成功/失败 contract |
 | 词法、语法、语义分析或诊断 | `cargo test -p analyzer` | Analyzer 单元测试、集成测试和诊断 golden 测试 |
 | 公式准备或逐行求值 | `cargo test -p evaluator` | 生成 contract、输入/runtime 不变量和内置函数行为 |
 | 补全、签名帮助、格式化或文本编辑 | `cargo test -p ide` | IDE 单元测试、集成测试和格式化 golden 测试 |

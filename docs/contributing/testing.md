@@ -25,7 +25,7 @@ generated expectations.
 | --- | --- | --- |
 | Documentation structure, metadata, translations, or links | `just docs-check` | The checker tests and the repository documentation scan |
 | Builtin declarations, call shapes, or resolution | `cargo test -p builtin_fn` | Resolver and declaration-DSL behavior, including macro pass/fail compilation |
-| Procedural macro parsing or expansion | `cargo test -p builtin_fn_macros` and `cargo test -p builtin_fn --test macro_ui` | Macro implementation units and the consuming crate's compile-pass/compile-fail contract |
+| Procedural macro parsing or expansion | `cargo test -p builtin_fn_macros` and `cargo test -p builtin_fn` | Macro implementation units plus the consuming crate's declaration-DSL and compile-pass/compile-fail contracts |
 | Lexing, parsing, semantic analysis, or diagnostics | `cargo test -p analyzer` | Analyzer unit, integration, and diagnostic golden tests |
 | Formula preparation or row evaluation | `cargo test -p evaluator` | Generated contracts, input/runtime invariants, and builtin behavior |
 | Completion, signature help, formatting, or text edits | `cargo test -p ide` | IDE unit, integration, and formatting golden tests |
