@@ -73,7 +73,7 @@ docs/
 └── assets/
 ```
 
-`.*` 表示相邻的英文 `.md` 与简体中文 `.zh-CN.md`。它不表示把两种语言交错写在一个文件里。`contributing/coding.*` 是条件项：只有审计确认项目存在需要文字说明的特有 coding rules 时才保留。
+`.*` 表示相邻的英文 `.md` 与简体中文 `.zh-CN.md`。它不表示把两种语言交错写在一个文件里。`contributing/coding.*` 是否保留，由 Contributing 小节定义的审计决定。
 
 ### 三个阅读入口
 
@@ -126,7 +126,11 @@ Inventory 至少从 WASM exports、公式语法与运算符、Rust builtin decla
 
 ### Contributing 与 glossary
 
-`docs/contributing/` 说明贡献者如何正确修改和验证项目，维护 testing、project-specific coding 和 changelog writing 规范。它不描述产品契约或实现机制；没有项目特有规则时，不用通用 Rust 建议填充 `coding.*`。
+`docs/contributing/` 说明贡献者如何正确修改和验证项目，维护 testing、project-specific coding 和 changelog writing 规范。它不描述产品契约或实现机制。
+
+实施前必须审计仓库中已经生效的 coding rules，包括 `AGENTS.md`、Cargo workspace lints、rustfmt 或 Clippy 配置、`justfile` 以及现有 contributor guidance。PR 或 review record 必须列出需要保留的项目特有规则及其权威来源，或者明确记录“不需要独立 coding guide”的结论。只有前一种结果才建立 `contributing/coding.*`；不得用通用 Rust 建议或对工具配置的逐项转述填充它。
+
+本次重构不建立 `operations/`。只有项目以后出现部署、监控、故障处理或发布操作，并确实需要 runbook 时，才另行决定是否增加该目录。
 
 项目只有一份规范术语表，因此使用根目录 `GLOSSARY.md`，不为单个文件建立 `reference/` 目录。它由 `docs/README.*` 链接，供整个仓库共同引用。
 
@@ -311,7 +315,6 @@ Checker 最后分别输出 errors、translation debt 和 migration debt。只有
 | demo 设计文档与 example README | 合并为 `how/examples/vite/README.*` |
 | `docs/design/testing.md` | 迁入 `contributing/testing.*` |
 | `docs/changelog_entry_guidelines.md` | 迁入 `contributing/changelogs.*` |
-| 项目特有的 coding rules | 经核验后进入 `contributing/coding.*`；不复制通用 Rust 建议或工具配置 |
 | `docs/glossary.md` | 迁入根目录 English-only `GLOSSARY.md` |
 | `docs/changelogs/` | 保留历史内容并逐步补齐 counterpart |
 | `docs/assets/` | 继续共享；最终未被引用的资产才删除 |
@@ -377,11 +380,11 @@ Evaluator contract generation 仍然从 Rust builtin declarations 工作，不�
 
 - 将 English-only glossary 迁到根目录。
 - 将 testing 和 changelog maintenance 文档迁入 `contributing/`。
-- 只有存在已确认的项目特有规则时才建立 `contributing/coding.*`。
+- 完成 Contributing 小节定义的 coding rules audit。
 - 保留并精简 changelog template。
 - 补齐历史 changelog counterpart。
 
-完成条件：术语、贡献规范和历史记录没有被强行塞入 intent/specs/how；所有应双语的正交文档均为 `synced`，且没有为了补齐目录而创建空泛的 coding 规范。
+完成条件：术语、贡献规范和历史记录没有被强行塞入 intent/specs/how；所有应双语的正交文档均为 `synced`；coding rules audit 在 PR 或 review record 中有明确结论。
 
 ### 5. 清理旧结构
 
