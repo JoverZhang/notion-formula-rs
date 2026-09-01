@@ -16,6 +16,7 @@ neutral_redirect_files = [
   "builtin_fn_macros/README.md",
   "analyzer/README.md",
   "ide/README.md",
+  "analyzer_wasm/README.md",
 ]
 
 control_files = [
@@ -30,7 +31,6 @@ ignored_directories = [
 
 legacy_files = [
   "README.md",
-  "analyzer_wasm/README.md",
   "docs/_description_templates/design_contract_template.md",
   "docs/_description_templates/module_README_template.md",
   "docs/builtin_functions/README.md",
