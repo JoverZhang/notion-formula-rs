@@ -1,4 +1,5 @@
 bilingual_files = [
+  "README.md",
   "DOCUMENTATION.md",
 ]
 
@@ -31,7 +32,6 @@ ignored_directories = [
 ]
 
 legacy_files = [
-  "README.md",
   "docs/_description_templates/design_contract_template.md",
   "docs/_description_templates/module_README_template.md",
   "docs/design/builtin-fn.md",
@@ -49,7 +49,5 @@ legacy_files = [
   "docs/design/testing.md",
   "docs/design/wasm-boundary.md",
   "docs/glossary.md",
-  "docs/README.md",
-  "docs/README.zh-CN.md",
   "docs/signature-help.md",
 ]
