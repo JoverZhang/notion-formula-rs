@@ -79,7 +79,7 @@ coordinate，再把操作交给 IDE。转换后的排序、重叠校验、edit �
 `format` 和 `apply_edits` 也只在坐标转换后委托操作。`help` 会传入保存的偏好数量，但补全和签名机制仍在
 `ide` 内部。
 
-## 坐标转换让 Rust 始终使用 scalar boundary
+## 坐标转换让 Rust 始终使用 Unicode scalar 边界
 
 Rust core span 和 cursor 使用 UTF-8 字节 offset；JavaScript 编辑器位置进入本 crate 时使用 UTF-16 code
 unit offset。[`offsets.rs`](../../../analyzer_wasm/src/offsets.rs) 集中实现两个方向。输入是否有效以及调用方
@@ -99,7 +99,8 @@ scalar 前已经累计的位置，避免从 scalar 中间切开。通用 convert
 - `apply_edits` 通过 `utf16_to_8_text_edits` 处理 DTO range。这个 helper 分别转换 endpoint，生成 Analyzer
   byte edit，再交给 IDE 校验整个 batch。
 
-Past-end、reversed 和 scalar-interior position 对调用方呈现的具体行为，以 WASM specification 为准。
+超过文档末尾、range 方向反转，以及落在 Unicode scalar 编码内部的位置，对调用方呈现的具体行为以 WASM
+specification 为准。
 
 因此，位于 surrogate pair 内的 endpoint 可能让 range 收缩为空字节区间，也可能改变多个 range 转换后的
 相对关系。Core edit validator 只能看到最终字节 range。`offsets.rs` 旁的单元测试固定了取整和越界路径；
@@ -184,7 +185,7 @@ cargo test -p analyzer_wasm
 ```
 
 `offsets.rs` 旁的单元测试覆盖 Unicode scalar 内部位置的向下取整，以及带校验的越界转换；analyze
-converter test 固定多行 diagnostic 的位置。[`analyzer_wasm/tests/analyze.rs`](../../../analyzer_wasm/tests/analyze.rs) 中的
+converter 的测试固定多行 diagnostic 的位置。[`analyzer_wasm/tests/analyze.rs`](../../../analyzer_wasm/tests/analyze.rs) 中的
 `wasm_bindgen_test` case 在 native 编译中不会执行，只通过 WASM test runner 运行：
 
 ```bash
