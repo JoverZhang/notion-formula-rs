@@ -26,7 +26,7 @@ The catalog is shared by semantic analysis, editor services, and evaluator contr
 
 ## Calls follow the declared argument shape
 
-Supported functions use ordinary calls such as `length(value)`. A subset also supports postfix syntax such as `value.length()`. Postfix syntax is equivalent to placing the receiver in the first argument slot. It is available only when the signature has a deterministic first slot and still expects at least one argument position beyond that receiver. A parsed member call that does not meet this rule is not silently treated as a normal call.
+Supported functions use ordinary calls such as `length(value)`. A subset also supports postfix syntax such as `"hello".substring(1)`. Postfix syntax is equivalent to placing the receiver in the first argument slot. It is available only when the signature has a deterministic first slot and still expects at least one argument position beyond that receiver. A parsed member call that does not meet this rule is not silently treated as a normal call.
 
 Signatures can combine fixed parameters, optional parameters, repeated parameter groups, and a tail after the repeated groups. A call must first match that shape. Too few, too many, or incomplete repeated arguments produce an argument-shape diagnostic before individual argument types are checked.
 

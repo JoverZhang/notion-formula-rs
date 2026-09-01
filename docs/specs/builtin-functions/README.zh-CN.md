@@ -26,7 +26,7 @@ Semantic analysis、editor services 和 evaluator contract generation 共用这�
 
 ## Call 必须符合声明的 argument shape
 
-受支持的函数可以使用 `length(value)` 这样的普通 call，其中一部分也支持 `value.length()` 这样的 postfix syntax。Postfix call 等价于把 receiver 放入第一个 argument slot。只有 signature 能确定第一个 slot，并且 receiver 之后仍有可写入的 argument position 时，才支持这种形式。不符合条件的 member call 即使能够被 parser 接受，也不会被静默转换为普通 call。
+受支持的函数可以使用 `length(value)` 这样的普通 call，其中一部分也支持 `"hello".substring(1)` 这样的 postfix syntax。Postfix call 等价于把 receiver 放入第一个 argument slot。只有 signature 能确定第一个 slot，并且 receiver 之后仍有可写入的 argument position 时，才支持这种形式。不符合条件的 member call 即使能够被 parser 接受，也不会被静默转换为普通 call。
 
 Signature 可以组合 fixed parameter、optional parameter、重复 parameter group，以及重复组之后的 tail。Call 必须先满足整体 shape；argument 太少、太多或重复组不完整时，会先产生 argument-shape diagnostic，之后才会检查各 argument 的 type。
 
