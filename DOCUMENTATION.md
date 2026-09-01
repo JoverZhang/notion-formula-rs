@@ -14,7 +14,7 @@ last_verified: 2026-09-01
 
 [简体中文](DOCUMENTATION.zh-CN.md)
 
-This policy answers where project knowledge belongs and when a change must update it. It applies to human and agent contributors.
+This is the repository's only authoritative documentation-maintenance standard. It answers where project knowledge belongs and when a change must update it, and it applies to human and agent contributors. Other documents may provide navigation or workflow instructions, but they do not redefine layer ownership, edit permission, translation states, or writing requirements.
 
 ## Put each fact at one level
 
