@@ -58,49 +58,48 @@ JsValue / UTF-16 positions
 阅读时从顶部的 JavaScript 调用向下，直到序列化结果。Config box 是多次调用之间唯一保留的状态。图中有意
 省略由下游 crate 负责的分析、补全、签名、格式化和编辑算法。
 
-## 每个方法组合自己的边界流水线
+## 每个方法组合不同的内部调用路径
 
-各 export 共用序列化 helper，但校验顺序不同：
+各 export 共用序列化 helper，但组合方式不同。下表用于阅读源码，不定义调用方可以传入什么，也不定义多个
+失败条件同时出现时的外部结果；这些保证属于 WASM API specification。
 
-| 方法 | `lib.rs` 中的边界流水线 |
+| 方法 | `lib.rs` 中的当前调用 |
 | --- | --- |
-| `new` | 校验 object key -> 反序列化 config -> 构造 `Context` |
-| `analyze` | 调用 `analyzer::analyze` -> 转换 diagnostic、token 和根类型 -> 序列化 |
-| `format` | 校验并转换 cursor -> 调用 `ide::format` -> 按更新后源码转换 cursor -> 序列化 |
-| `apply_edits` | 反序列化 edit -> 校验并转换 range -> 校验并转换 cursor -> 调用 `ide::apply_edits` -> 转换更新后的 cursor -> 序列化 |
-| `help` | 宽松转换 cursor -> 调用 `ide::help` -> 转换 help DTO，包括编辑后文档中的 cursor -> 序列化 |
+| `new` | `validate_config_keys` -> `from_value::<AnalyzerConfig>` -> 构造 `Context` |
+| `analyze` | `analyzer::analyze` -> `Converter::analyze_output` -> `to_value` |
+| `format` | `utf16_to_8_cursor` -> `ide::format` -> `utf8_to_16_offset` -> `to_value` |
+| `apply_edits` | 反序列化 edit -> `utf16_to_8_text_edits` -> `utf16_to_8_cursor` -> `ide::apply_edits` -> 反向转换 cursor -> `to_value` |
+| `help` | `utf16_to_8_offset` -> `ide::help` -> `Converter::help_output_view` -> `to_value` |
 
-调试失败时，顺序很重要。以 `apply_edits` 为例：edit payload 无法反序列化、UTF-16 range 超出输入文档，
-或 cursor 越界，都会让调用在进入 `ide` 之前失败。转换成字节坐标之后的排序、重叠校验、edit 应用和
-cursor 重定位仍由 IDE 负责。
+调试时，可以沿着对应行找到最先拥有可疑表示的 helper。以 `apply_edits` 为例，它会先准备 DTO edit 和 byte
+coordinate，再把操作交给 IDE。转换后的排序、重叠校验、edit 应用和 cursor 重定位仍由 IDE 负责。多个输入
+条件同时非法时调用方会看到哪个错误，由 WASM specification 定义，不由这张调用表定义。
 
 `analyze` 把 instance 中的 `Context` 直接交给 Analyzer，converter 不会重新解释 diagnostic 或推断类型。
 `format` 和 `apply_edits` 也只在坐标转换后委托操作。`help` 会传入保存的偏好数量，但补全和签名机制仍在
 `ide` 内部。
 
-## 坐标转换会向 Unicode scalar 起点取整
+## 坐标转换让 Rust 始终使用 scalar boundary
 
 Rust core span 和 cursor 使用 UTF-8 字节 offset；JavaScript 编辑器位置进入本 crate 时使用 UTF-16 code
-unit offset。[`offsets.rs`](../../../analyzer_wasm/src/offsets.rs) 集中实现两个方向：
+unit offset。[`offsets.rs`](../../../analyzer_wasm/src/offsets.rs) 集中实现两个方向。输入是否有效以及调用方
+最终能观察到什么坐标行为，由 WASM specification 定义；本节只解释实现这些规则的循环：
 
 - `Converter::utf16_to_8_offset` 先把 offset 限制在 UTF-16 文档长度内，再遍历 Unicode scalar；如果位置
   落在某个 scalar 的 UTF-16 编码内部，则向该 scalar 的字节起点取整。
 - `Converter::utf8_to_16_offset` 同样会限制 byte position，并在位置落入 scalar 的 UTF-8 编码内部时
   向起点取整，之后才累计 UTF-16 code unit。
 
-以 `"😀a"` 为例，UTF-16 offset `1` 位于 emoji 的 surrogate pair 内部，会转换为 byte `0`；offset `2`
-则转换到 emoji 后面的字节位置。Checked cursor 或 edit endpoint 位于 pair 内部时，也使用这条取整规则，
-不会一律拒绝 scalar-interior position。
+两个循环都逐个 Unicode scalar 累计位置。如果目标位置落在当前 scalar 的编码内部，循环会返回进入该
+scalar 前已经累计的位置，避免从 scalar 中间切开。通用 converter 对所有输入都有结果，export method 则
+通过不同 helper 组合这些转换：
 
-通用 converter 对所有输入都有结果，但导出方法会采用不同 wrapper：
+- `help` 直接调用 `Converter::utf16_to_8_offset`；
+- `format` 和 `apply_edits` 在进入 IDE 前通过 `utf16_to_8_cursor` 处理 cursor；
+- `apply_edits` 通过 `utf16_to_8_text_edits` 处理 DTO range。这个 helper 分别转换 endpoint，生成 Analyzer
+  byte edit，再交给 IDE 校验整个 batch。
 
-- `help` 直接调用带 clamp 的 converter。超出文档的 offset 会变成文档末尾，scalar-interior offset 会向下
-  取整。
-- `format` 和 `apply_edits` 通过 `utf16_to_8_cursor` 处理 cursor。它先拒绝超过 UTF-16 长度的位置，再对
-  scalar interior 使用相同的取整转换。
-- `utf16_to_8_text_edits` 在坐标转换前拒绝反向 range 或 end 超过 UTF-16 长度的 range，再分别转换两个
-  endpoint。每个 endpoint 都独立向下取整。转换后的 range 会交给 `ide::apply_edits` 校验字节区间顺序和
-  重叠。
+Past-end、reversed 和 scalar-interior position 对调用方呈现的具体行为，以 WASM specification 为准。
 
 因此，位于 surrogate pair 内的 endpoint 可能让 range 收缩为空字节区间，也可能改变多个 range 转换后的
 相对关系。Core edit validator 只能看到最终字节 range。`offsets.rs` 旁的单元测试固定了取整和越界路径；
@@ -149,18 +148,17 @@ match。增加内部 enum variant 时，compiler 会直接暴露尚未处理的�
 
 DTO layer 和 `serde_wasm_bindgen` 是两个独立 seam：
 
-- `from_value` 把 constructor input 转为 typed config，并把反序列化失败统一折叠成 constructor 的通用错误；
-- `apply_edits` 直接反序列化 edit array，在开始坐标处理之前映射 malformed payload；
-- `to_value` 序列化每个返回 DTO，并将 serializer failure 映射为 JavaScript `Error`。
+- `from_value` 是 constructor 把输入反序列化为 typed config 的入口；
+- `apply_edits` 在坐标转换前反序列化 edit array；
+- `to_value` 是各方法共用的 output serialization 入口；
+- 调用 `operation_err` 的方法通过它把 `IdeError` 适配为 `js_sys::Error`。
 
-Analyzer diagnostic 仍是 `AnalyzeResult` 内的数据；facade 不会把它转换成 thrown operation error。相比之下，
-`format` 和 `apply_edits` 的坐标或 IDE operation failure 会经过 `operation_err`，根据 `IdeError` message 构造
-`js_sys::Error`。已经执行到序列化阶段的方法仍可能在那里失败。稳定的外部错误面由 WASM spec 维护；本节
-只说明 failure 的来源。
+这些 helper 的位置用于定位转换失败。哪些失败作为数据返回、哪些会抛出错误，以及 message 和可观察顺序，
+都由 WASM specification 维护。
 
 ## Type generation 与 WASM packaging 是两条构建边界
 
-Checked-in TypeScript DTO 文件和可执行 WASM package 来自不同工具。
+签入仓库的 TypeScript DTO 文件和可执行 WASM package 来自不同工具。
 
 [`export_ts`](../../../analyzer_wasm/src/bin/export_ts.rs) 对一份显式排序的 `dto::v1` 类型列表调用
 `TS::decl()`，按需补上 `export`，再覆盖
@@ -185,8 +183,8 @@ Native test 在不启动 JavaScript runtime 的情况下检查纯 Rust 部分：
 cargo test -p analyzer_wasm
 ```
 
-`offsets.rs` 旁的单元测试覆盖 scalar-interior floor 和 checked out-of-range conversion；analyze converter test 固定
-多行 diagnostic location。[`analyzer_wasm/tests/analyze.rs`](../../../analyzer_wasm/tests/analyze.rs) 中的
+`offsets.rs` 旁的单元测试覆盖 Unicode scalar 内部位置的向下取整，以及带校验的越界转换；analyze
+converter test 固定多行 diagnostic 的位置。[`analyzer_wasm/tests/analyze.rs`](../../../analyzer_wasm/tests/analyze.rs) 中的
 `wasm_bindgen_test` case 在 native 编译中不会执行，只通过 WASM test runner 运行：
 
 ```bash

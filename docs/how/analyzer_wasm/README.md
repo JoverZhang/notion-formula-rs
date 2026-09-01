@@ -65,33 +65,37 @@ Read the diagram from a JavaScript call at the top to the serialized result at t
 configuration box is the only state held between calls. The diagram intentionally omits analysis,
 completion, signature, formatting, and edit algorithms owned by the downstream crates.
 
-## Each method composes a different boundary pipeline
+## Each method composes a different internal call path
 
-The exports share serialization helpers, but their validation order is method-specific:
+The exports share serialization helpers but compose different helpers. This table is a source-reading
+map, not the caller contract for accepted inputs or competing failures; those guarantees belong to
+the WASM API specification.
 
-| Method | Boundary pipeline in `lib.rs` |
+| Method | Current calls in `lib.rs` |
 | --- | --- |
-| `new` | validate object keys -> deserialize config -> build `Context` |
-| `analyze` | call `analyzer::analyze` -> convert diagnostics, tokens, and root type -> serialize |
-| `format` | checked cursor conversion -> call `ide::format` -> convert cursor against updated source -> serialize |
-| `apply_edits` | deserialize edits -> checked range conversion -> checked cursor conversion -> call `ide::apply_edits` -> convert updated cursor -> serialize |
-| `help` | permissive cursor conversion -> call `ide::help` -> convert help DTO, including edited-document cursors -> serialize |
+| `new` | `validate_config_keys` -> `from_value::<AnalyzerConfig>` -> build `Context` |
+| `analyze` | `analyzer::analyze` -> `Converter::analyze_output` -> `to_value` |
+| `format` | `utf16_to_8_cursor` -> `ide::format` -> `utf8_to_16_offset` -> `to_value` |
+| `apply_edits` | deserialize edits -> `utf16_to_8_text_edits` -> `utf16_to_8_cursor` -> `ide::apply_edits` -> reverse cursor conversion -> `to_value` |
+| `help` | `utf16_to_8_offset` -> `ide::help` -> `Converter::help_output_view` -> `to_value` |
 
-This ordering matters when debugging a failure. For example, `apply_edits` can fail before it reaches
-`ide` because the edit payload is not deserializable, because a UTF-16 range is outside the input
-document, or because the cursor is outside it. Sorting, overlap checks, edit application, and cursor
-rebasing after byte conversion remain IDE responsibilities.
+When debugging, follow the row until the first helper that owns the suspect representation.
+`apply_edits`, for example, prepares DTO edits and byte coordinates before it delegates to IDE.
+Sorting, overlap checks, edit application, and cursor rebasing after byte conversion remain IDE
+responsibilities. The WASM specification, rather than this call map, defines which error a caller
+observes when more than one input condition is invalid.
 
 `analyze` passes the instance `Context` directly to Analyzer. Its converter does not reinterpret
 diagnostics or inferred types. `format` and `apply_edits` similarly delegate the operation after
 coordinate conversion. `help` supplies the saved preference limit, but completion and signature
 mechanics stay in `ide`.
 
-## Coordinate conversion floors scalar interiors
+## Coordinate conversion keeps Rust on scalar boundaries
 
 Rust core spans and cursors are UTF-8 byte offsets. JavaScript editor positions arriving at this
 crate are UTF-16 code-unit offsets. [`offsets.rs`](../../../analyzer_wasm/src/offsets.rs) centralizes
-both directions:
+both directions. The WASM specification owns the accepted-input and externally visible coordinate
+rules; this section explains the loops that implement them:
 
 - `Converter::utf16_to_8_offset` clamps an offset to the UTF-16 document length, walks Unicode
   scalar values, and floors a position inside a scalar's UTF-16 encoding to that scalar's byte
@@ -99,21 +103,18 @@ both directions:
 - `Converter::utf8_to_16_offset` similarly clamps a byte position and floors a position inside a
   scalar's UTF-8 encoding before counting UTF-16 code units.
 
-For `"😀a"`, UTF-16 offset `1` lies inside the emoji's surrogate pair and converts to byte `0`;
-offset `2` converts to the byte immediately after the emoji. This flooring rule also applies when a
-checked cursor or edit endpoint is inside the pair. Scalar-interior positions are not universally
-rejected.
+Both loops accumulate positions one Unicode scalar at a time. If a requested position falls inside
+the current scalar encoding, they return the position accumulated before that scalar rather than
+slicing through it. The generic converters are total, while exported methods compose them through
+different helpers:
 
-The generic converters are intentionally total, but exported methods wrap them with different
-validation:
+- `help` calls `Converter::utf16_to_8_offset` directly.
+- `format` and `apply_edits` route cursors through `utf16_to_8_cursor` before entering IDE.
+- `apply_edits` routes DTO ranges through `utf16_to_8_text_edits`, which converts each endpoint and
+  produces Analyzer byte edits before IDE validates the batch.
 
-- `help` calls the clamping converter directly. An offset beyond the document becomes the document
-  end, and a scalar-interior offset is floored.
-- `format` and `apply_edits` pass cursors through `utf16_to_8_cursor`. It rejects a position beyond
-  the UTF-16 length, then uses the same flooring conversion for a scalar interior.
-- `utf16_to_8_text_edits` rejects a reversed range or an end beyond the UTF-16 length before
-  converting both endpoints. Each endpoint is floored independently. The converted ranges then go
-  to `ide::apply_edits`, where byte-range ordering and overlap are validated.
+Refer to the WASM specification for the caller-visible treatment of past-end, reversed, and
+scalar-interior positions.
 
 This composition means an endpoint inside a surrogate pair can collapse a range to an empty byte
 range or change how converted ranges relate to one another. The core edit validator sees only the
@@ -170,21 +171,19 @@ crate.
 
 The DTO layer and `serde_wasm_bindgen` are separate seams:
 
-- `from_value` turns constructor input into a typed config and collapses deserialization failures to
-  the constructor's generic error;
-- edit arrays are deserialized directly in `apply_edits`, where a malformed payload is mapped before
-  coordinate work begins;
-- `to_value` serializes every returned DTO and maps any serializer failure to a JavaScript `Error`.
+- `from_value` is the constructor's typed-config deserialization gateway;
+- `apply_edits` deserializes its edit array before coordinate conversion;
+- `to_value` is the common output-serialization gateway;
+- `operation_err` adapts an `IdeError` into a `js_sys::Error` for the methods that call it.
 
-Analyzer diagnostics remain data inside `AnalyzeResult`; the facade does not turn them into thrown
-operation errors. In contrast, coordinate and IDE operation failures from `format` and
-`apply_edits` pass through `operation_err`, which builds a `js_sys::Error` from the `IdeError`
-message. A method that reaches serialization can still fail there. The stable observable error
-surface is owned by the WASM specification; this section only identifies where failures originate.
+These helper placements identify where to debug conversion failures. The WASM specification owns
+which failures are returned as data, which are thrown, their messages, and their observable
+precedence.
 
 ## Type generation and WASM packaging are two build seams
 
-The checked-in TypeScript DTO file and the executable WASM package come from different tools.
+The TypeScript DTO file committed to the repository and the executable WASM package come from
+different tools.
 
 [`export_ts`](../../../analyzer_wasm/src/bin/export_ts.rs) calls `TS::decl()` for an explicit ordered
 list of `dto::v1` types, adds `export` where needed, and overwrites
