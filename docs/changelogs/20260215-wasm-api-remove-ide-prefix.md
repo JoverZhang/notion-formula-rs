@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260215-wasm-api-remove-ide-prefix
+title: "Remove the IDE prefix from the WASM API"
+language: en
+source_language: en
+counterpart: ./20260215-wasm-api-remove-ide-prefix.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-02-15
+---
+
 # 20260215-wasm-api-remove-ide-prefix
+
+[简体中文](20260215-wasm-api-remove-ide-prefix.zh-CN.md)
 
 - Type: Changed
 - Component: analyzer_wasm, examples/vite, docs

@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260720-builtin-function-runtime
+title: "Add the builtin function runtime"
+language: en
+source_language: en
+counterpart: ./20260720-builtin-function-runtime.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-07-20
+---
+
 # 20260720-builtin-function-runtime
+
+[简体中文](20260720-builtin-function-runtime.zh-CN.md)
 
 - Type: Added
 - Component: evaluator

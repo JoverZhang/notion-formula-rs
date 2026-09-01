@@ -1,31 +1,30 @@
 ---
 doc_id: changelog.20260730-evaluator-builtin-cleanup
-title: "Clean up evaluator builtin internals"
-language: en
+title: "整理 Evaluator 的 builtin 内部实现"
+language: zh-CN
 source_language: en
-counterpart: ./20260730-evaluator-builtin-cleanup.zh-CN.md
+counterpart: ./20260730-evaluator-builtin-cleanup.md
 implementation_status: historical
 document_status: stable
 translation_status: synced
 last_verified: 2026-07-30
 ---
 
-# 20260730-evaluator-builtin-cleanup
+# 整理 Evaluator 的 builtin 内部实现
 
-[简体中文](20260730-evaluator-builtin-cleanup.zh-CN.md)
+[English](20260730-evaluator-builtin-cleanup.md)
 
 - Type: Changed
 - Component: evaluator
 
 ## Summary
 
-Evaluator builtin dispatch support now centralizes parameter lookup and debug contract
-checking behind focused internal modules. Generated builtin contracts and formula results
-remain unchanged.
+Evaluator 的 builtin dispatch support 开始通过专门的内部模块集中处理 parameter lookup 和 debug contract
+checking。Generated builtin contract 和 formula result 均未改变。
 
 ## Compatibility notes
 
-- No builtin DSL, generated ABI, public Rust API, catalog order, or runtime behavior changed.
+- Builtin DSL、generated ABI、public Rust API、catalog 顺序和 runtime 行为均未改变。
 
 ## Tests
 

@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260718-builtin-function-catalog
+title: "Establish the builtin function catalog"
+language: en
+source_language: en
+counterpart: ./20260718-builtin-function-catalog.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-07-18
+---
+
 # 20260718-builtin-function-catalog
+
+[简体中文](20260718-builtin-function-catalog.zh-CN.md)
 
 - Type: Changed
 - Component: other

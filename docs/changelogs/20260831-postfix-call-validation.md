@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260831-postfix-call-validation
+title: "Validate postfix calls"
+language: en
+source_language: en
+counterpart: ./20260831-postfix-call-validation.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-08-31
+---
+
 # Postfix call validation
+
+[简体中文](20260831-postfix-call-validation.zh-CN.md)
 
 - Type: Fixed
 - Component: analyzer
