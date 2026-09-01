@@ -50,7 +50,7 @@ Completion candidate 取决于 cursor 附近的源码，以及配置的 property
 | Cursor context | Current candidate |
 | --- | --- |
 | 表达式起点，包括空 argument | 配置的 property、`not`、`true`、`false` 和受支持函数 |
-| identifier、literal 或 `)` 之后 | binary operator 和支持 postfix 的函数 |
+| identifier、literal 或 `)` 之后 | `==`、`!=`、`>=`、`>`、`<=`、`<`、`+`、`-`、`*`、`/` 和支持 postfix 的函数 |
 | receiver 与 `.` 之后 | 已知 receiver type 可接受的 postfix 函数 |
 | 严格位于 string literal 内部 | 不返回 completion candidate |
 
@@ -58,6 +58,9 @@ Receiver type 未知时，member completion 目前保留全部 postfix-capable �
 parameter 无法接受该 type 的函数。`.` 后的 query 还会进一步移除不匹配的函数。这些边界由
 [`test_completion_position.rs`](../../ide/src/tests/ide/test_completion_position.rs) 和
 [`test_completion_ranking.rs`](../../ide/src/tests/ide/test_completion_ranking.rs) 覆盖。
+
+Parser 还接受 `%`、`^`、`&&` 和 `||`，但 Current 的 after-atom completion set 不会提供它们。集成方不能
+根据 grammar 推断 completion catalog。
 
 Enabled candidate 会携带针对当前 insertion 或 replacement range 的 edit。Function 和 postfix-function edit
 插入括号，并把目标 cursor 放进括号内。`not`、`true` 和 `false` 会在末尾插入一个空格。Property candidate
@@ -98,9 +101,11 @@ call 不显示 receiver prefix；受支持的 postfix call 会单独显示 recei
 它。产生这些 slot 的 declaration 与 call-shape 机制不属于本文。
 
 Active parameter 跟随当前 top-level argument position。Nested call 或 list 内的 comma 不会推进它。Partial
-call 中的空 argument 仍会选中正在编辑的 slot。对于 repeated 或其他经过 projection 的 call shape，服务会在
-存在映射时选中当前 argument 对应的 displayed slot；无法映射时退回最后一个 displayed parameter。相关行为由
-[`test_completion_signature_help.rs`](../../ide/src/tests/ide/test_completion_signature_help.rs) 覆盖。
+call 中的空 argument 仍会选中正在编辑的 slot。对于 repeated 或其他经过 projection 的 call shape，存在
+直接映射时，服务会选中当前 argument 对应的 displayed slot；没有直接映射时，只要至少存在一个 displayed
+parameter，就返回最后一项的 index。零参数 signature 没有 displayed parameter，但仍返回 `0`。有直接映射的
+case 由 [`test_completion_signature_help.rs`](../../ide/src/tests/ide/test_completion_signature_help.rs) 覆盖；
+目前没有专门覆盖 mapping 缺失 fallback 的 regression test。
 
 ## 只格式化语法有效的源码
 
@@ -114,12 +119,13 @@ analysis。
 - binary 和 ternary operator 两侧、comma 之后使用约定的空格；
 - 末尾输出一个 newline；
 - 按 comment 与 syntax 的附着关系保留 comment；
-- 只有 construct 本身允许，且缩进加 rendered byte length 不超过 80 bytes 时才选择 inline layout，否则使用
-  对应的 multiline layout。
+- 对 compound construct，只有结构本身允许，且缩进加 rendered byte length 不超过 80 bytes 时才选择
+  inline layout，否则使用对应的 multiline layout。
 
-80-byte threshold 是 Current 固定布局规则，不是可配置的 editor width。Formatter 返回完整的新 document，
-并按照下文规则把传入 cursor 重定位穿过这次 replacement。因此，严格位于发生变化的 full-document range 内的
-cursor 通常移到开头；原本位于 document end 的 cursor 则在长度调整后仍位于末尾。实现和测试入口包括
+Atomic identifier 和 literal 不执行这项宽度检查，因此可能形成更长的一行。除此之外，80-byte threshold 是
+Current 固定布局规则，不是可配置的 editor width。Formatter 返回完整的新 document，并按照下文规则把传入
+cursor 重定位穿过这次 replacement。因此，严格位于发生变化的 full-document range 内的 cursor 通常移到
+开头；原本位于 document end 的 cursor 则在长度调整后仍位于末尾。实现和测试入口包括
 [`format.rs`](../../ide/src/format.rs)、[`format` goldens](../../ide/tests/format/) 和
 [`test_format_idempotence.rs`](../../ide/src/tests/ide/test_format_idempotence.rs)。
 

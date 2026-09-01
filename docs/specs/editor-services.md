@@ -59,7 +59,7 @@ properties and supported functions:
 | Cursor context | Current candidates |
 | --- | --- |
 | At an expression start, including an empty argument | configured properties, `not`, `true`, `false`, and supported functions |
-| After an identifier, literal, or `)` | binary operators and postfix-capable functions |
+| After an identifier, literal, or `)` | `==`, `!=`, `>=`, `>`, `<=`, `<`, `+`, `-`, `*`, `/`, and postfix-capable functions |
 | After a receiver and `.` | postfix-capable functions accepted by the known receiver type |
 | Strictly inside a string literal | no completion candidates |
 
@@ -68,6 +68,9 @@ set. For a known receiver type, it removes functions whose receiver parameter ca
 type. A query after `.` further removes nonmatching functions. These boundaries are exercised in
 [`test_completion_position.rs`](../../ide/src/tests/ide/test_completion_position.rs) and
 [`test_completion_ranking.rs`](../../ide/src/tests/ide/test_completion_ranking.rs).
+
+The parser also accepts `%`, `^`, `&&`, and `||`, but the Current after-atom completion set does not
+offer them. Integrations must not infer the completion catalog from the grammar.
 
 Enabled candidates carry an edit for the detected insertion or replacement range. Function and
 postfix-function edits insert parentheses and place the requested cursor inside them. `not`,
@@ -122,9 +125,11 @@ are outside this specification.
 The active parameter follows the current top-level argument position. Commas inside nested calls
 or lists do not advance it. Empty arguments in an incomplete call still select the slot being
 edited. For repeated or otherwise projected call shapes, the service selects the displayed slot
-corresponding to the current argument when one exists and falls back to the final displayed
-parameter when it cannot map that argument. The behavior is covered by
+corresponding to the current argument when one exists. Without a direct mapping it returns the
+final displayed parameter index when at least one exists; a zero-parameter signature returns `0`
+even though it has no displayed parameter. The mapped cases are covered by
 [`test_completion_signature_help.rs`](../../ide/src/tests/ide/test_completion_signature_help.rs).
+The no-mapping fallback has no dedicated regression test.
 
 ## Format only syntactically valid source
 
@@ -138,13 +143,14 @@ For accepted source, formatting is deterministic and idempotent over the covered
 - inserts conventional spaces around binary and ternary operators and after commas;
 - emits a single trailing newline;
 - preserves comments through their syntax attachment; and
-- selects an inline layout only when the construct permits it and indentation plus rendered byte
-  length is at most 80 bytes, otherwise using its multiline layout.
+- selects an inline layout for compound constructs only when the construct permits it and
+  indentation plus rendered byte length is at most 80 bytes, otherwise using its multiline layout.
 
-The 80-byte threshold is a Current fixed layout rule, not configurable editor width. The formatter
-returns the whole formatted document and rebases the supplied cursor through that replacement
-using the edit rules below. Most cursors strictly inside a changed full-document range therefore
-move to the start; a cursor at the document end remains at the end after length adjustment.
+Atomic identifiers and literals bypass the width check and can form a longer line. The 80-byte
+threshold is otherwise a Current fixed layout rule, not configurable editor width. The formatter
+returns the whole formatted document and rebases the supplied cursor through that replacement using
+the edit rules below. Most cursors strictly inside a changed full-document range therefore move to
+the start; a cursor at the document end remains at the end after length adjustment.
 [`format.rs`](../../ide/src/format.rs), the
 [`format` goldens](../../ide/tests/format/), and
 [`test_format_idempotence.rs`](../../ide/src/tests/ide/test_format_idempotence.rs) anchor these
