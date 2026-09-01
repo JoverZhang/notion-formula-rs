@@ -172,11 +172,13 @@ For postfix calls, the first projected slot becomes a receiver prefix such as
 `(condition: boolean).`; its `DisplaySegment::Param` has no `param_index` and cannot be active. The
 remaining parameter segments receive contiguous display indices. Active-parameter mapping finds the
 projected slot whose `argument_index` matches the cursor, subtracts the receiver slot in method form,
-and falls back to the last rendered parameter when incomplete input has no direct mapping. Ellipsis
-segments are never counted as active parameters. The focused cases in
+and uses `rendered_count.saturating_sub(1)` when no direct mapping exists. That fallback is the last
+rendered parameter index when at least one parameter exists; a zero-parameter signature instead
+returns `0` even though it has no rendered parameter. Ellipsis segments are never counted as active
+parameters. The focused cases in
 [`test_completion_signature_help.rs`](../../../ide/src/tests/ide/test_completion_signature_help.rs)
 cover nested commas, empty arguments, generic and union display, repeated slots, postfix receivers,
-and fallback mapping.
+and projected active-parameter mapping. They do not directly force the no-mapping fallback.
 
 [`build_signature_segments`](../../../ide/src/display.rs) keeps names, punctuation, separators,
 parameters, ellipsis, arrow, and return type as structured segments. The crate does not flatten them

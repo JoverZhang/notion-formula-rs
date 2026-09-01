@@ -145,10 +145,12 @@ observation 可以将其缩窄。Adapter 还会把函数参数显示为其返回
 Postfix 调用的第一个 projected slot 会变成 `(condition: boolean).` 这样的 receiver 前缀；对应的
 `DisplaySegment::Param` 没有 `param_index`，不能成为 active parameter。其余参数 segment 获得连续的
 显示 index。Active-parameter mapping 会找到 `argument_index` 与 cursor 匹配的 projected slot；method
-形式再减去 receiver slot。若不完整输入没有直接 mapping，则回退到最后一个 rendered parameter。
-Ellipsis segment 永远不计入 active parameter。集中测试
+形式再减去 receiver slot。没有直接 mapping 时，返回 `rendered_count.saturating_sub(1)`：至少存在一个
+parameter 时，它是最后一个 rendered parameter 的 index；零参数 signature 则会返回 `0`，尽管此时没有
+rendered parameter。Ellipsis segment 永远不计入 active parameter。集中测试
 [`test_completion_signature_help.rs`](../../../ide/src/tests/ide/test_completion_signature_help.rs) 覆盖嵌套逗号、
-空参数、generic 与 union 显示、重复 slot、postfix receiver 和 fallback mapping。
+空参数、generic 与 union 显示、重复 slot、postfix receiver 和投影后的 active-parameter mapping，但没有
+直接构造 mapping 缺失的 fallback case。
 
 [`build_signature_segments`](../../../ide/src/display.rs) 将名称、标点、分隔符、参数、省略号、箭头和返回
 类型保留为结构化 segment。这个 crate 不把它们压平成一段 UI 字符串，也不决定颜色和排版；最终呈现由
