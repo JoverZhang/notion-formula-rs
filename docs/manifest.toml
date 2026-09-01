@@ -6,7 +6,9 @@ bilingual_directories = [
   "docs",
 ]
 
-english_only_files = []
+english_only_files = [
+  "GLOSSARY.md",
+]
 
 neutral_redirect_files = []
 
