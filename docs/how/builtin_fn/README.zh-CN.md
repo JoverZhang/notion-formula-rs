@@ -78,7 +78,7 @@ builtin_functions! {
 DSL 支持：
 
 - `number`、`string`、`boolean`、`date`、`null` 和 `any` 这些 primitive type；
-- 已声明的 generic name、用 `|` 表示的 union、用 `[]` 表示的 postfix list type、
+- 已声明的 generic name、用 `|` 表示的 union、带有 `[]` suffix 的 list type、
   lambda type、grouped type 和 `Ident<T>` binder type；
 - 写作 `name?: Type` 的 optional fixed parameter；
 - 至多一个显式的 `repeat(min = N) { ... }` group；
@@ -152,16 +152,20 @@ Generic 会按照声明顺序获得确定的 `GenericId`。两种 binding kind �
 binding 机制。
 
 Lambda type 同时保留 parameter type 与 binding origin。`current` 会降低为
-`LambdaParam::Current`；其他 lambda parameter name 会降低为 `LambdaParam::ParamRef`，
-指向另一个已声明参数。`let` 的声明利用了这一关系：
+`LambdaParam::Current`；其他 lambda parameter name 会降低为
+`LambdaParam::ParamRef(name)`。当前声明约定用这个名称引用另一个参数，但 macro lowering
+不会校验目标是否存在。`let` 的声明遵循这一约定：
 
 ```rust,ignore
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 ```
 
-`Ident<T>` 标记携带 identifier 的参数，`body` parameter 再引用它。Analyzer 随后填入
-实际 identifier spelling，并进行 staged lambda inference；`builtin_fn` 只保存类型与
-引用关系。
+`Ident<T>` 标记携带 identifier 的参数，`body` 则使用 `ident` 作为 reference name。
+Analyzer 进行 staged lambda inference 时，会在 resolved argument 中查找同名 parameter，
+找到 identifier expression 就采用其实际 spelling，否则回退到 reference name 本身。
+查找与回退逻辑位于
+[`analyzer/src/analysis/infer.rs`](../../../analyzer/src/analysis/infer.rs)；`builtin_fn` 只保存
+类型与未经校验的 reference name。
 
 相关模型位于
 [`builtin_fn/src/types.rs`](../../../builtin_fn/src/types.rs)、
@@ -170,8 +174,8 @@ let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 
 ## 调用点解析返回一份无隐藏状态的快照
 
-`resolve_call_signature()` 接收 `FunctionSig` 和按语义顺序排列的参数。如果调用使用
-postfix 形式，receiver 此时已经插入 index zero。每个参数有两种 observation：
+`resolve_call_signature()` 接收 `FunctionSig` 和按语义顺序排列的参数。每个参数有两种
+observation：
 
 - `Empty`：语法上已有 argument slot，但没有 expression；
 - `Typed(Ty)`：已有 expression；推断不出类型时也会明确写作 `Ty::Unknown`。
@@ -189,10 +193,12 @@ Input slice 的末尾表示这个 argument slot 尚不存在。区分这些状�
 6. 比较 observation 与实例化后的 parameter type；
 7. 一并返回 validity、projection、逐参数状态和 return type。
 
-参数数量符合 shape 时得到 `ShapeValidity::Valid`。对于不完整或不合法的数量，resolver
-会返回具体的 `CallShapeError`，同时仍生成最小的 completable projection。没有对应
-projected parameter 的多余参数标为 `Unmapped`；empty 与 unknown argument 标为
-`Indeterminate`，避免把 partial call 误报为类型不匹配。
+参数数量符合 shape 时得到 `ShapeValidity::Valid`，其他数量则产生具体的
+`CallShapeError`。Fixed shape 始终投影全部已声明的 fixed slot，无论某个 slot 是否已有
+observation。Repeating shape 在数量合法时采用精确 split，数量不合法时采用大于等于
+observed count 的最小 completable count。没有对应 projected parameter 的多余参数标为
+`Unmapped`；empty 与 unknown argument 标为 `Indeterminate`，避免把 partial call 误报为
+类型不匹配。
 
 Projection 保持为语义数据。每个 `ResolvedParamSlot` 包含 logical `ParamRef`、可选的
 one-based repeat-group number、可选的 source argument index，以及实例化后的 expected
@@ -208,6 +214,9 @@ optional tail，因此其精确 split 唯一。Observed count 没有精确 split
 
 [`builtin_fn/tests/resolution.rs`](../../../builtin_fn/tests/resolution.rs) 覆盖精确、不完整
 和非法 shape、generic binding、staged observation 以及五种布局。
+
+`FunctionSig` 和 `ParamShape` 不包含 postfix-capability flag，只公开 signature shape。
+某个签名是否支持 postfix syntax，由 Analyzer 负责判断。
 
 ### Custom resolver 只能细化返回类型
 
@@ -229,28 +238,6 @@ metadata 或 generic declaration。Partial snapshot 也会调用 resolver，因�
 它们规范化为结果的 element union。实现与针对性测试分别位于
 [`builtin_fn/src/builtins.rs`](../../../builtin_fn/src/builtins.rs) 和
 [`builtin_fn/tests/resolution.rs`](../../../builtin_fn/tests/resolution.rs)。
-
-## Postfix eligibility 从签名形状推导
-
-当前 postfix gate 是
-[`analyzer/src/analysis/mod.rs`](../../../analyzer/src/analysis/mod.rs) 中的
-`analyzer::semantic::is_postfix_capable`。它根据 supported `FunctionSig` 推导 eligibility，
-catalog 不维护第二个 postfix flag。
-
-只有签名具有确定的第一个参数，并且至少还有一个 physical argument position 时，才可使用
-postfix 形式：
-
-- `head` 非空时，它的第一个 slot 接收 receiver，同时完整 displayed shape 至少有两个
-  logical parameter；
-- 否则由非空 repeat group 提供 receiver slot，并且 displayed shape 至少有两个 logical
-  parameter，或 minimum repetition 至少要求两个 physical slot；
-- tail-only signature，以及 minimum 只有一个 group 的 single-repeat-slot signature，
-  不符合条件。
-
-这使 `concat(min = 2)` 这类 repeat-only declaration 保持 eligible，但不会让只要求一个
-group 的 reducer 自动变成 eligible。Analyzer 会把符合条件的 member call desugar 成
-receiver 位于首位的普通 call；此后 `resolve_call_signature()` 与 prefix syntax 走同一条
-shape 和 type path。Postfix rendering 与 cursor mapping 仍由 IDE 负责。
 
 ## 每层只校验自己看得见的不变量
 

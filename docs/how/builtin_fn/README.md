@@ -82,7 +82,7 @@ builtin_functions! {
 The DSL accepts:
 
 - primitive types `number`, `string`, `boolean`, `date`, `null`, and `any`;
-- declared generic names, unions with `|`, postfix list types with `[]`, lambda types,
+- declared generic names, unions with `|`, list types with a `[]` suffix, lambda types,
   grouped types, and `Ident<T>` binder types;
 - optional fixed parameters written as `name?: Type`;
 - one explicit `repeat(min = N) { ... }` group;
@@ -162,16 +162,20 @@ ordinary binding machinery.
 
 Lambda types preserve both parameter type and binding origin. `current` lowers to
 `LambdaParam::Current`. Any other lambda parameter name lowers to
-`LambdaParam::ParamRef`, referring to another declared parameter. The `let` declaration
-uses this relationship:
+`LambdaParam::ParamRef(name)`. Current declarations use that name as a convention for
+referring to another parameter, but macro lowering does not validate that the target
+exists. The `let` declaration follows this convention:
 
 ```rust,ignore
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 ```
 
-`Ident<T>` marks the identifier-bearing argument, while the `body` parameter refers back
-to it. The Analyzer later supplies the actual identifier spelling and performs staged
-lambda inference; `builtin_fn` only preserves the type and reference relationship.
+`Ident<T>` marks the identifier-bearing argument, while `body` uses `ident` as its
+reference name. During staged lambda inference, the Analyzer searches the resolved
+arguments for a parameter with that name and uses its identifier spelling when available;
+otherwise it falls back to the reference name itself. This lookup and fallback live in
+[`analyzer/src/analysis/infer.rs`](../../../analyzer/src/analysis/infer.rs). `builtin_fn`
+only preserves the type and unvalidated reference name.
 
 The model is defined in
 [`builtin_fn/src/types.rs`](../../../builtin_fn/src/types.rs),
@@ -180,9 +184,8 @@ The model is defined in
 
 ## Resolution returns one immutable snapshot
 
-`resolve_call_signature()` accepts a `FunctionSig` and arguments in semantic order. A
-postfix receiver, when present, has already been inserted at index zero. Each argument is
-observed as either:
+`resolve_call_signature()` accepts a `FunctionSig` and arguments in semantic order. Each
+argument is observed as either:
 
 - `Empty`, when a syntactic slot exists but has no expression; or
 - `Typed(Ty)`, including `Ty::Unknown` when an expression exists but inference is
@@ -201,11 +204,12 @@ Resolution performs these steps:
 6. compare observations with instantiated parameter types; and
 7. return validity, projection, per-argument status, and return type together.
 
-A count accepted by the shape produces `ShapeValidity::Valid`. An incomplete or invalid
-count produces a specific `CallShapeError`, but resolution still returns the smallest
-completable projection. Excess arguments that have no projected parameter are marked
-`Unmapped`. Empty and unknown arguments are `Indeterminate`, so a partial call does not
-become a false type mismatch.
+A count accepted by the shape produces `ShapeValidity::Valid`; other counts produce a
+specific `CallShapeError`. Fixed shapes always project every declared fixed slot, whether
+or not an observation exists for that slot. Repeating shapes use their exact split when
+the count is valid and the smallest greater or equal completable count when it is not.
+Excess arguments that have no projected parameter are marked `Unmapped`. Empty and unknown
+arguments are `Indeterminate`, so a partial call does not become a false type mismatch.
 
 The projection remains semantic data: each `ResolvedParamSlot` carries a logical
 `ParamRef`, an optional one-based repeat-group number, an optional source argument index,
@@ -223,6 +227,10 @@ it never invents observations for absent source arguments.
 [`builtin_fn/tests/resolution.rs`](../../../builtin_fn/tests/resolution.rs) covers exact,
 incomplete, and invalid shapes, generic binding, staged observations, and all five layout
 forms.
+
+`FunctionSig` and `ParamShape` contain no postfix-capability flag; they expose only the
+signature shape. The Analyzer owns the decision about whether a signature supports
+postfix syntax.
 
 ### Custom resolvers can refine only the return type
 
@@ -245,31 +253,6 @@ the first list argument and normalizes them into the result element union. The f
 and its focused test live in
 [`builtin_fn/src/builtins.rs`](../../../builtin_fn/src/builtins.rs) and
 [`builtin_fn/tests/resolution.rs`](../../../builtin_fn/tests/resolution.rs).
-
-## Postfix eligibility is derived from the signature shape
-
-The current postfix gate is implemented by
-`analyzer::semantic::is_postfix_capable` in
-[`analyzer/src/analysis/mod.rs`](../../../analyzer/src/analysis/mod.rs). It derives
-eligibility from the supported `FunctionSig`; the catalog does not maintain a second
-postfix flag.
-
-A signature is eligible only when it has a deterministic first parameter and at least one
-additional physical argument position:
-
-- a non-empty `head` supplies the receiver slot, and the full displayed shape must contain
-  at least two logical parameters;
-- otherwise a non-empty repeat group supplies the receiver slot, and either the displayed
-  shape has at least two logical parameters or its minimum repetition requires at least
-  two physical slots;
-- a tail-only signature, or a single repeat slot whose minimum is only one group, is not
-  eligible.
-
-This keeps a repeat-only declaration such as `concat(min = 2)` eligible without making a
-one-group reducer eligible. The Analyzer desugars an eligible member call to an ordinary
-call with the receiver prepended. From that point on, `resolve_call_signature()` uses the
-same shape and type path as prefix syntax. Postfix rendering and cursor mapping remain IDE
-responsibilities.
 
 ## Validation is split across the layer that has enough context
 
