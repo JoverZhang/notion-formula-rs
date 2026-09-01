@@ -19,8 +19,8 @@ last_verified: 2026-07-30
 
 ## Summary
 
-Evaluator 的 builtin dispatch support 开始通过专门的内部模块集中处理 parameter lookup 和 debug contract
-checking。Generated builtin contract 和 formula result 均未改变。
+Evaluator 把 builtin dispatch 所需的 parameter lookup 和 debug contract 检查集中到专门的内部模块。
+Generated builtin contract 和 formula result 均未改变。
 
 ## Compatibility notes
 

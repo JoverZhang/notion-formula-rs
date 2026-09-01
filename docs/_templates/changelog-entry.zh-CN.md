@@ -14,15 +14,16 @@ last_verified: 2026-09-01
 
 [English](changelog-entry.md)
 
-把下面的结构复制到 `docs/changelogs/YYYYMMDD-short-slug.zh-CN.md`，替换所有 placeholder，并在相邻位置
-建立英文 counterpart。
+先为本轮编辑选择 `en` 或 `zh-CN` 作为 source language，并在两份 counterpart 中使用同一个值。把下面的
+结构复制到 `docs/changelogs/YYYYMMDD-short-slug.zh-CN.md`，替换所有 placeholder，再在相邻位置建立英文
+counterpart。
 
 ```markdown
 ---
 doc_id: changelog.YYYYMMDD-short-slug
 title: "简短说明"
 language: zh-CN
-source_language: en
+source_language: <en-or-zh-CN>
 counterpart: ./YYYYMMDD-short-slug.md
 implementation_status: historical
 document_status: stable

@@ -19,22 +19,22 @@ last_verified: 2026-07-20
 
 ## Summary
 
-全部 83 项受支持的 builtin declaration 开始通过同步的 prepared-input Evaluator 执行。Value function 会分别
-保留 null、error 和 mask state，conditional 与 list lambda 则只对选中的 row mask 求值。Generated typed
-argument 到 handwritten kernel boundary 时仍然保留具体类型，不会重新擦除为 dynamic column。
+全部 83 项受支持的 builtin declaration 开始通过同步、预先准备输入的 Evaluator 执行。Value function 会
+分别保留 null、error 和 mask state；conditional 与 list lambda 只对选中的 row mask 求值。Generated
+typed argument 到达 handwritten kernel boundary 时仍保留具体类型，不会再次擦除成 dynamic column。
 
 ## Compatibility notes
 
 - Public Evaluator API 和 catalog syntax 均未改变。
 - `now()` 和 `today()` 使用 frozen `BuiltinRuntimeContext`，`id()` 使用当前 `RowBatch` 的 row ID。
-- Catalog 中标记为 unsupported 的条目仍可供文档和 analysis 使用，但不承担 runtime dispatch obligation。
+- Catalog 中标记为 unsupported 的条目仍可供文档和 analysis 使用，但不需要实现 runtime dispatch。
 
 ## Tests
 
 - `cargo test -p evaluator`
 - `cargo test -p evaluator --release`
 - `cargo run -p builtin_fn --bin builtin_catalog -- --check`
-- Workspace 和 Docker verification 记录在对应 pull request 中。
+- Workspace 和 Docker 的 verification 结果记录在对应 pull request 中。
 
 ## Links
 

@@ -19,8 +19,8 @@ last_verified: 2026-02-15
 
 ## Summary
 
-Stateful WASM `Analyzer` method 从 `ide_*` 改为不带前缀的 `format`、`apply_edits` 和 `help`。Vite demo
-wrapper 也同步更新，使 proxy function name 直接对应底层 WASM method name。
+Stateful WASM `Analyzer` 的 method 从 `ide_*` 改为不带前缀的 `format`、`apply_edits` 和 `help`。Vite
+demo wrapper 也同步更新，使 proxy function 的名称直接对应底层 WASM method。
 
 ## Compatibility notes
 

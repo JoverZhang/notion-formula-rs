@@ -19,9 +19,9 @@ last_verified: 2026-02-13
 
 ## Summary
 
-WASM API 改为 instance-based（`new Analyzer(config)`），并删除接收 `context_json` string 的 function-style
-export。Config 改用 object input（`AnalyzerConfig`），在顶层支持 `preferred_limit`，传入 `null` 时使用默认值
-`5`。
+WASM API 改为先通过 `new Analyzer(config)` 创建 instance，再调用其 method；原先接收 `context_json`
+string 的 function-style export 已删除。Config 改为接收 `AnalyzerConfig` object，并在顶层支持
+`preferred_limit`；传入 `null` 时使用默认值 `5`。
 
 UTF 转换 helper 也集中到 `analyzer_wasm/src/offsets.rs` 并改名为：
 
@@ -35,13 +35,12 @@ UTF 转换 helper 也集中到 `analyzer_wasm/src/offsets.rs` 并改名为：
 - Breaking WASM API：
   - 删除 `analyze(source, context_json)`；
   - 删除 `ide_help(source, cursor_utf16, context_json)`；
-  - 改为创建一次 `Analyzer`，再调用 instance method。
+  - 改为创建一次 `Analyzer`，再重复调用它的 method。
 - Breaking WASM config shape：
   - 删除嵌套的 `completion.preferred_limit`；
   - 改用 `AnalyzerConfig.preferred_limit`。
 - Breaking demo integration：
-  - `examples/vite` 改用 `initWasm(ANALYZER_CONFIG)` 初始化 wrapper，并使用 stateful `Analyzer`
-    instance。
+  - `examples/vite` 改用 `initWasm(ANALYZER_CONFIG)` 初始化 wrapper，并复用同一个 `Analyzer` instance。
 
 ## Tests
 

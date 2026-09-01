@@ -28,13 +28,13 @@ type。
 
 - `builtin_categories()` 公开受支持及仅记录在案但不受支持的声明；`builtins_functions()` 仍然只公开可执行的
   semantic signature。
-- `SemanticMap::builtin_calls` 保留最终的共享解析结果，供 downstream consumer 使用。
+- `SemanticMap::builtin_calls` 保留最终的共享解析结果，供下游使用。
 - `concat` 改为至少需要两个 repeat group；`id()` 是 catalog 定义的零参数 current-row 形式。
 - `name`、`email`、`lets`、不可用的 rich/date-range type 和仅供 operator 使用的声明仍会记录，但不进入
   executable signature 或 completion。
 - 推断 implicit lambda 的 Analyzer 入口开始接收 mutable expression，从而在 `SemanticMap` 中保留最终转换
   后的 call 及其 `ResolvedFunctionSig`。
-- `BuiltinSigParser` 仍可作为独立 compatibility API 使用，但 production builtin declaration 不再于 runtime
+- `BuiltinSigParser` 仍可作为独立 compatibility API 使用，但 production builtin declaration 不再在 runtime
   解析 signature string。
 
 ## Tests

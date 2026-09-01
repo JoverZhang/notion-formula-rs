@@ -27,7 +27,7 @@ last_verified: 2026-02-07
 
 ## Compatibility notes
 
-- 本次只修改文档，不涉及 runtime 行为。
+- 本次只修改文档，无意改变 runtime 行为。
 
 ## Tests
 

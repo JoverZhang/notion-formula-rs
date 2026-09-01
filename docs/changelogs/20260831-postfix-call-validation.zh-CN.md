@@ -19,8 +19,8 @@ last_verified: 2026-08-31
 
 ## Summary
 
-Semantic analysis 开始为不受支持和未知的 postfix member call 报告 diagnostic，不再静默地把它们的 type
-保留为 `Unknown`。受支持的 postfix call 仍然使用与 prefix form 相同的 inference 和 validation rule。
+Semantic analysis 开始为不受支持或未知的 postfix member call 报告 diagnostic，不再静默地把 type 保留为
+`Unknown`。受支持的 postfix call 仍沿用 prefix form 的 inference 和 validation rule。
 
 ## Compatibility notes
 

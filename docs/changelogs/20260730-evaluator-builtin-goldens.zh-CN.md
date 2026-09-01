@@ -19,8 +19,8 @@ last_verified: 2026-07-30
 
 ## Summary
 
-每一项受支持 builtin 的 Evaluator runtime 行为开始由易于阅读的 golden fixture 记录和验证。Fixture 除了
-formula 和逐行 result，还可以包含 typed property column、row ID、execution mask 和 frozen runtime
+每一项受支持 builtin 的 Evaluator runtime 行为开始由易于阅读的 golden fixture 记录和验证。除了 formula
+和逐行 result，fixture 还可以包含 typed property column、row ID、execution mask 和 frozen runtime
 context。
 
 ## Compatibility notes

@@ -19,12 +19,12 @@ last_verified: 2026-02-11
 
 ## Summary
 
-Editing/boundary API 经历了一次 breaking refactor：
+这次修改对 editing 与 boundary API 做了 breaking refactor：
 
 - Core diagnostic 直接携带 action：
   - `Diagnostic.actions: Vec<CodeAction>`；
   - 使用 byte coordinate 的 `CodeAction { title, edits: Vec<TextEdit> }`。
-- Parser quick-fix generation 开始填充 diagnostic action。
+- Parser 开始生成 quick fix，并把它们写入 diagnostic action。
 - `ParseOutput` 不再携带独立的 quick-fix list。
 - WASM API 开始导出：
   - `analyze(source, context_json)`；
@@ -41,7 +41,7 @@ Editing/boundary API 经历了一次 breaking refactor：
   - `DiagnosticView` 增加供 UI 列表使用的 1-based `line` 和 `col`；
   - 新增 `ApplyResultView`。
 - 删除旧 boundary endpoint 和旧 line/column endpoint。
-- Completion、action 和 edit application 统一使用 `TextEdit` / `TextEditView` model。
+- Completion、action 和 edit application 开始共用 `TextEdit` / `TextEditView` model。
 
 ## Tests
 

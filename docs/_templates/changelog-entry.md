@@ -14,15 +14,16 @@ last_verified: 2026-09-01
 
 [简体中文](changelog-entry.zh-CN.md)
 
-Copy this scaffold to `docs/changelogs/YYYYMMDD-short-slug.md`, replace every placeholder, and create
-its adjacent Chinese counterpart.
+Choose `en` or `zh-CN` as the source language for this editing cycle, and use that same value in
+both counterparts. Copy this scaffold to `docs/changelogs/YYYYMMDD-short-slug.md`, replace every
+placeholder, and create its adjacent Chinese counterpart.
 
 ```markdown
 ---
 doc_id: changelog.YYYYMMDD-short-slug
 title: "Short description"
 language: en
-source_language: en
+source_language: <en-or-zh-CN>
 counterpart: ./YYYYMMDD-short-slug.zh-CN.md
 implementation_status: historical
 document_status: stable
