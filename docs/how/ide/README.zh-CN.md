@@ -89,7 +89,9 @@ Cursor 严格位于字符串 literal 内部时，位置会强制变成 `None`，
 
 - `NeedExpr` 提供已配置属性、`not`/`true`/`false`，以及 `semantic::Context` 中的全部函数。属性插入
   `prop("Name")`，函数插入调用括号。
-- `AfterAtom` 提供二元运算符和可用于 postfix 调用的函数，并一并插入开头的点号。
+- `AfterAtom` 提供固定的 operator 子集 `==`、`!=`、`>=`、`>`、`<=`、`<`、`+`、`-`、`*` 和
+  `/`，以及可用于 postfix 调用的函数；函数 insert text 会带开头的点号。Parser 支持的 `%`、`^`、
+  `&&` 和 `||` 不在这里的 completion candidate 中。
 - `AfterDot` 只提供可用于 postfix 调用的函数；源码已经包含点号，因此 insert text 不再带点号。当前 token
   gate 不把右方括号识别为 completion receiver，所以 list literal 不会进入这个分支。
 - `None` 不生成候选项。
@@ -109,14 +111,14 @@ expected type 会按类型兼容性重排补全分类和候选项；位于类型
 一步。不兼容项只会后移，不会被删除，因此公式尚不完整时仍可继续补全。
 
 如果存在 query，[`rank_by_query`](../../../ide/src/completion/ranking.rs) 会按完全匹配、子串匹配和 fuzzy
-subsequence 质量排列函数与属性 label。普通表达式补全保留不匹配项；点号后的 member 补全则删除不匹配
+subsequence 质量排列函数与属性 label。普通表达式补全保留不匹配项；点号后的 member 补全则过滤掉不匹配的
 method。原始候选位置是最后的 tie-break，因此 `Context` 稳定时输出也稳定。`preferred_indices` 从最终列表
 中选择不超过 `CompletionConfig::preferred_limit` 个可用且匹配的函数或属性，不会另建第二份候选清单。
 
 ## 签名帮助只负责适配共享的解析后签名
 
-[`compute_signature_help_if_in_call`](../../../ide/src/signature/mod.rs) 只在 call context 存在、cursor 已经过
-左括号，并且能在 `semantic::Context` 中找到 callee 时继续；否则返回 `None`。Current 实现最多生成一个
+[`compute_signature_help_if_in_call`](../../../ide/src/signature/mod.rs) 只在 call context 存在、cursor 位于
+左括号之后，并且能在 `semantic::Context` 中找到 callee 时继续；否则返回 `None`。Current 实现最多生成一个
 signature candidate，`active_signature` 固定为零。
 
 对于识别出的调用，这个模块执行四项与呈现有关的工作：
@@ -165,17 +167,24 @@ token stream。AST 负责运算优先级和表达式嵌套，原始 trivia 则�
 就回滚集合，避免一次失败的紧凑布局提前消耗注释。
 
 Formatter 通过 `INDENT` 和 `MAX_WIDTH` 常量集中维护缩进与行宽策略。原本跨行的表达式通常继续走
-multiline 路径；带末尾行注释的 binary expression 可以重新尝试 inline layout。单行表达式只有在所有
-嵌套部分都能放进宽度时才保持 inline。调用、列表、分组、运算符、三元表达式和 member call 共用这套
-递归布局。[`ide/tests/format`](../../../ide/tests/format) 下的 golden snapshot 覆盖注释附着和多行布局；
+multiline 路径；带末尾行注释的 binary expression 可以重新尝试 inline layout。Call、list、group、
+operator、ternary 和 member call 等复合结构，只有在递归的 inline 尝试符合行宽时才保持单行。Atomic
+identifier 和 literal 不执行这项行宽检查，因此可能单独形成超过 `MAX_WIDTH` 的一行。
+[`ide/tests/format`](../../../ide/tests/format) 下的 golden snapshot 覆盖注释附着和多行布局；
 [`test_format_idempotence.rs`](../../../ide/src/tests/ide/test_format_idempotence.rs) 要求第二次格式化得到完全
 相同的文本。
 
 ## 编辑应用将校验与修改分开
 
-[`apply_edits`](../../../ide/src/edit.rs) 先按原始源码中的 `(start, end)` 排序调用方提供的 edit，再把完整
-vector 交给 `validate_cursor` 和 `validate_sorted_non_overlapping_edits`。这两个 validator 会检查源码范围、
-UTF-8 字符边界、range 方向和重叠，并在构造新文本之前把失败映射为 `IdeError` variant。
+Analyzer 的 parser recovery 会生成 diagnostic `CodeAction` 及其中使用 byte range 的 `TextEdit` list。
+IDE 不选择也不生成这些 action。调用方选中 action 后，其中的 edits 会与其他调用方 edit 一样进入
+[`apply_edits`](../../../ide/src/edit.rs)。
+
+`apply_edits` 先按原始源码中的 `(start, end)` 对 edit 执行 stable sort，再把完整 vector 交给
+`validate_cursor` 和 `validate_sorted_non_overlapping_edits`。Validator 会检查源码范围、UTF-8 字符边界和
+range 方向。只有当前 edit 的 start 早于前一项排序后 end 时才视为重叠，因此相邻 range 和同一位置的
+zero-width insertion 都合法。对于 start/end 相同的 zero-width insertion，stable sort 配合反向应用会
+保留调用方顺序。所有失败都会在构造新文本之前映射为 `IdeError` variant。
 
 校验通过后，[`apply_text_edits_bytes_with_cursor`](../../../ide/src/text_edit.rs) 从源码末尾向前遍历 edit，
 从而保持原始坐标有效。遍历过程中，位于 edit 之后的 cursor 会按字节长度差移动；位于替换区间内部的

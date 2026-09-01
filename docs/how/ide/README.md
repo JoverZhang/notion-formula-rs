@@ -103,7 +103,9 @@ The `PositionKind` selects one candidate source in
 
 - `NeedExpr` offers configured properties, `not`/`true`/`false`, and every function in
   `semantic::Context`. A property inserts `prop("Name")`; a function inserts its call parentheses.
-- `AfterAtom` offers binary operators and postfix-capable functions, inserting the leading dot.
+- `AfterAtom` offers the fixed operator subset `==`, `!=`, `>=`, `>`, `<=`, `<`, `+`, `-`, `*`,
+  and `/`, plus postfix-capable functions with the leading dot. Parser-supported `%`, `^`, `&&`,
+  and `||` are not completion candidates here.
 - `AfterDot` offers only postfix-capable functions and omits the dot from inserted text because it is
   already present in the source. The current token gate does not recognize a closing bracket as a
   completion receiver, so a list literal does not enter this branch.
@@ -129,7 +131,7 @@ while the formula is incomplete.
 
 If a query exists, [`rank_by_query`](../../../ide/src/completion/ranking.rs) then orders function and
 property labels by exact match, substring match, and fuzzy subsequence quality. Ordinary expression
-completion retains unmatched items. Member completion after a dot removes unmatched methods. The
+completion retains unmatched items. Member completion after a dot filters out unmatched methods. The
 original candidate position remains the final tie-break, so a stable `Context` produces stable
 output. `preferred_indices` selects up to `CompletionConfig::preferred_limit` enabled matching
 functions and properties from the final list; it does not create a second candidate list.
@@ -137,7 +139,7 @@ functions and properties from the final list; it does not create a second candid
 ## Signature help adapts the shared resolved signature
 
 [`compute_signature_help_if_in_call`](../../../ide/src/signature/mod.rs) starts only when call context
-exists, the cursor is after the opening parenthesis, and the callee resolves in
+exists, the cursor is positioned after the opening parenthesis, and the callee resolves in
 `semantic::Context`. It returns `None` otherwise. The Current implementation produces at most one
 signature candidate and sets `active_signature` to zero.
 
@@ -196,9 +198,10 @@ multiline, so a failed compact layout cannot consume comments.
 
 The formatter centralizes indentation and width policy in the `INDENT` and `MAX_WIDTH` constants.
 Existing multiline expressions normally remain on a multiline path; binary expressions with a
-trailing line comment may retry inline layout. A single-line expression stays inline when every
-nested part can do so within the width. Calls, lists, groups, operators, ternaries, and member calls
-share this recursive layout model. Golden snapshots under
+trailing line comment may retry inline layout. Compound calls, lists, groups, operators, ternaries,
+and member calls remain inline only when their recursive inline attempt fits the width. Atomic
+identifiers and literals bypass that width check and can therefore form a line longer than
+`MAX_WIDTH`. Golden snapshots under
 [`ide/tests/format`](../../../ide/tests/format) exercise comment placement and multiline layouts;
 unit tests in
 [`test_format_idempotence.rs`](../../../ide/src/tests/ide/test_format_idempotence.rs) require a
@@ -206,10 +209,16 @@ second formatting pass to produce identical text.
 
 ## Edit application separates validation from mutation
 
-[`apply_edits`](../../../ide/src/edit.rs) sorts caller edits by original-source `(start, end)` and
-passes the whole vector through `validate_cursor` and `validate_sorted_non_overlapping_edits` before
-constructing updated text. The validators check source bounds, UTF-8 character boundaries, range
-direction, and overlap, and map failures to `IdeError` variants before mutation begins.
+Analyzer parser recovery creates diagnostic `CodeAction` values and their byte-range `TextEdit`
+lists. The IDE neither chooses nor generates those actions. Once a caller selects an action, its
+edits enter the same [`apply_edits`](../../../ide/src/edit.rs) path as any other caller-supplied edit.
+
+`apply_edits` stably sorts edits by original-source `(start, end)` and passes the whole vector through
+`validate_cursor` and `validate_sorted_non_overlapping_edits` before constructing updated text. The
+validators check source bounds, UTF-8 character boundaries, and range direction. An edit overlaps
+only when its start is before the previous sorted end, so adjacent ranges and zero-width insertions
+at the same position remain valid. For tied zero-width insertions, stable sorting and reverse
+application preserve caller order. Failures map to `IdeError` variants before mutation begins.
 
 After validation, [`apply_text_edits_bytes_with_cursor`](../../../ide/src/text_edit.rs) traverses
 edits from the end of the source toward the beginning so original coordinates remain valid. During
