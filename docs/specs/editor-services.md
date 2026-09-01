@@ -59,13 +59,19 @@ properties and supported functions:
 | Cursor context | Current candidates |
 | --- | --- |
 | At an expression start, including an empty argument | configured properties, `not`, `true`, `false`, and supported functions |
-| Strictly inside an identifier, `not`, `true`, or `false`, or after an identifier that is a proper prefix of a configured property name, supported function name, `not`, `true`, or `false` | the expression-start set above |
+| Strictly inside an identifier, `not`, `true`, or `false`, or after an identifier that the Current classifier recognizes as a prefix of a configured property name, supported function name, `not`, `true`, or `false` | the expression-start set above |
 | After a complete identifier, literal, or `)` outside the prefix case | `==`, `!=`, `>=`, `>`, `<=`, `<`, `+`, `-`, `*`, `/`, and postfix-capable functions |
 | After a receiver and `.` | postfix-capable functions accepted by the known receiver type |
 | Strictly inside a string literal | no completion candidates |
 
-A whitespace-only document is a Current exception to the expression-start rule. It returns the
-expression-start set at cursor `0`, but returns no candidates at a nonzero cursor. Identifier-prefix
+A document containing only lexer-skipped horizontal whitespace—space, tab, or carriage return—is a
+Current exception to the expression-start rule. It returns the expression-start set at cursor `0`,
+but returns no candidates at a nonzero cursor. A newline is retained as trivia and does not trigger
+this exception.
+
+For property and function names, the prefix classifier compares lowercased prefixes but tests an
+exact name against its original spelling. An exact mixed-case name such as configured `Title` can
+therefore still take the prefix path, while an exact lowercase name does not. Identifier-prefix
 completion uses the detected identifier as its replacement range; an ordinary insertion context
 uses an empty range at the cursor.
 
@@ -98,13 +104,14 @@ known call.
 
 ## Treat ordering and preferred indices as deterministic hints
 
-When an expression-start cursor is inside a known call argument, candidates are first reordered by
-the expected argument type. This stage keeps each `CompletionKind` in one contiguous bucket. Within
-a bucket, enabled candidates precede disabled candidates and stronger type matches precede weaker
-ones. Whole buckets are ordered by their best match, with a fixed kind priority breaking ties. A
-compatible candidate can therefore still follow an incompatible candidate from an earlier bucket.
-This stage reorders candidates but does not remove them; later query ranking can change the final
-order again.
+When an expression-start cursor is inside a known call argument that maps to a concrete expected
+type, candidates are first reordered by that type. Arguments without a projected parameter and
+parameters whose expected type is `Unknown` or generic skip this stage. Type ranking keeps each
+`CompletionKind` in one contiguous bucket. Within a bucket, enabled candidates precede disabled
+candidates; within each of those two partitions, stronger type matches precede weaker ones. Whole
+buckets are ordered by their best match, with a fixed kind priority breaking ties. A compatible
+candidate can therefore still follow an incompatible candidate from an earlier bucket. This stage
+reorders candidates but does not remove them; later query ranking can change the final order again.
 
 The replacement text yields a query only when it is nonempty after normalization and every
 character is an ASCII letter or digit, underscore, or whitespace. Query matching ignores ASCII
@@ -115,9 +122,9 @@ completion retains nonmatching candidates after the matches. Member completion a
 nonmatching candidates instead. Function `()` and a postfix label's leading `.` are not part of the
 text used for matching.
 
-A replacement containing any non-ASCII character does not form a query. The service then skips
-query ranking, preserves the order produced by earlier stages, and returns no `preferred_indices`.
-The Current ordering and query boundaries are implemented in
+A replacement containing a non-ASCII character that is not whitespace does not form a query. The
+service then skips query ranking, preserves the order produced by earlier stages, and returns no
+`preferred_indices`. The Current ordering and query boundaries are implemented in
 [`completion/ranking.rs`](../../ide/src/completion/ranking.rs) and exercised in
 [`test_completion_ranking.rs`](../../ide/src/tests/ide/test_completion_ranking.rs).
 

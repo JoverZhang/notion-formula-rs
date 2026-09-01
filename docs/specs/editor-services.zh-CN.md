@@ -50,14 +50,19 @@ Completion candidate 取决于 cursor 附近的源码，以及配置的 property
 | Cursor context | Current candidate |
 | --- | --- |
 | 表达式起点，包括空 argument | 配置的 property、`not`、`true`、`false` 和受支持函数 |
-| 严格位于 identifier、`not`、`true` 或 `false` 内部，或者 identifier 是配置 property name、受支持 function name、`not`、`true` 或 `false` 的未完成前缀 | 上述 expression-start candidate |
+| 严格位于 identifier、`not`、`true` 或 `false` 内部，或者 Current classifier 把 identifier 识别为配置 property name、受支持 function name、`not`、`true` 或 `false` 的前缀 | 上述 expression-start candidate |
 | 完整 identifier、literal 或 `)` 之后，且不属于前缀补全 | `==`、`!=`、`>=`、`>`、`<=`、`<`、`+`、`-`、`*`、`/` 和支持 postfix 的函数 |
 | receiver 与 `.` 之后 | 已知 receiver type 可接受的 postfix 函数 |
 | 严格位于 string literal 内部 | 不返回 completion candidate |
 
-只有 whitespace 的文档是 expression-start 规则的 Current 例外。Cursor 位于 `0` 时返回 expression-start
-candidate；cursor 位于其他位置时不返回 candidate。Identifier prefix completion 会把识别到的 identifier
-作为 replacement range，普通插入位置则使用 cursor 处的空 range。
+源码只包含 lexer 会跳过的水平 whitespace，即 space、tab 或 carriage return 时，属于 expression-start 规则的
+Current 例外。Cursor 位于 `0` 时返回 expression-start candidate；cursor 位于其他位置时不返回 candidate。
+Newline 会作为 trivia 保留下来，不触发该例外。
+
+对于 property 和 function name，prefix classifier 会比较转为小写后的 prefix，却以原始拼写判断 exact name。
+因此，与配置完全相同的 mixed-case name（例如 `Title`）仍可能走 prefix 路径，完全相同的 lowercase name 则
+不会。Identifier prefix completion 会把识别到的 identifier 作为 replacement range，普通插入位置使用 cursor
+处的空 range。
 
 Receiver type 未知时，member completion 目前保留全部 postfix-capable 函数；type 已知时，会移除其 receiver
 parameter 无法接受该 type 的函数。`.` 后的 query 还会进一步移除不匹配的函数。这些边界由
@@ -82,11 +87,12 @@ Completion 与 signature help 是两份独立结果。特别是，当 cursor 严
 
 ## 把排序和 preferred_indices 当作确定性的选择提示
 
-当 expression-start cursor 位于已知 call argument 中时，candidate 会先根据当前 argument 的 expected type
-重新排序。该阶段让每种 `CompletionKind` 保持在一个连续 bucket 中。Bucket 内先排 enabled candidate，再排
-disabled candidate；type match 更强的 candidate 靠前。各 bucket 按其中最佳 match 排序，分数相同时使用固定
-kind priority。因此，一个 compatible candidate 仍可能排在前一个 bucket 的 incompatible candidate 之后。
-该阶段只排序，不移除 candidate；后续 query ranking 还可能改变最终顺序。
+当 expression-start cursor 位于已知 call argument 中，而且该 argument 能映射到 concrete expected type 时，
+candidate 会先按该 type 排序。没有 projected parameter，或者 expected type 为 `Unknown` 或 generic 时，会跳过
+该阶段。Type ranking 让每种 `CompletionKind` 保持在一个连续 bucket 中。Bucket 内先排 enabled candidate，
+再排 disabled candidate；同一分区内，type match 更强的 candidate 靠前。各 bucket 按其中最佳 match 排序，
+分数相同时使用固定 kind priority。因此，一个 compatible candidate 仍可能排在前一个 bucket 的 incompatible
+candidate 之后。该阶段只排序，不移除 candidate；后续 query ranking 还可能改变最终顺序。
 
 Replacement text 经过 normalization 后非空，而且每个字符都是 ASCII letter、digit、下划线或 whitespace 时，
 才能形成 query。匹配会忽略 ASCII 大小写和下划线。对 function 和 property label 而言，exact match 先于
@@ -94,8 +100,8 @@ containing match，后者又先于保持字符顺序的 fuzzy subsequence match�
 kind 和原始顺序规则决定。普通 expression completion 会把不匹配 candidate 保留在匹配项之后，只有 `.` 后的
 member completion 会移除不匹配项。Function label 的 `()` 与 postfix label 开头的 `.` 不参与匹配。
 
-Replacement text 只要包含 non-ASCII character，就不会形成 query。服务会跳过 query ranking，保留此前阶段
-产生的顺序，并返回空的 `preferred_indices`。Current 排序与 query 边界位于
+Replacement text 只要包含 non-ASCII 且不是 whitespace 的 character，就不会形成 query。服务会跳过 query
+ranking，保留此前阶段产生的顺序，并返回空的 `preferred_indices`。Current 排序与 query 边界位于
 [`completion/ranking.rs`](../../ide/src/completion/ranking.rs)，并由
 [`test_completion_ranking.rs`](../../ide/src/tests/ide/test_completion_ranking.rs) 覆盖。
 
@@ -128,7 +134,7 @@ Formatting 是 full-document、all-or-nothing operation。Lexing 或 parsing 只
 就失败，不会返回部分格式化的源码。Semantic problem 本身不阻止 formatting，因为该操作不执行 semantic
 analysis。
 
-对可接受源码，formatting 结果是确定且 idempotent 的，并遵守以下规则：
+对可接受源码，在 formatter 覆盖的 syntax 范围内，formatting 结果是确定且 idempotent 的，并遵守以下规则：
 
 - 每级缩进使用两个空格；
 - binary 和 ternary operator 两侧、comma 之后使用约定的空格；
@@ -171,4 +177,4 @@ cursor 行为的实现和测试入口是 [`edit.rs`](../../ide/src/edit.rs)、
 本文不承诺 Rust `pub` API 稳定性、特定 completion widget、diagnostic 分组策略、signature popover 布局或
 自动选择 action，也不规定 serialized enum spelling、optional field 表示、position unit、Unicode scalar
 boundary 转换、clamping 或 JavaScript exception message。这些 transport 细节由 WASM API specification
-负责；应用呈现由消费 editor service 的 client 负责。
+负责；应用呈现由使用 editor service 的 client 负责。
