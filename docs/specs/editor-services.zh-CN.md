@@ -19,11 +19,11 @@ formatting 和 edit 行为。这些服务在公式尚未写完时仍会尽量提
 变成可求值公式。
 
 本文规定的是服务行为，不是 transport。WASM API specification 负责导出方法名、DTO field、UTF-16 转换、
-边界校验、序列化和 JavaScript error delivery；公式语法与求值分别由 formula-language 和 builtin-function
-specification 负责。Vite 示例里的 completion popover、分组、焦点和 quick-fix 选择属于 example policy，不是
-编辑器服务的保证。
+边界校验、序列化和 JavaScript error delivery；公式语法与求值语义按适用范围由 formula-language 和
+builtin-function specification 共同规定。Vite 示例里的 completion popover、分组、焦点和 quick-fix 选择属于
+example policy，不是编辑器服务的保证。
 
-## 按服务产生的顺序消费 diagnostic
+## 按服务返回的顺序处理 diagnostic
 
 一次分析可以同时返回语法和语义问题。结果按以下三个阶段拼接：
 
@@ -31,9 +31,9 @@ specification 负责。Vite 示例里的 completion popover、分组、焦点和
 2. lexer diagnostic；
 3. semantic diagnostic。
 
-服务会保留这个阶段顺序，不会再按源码位置做全局排序，也不会对不同阶段产生的 diagnostic 做全局去重。单个
-阶段可以合并自己在同一 span 上的报告；因此，consumer 应保留返回顺序，但不能把它理解成 source-order sort。
-这条顺序的实现入口是 [`analyzer::analyze`](../../analyzer/src/lib.rs)。
+服务会保留这三个阶段的顺序，不会再按源码位置做全局排序，也不会对不同阶段产生的 diagnostic 做全局去重。
+单个阶段可以合并自己在同一 span 上的报告；因此，consumer 应保留返回顺序，但不能把它理解成 source-order
+sort。该顺序的实现入口是 [`analyzer::analyze`](../../analyzer/src/lib.rs)。
 
 部分 parser recovery diagnostic 会带有用于插入、替换或删除源码的 action。Action 是可选信息：并非每个
 parser diagnostic 都有 action，lexer 和 semantic diagnostic 目前都没有。Action edit 使用原文档位置，并
@@ -50,9 +50,14 @@ Completion candidate 取决于 cursor 附近的源码，以及配置的 property
 | Cursor context | Current candidate |
 | --- | --- |
 | 表达式起点，包括空 argument | 配置的 property、`not`、`true`、`false` 和受支持函数 |
-| identifier、literal 或 `)` 之后 | `==`、`!=`、`>=`、`>`、`<=`、`<`、`+`、`-`、`*`、`/` 和支持 postfix 的函数 |
+| 严格位于 identifier、`not`、`true` 或 `false` 内部，或者 identifier 是配置 property name、受支持 function name、`not`、`true` 或 `false` 的未完成前缀 | 上述 expression-start candidate |
+| 完整 identifier、literal 或 `)` 之后，且不属于前缀补全 | `==`、`!=`、`>=`、`>`、`<=`、`<`、`+`、`-`、`*`、`/` 和支持 postfix 的函数 |
 | receiver 与 `.` 之后 | 已知 receiver type 可接受的 postfix 函数 |
 | 严格位于 string literal 内部 | 不返回 completion candidate |
+
+只有 whitespace 的文档是 expression-start 规则的 Current 例外。Cursor 位于 `0` 时返回 expression-start
+candidate；cursor 位于其他位置时不返回 candidate。Identifier prefix completion 会把识别到的 identifier
+作为 replacement range，普通插入位置则使用 cursor 处的空 range。
 
 Receiver type 未知时，member completion 目前保留全部 postfix-capable 函数；type 已知时，会移除其 receiver
 parameter 无法接受该 type 的函数。`.` 后的 query 还会进一步移除不匹配的函数。这些边界由
@@ -62,9 +67,11 @@ parameter 无法接受该 type 的函数。`.` 后的 query 还会进一步移�
 Parser 还接受 `%`、`^`、`&&` 和 `||`，但 Current 的 after-atom completion set 不会提供它们。集成方不能
 根据 grammar 推断 completion catalog。
 
-Enabled candidate 会携带针对当前 insertion 或 replacement range 的 edit。Function 和 postfix-function edit
-插入括号，并把目标 cursor 放进括号内。`not`、`true` 和 `false` 会在末尾插入一个空格。Property candidate
-插入 `prop("Name")`，cursor 位于整个 call 之后。
+配置中标为 disabled 的 property 仍会连同 disable reason 一起返回。它没有 primary edit 或目标 cursor，也
+不会进入 `preferred_indices`。Enabled candidate 会携带针对当前 insertion 或 replacement range 的 edit。
+Function 和 postfix-function edit 插入括号，并把目标 cursor 放进括号内。`not`、`true` 和 `false` 会在末尾
+插入一个空格。Property candidate 插入 `prop("Name")`，cursor 位于整个 call 之后。相关行为由
+[`test_completion_smoke.rs`](../../ide/src/tests/ide/test_completion_smoke.rs) 覆盖。
 
 Property name 会被原样放进双引号。Current completion service 不会转义配置名称中的双引号、反斜杠或其他
 影响源码的字符，因此 candidate 可能插入无效公式。集成方不能把 property completion 当成 escaping guarantee。
@@ -76,14 +83,21 @@ Completion 与 signature help 是两份独立结果。特别是，当 cursor 严
 ## 把排序和 preferred_indices 当作确定性的选择提示
 
 当 expression-start cursor 位于已知 call argument 中时，candidate 会先根据当前 argument 的 expected type
-重新排序。Result type 兼容的 item 排在 unknown 或不兼容类型之前；这个阶段只排序，不移除 candidate。
+重新排序。该阶段让每种 `CompletionKind` 保持在一个连续 bucket 中。Bucket 内先排 enabled candidate，再排
+disabled candidate；type match 更强的 candidate 靠前。各 bucket 按其中最佳 match 排序，分数相同时使用固定
+kind priority。因此，一个 compatible candidate 仍可能排在前一个 bucket 的 incompatible candidate 之后。
+该阶段只排序，不移除 candidate；后续 query ranking 还可能改变最终顺序。
 
-Replacement text 能形成 query 时，匹配会忽略 ASCII 大小写和下划线。对 function 和 property label 而言，
-exact match 先于 containing match，后者又先于保持字符顺序的 fuzzy subsequence match；其余顺序由确定性的
-紧凑度、candidate kind 和原始顺序规则决定。普通 expression completion 会把不匹配 candidate 保留在匹配项
-之后，只有 `.` 后的 member completion 会移除不匹配项。Function label 的 `()` 与 postfix label 开头的 `.`
-不参与匹配。Current 排序规则位于 [`completion/ranking.rs`](../../ide/src/completion/ranking.rs) 和
-[`completion/matchers.rs`](../../ide/src/completion/matchers.rs)。
+Replacement text 经过 normalization 后非空，而且每个字符都是 ASCII letter、digit、下划线或 whitespace 时，
+才能形成 query。匹配会忽略 ASCII 大小写和下划线。对 function 和 property label 而言，exact match 先于
+containing match，后者又先于保持字符顺序的 fuzzy subsequence match；其余顺序由确定性的紧凑度、candidate
+kind 和原始顺序规则决定。普通 expression completion 会把不匹配 candidate 保留在匹配项之后，只有 `.` 后的
+member completion 会移除不匹配项。Function label 的 `()` 与 postfix label 开头的 `.` 不参与匹配。
+
+Replacement text 只要包含 non-ASCII character，就不会形成 query。服务会跳过 query ranking，保留此前阶段
+产生的顺序，并返回空的 `preferred_indices`。Current 排序与 query 边界位于
+[`completion/ranking.rs`](../../ide/src/completion/ranking.rs)，并由
+[`test_completion_ranking.rs`](../../ide/src/tests/ide/test_completion_ranking.rs) 覆盖。
 
 `preferred_indices` 是指向最终已排序 item list 的 selection hint。数量不超过配置的 preferred limit，顺序与
 最终 list 一致，而且只指向匹配 query 的 enabled function 或 property candidate。没有 query、limit 为 0，
@@ -91,9 +105,10 @@ exact match 先于 containing match，后者又先于保持字符顺序的 fuzzy
 
 ## 为 active call 提供一个 best-effort signature
 
-Cursor 位于 innermost known function call 的左括号之后时，可以获得 signature help。Cursor 还在左括号前、
-已经离开 call，或 callee 未知时，不提供 signature。缺失右括号不会阻止 help，因此 `if(` 这样的 partial call
-仍能得到结果。
+Signature help 只检查 cursor 之前最内层尚未匹配的 `(`。紧邻该括号之前的 token 是已知 function name，且
+cursor 位于括号之后时，才会返回 signature。最内层括号属于 grouping expression 或 unknown callee 时，服务
+不会回退到外层 known call，而是直接不返回 signature。Cursor 仍在括号前或已经离开 call 时同样没有结果。
+缺失右括号不会阻止 help，因此 `if(` 这样的 partial call 仍能得到结果。
 
 Current 服务返回一个 structured signature，并将它选为 active signature。显示的 parameter 和 return type
 会结合已有 argument 的 best-effort type；未知或未完成的 argument 可以保留 generic 或 `unknown`。Normal
@@ -113,7 +128,7 @@ Formatting 是 full-document、all-or-nothing operation。Lexing 或 parsing 只
 就失败，不会返回部分格式化的源码。Semantic problem 本身不阻止 formatting，因为该操作不执行 semantic
 analysis。
 
-对可接受源码，formatting 结果是确定的，并遵守以下规则：
+对可接受源码，formatting 结果是确定且 idempotent 的，并遵守以下规则：
 
 - 每级缩进使用两个空格；
 - binary 和 ternary operator 两侧、comma 之后使用约定的空格；
@@ -123,8 +138,8 @@ analysis。
   inline layout，否则使用对应的 multiline layout。
 
 Atomic identifier 和 literal 不执行这项宽度检查，因此可能形成更长的一行。除此之外，80-byte threshold 是
-Current 固定布局规则，不是可配置的 editor width。Formatter 返回完整的新 document，并按照下文规则把传入
-cursor 重定位穿过这次 replacement。因此，严格位于发生变化的 full-document range 内的 cursor 通常移到
+Current 固定布局规则，不是可配置的 editor width。Formatter 返回完整的新 document，并按照下文规则根据
+这次 replacement 重定位传入的 cursor。因此，严格位于发生变化的 full-document range 内的 cursor 通常移到
 开头；原本位于 document end 的 cursor 则在长度调整后仍位于末尾。实现和测试入口包括
 [`format.rs`](../../ide/src/format.rs)、[`format` goldens](../../ide/tests/format/) 和
 [`test_format_idempotence.rs`](../../ide/src/tests/ide/test_format_idempotence.rs)。

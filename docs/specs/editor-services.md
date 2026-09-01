@@ -59,9 +59,15 @@ properties and supported functions:
 | Cursor context | Current candidates |
 | --- | --- |
 | At an expression start, including an empty argument | configured properties, `not`, `true`, `false`, and supported functions |
-| After an identifier, literal, or `)` | `==`, `!=`, `>=`, `>`, `<=`, `<`, `+`, `-`, `*`, `/`, and postfix-capable functions |
+| Strictly inside an identifier, `not`, `true`, or `false`, or after an identifier that is a proper prefix of a configured property name, supported function name, `not`, `true`, or `false` | the expression-start set above |
+| After a complete identifier, literal, or `)` outside the prefix case | `==`, `!=`, `>=`, `>`, `<=`, `<`, `+`, `-`, `*`, `/`, and postfix-capable functions |
 | After a receiver and `.` | postfix-capable functions accepted by the known receiver type |
 | Strictly inside a string literal | no completion candidates |
+
+A whitespace-only document is a Current exception to the expression-start rule. It returns the
+expression-start set at cursor `0`, but returns no candidates at a nonzero cursor. Identifier-prefix
+completion uses the detected identifier as its replacement range; an ordinary insertion context
+uses an empty range at the cursor.
 
 For a receiver whose type is unknown, member completion currently keeps the full postfix-capable
 set. For a known receiver type, it removes functions whose receiver parameter cannot accept that
@@ -72,10 +78,13 @@ type. A query after `.` further removes nonmatching functions. These boundaries 
 The parser also accepts `%`, `^`, `&&`, and `||`, but the Current after-atom completion set does not
 offer them. Integrations must not infer the completion catalog from the grammar.
 
-Enabled candidates carry an edit for the detected insertion or replacement range. Function and
-postfix-function edits insert parentheses and place the requested cursor inside them. `not`,
-`true`, and `false` insert a trailing space. A property candidate inserts `prop("Name")` and places
-the cursor after the call.
+A configured property marked disabled is still returned with its disable reason. It has no primary
+edit or requested cursor and cannot appear in `preferred_indices`. Enabled candidates carry an edit
+for the detected insertion or replacement range. Function and postfix-function edits insert
+parentheses and place the requested cursor inside them. `not`, `true`, and `false` insert a trailing
+space. A property candidate inserts `prop("Name")` and places the cursor after the call. Disabled
+property behavior is covered by
+[`test_completion_smoke.rs`](../../ide/src/tests/ide/test_completion_smoke.rs).
 
 Property names are inserted verbatim between the quotes. The Current completion service does not
 escape a quotation mark, backslash, or other source-sensitive character in the configured name.
@@ -90,17 +99,27 @@ known call.
 ## Treat ordering and preferred indices as deterministic hints
 
 When an expression-start cursor is inside a known call argument, candidates are first reordered by
-the expected argument type. Compatible result types rank ahead of unknown or incompatible types;
-this step reorders candidates but does not remove them.
+the expected argument type. This stage keeps each `CompletionKind` in one contiguous bucket. Within
+a bucket, enabled candidates precede disabled candidates and stronger type matches precede weaker
+ones. Whole buckets are ordered by their best match, with a fixed kind priority breaking ties. A
+compatible candidate can therefore still follow an incompatible candidate from an earlier bucket.
+This stage reorders candidates but does not remove them; later query ranking can change the final
+order again.
 
-When the replacement text yields a query, matching ignores ASCII case and underscores. For
-function and property labels, an exact match ranks before a containing match, which ranks before an
-ordered-subsequence fuzzy match; deterministic compactness, candidate-kind, and original-order tie
-breakers settle the remaining cases. Ordinary expression completion retains nonmatching candidates
-after the matches. Member completion after `.` removes nonmatching candidates instead. Function
-`()` and a postfix label's leading `.` are not part of the text used for matching. The Current
-ordering rules are implemented in [`completion/ranking.rs`](../../ide/src/completion/ranking.rs) and
-[`completion/matchers.rs`](../../ide/src/completion/matchers.rs).
+The replacement text yields a query only when it is nonempty after normalization and every
+character is an ASCII letter or digit, underscore, or whitespace. Query matching ignores ASCII
+case and underscores. For function and property labels, an exact match ranks before a containing
+match, which ranks before an ordered-subsequence fuzzy match; deterministic compactness,
+candidate-kind, and original-order tie breakers settle the remaining cases. Ordinary expression
+completion retains nonmatching candidates after the matches. Member completion after `.` removes
+nonmatching candidates instead. Function `()` and a postfix label's leading `.` are not part of the
+text used for matching.
+
+A replacement containing any non-ASCII character does not form a query. The service then skips
+query ranking, preserves the order produced by earlier stages, and returns no `preferred_indices`.
+The Current ordering and query boundaries are implemented in
+[`completion/ranking.rs`](../../ide/src/completion/ranking.rs) and exercised in
+[`test_completion_ranking.rs`](../../ide/src/tests/ide/test_completion_ranking.rs).
 
 `preferred_indices` are selection hints into the final, already ordered item list. They contain at
 most the configured preferred limit, preserve final item order, and refer only to enabled function
@@ -110,10 +129,12 @@ authorize a client to reorder the returned items.
 
 ## Show one best-effort signature for the active call
 
-Signature help is available after the opening parenthesis of the innermost known function call
-that contains the cursor. It is absent before the parenthesis, after the cursor has left the call,
-or when the callee is unknown. A missing closing parenthesis does not suppress help, so partial
-calls such as `if(` can still receive it.
+Signature help examines only the innermost unmatched `(` before the cursor. It is available when
+the token immediately before that parenthesis names a known function and the cursor is after the
+parenthesis. If the innermost parenthesis is a grouping expression or belongs to an unknown callee,
+the service returns no signature instead of falling back to an enclosing known call. Help is also
+absent before the parenthesis or after the cursor has left the call. A missing closing parenthesis
+does not suppress help, so partial calls such as `if(` can still receive it.
 
 The Current service returns one structured signature and selects it as the active signature. The
 displayed parameter and return types incorporate best-effort types from arguments already present;
