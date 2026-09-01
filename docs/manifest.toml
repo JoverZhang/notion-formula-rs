@@ -17,6 +17,7 @@ neutral_redirect_files = [
   "analyzer/README.md",
   "ide/README.md",
   "analyzer_wasm/README.md",
+  "examples/vite/README.md",
 ]
 
 control_files = [
@@ -52,5 +53,4 @@ legacy_files = [
   "docs/README.md",
   "docs/README.zh-CN.md",
   "docs/signature-help.md",
-  "examples/vite/README.md",
 ]
