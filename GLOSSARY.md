@@ -14,7 +14,7 @@ depth, but it should keep these names and preserve code identifiers exactly.
 
 | Term | Code anchor or example | Meaning | Avoid |
 | --- | --- | --- | --- |
-| formula | `prepare_formula` | The expression or program represented at a lifecycle stage as source, an analyzed expression, or a prepared plan. A formula is not a persisted record with its own ID. | equation |
+| formula | `prepare_formula` | The expression represented at a lifecycle stage as source, an analyzed expression, or a prepared plan. A formula is not a persisted record with its own ID. | equation |
 | formula source | `source: &str` | The formula text supplied to the analyzer. Rust components store it as UTF-8; an external interface may define another coordinate system for offsets. | content when formula text is intended |
 | token | `Token` | A syntax unit emitted by the lexer. | word |
 | trivia | comments and newlines | Tokens retained for source fidelity but skipped when they do not participate in syntax or semantic analysis. | whitespace when comments are included |
