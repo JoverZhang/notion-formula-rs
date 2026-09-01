@@ -1,4 +1,6 @@
-bilingual_files = []
+bilingual_files = [
+  "DOCUMENTATION.md",
+]
 
 bilingual_directories = [
   "docs",
