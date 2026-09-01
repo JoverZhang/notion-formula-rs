@@ -98,9 +98,9 @@ index。[`TokenQuery`](../../../analyzer/src/parser/tokenstream.rs) 在相同规
 
 ## 语法恢复修补结构，不虚构含义
 
-parser 使用 Pratt binding power 处理 prefix、binary、ternary、call、list 和 member-call 表达式。缺少
-必要语法时，它可以插入 `ExprKind::Error`，并扫描至逗号、冒号或闭合分隔符等安全边界，让外层表达式
-继续供下游使用。
+parser 使用 Pratt binding power 处理 prefix、binary 和 ternary 表达式。List 在 primary 阶段解析；
+随后独立的 postfix loop 在 primary 之后继续消费 prefix call 与 member call。缺少必要语法时，parser
+可以插入 `ExprKind::Error`，并扫描至逗号、冒号或闭合分隔符等安全边界，让外层表达式继续供下游使用。
 
 分隔符和分隔项恢复可以在诊断中附加 `CodeAction`，其中包含使用字节坐标的 `TextEdit`，例如插入缺失的
 `)` 或删除尾随逗号。恢复操作只描述一次局部源码修补，并不保证剩余公式已经合法。所有 AST 消费方都
@@ -115,8 +115,13 @@ Member 语法也只有 `receiver.method(...)` 这种调用形式能够进入语�
 [`analyze_expr_with_semantic_map`](../../../analyzer/src/analysis/mod.rs) 按顺序对可变表达式执行三项操作：
 
 1. **改写受支持的 postfix 调用。** 只有 method 出现在 `postfix_capable_builtin_names()` 中时，member
-   call 才会被改写。这份 allowlist 来自 `builtins_functions()` 返回的规范 catalog；后续查找和校验则
-   使用 `Context.functions`。
+   call 才会被改写。Allowlist 先取得 `builtins_functions()` 返回的受支持 signature，再通过
+   `is_postfix_capable` 过滤。非空 parameter head 必须至少有两个 display parameter；head 为空时，
+   repeat-first shape 必须有两个 display parameter，或由最少 repeat group 提供至少两个 position。
+   Tail-only shape 不符合条件。这些规则会确定一个 receiver slot，并保留另一个 argument position；后续
+   查找和校验仍使用 `Context.functions`。Filter 与对应的语义边界测试位于
+   [`analysis/mod.rs`](../../../analyzer/src/analysis/mod.rs) 和
+   [`test_semantic.rs`](../../../analyzer/src/tests/analysis/test_semantic.rs)。
 2. **尽可能推导事实。** 推导过程访问子表达式、记录类型，并为每个成功解析的 builtin 调用保留最终
    `ResolvedFunctionSig`。无法确定的表达式记为 `Ty::Unknown`，推导本身不产生诊断。函数类型参数会在
    临时词法作用域中完成推导，再由合成的 `ImplicitLambda` 节点包裹。

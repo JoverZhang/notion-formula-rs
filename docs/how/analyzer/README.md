@@ -108,10 +108,11 @@ covered by [`test_invariants.rs`](../../../analyzer/src/tests/parser/test_invari
 
 ## Syntax recovery repairs structure, not meaning
 
-The parser uses Pratt binding powers for prefix, binary, ternary, call, list, and member-call
-expressions. When required syntax is missing, it can insert `ExprKind::Error` and scan to a boundary
-such as a comma, colon, or closing delimiter. This keeps the surrounding expression available to
-later tooling.
+The parser uses Pratt binding powers for prefix, binary, and ternary expressions. Lists are parsed
+as primary expressions; a separate postfix loop consumes prefix calls and member calls after the
+primary. When required syntax is missing, the parser can insert `ExprKind::Error` and scan to a
+boundary such as a comma, colon, or closing delimiter. This keeps the surrounding expression
+available to later tooling.
 
 Delimiter and separator recovery may attach a `CodeAction` containing byte-based `TextEdit` values,
 for example to insert a missing `)` or remove a trailing comma. A recovery action describes a local
@@ -128,8 +129,14 @@ be a prefix call callee. Member syntax reaches semantic analysis only in the cal
 operations to a mutable expression:
 
 1. **Desugar supported postfix calls.** A member call is rewritten only when its method appears in
-   `postfix_capable_builtin_names()`. That allowlist is derived from the canonical catalog returned
-   by `builtins_functions()`, while later lookup and validation use `Context.functions`.
+   `postfix_capable_builtin_names()`. The allowlist starts from the supported signatures returned by
+   `builtins_functions()` and applies `is_postfix_capable`. A non-empty parameter head requires at
+   least two displayed parameters. When the head is empty, a repeat-first shape requires either two
+   displayed parameters or minimum repeat groups that supply at least two positions. A tail-only
+   shape is excluded. These rules provide one deterministic receiver slot and leave another
+   argument position; later lookup and validation still use `Context.functions`. The filter and its
+   semantic boundary tests live in [`analysis/mod.rs`](../../../analyzer/src/analysis/mod.rs) and
+   [`test_semantic.rs`](../../../analyzer/src/tests/analysis/test_semantic.rs).
 2. **Infer best-effort facts.** Inference visits subexpressions, records their types, and retains the
    final `ResolvedFunctionSig` for each resolved builtin call. Indeterminate expressions become
    `Ty::Unknown`; inference does not emit diagnostics. Function-typed arguments are inferred in a
