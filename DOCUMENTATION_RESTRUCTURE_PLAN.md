@@ -28,7 +28,7 @@ DOCUMENTATION.zh-CN.md
 DOCUMENTATION_RESTRUCTURE_PLAN.md
 
 docs/
-├── manifest.json
+├── manifest.toml
 ├── README.md
 ├── README.zh-CN.md
 ├── intent/
@@ -195,53 +195,54 @@ Human writing 至少要求：
 
 ## Manifest 与 Markdown 分类
 
-`docs/manifest.json` 是双语覆盖范围的机器可读来源。它只记录路径类别，不重复文档 front matter 中的 `doc_id`、source language、counterpart 或翻译状态。
+`docs/manifest.toml` 是双语覆盖范围的机器可读来源。它只记录路径类别，不重复文档 front matter 中的 `doc_id`、source language、counterpart 或翻译状态。
 
 预期结构如下：
 
-```json
-{
-  "bilingual_files": [
-    "README.md",
-    "DOCUMENTATION.md"
-  ],
-  "bilingual_directories": [
-    "docs"
-  ],
-  "english_only_files": [
-    "docs/reference/glossary.md"
-  ],
-  "neutral_redirect_files": [
-    "analyzer/README.md",
-    "analyzer_wasm/README.md",
-    "builtin_fn/README.md",
-    "builtin_fn_macros/README.md",
-    "evaluator/README.md",
-    "ide/README.md",
-    "examples/vite/README.md"
-  ],
-  "control_files": [
-    "AGENTS.md",
-    "CLAUDE.md",
-    "DOCUMENTATION_RESTRUCTURE_PLAN.md"
-  ],
-  "ignored_directories": [
-    ".agent"
-  ]
-}
+```toml
+bilingual_files = [
+  "README.md",
+  "DOCUMENTATION.md",
+]
+
+bilingual_directories = [
+  "docs",
+]
+
+english_only_files = [
+  "docs/reference/glossary.md",
+]
+
+neutral_redirect_files = [
+  "analyzer/README.md",
+  "analyzer_wasm/README.md",
+  "builtin_fn/README.md",
+  "builtin_fn_macros/README.md",
+  "evaluator/README.md",
+  "ide/README.md",
+  "examples/vite/README.md",
+]
+
+control_files = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  "DOCUMENTATION_RESTRUCTURE_PLAN.md",
+]
+
+ignored_directories = [
+  ".agent",
+]
 ```
 
 `bilingual_files` 使用无 `.zh-CN` 后缀的基准路径，同时覆盖其相邻 counterpart。`bilingual_directories` 覆盖目录中的所有 Markdown；exact exception 优先于目录默认值。
 
 迁移期间允许 manifest 临时增加一个逐文件的 `legacy_files` 列表：
 
-```json
-{
-  "legacy_files": [
-    "docs/design/demo-vite.md",
-    "docs/signature-help.md"
-  ]
-}
+```toml
+legacy_files = [
+  "docs/design/demo-vite.md",
+  "docs/signature-help.md",
+]
 ```
 
 它只用于登记尚未迁入新结构的现有文件。Checker 把它们列为 migration debt，并继续检查本地链接。每迁移一个文件就删除一个条目；不得用目录规则或通配符扩大 legacy 范围，也不得把新文件加入该列表。最终交付时 `legacy_files` 必须为空并从 manifest 删除。
@@ -340,7 +341,7 @@ Evaluator contract generation 仍然从 Rust builtin declarations 工作，不�
 
 ### 1. 建立维护规则和 checker
 
-- 创建 `DOCUMENTATION.*` 和 `docs/manifest.json`。
+- 创建 `DOCUMENTATION.*` 和 `docs/manifest.toml`。
 - 更新 `AGENTS.md` 的文档入口和 `.agent/` legacy 提示。
 - 重构 `check-docs.mjs` 及其内嵌目录树 fixtures。
 - 建立目标目录入口，但不填充未经授权的 intent/specs 内容。
