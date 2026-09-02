@@ -49,7 +49,7 @@ type。
 
 ## Links
 
-- [`docs/design/builtin-fn.md`](../design/builtin-fn.md)
-- [`docs/design/evaluator.md`](../design/evaluator.md)
-- [`docs/design/contracts.md`](../design/contracts.md)
+- [Builtin declaration 实现](../how/builtin_fn/README.zh-CN.md)
+- [Evaluator 实现](../how/evaluator/README.zh-CN.md)
+- [Builtin function 规格](../specs/builtin-functions/README.zh-CN.md)
 - [`builtin_fn/README.md`](../../builtin_fn/README.md)

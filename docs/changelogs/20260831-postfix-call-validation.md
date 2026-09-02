@@ -34,4 +34,4 @@ validation rules as their prefix form.
 
 ## Links
 
-- `docs/design/analyzer.md`
+- [Analyzer implementation](../how/analyzer/README.md)
