@@ -7,7 +7,7 @@ counterpart: ./README.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # 找到合适的文档入口
@@ -18,7 +18,7 @@ last_verified: 2026-09-01
 
 ## 了解项目方向
 
-阅读精简的[项目意图](intent/README.zh-CN.md)，了解项目要解决的问题、服务对象、目标、边界，以及需要重新评估这些选择的条件。
+阅读精简的[项目意图](intent/README.zh-CN.md)，了解作者为何做这个项目、Formula engine 在服务端与浏览器运行的目标、项目的 DSL 实践和边界。
 
 ## 使用或集成系统
 

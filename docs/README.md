@@ -7,7 +7,7 @@ counterpart: ./README.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # Find the right documentation
@@ -18,8 +18,8 @@ Choose the entry that matches the question you are trying to answer.
 
 ## Understand the direction
 
-Read the short [project intent](intent/README.md) for the problem, audience, goals, boundaries,
-and conditions that would trigger reevaluation.
+Read the short [project intent](intent/README.md) for the author's motivation, the Formula engine's
+server-and-browser direction, the project's DSL practice, and its boundaries.
 
 ## Use or integrate the system
 
