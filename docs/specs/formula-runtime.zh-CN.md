@@ -102,7 +102,7 @@ pub struct Span {
 }
 ```
 
-公式没有 display name。`prop("x")` 精确引用 `PropertyId("x")`。Rust span 是 UTF-8 byte 半开区间；TypeScript Adapter 转为 UTF-16 code-unit 半开区间。
+`PropertyId` 是公式的唯一标识，不另设 display name。`Span` 是 UTF-8 byte 半开区间。
 
 ## FormulaEvaluator
 
@@ -361,47 +361,6 @@ apply_edits
 编辑后的 expression 可以无效；这仍是成功结果，错误出现在新 state 的 diagnostics 中。陈旧版本、非法 range、重叠 edits 或非法 cursor 返回 `ApplyEditsError`，Analyzer 保持不变。
 
 format 只要求语法可格式化，不依赖 Schema 中的语义正确性。Quick fix 必须绑定产生对应 diagnostic 的 version。
-
-## TypeScript Worker Adapter
-
-```ts
-interface FormulaEvaluator {
-  evaluate(input: EvaluateInput): Promise<EvaluateResult>;
-  close(): Promise<void>;
-}
-
-interface FormulaAnalyzer {
-  getState(): Promise<FormulaAnalyzerState>;
-  queryCursorHelp(cursor: number): Promise<CursorHelp>;
-  queryQuickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
-  queryFormatEdits(): Promise<FormulaEdit>;
-  applyEdits(edit: FormulaEdit, cursor: number): Promise<ApplyEditsResult>;
-  close(): Promise<void>;
-}
-
-declare function createFormulaEvaluator(): Promise<FormulaEvaluator>;
-
-declare function createFormulaAnalyzer(
-  schema: AnalyzerSchema,
-  formulaId: PropertyId,
-  expression: string,
-): Promise<FormulaAnalyzer>;
-```
-
-Evaluator 和 Analyzer 可以运行在不同 Worker 或线程池。具体数量不属于接口：
-
-```text
-Evaluator request
-  彼此无公式状态依赖，可以并行调度
-
-Analyzer session
-  query 可以复用 compiled state
-  applyEdits 必须按 session 顺序执行
-```
-
-Rust 错误在 TypeScript 中拒绝 Promise；formula diagnostics 和 row errors 属于成功结果。Rust 使用 UTF-8 offset，Adapter 对外使用 UTF-16 offset。
-
-`close()` 幂等。开始关闭后拒绝新调用，等待已入队调用完成，Drop Rust 对象后再终止 Worker。Rust 接口只使用所有权和 `Drop`。
 
 ## 第一版不提供
 
