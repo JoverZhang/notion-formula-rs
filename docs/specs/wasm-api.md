@@ -341,10 +341,7 @@ validation-precedence combination has a dedicated exported-boundary regression t
 ## The Current WASM API covers analysis and editing
 
 The Current WASM module exposes analysis and editor services only. It does not currently export
-formula evaluation, prepared plans, row inputs, evaluator results, or Rust crate APIs. The
-[project intent](../intent/README.md) describes browser-side evaluation as a goal; that goal does
-not add an evaluation operation or compatibility guarantee to this API before a user-visible
-contract is specified.
+formula evaluation, prepared plans, row inputs, evaluator results, or Rust crate APIs.
 
 This API also makes no promise about completion widgets, quick-fix selection, popover layout,
 focus, or formula-panel identity. Those remain application concerns rather than fields or behavior

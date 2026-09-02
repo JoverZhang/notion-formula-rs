@@ -320,8 +320,7 @@ type HelpResult = {
 ## 当前 WASM API 只覆盖分析与编辑
 
 当前 WASM 模块只导出分析与编辑器服务，尚未导出公式求值、prepared plan、row input、
-evaluator 结果或 Rust crate API。[项目意图](../intent/README.zh-CN.md)把浏览器端求值列为目标；
-在面向使用者的契约形成之前，这一目标不代表当前 API 已提供求值操作或兼容性保证。
+evaluator 结果或 Rust crate API。
 
 该 API 也不承诺补全组件、quick fix 选择、popover 布局、focus 或公式面板 identity 的任何行为。
 这些仍属于应用策略，不是该边界的字段或行为。
