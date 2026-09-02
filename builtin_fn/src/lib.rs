@@ -2,7 +2,6 @@ extern crate self as builtin_fn;
 
 mod builtins;
 mod catalog;
-mod catalog_render;
 mod param_shape;
 mod parser;
 mod resolution;
@@ -13,10 +12,6 @@ mod types;
 pub use builtin_fn_macros::builtin_functions;
 pub use builtins::{builtin_categories, builtins_functions};
 pub use catalog::{BuiltinCatalogEntry, BuiltinCategory};
-pub use catalog_render::{
-    CATALOG_BEGIN_MARKER, CATALOG_END_MARKER, CatalogRegionError, render_builtin_catalog,
-    render_builtin_readme,
-};
 pub use param_shape::resolve_repeat_tail_used;
 pub use parser::{
     BuiltinSigParseError, BuiltinSigParseErrorKind, BuiltinSigParser, GenericKindRegistry,

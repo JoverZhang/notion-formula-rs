@@ -69,7 +69,6 @@ const APPROVED_LEGACY_FILES = new Set([
   "docs/_description_templates/changelog_entry_template.md",
   "docs/_description_templates/design_contract_template.md",
   "docs/_description_templates/module_README_template.md",
-  "docs/builtin_functions/README.md",
   "docs/changelog_entry_guidelines.md",
   "docs/changelogs/20260207-add-docs-system.md",
   "docs/changelogs/20260210-disable-partial-format-on-syntax-errors.md",

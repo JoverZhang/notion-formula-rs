@@ -8,8 +8,7 @@ Where regression coverage lives, what each layer validates, and how to refresh s
 - Coverage:
   - function-like category DSL compile-pass and compile-fail diagnostics/recovery
   - fixed, repeat, head + repeat, repeat + tail, and synthetic head + repeat + tail shapes
-  - complete catalog order, cross-category uniqueness, support status, and resolver placement
-  - deterministic README marked-region rendering checked byte-for-byte
+  - category order, cross-category uniqueness, catalog self-consistency, and resolver placement
   - shared partial-call projection, generic binding, staged lambda inference, argument
     compatibility, and `flat` return refinement
 
@@ -17,7 +16,6 @@ Run:
 
 ```bash
 cargo test -p builtin_fn
-cargo run -p builtin_fn --bin builtin_catalog -- --check
 ```
 
 ## analyzer

@@ -40,6 +40,8 @@ repeat groups, generic binding, staged lambda inference, and resolver-refined re
 
 ## Tests
 
+These commands record verification at the landing date; they are not the Current test recipe.
+
 - `cargo test -p builtin_fn`
 - `cargo test -p analyzer`
 - `cargo test -p ide`

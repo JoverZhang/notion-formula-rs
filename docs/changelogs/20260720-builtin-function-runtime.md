@@ -34,6 +34,8 @@ the handwritten kernel boundary instead of being erased back to dynamic columns.
 
 ## Tests
 
+These commands record verification at the landing date; they are not the Current test recipe.
+
 - `cargo test -p evaluator`
 - `cargo test -p evaluator --release`
 - `cargo run -p builtin_fn --bin builtin_catalog -- --check`
