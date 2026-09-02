@@ -16,18 +16,17 @@ last_verified: 2026-09-02
 
 > 本文描述 Planned 接口。实现和英文版本完成前，它不是当前运行时契约。
 
-本文回答一个问题：宿主如何计算一组公式，同时为单个未提交 expression 提供编辑器能力？Rust 是规范源，TypeScript 只提供 Worker Adapter。
+本文回答一个问题：宿主如何计算一组公式，同时为单个未提交 expression 提供编辑器能力？
 
 ```text
 FormulaEvaluator
-  无公式状态
+  无状态
   每次接收完整求值快照
-  一次计算多个 target
+  一次计算多个 formula 列
 
 FormulaAnalyzer
   持有一个 expression 的 compiled state
   重复响应 cursor 查询
-  不会把草稿提交给 FormulaEvaluator
 ```
 
 ## 共享数据模型
@@ -66,15 +65,28 @@ pub enum Type {
 Schema rules
   - PropertyId 非空、唯一、区分大小写
   - 不执行 Unicode normalization
-  - Type 不包含 Unknown 或 Null
-  - Union 只包含明确的值类型
-  - 所有输入属性和公式结果均可按行为 null
-  - nullability 不写进 Type
+  - Type 只允许明确类型
+  - 默认 Type 均为 Nullable
 ```
 
-`Type` 描述非 null 值的静态类型，不保证每一行都有值。例如，`Type::Number` 的列可以通过 validity 表示部分行或全部行为 null。公式语言不提供 `null` 字面量；Analyzer 内部可以使用 `Unknown` 或 `Null` 作为推断中间态，但它们不得进入公共 `Type`。
+`Type` 仅描述非 null 值的静态类型，不要求每一行都有值。
 
-Evaluator 的 Schema 描述调用方提供的基础列。Analyzer 的 Schema 描述当前 expression 可以引用的全部字段，包括其他公式已经推断出的明确字段类型。
+Evaluator 的 `Schema` 描述调用方提供的基础列。Analyzer 还需要其他公式的类型和直接依赖：
+
+```rust
+pub struct FormulaSchema {
+    pub id: PropertyId,
+    pub ty: Type,
+    pub dependencies: Vec<PropertyId>,
+}
+
+pub struct AnalyzerSchema {
+    pub properties: Vec<PropertySchema>,
+    pub formulas: Vec<FormulaSchema>,
+}
+```
+
+`AnalyzerSchema` 中的 ID 共享命名空间且不得重复。`FormulaSchema.dependencies` 只记录对其他公式的直接依赖，不记录基础属性。它不携带 source；当前草稿只由 `FormulaAnalyzer` 持有。
 
 ### 公式和文本位置
 
@@ -121,10 +133,10 @@ schema + formulas + row_ids + columns + runtime + targets
                          ↓
                FormulaEvaluator::evaluate
                          ↓
-            formula types + target columns
+            formula schema + target columns
 ```
 
-Evaluator 不提供 `upsert`、`remove`、`state`、`revision` 或 `applyChanges`。公式数组顺序不影响依赖分析；每次调用都会根据本次输入建立公式命名空间和依赖图。
+每次调用都会根据本次输入建立公式命名空间和依赖图，不保留上一次请求的状态。公式数组顺序不影响依赖分析。
 
 ### 请求约束
 
@@ -205,13 +217,8 @@ RuntimeContext 在一次请求的全部行和公式中保持不变。`now()`、`
 
 ```rust
 pub struct EvaluateResult {
-    pub formula_types: Vec<FormulaType>,
+    pub formulas: Vec<FormulaSchema>,
     pub targets: Vec<TargetResult>,
-}
-
-pub struct FormulaType {
-    pub id: PropertyId,
-    pub output_type: Type,
 }
 
 pub struct TargetResult {
@@ -229,7 +236,7 @@ pub struct RowError {
 }
 ```
 
-`formula_types` 包含全部公式并按 ID 确定性排序，供宿主构建 Analyzer Schema。`targets` 只包含请求的列。
+`formulas` 包含全部公式的类型和直接依赖，并按 ID 确定性排序，可直接作为 `AnalyzerSchema.formulas`。`targets` 只包含请求的列。
 
 ```text
 普通 null
@@ -247,8 +254,6 @@ pub struct RowError {
 
 同一 target、同一行可以有多个错误。错误保持确定性的求值遍历顺序，不按行重新排序。短路逻辑和条件表达式不执行未选中的分支。
 
-第一版返回完整列，不提供流、分页、取消或 row provider。
-
 ## FormulaAnalyzer
 
 ### 生命周期和状态
@@ -257,7 +262,11 @@ pub struct RowError {
 pub struct FormulaAnalyzer { /* private compiled state */ }
 
 impl FormulaAnalyzer {
-    pub fn new(schema: Schema, expression: String) -> Result<Self, AnalyzerSchemaError>;
+    pub fn new(
+        schema: AnalyzerSchema,
+        formula_id: PropertyId,
+        expression: String,
+    ) -> Result<Self, AnalyzerSchemaError>;
     pub fn state(&self) -> &FormulaAnalyzerState;
     pub fn query_cursor_help(&self, cursor: TextOffset) -> CursorHelp;
     pub fn query_quick_fixes(&self, diagnostic_id: DiagnosticId) -> Vec<QuickFix>;
@@ -270,7 +279,16 @@ impl FormulaAnalyzer {
 }
 ```
 
-Schema 在 Analyzer 生命周期内固定。Schema 改变时，宿主用当前 source 创建新的 Analyzer。
+`AnalyzerSchema` 和 `formula_id` 在 Analyzer 生命周期内固定。两者改变时，宿主用当前 source 创建新的 Analyzer。
+
+```text
+cycle detection
+  - 从 expression 提取当前公式的新依赖
+  - 替换 AnalyzerSchema.formulas 中 formula_id 的已有依赖
+  - 直接或间接引用自身时产生 diagnostic
+  - 会形成循环的 completion 仍然返回，但标记为 disabled
+  - 新公式必须先分配无冲突的 ID；Schema 中可以还没有这个 ID
+```
 
 ```rust
 pub struct FormulaAnalyzerState {
@@ -291,7 +309,7 @@ pub struct FormulaDiagnostic {
 
 无效 expression 仍会创建 Analyzer；问题放入 diagnostics，无法推断明确输出时 `output_type = None`。只有 Schema 本身无效才使 `new` 返回错误。
 
-`state` 是公开状态。query 方法可以更新不可观察的私有缓存，但不得改变 `source`、`version` 或公开状态。
+`query_*` 方法不得改变 `source`、`version` 或其他公开状态，但可以更新不可观察的私有缓存。
 
 ### Cursor help
 
@@ -364,7 +382,8 @@ interface FormulaAnalyzer {
 declare function createFormulaEvaluator(): Promise<FormulaEvaluator>;
 
 declare function createFormulaAnalyzer(
-  schema: Schema,
+  schema: AnalyzerSchema,
+  formulaId: PropertyId,
   expression: string,
 ): Promise<FormulaAnalyzer>;
 ```
@@ -390,10 +409,9 @@ Rust 错误在 TypeScript 中拒绝 Promise；formula diagnostics 和 row errors
 FormulaEvaluator
   - 持久公式集合或 mutation 方法
   - revision、事务或增量 evaluate
-  - 流式结果与取消
+  - 流、分页、取消或 row provider
 
 FormulaAnalyzer
-  - FormulaId 或向 Evaluator 提交草稿
   - 可变 Schema
   - 多 expression 文档
   - 增量编译性能保证
