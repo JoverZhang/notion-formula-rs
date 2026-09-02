@@ -24,7 +24,6 @@ neutral_redirect_files = [
 control_files = [
   "AGENTS.md",
   "CLAUDE.md",
-  "DOCUMENTATION_RESTRUCTURE_PLAN.md",
 ]
 
 ignored_directories = [
