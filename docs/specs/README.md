@@ -18,8 +18,8 @@ Choose the specification by the behavior you need to rely on:
 
 - [Formula language](formula-language.md): source forms, operators, analysis, and evaluation
   outcomes
-- [Formula references](formula-references.md): property references, rename handling, and the
-  absence of formula identity APIs
+- [Formula references](formula-references.md): property and formula reference behavior,
+  including rename handling
 - [Builtin functions](builtin-functions/README.md): call shapes, type resolution, controlled
   evaluation, and row-local failures
 - [Editor services](editor-services.md): diagnostics, completion, signature help, formatting,
