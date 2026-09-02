@@ -31,6 +31,8 @@ typed argument 到达 handwritten kernel boundary 时仍保留具体类型，不
 
 ## Tests
 
+这些命令记录当时合入前的核验，不是当前测试入口。
+
 - `cargo test -p evaluator`
 - `cargo test -p evaluator --release`
 - `cargo run -p builtin_fn --bin builtin_catalog -- --check`

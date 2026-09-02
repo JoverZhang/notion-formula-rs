@@ -39,6 +39,8 @@ type。
 
 ## Tests
 
+这些命令记录当时合入前的核验，不是当前测试入口。
+
 - `cargo test -p builtin_fn`
 - `cargo test -p analyzer`
 - `cargo test -p ide`
