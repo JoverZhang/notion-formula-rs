@@ -32,6 +32,7 @@ ignored_directories = [
 
 legacy_files = [
   "README.md",
+  "analyzer_wasm/README.md",
   "docs/_description_templates/design_contract_template.md",
   "docs/_description_templates/module_README_template.md",
   "docs/builtin_functions/README.md",
@@ -53,4 +54,5 @@ legacy_files = [
   "docs/README.md",
   "docs/README.zh-CN.md",
   "docs/signature-help.md",
+  "examples/vite/README.md",
 ]
