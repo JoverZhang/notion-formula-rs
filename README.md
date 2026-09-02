@@ -1,29 +1,32 @@
----
-doc_id: project.index
-title: "notion-formula-rs"
-language: en
-source_language: en
-counterpart: ./README.zh-CN.md
-implementation_status: current
-document_status: stable
-translation_status: synced
-last_verified: 2026-09-01
----
-
 # notion-formula-rs
 
-[简体中文](README.zh-CN.md)
+A Rust Formula engine for analyzing, editing, and evaluating Notion-style formulas.
 
-`notion-formula-rs` is a Rust workspace for analyzing, editing, and evaluating Notion-style
-formulas. It provides Rust crates, a stateful WebAssembly API, and a Vite/CodeMirror example.
+[Live demo](https://joverzhang.github.io/notion-formula-rs/) ·
+[Documentation](docs/README.md) · [简体中文](README.zh-CN.md)
 
-## Try the browser example
+![The browser demo showing completion suggestions, signature help, and inferred result types](docs/assets/browser-demo.webp)
 
-Run from the repository root:
+## What it does
 
-```bash
-just run-example-vite
-```
+- Analyzes incomplete formula source and returns diagnostics and inferred result types.
+- Provides completion, signature help, deterministic formatting, and quick fixes for formula
+  editors.
+- Prepares formulas once and evaluates batches of rows synchronously in Rust.
+- Exposes analysis and editor operations to browser integrations through WebAssembly.
 
-Use the [documentation index](docs/README.md) to find project intent, current specifications,
-implementation guides, and contributor guidance.
+## Current scope
+
+Notion Formula is the starting vocabulary, not a promise of complete compatibility. The browser
+demo focuses on analysis and editing; synchronous row evaluation is currently provided by the
+Rust evaluator rather than the demo. The [current specifications](docs/specs/README.md) define the
+supported syntax and behavior.
+
+## Explore the project
+
+[Project intent](docs/intent/README.md) · [Current specifications](docs/specs/README.md) ·
+[Implementation map](docs/how/README.md)
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
