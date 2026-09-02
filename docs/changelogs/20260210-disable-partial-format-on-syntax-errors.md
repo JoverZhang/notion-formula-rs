@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260210-disable-partial-format-on-syntax-errors
+title: "Disable partial formatting on syntax errors"
+language: en
+source_language: en
+counterpart: ./20260210-disable-partial-format-on-syntax-errors.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-02-10
+---
+
 # 20260210-disable-partial-format-on-syntax-errors
+
+[简体中文](20260210-disable-partial-format-on-syntax-errors.zh-CN.md)
 
 - Type: Fixed
 - Component: analyzer_wasm

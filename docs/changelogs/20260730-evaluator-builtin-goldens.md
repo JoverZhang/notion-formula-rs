@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260730-evaluator-builtin-goldens
+title: "Add evaluator builtin golden fixtures"
+language: en
+source_language: en
+counterpart: ./20260730-evaluator-builtin-goldens.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-07-30
+---
+
 # Evaluator builtin goldens
+
+[简体中文](20260730-evaluator-builtin-goldens.zh-CN.md)
 
 - Type: Changed
 - Component: evaluator

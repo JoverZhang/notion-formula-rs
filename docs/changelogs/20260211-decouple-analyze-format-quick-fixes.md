@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260211-decouple-analyze-format-quick-fixes
+title: "Decouple analysis, formatting, and quick fixes"
+language: en
+source_language: en
+counterpart: ./20260211-decouple-analyze-format-quick-fixes.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-02-11
+---
+
 # 20260211-decouple-analyze-format-quick-fixes
+
+[简体中文](20260211-decouple-analyze-format-quick-fixes.zh-CN.md)
 
 - Type: Changed
 - Component: analyzer + analyzer_wasm + examples/vite

@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260213-wasm-stateful-analyzer-config-and-offset-renames
+title: "Make the WASM Analyzer stateful"
+language: en
+source_language: en
+counterpart: ./20260213-wasm-stateful-analyzer-config-and-offset-renames.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-02-13
+---
+
 # 20260213-wasm-stateful-analyzer-config-and-offset-renames
+
+[简体中文](20260213-wasm-stateful-analyzer-config-and-offset-renames.zh-CN.md)
 
 - Type: Changed
 - Component: analyzer_wasm, examples/vite, docs

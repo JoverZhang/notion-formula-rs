@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260213-refactor-analyzer-ide-wasm-entrypoints
+title: "Refactor Analyzer, IDE, and WASM entry points"
+language: en
+source_language: en
+counterpart: ./20260213-refactor-analyzer-ide-wasm-entrypoints.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-02-13
+---
+
 # 20260213-refactor-analyzer-ide-wasm-entrypoints
+
+[简体中文](20260213-refactor-analyzer-ide-wasm-entrypoints.zh-CN.md)
 
 - Type: Changed
 - Component: analyzer, analyzer_wasm, examples/vite, docs

@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260207-add-docs-system
+title: "Add the documentation system"
+language: en
+source_language: en
+counterpart: ./20260207-add-docs-system.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-02-07
+---
+
 # 20260207-add-docs-system
+
+[简体中文](20260207-add-docs-system.zh-CN.md)
 
 - Type: Added
 - Component: docs

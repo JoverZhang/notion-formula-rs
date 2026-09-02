@@ -1,4 +1,18 @@
+---
+doc_id: changelog.20260718-evaluator-generated-structure
+title: "Generate the evaluator structure"
+language: en
+source_language: en
+counterpart: ./20260718-evaluator-generated-structure.zh-CN.md
+implementation_status: historical
+document_status: stable
+translation_status: synced
+last_verified: 2026-07-18
+---
+
 # 20260718-evaluator-generated-structure
+
+[简体中文](20260718-evaluator-generated-structure.zh-CN.md)
 
 - Type: Changed
 - Component: evaluator
