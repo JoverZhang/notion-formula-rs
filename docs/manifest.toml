@@ -1,4 +1,5 @@
 bilingual_files = [
+  "README.md",
   "DOCUMENTATION.md",
 ]
 
@@ -50,8 +51,6 @@ legacy_files = [
   "docs/design/testing.md",
   "docs/design/wasm-boundary.md",
   "docs/glossary.md",
-  "docs/README.md",
-  "docs/README.zh-CN.md",
   "docs/signature-help.md",
   "examples/vite/README.md",
 ]
