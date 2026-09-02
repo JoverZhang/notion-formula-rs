@@ -35,7 +35,6 @@ legacy_files = [
   "analyzer_wasm/README.md",
   "docs/_description_templates/design_contract_template.md",
   "docs/_description_templates/module_README_template.md",
-  "docs/builtin_functions/README.md",
   "docs/design/builtin-fn.md",
   "docs/design/demo-vite.md",
   "docs/design/drift-tracker.md",

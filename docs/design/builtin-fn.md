@@ -1,8 +1,8 @@
 # Builtin Functions Design
 
 This document defines the builtin-function declaration syntax, call-site signature
-resolution, catalog and documentation generation, and the compile-time and runtime
-contracts that the evaluator must implement.
+resolution, structured catalog, and the compile-time and runtime contracts that the
+evaluator must implement.
 
 See [`builtin_fn/README.md`](../../builtin_fn/README.md) for the module implementation
 entry point and [`contracts.md`](contracts.md) for shared cross-crate constraints.
@@ -19,7 +19,7 @@ A category-level declaration must produce:
 3. generic-binding rules and the call-site return type;
 4. a custom resolver for specialized type inference;
 5. canonical completion detail and Signature Help metadata;
-6. catalog data that can be checked against the builtin documentation;
+6. structured catalog data consumed by the analyzer, IDE, and evaluator;
 7. a per-function trait, marker, and typed dispatch binding that the evaluator must
    implement; and
 8. the dependency manifest and synchronous evaluation contract callers use to prepare
@@ -43,7 +43,7 @@ resolved parameters + return type
         |
         +--> semantic validation and expression type inference
         +--> completion and Signature Help
-        +--> catalog and README renderer
+        +--> structured catalog consumers
         +--> evaluator trait / typed dispatch
                          |
                          v
@@ -719,17 +719,14 @@ Dynamic rendering uses `ResolvedFunctionSig::projection`, not `preview_groups`:
 - fixed-tail presentation after `...`; and
 - postfix presentation without duplicating the semantic signature.
 
-### Documentation and catalog checks
+### Catalog checks
 
 - stable category and function order;
-- declared names and canonical detail;
-- the generated catalog region in `docs/builtin_functions/README.md`; and
-- deterministic drift failures in CI.
+- declared names, canonical detail, and support status; and
+- cross-category uniqueness and executable-registry order.
 
 Category declarations are the sole source of truth for the function inventory, signature
-syntax, ordering, and inclusion in the executable registry. Explanatory README prose
-remains hand-maintained; the function catalog region is generated from declaration
-metadata.
+syntax, ordering, and inclusion in the executable registry.
 
 ### Evaluator
 
@@ -769,36 +766,15 @@ For these entries, the macro:
 - parses and validates declaration syntax;
 - includes the entry in category ordering and duplicate-name checks;
 - derives canonical parameter names and documentation detail;
-- generates the catalog metadata required by the README;
+- generates structured catalog metadata for downstream consumers;
 - does not generate a runtime `FunctionSig`;
 - permits named documentation-only types such as `DateRange`, `Link`, and `StyledText`
   without requiring matching `Ty` variants;
 - still rejects unknown types in supported declarations; and
 - rejects using `#[resolver(...)]` together with `#[unsupported]`.
 
-Generated documentation renders both the reason and signature:
-
-```rust
-// Unsupported: the semantic type model does not yet represent `DateRange`.
-dateRange(start: date, end: date) -> DateRange
-```
-
 When making an entry supported, remove `#[unsupported]` and the obsolete explanation; the
 declaration must then lower successfully to `FunctionSig`.
-
-### README generation
-
-An independent renderer consumes `builtin_categories()`:
-
-```rust,ignore
-let markdown = render_builtin_catalog(&builtin_categories());
-```
-
-The renderer replaces only the marked generated region in
-`docs/builtin_functions/README.md`; surrounding explanatory prose remains hand-maintained.
-It requires exactly one begin marker followed by exactly one end marker. CI renders the
-same region in memory and compares it byte-for-byte with the committed file. The procedural
-macro itself never reads or writes repository files.
 
 ## Module Interfaces and Ownership
 
@@ -1635,8 +1611,7 @@ every builtin:
    inferred types, diagnostics, Signature Help projections, numbering, and active
    parameters. Add tests at a consumer layer only for behavior unique to that consumer;
    do not replicate the complete matrix at every layer.
-6. The README renderer compares its output byte-for-byte with the committed catalog region.
-7. Evaluator golden fixtures execute through the public prepare/input/evaluate interface.
+6. Evaluator golden fixtures execute through the public prepare/input/evaluate interface.
    Every supported catalog entry has one baseline `.formula` / `.snap` pair; additional
    fixtures cover properties, masks, runtime snapshots, lazy execution, and regressions.
 
@@ -1658,7 +1633,7 @@ Structural and runtime behavior use different coverage scopes:
 | Controlled runtime | Every supported Controlled builtin golden | Lambda behavior, branch masks, and selected values |
 | Complete shape | Synthetic `caseOf` | Generated head + repeat + tail structure |
 | Input contract | One table-driven test | Missing, duplicate, kind, length, and layout errors |
-| Catalog / docs | Iterate every declaration | Unique names, ordering, rendering, and documentation consistency |
+| Catalog | Iterate every declaration | Unique names, ordering, support metadata, and executable-registry consistency |
 
 Every supported builtin keeps exactly one required baseline golden. Add another scenario
 fixture only when at least one condition holds:
@@ -1695,5 +1670,4 @@ fixture only when at least one condition holds:
   conflated;
 - column fan-out tests prove that cloning does not copy rows and that the unique-ownership
   path can recover owned storage;
-- the README renderer's catalog region matches committed content byte-for-byte; and
 - workspace `just verify` passes.
