@@ -60,11 +60,6 @@ pub enum Type {
     List(Box<Type>),
     Union(Vec<Type>),
 }
-
-pub enum InferredType {
-    Known(Type),
-    NullOnly,
-}
 ```
 
 ```text
@@ -72,21 +67,14 @@ Schema rules
   - PropertyId 非空、唯一、区分大小写
   - 不执行 Unicode normalization
   - Type 不包含 Unknown 或 Null
-  - Union 只包含明确的非 null 类型
-  - 所有属性默认 nullable；nullability 不写进 Type
+  - Union 只包含明确的值类型
+  - 所有输入属性和公式结果均可按行为 null
+  - nullability 不写进 Type
 ```
 
-类型推断会移除 union 中的 null：
+`Type` 描述非 null 值的静态类型，不保证每一行都有值。例如，`Type::Number` 的列可以通过 validity 表示部分行或全部行为 null。公式语言不提供 `null` 字面量；Analyzer 内部可以使用 `Unknown` 或 `Null` 作为推断中间态，但它们不得进入公共 `Type`。
 
-```text
-Number | null           => Known(Number)
-Number | String | null  => Known(Union([Number, String]))
-null                    => NullOnly
-```
-
-`NullOnly` 是有效的 expression 结果，但不能写入 Schema。Analyzer Schema 中的公式字段必须已经得到 `Known(Type)`。
-
-Evaluator 的 Schema 描述调用方提供的基础列。Analyzer 的 Schema 描述当前 expression 可以引用的全部字段，包括其他公式已推断出的字段类型。
+Evaluator 的 Schema 描述调用方提供的基础列。Analyzer 的 Schema 描述当前 expression 可以引用的全部字段，包括其他公式已经推断出的明确字段类型。
 
 ### 公式和文本位置
 
@@ -144,6 +132,7 @@ Evaluator 不提供 `upsert`、`remove`、`state`、`revision` 或 `applyChanges
 formulas
   - ID 唯一
   - 不得与 Schema property ID 冲突
+  - 每个公式都必须推断出明确的 Type
   - 缺失引用、语法/类型错误和依赖环直接返回 EvaluateError
 
 targets
@@ -205,11 +194,10 @@ pub enum Column {
     Date(ColumnData<i64>),
     List(ColumnData<Vec<Option<Value>>>),
     Union(ColumnData<Value>),
-    Null { len: usize },
 }
 ```
 
-`Bitmap` 长度必须等于 `values.len()`。null 或行错误位置的占位 value 不可读取。`Date` 是 UTC Unix epoch milliseconds。
+`Bitmap` 长度必须等于 `values.len()`。每个 `Column` variant 必须匹配其静态 `Type`；全空列仍使用对应 variant，并设置 `Validity::AllNull`。null 或行错误位置的占位 value 不可读取。`Date` 是 UTC Unix epoch milliseconds。
 
 RuntimeContext 在一次请求的全部行和公式中保持不变。`now()`、`today()` 等函数不得在计算期间读取系统时钟。`row_ids` 为 `id()` 提供逐行身份。
 
@@ -223,12 +211,12 @@ pub struct EvaluateResult {
 
 pub struct FormulaType {
     pub id: PropertyId,
-    pub output_type: InferredType,
+    pub output_type: Type,
 }
 
 pub struct TargetResult {
     pub id: PropertyId,
-    pub output_type: InferredType,
+    pub output_type: Type,
     pub column: Column,
     pub errors: Vec<RowError>,
 }
@@ -288,7 +276,7 @@ Schema 在 Analyzer 生命周期内固定。Schema 改变时，宿主用当前 s
 pub struct FormulaAnalyzerState {
     pub version: DraftVersion,
     pub source: String,
-    pub output_type: Option<InferredType>,
+    pub output_type: Option<Type>,
     pub diagnostics: Vec<FormulaDiagnostic>,
     pub tokens: Vec<Token>,
 }
