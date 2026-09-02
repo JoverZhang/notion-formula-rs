@@ -1,29 +1,30 @@
----
-doc_id: project.index
-title: "notion-formula-rs"
-language: zh-CN
-source_language: en
-counterpart: ./README.md
-implementation_status: current
-document_status: stable
-translation_status: synced
-last_verified: 2026-09-01
----
-
 # notion-formula-rs
 
-[English](README.md)
+一个用 Rust 实现的 Formula 引擎，用于分析、编辑和求值 Notion 风格公式。
 
-`notion-formula-rs` 用 Rust 实现 Notion 风格公式的分析、编辑和求值能力。仓库包含若干
-Rust crate，对外提供带状态的 WebAssembly API，并带有一个使用 Vite 与 CodeMirror 的浏览器示例。
+[在线演示](https://joverzhang.github.io/notion-formula-rs/) ·
+[项目文档](docs/README.zh-CN.md) · [English](README.md)
 
-## 运行浏览器示例
+![浏览器演示中的补全候选、签名帮助和推断结果类型](docs/assets/browser-demo.webp)
 
-在仓库根目录运行：
+## 它能做什么
 
-```bash
-just run-example-vite
-```
+- 在 Formula 尚未写完时继续分析，并返回诊断和推断出的结果类型。
+- 为 Formula 编辑器提供补全、签名帮助、确定性格式化和 quick fix。
+- 在 Rust 中同步计算成批行数据的 Formula 结果。
+- 通过 WebAssembly 向浏览器集成提供分析和编辑器操作。
 
-需要查找项目意图、当前规格、实现说明或贡献指南时，从
-[文档索引](docs/README.zh-CN.md)进入。
+## 当前范围
+
+项目以 Notion 风格的 Formula 语法为起点，但不承诺完整兼容 Notion。浏览器演示聚焦分析和编辑；
+同步的逐行求值目前由 Rust evaluator 提供，尚未接入演示页面。受支持的语法和行为以
+[当前规格](docs/specs/README.zh-CN.md)为准。
+
+## 继续了解
+
+[项目意图](docs/intent/README.zh-CN.md) · [当前规格](docs/specs/README.zh-CN.md) ·
+[实现导读](docs/how/README.zh-CN.md)
+
+## License
+
+本项目采用 [Apache License 2.0](LICENSE)。

@@ -12,6 +12,7 @@ const checkerPath = fileURLToPath(new URL("./check-docs.mjs", import.meta.url));
 
 const manifestCategories = [
   "bilingual_files",
+  "bilingual_landing_files",
   "bilingual_directories",
   "english_only_files",
   "neutral_redirect_files",
@@ -114,6 +115,95 @@ const fixtures = [
       documentCount: 5,
       errors: [],
       pairCount: 1,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "accepts a complete metadata-free bilingual landing page",
+    repository: {
+      "README.md": "# Project\n\n[简体中文](README.zh-CN.md)\n",
+      "README.zh-CN.md": "# 项目\n\n[English](README.md)\n",
+      docs: {
+        "manifest.toml": documentationManifest({
+          bilingual_landing_files: ["README.md"],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 2,
+      errors: [],
+      pairCount: 1,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "requires both landing pages to link to each other",
+    repository: {
+      "README.md": "# Project\n",
+      "README.zh-CN.md": "# 项目\n\n[English](README.md)\n",
+      docs: {
+        "manifest.toml": documentationManifest({
+          bilingual_landing_files: ["README.md"],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 2,
+      errors: ["README.md: document body must link to its counterpart"],
+      pairCount: 1,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "rejects YAML metadata on bilingual landing pages",
+    repository: {
+      "README.md": bilingualDocument({
+        body: "# Project\n\n[简体中文](README.zh-CN.md)",
+        counterpart: "./README.zh-CN.md",
+        docId: "project.readme",
+        language: "en",
+        title: "Project",
+      }),
+      "README.zh-CN.md": bilingualDocument({
+        body: "# 项目\n\n[English](README.md)",
+        counterpart: "./README.md",
+        docId: "project.readme",
+        language: "zh-CN",
+        title: "项目",
+      }),
+      docs: {
+        "manifest.toml": documentationManifest({
+          bilingual_landing_files: ["README.md"],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 2,
+      errors: [
+        "README.md: bilingual landing page must not use YAML frontmatter",
+        "README.zh-CN.md: bilingual landing page must not use YAML frontmatter",
+      ],
+      pairCount: 1,
+      translationDebt: [],
+    },
+  },
+  {
+    name: "requires a declared landing-page counterpart",
+    repository: {
+      "README.md": "# Project\n\n[简体中文](README.zh-CN.md)\n",
+      docs: {
+        "manifest.toml": documentationManifest({
+          bilingual_landing_files: ["README.md"],
+        }),
+      },
+    },
+    expected: {
+      documentCount: 1,
+      errors: [
+        "README.md: required counterpart README.zh-CN.md is missing",
+        "README.md:3: missing local link target README.zh-CN.md",
+      ],
+      pairCount: 0,
       translationDebt: [],
     },
   },
