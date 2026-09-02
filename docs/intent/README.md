@@ -36,4 +36,4 @@ The host system defines and stores non-Formula fields and supplies their values.
 
 ## A personal motivation
 
-The project's IDE- and LSP-related work also comes from a personal wish: to study how these technologies work while there is still some warmth left in them, and to satisfy a curiosity I have carried since my youth.
+The project's IDE- and LSP-related work is also partly for me. While these technologies still have some warmth left, I want to build the relevant pieces myself, see how they really work, and satisfy a curiosity I have carried since my youth.
