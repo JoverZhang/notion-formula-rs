@@ -16,6 +16,7 @@ neutral_redirect_files = [
   "builtin_fn_macros/README.md",
   "analyzer/README.md",
   "ide/README.md",
+  "analyzer_wasm/README.md",
 ]
 
 control_files = [
