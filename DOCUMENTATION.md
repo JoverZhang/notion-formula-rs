@@ -18,7 +18,7 @@ This is the repository's only authoritative documentation-maintenance standard. 
 
 ## Put each fact at one level
 
-- `docs/intent/` states why the system exists: its audience, goals, non-goals, boundaries, trade-offs, and reevaluation conditions. Keep it short.
+- `docs/intent/` states why the system exists and owns human-approved motivations, direction, goals, non-goals, boundaries, trade-offs, and reevaluation conditions. It is not a checklist; keep it short.
 - `docs/specs/` states the current, user-observable contract without mirroring the crate layout or preserving design history.
 - `docs/how/` explains how the current implementation works. Its directories follow source crate names, with one implementation guide per crate by default.
 - `docs/contributing/` explains repository-specific development practices such as testing and changelog writing.

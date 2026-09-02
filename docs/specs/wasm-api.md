@@ -7,7 +7,7 @@ counterpart: ./wasm-api.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # WASM API
@@ -338,9 +338,14 @@ are exercised at the exported boundary by
 [`analyzer_wasm/tests/analyze.rs`](../../analyzer_wasm/tests/analyze.rs); not every message or
 validation-precedence combination has a dedicated exported-boundary regression test.
 
-## Keep evaluator and UI behavior outside this API
+## The Current WASM API covers analysis and editing
 
-The WASM module exposes analysis and editor services only. It does not export formula evaluation,
-prepared plans, row inputs, evaluator results, or Rust crate APIs. It also makes no promise about
-completion widgets, quick-fix selection, popover layout, focus, or formula-panel identity. Those are
-application concerns rather than fields or behavior of this boundary.
+The Current WASM module exposes analysis and editor services only. It does not currently export
+formula evaluation, prepared plans, row inputs, evaluator results, or Rust crate APIs. The
+[project intent](../intent/README.md) describes browser-side evaluation as a goal; that goal does
+not add an evaluation operation or compatibility guarantee to this API before a user-visible
+contract is specified.
+
+This API also makes no promise about completion widgets, quick-fix selection, popover layout,
+focus, or formula-panel identity. Those remain application concerns rather than fields or behavior
+of this boundary.
