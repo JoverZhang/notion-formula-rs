@@ -766,12 +766,6 @@ export function checkDocumentation(repositoryRoot) {
   );
 }
 
-function reportDebt(title, entries) {
-  if (entries.length === 0) return;
-  console.log(`${title} (${entries.length}):`);
-  for (const entry of entries) console.log(`- ${entry}`);
-}
-
 function reportDocumentationResult(report) {
   if (report.errors.length === 0) {
     console.log(
@@ -784,7 +778,10 @@ function reportDocumentationResult(report) {
     process.exitCode = 1;
   }
 
-  reportDebt("Translation debt", report.translationDebt);
+  if (report.translationDebt.length > 0) {
+    console.log(`Translation debt (${report.translationDebt.length}):`);
+    for (const entry of report.translationDebt) console.log(`- ${entry}`);
+  }
 }
 
 function main() {
