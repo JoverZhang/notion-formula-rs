@@ -11,12 +11,12 @@
 
 - 在 Formula 尚未写完时继续分析，并返回诊断和推断出的结果类型。
 - 为 Formula 编辑器提供补全、签名帮助、确定性格式化和 quick fix。
-- 只准备一次 Formula，随后在 Rust 中同步求值一批行数据。
+- 在 Rust 中同步计算成批行数据的 Formula 结果。
 - 通过 WebAssembly 向浏览器集成提供分析和编辑器操作。
 
 ## 当前范围
 
-Notion Formula 是这个项目的起点，并不代表项目已经完整兼容 Notion。浏览器演示聚焦分析和编辑；
+项目以 Notion 风格的 Formula 语法为起点，但不承诺完整兼容 Notion。浏览器演示聚焦分析和编辑；
 同步的逐行求值目前由 Rust evaluator 提供，尚未接入演示页面。受支持的语法和行为以
 [当前规格](docs/specs/README.zh-CN.md)为准。
 
