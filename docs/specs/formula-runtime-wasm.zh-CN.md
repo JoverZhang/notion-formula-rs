@@ -1,45 +1,53 @@
 ---
 doc_id: specs.formula-runtime-wasm
-title: "Formula Runtime 的 WASM Wrapper"
+title: "FormulaEngine 的 WASM Wrapper"
 language: zh-CN
 source_language: zh-CN
 counterpart: ./formula-runtime-wasm.md
 implementation_status: planned
 document_status: draft
 translation_status: pending
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
-# Formula Runtime 的 WASM Wrapper
+# FormulaEngine 的 WASM Wrapper
 
 [English](formula-runtime-wasm.md)
 
 > 本文描述 Planned 接口，不是当前 WASM 契约。
 
-本文只描述 [Formula Runtime Rust 接口](formula-runtime.zh-CN.md)如何通过 WASM 在 Worker 中调用，不重复公式分析和求值语义。
+本文只描述如何通过 WASM 在 Worker 中调用 [FormulaEngine Rust 接口](formula-runtime.zh-CN.md)，不重复 Engine 或 Draft 语义。
 
 ```text
 main thread
-  → async client
-    → Worker
+  → FormulaEngineClient
+    → Worker RPC
       → WASM wrapper
-        → FormulaEvaluator / FormulaAnalyzer
+        → FormulaEngine
+          → FormulaDraft
 ```
 
 ## Client
 
 ```ts
-interface FormulaEvaluatorClient {
+interface FormulaEngineClient {
+  getState(): Promise<FormulaEngineState>;
+  upsertProperty(property: PropertySchema): Promise<ChangeResult>;
+  removeProperty(id: PropertyId): Promise<ChangeResult | null>;
+  upsertFormula(formula: FormulaDefinition): Promise<ChangeResult>;
+  removeFormula(id: PropertyId): Promise<ChangeResult | null>;
   evaluate(input: EvaluateInput): Promise<EvaluateResult>;
+  createDraft(formula: FormulaDefinition): Promise<FormulaDraftClient>;
   close(): Promise<void>;
 }
 
-interface FormulaAnalyzerClient {
-  getState(): Promise<FormulaAnalyzerState>;
-  queryCursorHelp(cursor: number): Promise<CursorHelp>;
-  queryQuickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
-  queryFormatEdits(): Promise<FormulaEdit>;
+interface FormulaDraftClient {
+  getState(): Promise<FormulaDraftState>;
+  help(cursor: number): Promise<CursorHelp>;
+  quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
+  formatEdits(): Promise<FormulaEdit>;
   applyEdits(edit: FormulaEdit, cursor: number): Promise<ApplyEditsResult>;
+  intoDefinition(): Promise<FormulaDefinition>;
   close(): Promise<void>;
 }
 ```
@@ -47,28 +55,15 @@ interface FormulaAnalyzerClient {
 Wrapper 只负责：
 
 ```text
-- Worker RPC
+- Worker RPC 与 session 路由
 - Rust DTO 与 JavaScript DTO 的无损转换
 - UTF-8 byte offset 与 UTF-16 code-unit offset 的转换
 - Rust Result 与 Promise 的转换
-- 对象生命周期
+- Engine 和 Draft 的生命周期
 ```
 
-formula diagnostics 和 row errors 属于成功结果。其他 Rust error 拒绝 Promise。
+`FormulaEngineClient` 及其创建的所有 `FormulaDraftClient` 共享一条 FIFO 队列，调用按入队顺序串行执行。每个 `FormulaDraftClient` 对应 Worker 中的一份独立 draft；`close()` 释放它即表示 discard。`intoDefinition()` 消耗 draft，返回的 definition 仍需显式传给 `upsertFormula()` 才会修改 Engine。
 
-## Worker 和生命周期
+Engine client 的 `close()` 幂等：开始关闭后拒绝新调用，等待已入队调用完成，释放关联对象，再终止 Worker。Worker 和线程池的具体数量不属于接口。
 
-```text
-FormulaEvaluatorClient
-  - 每个请求自包含
-  - 调度方式不改变结果
-
-FormulaAnalyzerClient
-  - 一个 client 对应一个 Analyzer session
-  - 同一 session 的调用按入队顺序执行
-  - query 复用同一个 compiled state
-```
-
-`close()` 幂等。开始关闭后拒绝新调用，等待已入队调用完成，释放 WASM 对象，再终止 Worker。Worker 和线程池的具体数量不属于接口。
-
-Wrapper 不实现公式解析、类型推断、依赖图、循环依赖检测、求值或文本编辑语义。
+Wrapper 不实现依赖分析、循环检测、求值或文本编辑语义。
