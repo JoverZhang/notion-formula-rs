@@ -1,0 +1,15 @@
+[package]
+name = "spec-codegen"
+version = "0.1.0"
+edition = "2024"
+description = "Generate Rust interface headers from Markdown declarations"
+license = "Apache-2.0"
+repository = "https://github.com/JoverZhang/notion-formula-rs"
+
+[dependencies]
+prettyplease = "0.2"
+proc-macro2 = { version = "1", features = ["span-locations"] }
+pulldown-cmark = { version = "0.13", default-features = false }
+quote = "1"
+syn = { version = "2", features = ["full", "visit"] }
+tempfile = "3"

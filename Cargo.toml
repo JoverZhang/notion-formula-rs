@@ -6,6 +6,8 @@ members = [
     "evaluator",
     "analyzer_wasm",
     "ide",
+    "tools/spec-codegen",
+    "tools/spec-codegen/header-support",
 ]
 
 resolver = "2"

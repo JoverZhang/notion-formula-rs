@@ -32,6 +32,7 @@ last_verified: 2026-09-02
 ## 参与贡献
 
 - [测试指南](contributing/testing.zh-CN.md)
+- [从 Markdown 生成 Rust 头文件](contributing/spec-codegen.zh-CN.md)
 - [Changelog 写作指南](contributing/changelogs.zh-CN.md)
 - [文档维护标准](../DOCUMENTATION.zh-CN.md)
 
