@@ -139,8 +139,9 @@ just test-spec-codegen
 - Ordinary data declarations can be generic. Facades require non-generic named-field structs.
 - Methods support `self`, `&self`, `&mut self`, or no receiver, with named parameters.
 - `doc` and `derive` attributes are preserved. Unsupported attributes are rejected.
-- Trait impls, method bodies, generic facade methods, typed receivers, destructuring, and
+- Trait impls, method bodies, generic facade methods (including argument-position `impl Trait`), typed receivers, destructuring, and
   `async`/`const`/`unsafe`/`extern`/variadic methods are rejected.
+  Return-position `impl Trait` does not introduce generic parameters and is preserved.
 - `inner`, `<Type>Inner`, and `*_impl` are reserved for facade storage and handwritten hooks.
 - Missing or incompatible hooks fail Rust compilation. Tests and review still own behavioral
   correctness and any additional handwritten public methods.

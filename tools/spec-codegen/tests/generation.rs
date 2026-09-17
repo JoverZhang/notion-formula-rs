@@ -166,6 +166,31 @@ fn rejects_invalid_metadata() {
 }
 
 #[test]
+fn rejects_implicit_generic_parameters_but_keeps_opaque_returns() {
+    for ty in [
+        "impl core::fmt::Display",
+        "Option<impl core::fmt::Display>",
+        "&impl core::fmt::Display",
+        "(impl core::fmt::Display)",
+    ] {
+        let fixture = Fixture::new(&marked(&format!(
+            "struct Engine {{}} impl Engine {{ pub fn accept(value: {ty}); }}"
+        )));
+        let error = fixture.generate().expect_err(ty).to_string();
+        assert!(error.contains("implicit generics"), "{error}");
+        assert!(error.contains("api.md:2:"), "{error}");
+    }
+
+    let fixture = Fixture::new(&marked(
+        "struct Engine {} impl Engine { pub fn make() -> impl core::fmt::Display; pub fn take(value: Box<dyn core::fmt::Display>); }",
+    ));
+    fixture.generate().unwrap();
+    let header = fixture.header("engine");
+    assert!(header.contains("-> impl core::fmt::Display"), "{header}");
+    assert!(header.contains("Box<dyn core::fmt::Display>"), "{header}");
+}
+
+#[test]
 fn rejects_unsupported_syntax_duplicates_and_reserved_names() {
     for code in [
         "struct Engine {} struct Engine {}",

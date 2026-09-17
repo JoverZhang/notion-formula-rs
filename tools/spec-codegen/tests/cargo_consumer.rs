@@ -21,6 +21,7 @@ pub struct FormulaEngine {
 impl FormulaEngine {
     pub fn new(schema: Schema, label: String) -> Self;
     pub fn schema(&self) -> &Schema;
+    pub fn display(&self) -> impl core::fmt::Display;
     pub fn bump(&mut self, by: usize);
     pub fn into_rows(self) -> usize;
     pub fn zero() -> usize;
@@ -63,6 +64,10 @@ mod engine {
         #[cfg(feature = "wrong-return")]
         fn schema_impl(&self) -> u64 { 0 }
 
+        fn display_impl(&self) -> impl core::fmt::Display {
+            self.inner.schema.rows
+        }
+
         #[cfg(not(feature = "missing-hook"))]
         fn bump_impl(&mut self, by: usize) {
             self.inner.schema.rows += by;
@@ -83,6 +88,7 @@ fn main() {
     assert_eq!(engine.label, "Renamed");
     assert_eq!(engine.schema().rows, 1);
     engine.bump(2);
+    assert_eq!(engine.display().to_string(), "3");
     #[cfg(feature = "private-access")]
     let _ = &engine.inner;
     assert_eq!(engine.into_rows(), 3);

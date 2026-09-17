@@ -89,6 +89,20 @@ impl<'ast> Visit<'ast> for AttributeCheck {
     }
 }
 
+#[derive(Default)]
+struct ArgumentGenerics(Option<syn::Error>);
+
+impl<'ast> Visit<'ast> for ArgumentGenerics {
+    fn visit_type_impl_trait(&mut self, ty: &'ast syn::TypeImplTrait) {
+        if self.0.is_none() {
+            self.0 = Some(syn::Error::new_spanned(
+                ty,
+                "argument-position impl Trait introduces implicit generics; facade methods must be non-generic",
+            ));
+        }
+    }
+}
+
 fn validate_item(item: &Item) -> syn::Result<Option<&Ident>> {
     let mut attrs = AttributeCheck::default();
     attrs.visit_item(item);
@@ -300,17 +314,24 @@ fn emit_method(method: Method) -> syn::Result<TokenStream> {
                     ));
                 }
             }
-            FnArg::Typed(arg) => match arg.pat.as_ref() {
-                Pat::Ident(ident) if ident.by_ref.is_none() && ident.subpat.is_none() => {
-                    args.push(&ident.ident);
+            FnArg::Typed(arg) => {
+                let mut generics = ArgumentGenerics::default();
+                generics.visit_type(&arg.ty);
+                if let Some(error) = generics.0 {
+                    return Err(error);
                 }
-                _ => {
-                    return Err(syn::Error::new_spanned(
-                        &arg.pat,
-                        "parameters must be named identifiers",
-                    ));
+                match arg.pat.as_ref() {
+                    Pat::Ident(ident) if ident.by_ref.is_none() && ident.subpat.is_none() => {
+                        args.push(&ident.ident);
+                    }
+                    _ => {
+                        return Err(syn::Error::new_spanned(
+                            &arg.pat,
+                            "parameters must be named identifiers",
+                        ));
+                    }
                 }
-            },
+            }
         }
     }
     let hook = format_ident!("{}_impl", sig.ident);

@@ -134,8 +134,9 @@ just test-spec-codegen
 - 普通数据声明可以带泛型；门面必须是非泛型、使用命名字段的 struct。
 - 方法支持 `self`、`&self`、`&mut self` 或无 receiver，参数必须有名称。
 - 保留 `doc` 和 `derive` 属性；拒绝不支持的属性。
-- 拒绝 trait impl、方法体、门面泛型方法、显式类型 receiver、解构参数，以及
+- 拒绝 trait impl、方法体、门面泛型方法（包括参数位置的 `impl Trait`）、显式类型 receiver、解构参数，以及
   `async`/`const`/`unsafe`/`extern`/可变参数方法。
+  返回位置的 `impl Trait` 不引入泛型参数，予以保留。
 - `inner`、`<Type>Inner` 和 `*_impl` 保留给门面的私有状态及手写实现。
 - 缺少实现方法或类型不兼容会导致 Rust 编译失败。行为正确性、额外手写的公开方法仍需要测试和 review。
 
