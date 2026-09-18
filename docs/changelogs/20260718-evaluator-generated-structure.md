@@ -53,5 +53,5 @@ and dispatch contracts during compilation.
 
 - [Builtin declaration implementation](../how/builtin_fn/README.md)
 - [Evaluator implementation](../how/evaluator/README.md)
-- [Builtin function specification](../specs/builtin-functions/README.md)
+- [Builtin function specification](../specs/builtin-functions.md)
 - [`evaluator/README.md`](../../evaluator/README.md)

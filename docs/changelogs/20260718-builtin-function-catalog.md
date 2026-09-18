@@ -52,5 +52,5 @@ These commands record verification at the landing date; they are not the Current
 
 - [Builtin declaration implementation](../how/builtin_fn/README.md)
 - [Evaluator implementation](../how/evaluator/README.md)
-- [Builtin function specification](../specs/builtin-functions/README.md)
+- [Builtin function specification](../specs/builtin-functions.md)
 - [`builtin_fn/README.md`](../../builtin_fn/README.md)
