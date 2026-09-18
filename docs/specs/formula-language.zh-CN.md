@@ -107,6 +107,8 @@ a - * / % ^ b  两个 number → number；除数/模数为 0 → 行错误
 a == b / !=    任意非 null 值；不同 value kind 不相等
 a < <= >= > b  同 kind 的 number/string/boolean/date → boolean；NaN 无法排序 → 行类型错误
 
+表外的一元/非逻辑二元非 null 操作数组合 → 行类型错误；==/!= 接受不同 kind，不属于此类。
+比较顺序：number 按数值，string 按字典序，boolean 为 false < true，date 按时间先后。
 文本转换：整数无 .0，boolean 小写，date 为 epoch milliseconds 整数，
           list 用方括号和逗号包围递归转换后的元素。
 

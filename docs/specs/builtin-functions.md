@@ -181,6 +181,7 @@ Category order is General, Text, Number, Date, People, List, Special; declaratio
 
 ```text
 shape → type → execution
+  Supported evaluation requires successful syntax and semantic validation; unknown alone is not validation failure.
   Validate fixed/optional/repeat/trailing argument shape before types; known type mismatches produce diagnostics.
   Generics, unions, and implicit function parameters participate in call-wide type binding.
   Unknown, including nested unknown, is indeterminate rather than an immediate mismatch; analysis success does not ensure row success.

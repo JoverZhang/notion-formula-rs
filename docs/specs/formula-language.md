@@ -108,6 +108,8 @@ a - * / % ^ b  two numbers → number; division/remainder by zero → row error
 a == b / !=    any non-null values; different value kinds are unequal
 a < <= >= > b  same-kind number/string/boolean/date → boolean; NaN is unordered → row type error
 
+Other non-null unary/non-logical binary operand combinations → row type errors; ==/!= permit different kinds.
+Comparison order: numeric for numbers, lexical for strings, false < true for booleans, chronological for dates.
 Stringification: integers omit .0, booleans are lowercase, dates are epoch-millisecond integers,
                  lists use brackets and commas around recursively formatted elements.
 
