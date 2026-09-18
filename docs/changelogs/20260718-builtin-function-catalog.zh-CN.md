@@ -51,5 +51,5 @@ type。
 
 - [Builtin declaration 实现](../how/builtin_fn/README.zh-CN.md)
 - [Evaluator 实现](../how/evaluator/README.zh-CN.md)
-- [Builtin function 规格](../specs/builtin-functions/README.zh-CN.md)
+- [Builtin function 规格](../specs/builtin-functions.zh-CN.md)
 - [`builtin_fn/README.md`](../../builtin_fn/README.md)

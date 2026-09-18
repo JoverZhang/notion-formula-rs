@@ -1,96 +1,142 @@
 ---
 doc_id: specs.formula-language
-title: "What source and evaluation behavior does the formula language support?"
+title: "Formula grammar and evaluation rules"
 language: en
-source_language: en
+source_language: zh-CN
 counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-01
+last_verified: 2026-09-18
 ---
 
-# Formula language
+# Formula grammar and evaluation rules
 
-[简体中文](formula-language.zh-CN.md)
+[简体中文](formula-language.zh-CN.md) · [Specification index](README.md)
 
-This Current specification defines the formula source and non-builtin evaluation behavior that formula authors and integrations may rely on. It covers literals, expression forms, operators, nulls, lazy branches, and the boundary between best-effort analysis and supported evaluation. Builtin-specific calls, editor presentation, and transport DTOs are outside its scope.
+Current: complete expressions accepted by this repository, not a promise of full upstream Notion compatibility.
+IDE recovery for incomplete source does not extend this grammar.
 
-Notion-style syntax is a starting vocabulary, not a compatibility promise. Only the forms and behavior documented here belong to the supported language.
+## EBNF
 
-## Write formulas from these source forms
+```ebnf
+(* | choice; , concatenation; [ ] optional; { } repetition; ? ... ? lexical condition; - set difference. *)
+(* In trivia, \t, \r, and \n denote tab, CR, and LF control characters. *)
+source      = expression, EOF ;
+expression  = conditional ;
+conditional = disjunction, [ "?", expression, ":", conditional ] ;
+disjunction = conjunction, { "||", conjunction } ;
+conjunction = equality, { "&&", equality } ;
+equality    = comparison, { ( "==" | "!=" ), comparison } ;
+comparison  = addition, { ( "<" | "<=" | ">" | ">=" ), addition } ;
+addition    = product, { ( "+" | "-" ), product } ;
+product     = unary, { ( "*" | "/" | "%" ), unary } ;
+unary       = ( "!" | "not" | "-" ), unary | power ;
+power       = postfix, [ "^", unary ] ;
+postfix     = primary, { ".", identifier, arguments } ;
+primary     = number | string | boolean | identifier, [ arguments ]
+            | "(", expression, ")" | "[", [ expressions ], "]" ;
+arguments   = "(", [ expressions ], ")" ;
+expressions = expression, { ",", expression } ; (* No trailing comma *)
 
-- Boolean literals are `true` and `false`.
-- Number literals contain decimal digits, may have a fractional part whose dot is followed by at least one digit, and may have an `e` or `E` exponent with an optional sign and at least one exponent digit. Examples include `12`, `3.14`, and `2.5e-3`.
-- String literals use double quotes. The supported escapes are `\n`, `\t`, `\"`, and `\\`.
-- List literals contain comma-separated expressions in brackets, such as `[1, "x"]`. A trailing comma is not supported.
-- Identifiers start with `_` or a Unicode alphabetic character, followed by `_` or Unicode alphanumeric characters. `true`, `false`, and `not` are reserved lowercase words.
-- Parentheses group an expression. Calls use `name(arg1, ...)`; supported functions may also allow `receiver.name(arg1, ...)`. A member name without the following call parentheses is not supported. Call argument lists do not allow a trailing comma.
-- `//` starts a line comment, `/* ... */` encloses a block comment, and newlines may appear between tokens.
+boolean     = "true" | "false" ;
+number      = digits, [ ".", digits ], [ ( "e" | "E" ), [ "+" | "-" ], digits ] ;
+digits      = digit, { digit } ;
+digit       = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+string      = '"', { string-char | escape }, '"' ;
+string-char = ? Any Unicode scalar except double quote and backslash; includes raw newlines ? ;
+escape      = '\', ( "n" | "t" | '"' | '\' ) ;
+identifier  = identifier-token - keyword ;
+identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
+letter      = ? Rust char::is_alphabetic ? ;
+alphanumeric = ? Rust char::is_alphanumeric ? ;
+keyword     = "true" | "false" | "not" ;
 
-There is no source literal for null or date values. Nulls can enter through input data or function results, and dates enter through typed properties or functions. The lexer and expression parser that define these forms live under [`analyzer/src/lexer/`](../../analyzer/src/lexer/) and [`analyzer/src/parser/`](../../analyzer/src/parser/).
+(* Trivia may separate tokens, never split a lexical token. *)
+trivia        = " " | "\t" | "\r" | "\n" | line-comment | block-comment ;
+line-comment  = "//", { ? Any scalar except LF ? } ;
+block-comment = "/*", ? Text up to the first */; no nesting ?, "*/" ;
+EOF           = ? End of input ? ;
+```
 
-## Apply operators in the defined order
+```text
+-2^2        == -(2^2)       // ^ binds above prefix operators; ^ and ?: associate right, other binary operators left
+2^3^2       == 2^(3^2)
+2^-2        == 2^(-2)
+a?b:c?d:e   == a?b:(c?d:e)
 
-From highest to lowest precedence, expressions bind in this order:
+3.method()                  // A number consumes . only when a digit immediately follows it
+.5                          // Unsupported
+f(1).method(2)              // Member calls chain; evaluation also requires builtin postfix support
+(f)(1), f()(1), value.field // Unsupported: ordinary calls require an identifier callee; no bare member access
+null and date literals      // Unsupported; nulls and dates enter through properties or functions
+```
 
-| Precedence | Form | Associativity |
-| --- | --- | --- |
-| Highest | call and postfix-call suffixes | left-to-right chaining where the syntax permits |
-|  | `^` | right |
-|  | prefix `!`, `not`, `-` | prefix |
-|  | `*`, `/`, `%` | left |
-|  | `+`, `-` | left |
-|  | `<`, `<=`, `>=`, `>` | left |
-|  | `==`, `!=` | left |
-|  | `&&` | left |
-|  | `||` | left |
-| Lowest | `condition ? then : otherwise` | right |
+## Property references
 
-Parentheses override this order. In particular, `2 ^ 3 ^ 2` means `2 ^ (3 ^ 2)`, `-2 ^ 2` means `-(2 ^ 2)`, and chained ternaries associate through the `otherwise` branch. [`BinOp::infix_binding_power`](../../analyzer/src/parser/ast.rs) is the parser anchor for this ordering.
+```text
+prop("Name")                // Exactly one double-quoted string literal; lookup uses decoded text
+prop("Na" + "me")           // Not a valid property reference
+prop(1), prop("A", "B")     // Likewise
+x.prop("Name")             // Not recognized as a property reference
 
-## Treat analysis as best effort
+lookup
+  Current uses exact, case-sensitive property names from the context.
+  Names must be unique; selection among duplicates is unspecified. Missing name → semantic diagnostic, prepare fails.
+  prepare collects references from every branch, including runtime-skipped branches; deduplicates in first-source-occurrence order.
+  Every required input must exist and match its type/column layout; missing input is not null.
 
-Analysis is designed to remain useful while source is being edited. Lexer or parser diagnostics can coexist with recovered syntax, semantic analysis can assign `unknown` to an unbound identifier or an indeterminate operator, and branches of different known types can produce a union type.
+rename
+  No automatic source rewriting or retargeting of prepared formulas.
+  The host updates source and prepares again; existing prepared formulas still require the original context's inputs.
 
-These results are not compile-time proof that evaluation will succeed. For example, `"count: " + 3` can infer `unknown` and still evaluate to text, while an unbound identifier can remain `unknown` during analysis and fail when a row reaches it. The current inference rules are anchored in [`analyzer/src/analysis/infer.rs`](../../analyzer/src/analysis/infer.rs).
+boundary
+  Current production has no persisted FormulaId/FormulaName, formula references, or rename API.
+  The demo's FormulaId is UI identity only; the Planned Engine ID/dependency model is not Current behavior.
+```
 
-Supported evaluation starts from source with no lexer or parser diagnostics and an expression accepted by semantic preparation. A recovered syntax tree does not make malformed source supported for evaluation. Conversely, imprecise inference by itself is not rejection. Formula diagnostic prose explains a problem but is not a machine-readable compatibility key; integrations must not branch on the exact English sentence.
+See [FormulaEngine](formula-runtime.md) for Planned definitions.
 
-## Evaluate ordinary operators row by row
+## Operators and nulls
 
-After their operands evaluate successfully and are non-null, ordinary operators have these meanings:
+```text
+op             Non-null operands and successful result
+-x             number → number
+!x / not x     boolean → boolean
+a + b          two numbers → addition; either operand a string → stringify both and concatenate
+a - * / % ^ b  two numbers → number; division/remainder by zero → row error
+a == b / !=    any non-null values; different value kinds are unequal
+a < <= >= > b  same-kind number/string/boolean/date → boolean; NaN is unordered → row type error
 
-| Operators | Supported operands | Result |
-| --- | --- | --- |
-| unary `-` | number | negated number |
-| unary `!`, `not` | boolean | negated boolean |
-| `+` | two numbers | numeric addition |
-| `+` | either operand is text | text concatenation after converting the other operand to text |
-| `-`, `*`, `/`, `%`, `^` | two numbers | subtraction, multiplication, division, remainder, or exponentiation |
-| `==`, `!=` | any two non-null values | value equality or inequality; values of different kinds are unequal |
-| `<`, `<=`, `>=`, `>` | two orderable numbers, two texts, two booleans, or two dates | same-kind ordering |
+Other non-null unary/non-logical binary operand combinations → row type errors; ==/!= permit different kinds.
+Comparison order: numeric for numbers, lexical for strings, false < true for booleans, chronological for dates.
+Stringification: integers omit .0, booleans are lowercase, dates are epoch-millisecond integers,
+                 lists use brackets and commas around recursively formatted elements.
 
-Text concatenation renders integral numbers without a `.0`, booleans as lowercase `true` or `false`, dates as their epoch-millisecond integer, and lists as bracketed comma-separated values whose items use the same conversion. Ordering is numeric for numbers, lexical for text, `false` before `true` for booleans, and chronological for dates. `NaN` is not an orderable number; a relational comparison involving it produces a row-level type failure.
+Non-logical operators evaluate both sides: any error wins; otherwise any null produces null.
+Unary operators: null → null.
+List literals evaluate every element: any error fails; otherwise any null makes the whole list expression null.
 
-Division or remainder by zero fails the affected row. Other unsupported operand combinations produce a row-level type failure. Equality is the exception: different non-null value kinds compare as unequal rather than failing. These rules are implemented in [`evaluator/src/runtime/operators.rs`](../../evaluator/src/runtime/operators.rs).
+a && b: a=true → evaluate b; a=false/null → false and skip b; reached b=null → null.
+a || b: a=true → true and skip b; a=false/null → evaluate b, yielding boolean/null.
+a ? b : c: a=true → b; a=false/null → c; condition accepts only boolean/null.
+Skipped expressions produce no row errors; prepare still discovers every property reference.
+```
 
-## Distinguish null, failure, and skipped work
+## Analysis and failure boundaries
 
-Null is a successful absence of a value, not an evaluation error. After operands have evaluated without an error, unary operators and ordinary non-logical binary operators return null when a required operand is null.
+```text
+analyze(source)     → best-effort diagnostics, tokens, and types; not proof of executability
+prepare / validation → source/schema/input problems fail before row evaluation
+evaluate            → runtime failures are row-local; other rows can continue
 
-Evaluation order changes what can be observed:
+Current inference permits unknown, unions, and nested unknown.
+Unbound identifiers or indeterminate inference need not be rejected immediately; syntax diagnostics block evaluation.
+For example, "count: " + 3 can infer unknown while still concatenating at runtime.
+Diagnostic messages are not a machine interface; Planned Engine Ready requires concrete Type, a stricter target contract.
+```
 
-- Non-logical binary operators evaluate both operands for every row that reaches the expression. An error from either operand fails that row even if the other operand is null.
-- A list literal evaluates every item. If any item fails, the row fails; otherwise, if any item is null, the whole list expression is null.
-- `left && right` supports boolean or null operands. It evaluates `right` only when `left` is `true`; `false` or null on the left returns `false` without evaluating the right side. A null right side reached from `true` returns null.
-- `left || right` supports boolean or null operands. `true` skips the right side and returns `true`; `false` or null evaluates the right side and returns its boolean or null result.
-- `condition ? then : otherwise` evaluates only `then` for `true`, and only `otherwise` for `false` or null. The supported condition domain is boolean or null; behavior for other condition types is not part of this contract.
-
-An expression that is skipped by `&&`, `||`, or a ternary branch cannot contribute a runtime error. This laziness applies to expression execution, not to discovery of referenced properties, which is defined in the [formula-reference specification](formula-references.md).
-
-## Keep whole-formula and row failures separate
-
-A source, property context, or required input that cannot be prepared rejects the formula or evaluation before a row result exists. Once evaluation starts, runtime failures such as divide-by-zero and type errors remain local to the row that reaches them; other rows can still return values or null. Null therefore does not mean failure, and one failing row does not invalidate successful rows.
-
-The distinct null and row-failure outcomes are exercised by [`evaluator/tests/runtime_structure.rs`](../../evaluator/tests/runtime_structure.rs). Builtin functions may define more specific null and control-flow behavior; their specification owns those exceptions.
+See [builtins](builtin-functions.md) for signatures and controlled evaluation.
+Implementation anchors: [lexer](../../analyzer/src/lexer/mod.rs), [parser](../../analyzer/src/parser/expr.rs),
+[precedence](../../analyzer/src/parser/ast.rs), [operators](../../evaluator/src/runtime/operators.rs),
+[reference and short-circuit tests](../../evaluator/tests/runtime_structure.rs).
