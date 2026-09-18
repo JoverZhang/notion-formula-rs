@@ -70,7 +70,7 @@ clean:
 
 test: test-rust test-example-vite
 
-test-rust: test-builtin_fn test-analyzer test-evaluator test-ide test-analyzer_wasm
+test-rust: test-builtin_fn test-analyzer test-evaluator test-ide test-analyzer_wasm test-spec-codegen
 
 test-builtin_fn:
   cargo test -p builtin_fn
@@ -87,6 +87,9 @@ test-ide:
 test-analyzer_wasm:
   cargo test -p analyzer_wasm
   wasm-pack test --node analyzer_wasm
+
+test-spec-codegen:
+  cargo test -p spec-codegen -p spec_header
 
 test-analyzer-bless:
   BLESS=1 cargo test -p analyzer

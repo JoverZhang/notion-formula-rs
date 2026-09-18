@@ -7,12 +7,14 @@ import { fileURLToPath } from "node:url";
 const MANIFEST_PATH = "docs/manifest.toml";
 const MANIFEST_CATEGORIES = [
   "bilingual_files",
+  "bilingual_landing_files",
   "bilingual_directories",
   "english_only_files",
   "neutral_redirect_files",
   "control_files",
   "ignored_directories",
 ];
+const BILINGUAL_FILE_CATEGORIES = ["bilingual_files", "bilingual_landing_files"];
 const EXACT_CATEGORIES = [
   "english_only_files",
   "neutral_redirect_files",
@@ -254,8 +256,8 @@ function validateManifestPaths(manifest) {
       if (category.endsWith("_files") && extname(path).toLowerCase() !== ".md") {
         errors.push(`${MANIFEST_PATH}: ${category} entry must be a Markdown file: ${path}`);
       }
-      if (category === "bilingual_files" && path.endsWith(".zh-CN.md")) {
-        errors.push(`${MANIFEST_PATH}: bilingual_files must use the base .md path: ${path}`);
+      if (BILINGUAL_FILE_CATEGORIES.includes(category) && path.endsWith(".zh-CN.md")) {
+        errors.push(`${MANIFEST_PATH}: ${category} must use the base .md path: ${path}`);
       }
     }
   }
@@ -441,23 +443,37 @@ function classifyDocumentation(repositoryRoot, manifest, documents) {
     }
   }
 
-  for (const path of manifest.bilingual_files) {
-    const counterpart = bilingualCounterpartPath(path);
-    if (!documentPaths.has(path) && !documentPaths.has(counterpart)) {
-      errors.push(`${MANIFEST_PATH}: bilingual_files references missing document pair ${path}`);
+  for (const category of BILINGUAL_FILE_CATEGORIES) {
+    for (const path of manifest[category]) {
+      const counterpart = bilingualCounterpartPath(path);
+      if (!documentPaths.has(path) && !documentPaths.has(counterpart)) {
+        errors.push(`${MANIFEST_PATH}: ${category} references missing document pair ${path}`);
+      }
     }
   }
 
   const classifiedDocuments = documents.map((document) => {
     const path = displayPath(repositoryRoot, document.filePath);
     const exact = exactMatches.get(path);
-    if (exact?.length) return { ...document, category: exact[0], path };
-
     const basePath = bilingualBasePath(path);
-    if (
+    const isLanding = manifest.bilingual_landing_files.includes(basePath);
+    const isBilingual =
       manifest.bilingual_files.includes(basePath) ||
-      manifest.bilingual_directories.some((directory) => pathIsWithinDirectory(path, directory))
-    ) {
+      manifest.bilingual_directories.some((directory) => pathIsWithinDirectory(path, directory));
+    const categoryCount = (exact?.length ?? 0) + Number(isLanding) + Number(isBilingual);
+
+    if (categoryCount > 1 && (isLanding || isBilingual)) {
+      const categories = [
+        ...(exact ?? []),
+        ...(isLanding ? ["bilingual_landing_files"] : []),
+        ...(isBilingual ? ["bilingual"] : []),
+      ];
+      errors.push(`${path}: Markdown file matches multiple categories: ${categories.join(", ")}`);
+    }
+
+    if (exact?.length) return { ...document, category: exact[0], path };
+    if (isLanding) return { ...document, category: "bilingual_landing", path };
+    if (isBilingual) {
       return { ...document, category: "bilingual", path };
     }
 
@@ -466,6 +482,53 @@ function classifyDocumentation(repositoryRoot, manifest, documents) {
   });
 
   return { documents: classifiedDocuments, errors };
+}
+
+function checkBilingualLandingPages(repositoryRoot, documents) {
+  const errors = [];
+  const groups = new Map();
+  let pairCount = 0;
+
+  for (const document of documents) {
+    errors.push(...document.errors);
+    if (document.frontmatterPresent) {
+      errors.push(`${document.path}: bilingual landing page must not use YAML frontmatter`);
+    }
+
+    const basePath = bilingualBasePath(document.path);
+    const group = groups.get(basePath) ?? [];
+    group.push(document);
+    groups.set(basePath, group);
+  }
+
+  for (const [basePath, group] of groups) {
+    const byPath = new Map(group.map((document) => [document.path, document]));
+    const source = byPath.get(basePath);
+    const translation = byPath.get(bilingualCounterpartPath(basePath));
+    const existing = source ?? translation;
+
+    if (!source || !translation) {
+      errors.push(
+        `${existing.path}: required counterpart ${bilingualCounterpartPath(existing.path)} is missing`,
+      );
+      continue;
+    }
+
+    pairCount += 1;
+    for (const [document, counterpart] of [
+      [source, translation],
+      [translation, source],
+    ]) {
+      const linkedTargets = document.links.map((link) =>
+        resolveLocalLink(document.filePath, link.destination),
+      );
+      if (!linkedTargets.includes(counterpart.filePath)) {
+        errors.push(`${document.path}: document body must link to its counterpart`);
+      }
+    }
+  }
+
+  return { errors, pairCount };
 }
 
 function checkMetadataValues(path, metadata) {
@@ -715,8 +778,12 @@ function validateDocumentation(repositoryRoot, classification, manifestErrors) {
     repositoryRoot,
     documents.filter((document) => document.category === "bilingual"),
   );
+  const landingPages = checkBilingualLandingPages(
+    repositoryRoot,
+    documents.filter((document) => document.category === "bilingual_landing"),
+  );
 
-  errors.push(...bilingual.errors);
+  errors.push(...bilingual.errors, ...landingPages.errors);
   errors.push(
     ...checkEnglishOnlyDocumentation(
       documents.filter((document) => document.category === "english_only_files"),
@@ -736,7 +803,7 @@ function validateDocumentation(repositoryRoot, classification, manifestErrors) {
   return {
     documentCount: documents.length,
     errors: [...new Set(errors)].sort(),
-    pairCount: bilingual.pairCount,
+    pairCount: bilingual.pairCount + landingPages.pairCount,
     translationDebt: [...new Set(bilingual.translationDebt)].sort(),
   };
 }

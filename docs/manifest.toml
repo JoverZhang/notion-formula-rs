@@ -1,6 +1,9 @@
 bilingual_files = [
-  "README.md",
   "DOCUMENTATION.md",
+]
+
+bilingual_landing_files = [
+  "README.md",
 ]
 
 bilingual_directories = [

@@ -1,0 +1,7 @@
+[package]
+name = "spec_header"
+version = "0.1.0"
+edition = "2024"
+description = "Include generated Rust interface headers in the consuming module"
+license = "Apache-2.0"
+repository = "https://github.com/JoverZhang/notion-formula-rs"
