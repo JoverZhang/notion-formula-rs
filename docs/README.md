@@ -34,6 +34,7 @@ into the guide owned by the relevant crate or example.
 ## Contribute safely
 
 - [Testing guide](contributing/testing.md)
+- [Markdown-generated Rust headers](contributing/spec-codegen.md)
 - [Changelog guide](contributing/changelogs.md)
 - [Documentation policy](../DOCUMENTATION.md)
 

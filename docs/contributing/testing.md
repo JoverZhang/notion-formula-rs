@@ -24,6 +24,7 @@ generated expectations.
 | Changed area | First command | What it exercises |
 | --- | --- | --- |
 | Documentation structure, metadata, translations, or links | `just docs-check` | The checker tests and the repository documentation scan |
+| Markdown-generated Rust headers or their inclusion macro | `just test-spec-codegen` | Extraction, validation, owned-output cleanup, and a real Cargo consumer's compile-pass/fail and rebuild behavior |
 | Builtin declarations, call shapes, or resolution | `cargo test -p builtin_fn` | Resolver and declaration-DSL behavior, including macro pass/fail compilation |
 | Procedural macro parsing or expansion | `cargo test -p builtin_fn_macros` and `cargo test -p builtin_fn` | Macro implementation units plus the consuming crate's declaration-DSL and compile-pass/compile-fail contracts |
 | Lexing, parsing, semantic analysis, or diagnostics | `cargo test -p analyzer` | Analyzer unit, integration, and diagnostic golden tests |
