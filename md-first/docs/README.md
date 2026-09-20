@@ -1,9 +1,9 @@
 ---
 doc_id: md-first.docs.index
 title: "md-first"
-language: zh-CN
+language: en
 source_language: zh-CN
-counterpart: ./README.md
+counterpart: ./README.zh-CN.md
 implementation_status: current
 document_status: draft
 translation_status: synced
@@ -12,7 +12,7 @@ last_verified: 2026-09-20
 
 # md-first
 
-[English](README.md)
+[简体中文](README.zh-CN.md)
 
-- [Intent](intent/README.zh-CN.md)
-- [Specification](specs/README.zh-CN.md)
+- [Intent](intent/README.md)
+- [Specification](specs/README.md)

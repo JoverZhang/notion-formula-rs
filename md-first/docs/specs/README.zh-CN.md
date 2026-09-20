@@ -6,11 +6,13 @@ source_language: zh-CN
 counterpart: ./README.md
 implementation_status: current
 document_status: draft
-translation_status: pending
+translation_status: synced
 last_verified: 2026-09-20
 ---
 
 # Specification
+
+[English](README.md)
 
 - [Configuration](#configuration)
 - [Dispatcher](#dispatcher)
@@ -24,7 +26,7 @@ last_verified: 2026-09-20
 
 ```toml
 [workspace.metadata.md-first]
-include = ["md-first/docs/specs/README.zh-CN.md"]
+include = ["md-first/docs/specs/README.md"]
 exclude = []
 ```
 
@@ -168,8 +170,8 @@ impl Counter {
 
 ## 自举验收
 
-1. 从已提交的生成代码编译 md-first，读取本文，生成自己的接口。
-2. 使用刚生成的接口重新编译 md-first，再读取本文生成一次。
+1. 从已提交的生成代码编译 md-first，读取[英文 Spec](README.md)，生成自己的接口。
+2. 使用刚生成的接口重新编译 md-first，再读取同一 Spec 生成一次。
 3. 两次编译都成功，且两轮输出逐字节一致，才通过。
 
 生成文件与 Spec 一同提交到 Git；CI 还需检查提交的文件与生成结果一致。
