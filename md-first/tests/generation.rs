@@ -50,6 +50,27 @@ fn fence(out: &str, code: &str) -> String {
     format!("```rust out={out}\n{code}\n```\n")
 }
 
+fn run_consumer(project: &Project, configuration: &[&str]) {
+    let binary = project.root().join("consumer");
+    let mut command = Command::new("rustc");
+    command.args(["--edition=2024", "--deny=warnings"]);
+    for cfg in configuration {
+        command.arg("--cfg").arg(cfg);
+    }
+    let result = command
+        .arg(project.root().join("main.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "configuration {configuration:?}: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(Command::new(binary).status().unwrap().success());
+}
+
 struct Inspect {
     calls: Rc<Cell<usize>>,
 }
@@ -362,20 +383,92 @@ fn main() {
     assert_eq!(identity!(11_u32.value()), 11);
 }
 "#);
-    let binary = project.root().join("consumer");
-    let result = Command::new("rustc")
-        .args(["--edition=2024", "--deny=warnings"])
-        .arg(project.root().join("main.rs"))
-        .arg("-o")
-        .arg(&binary)
-        .output()
-        .unwrap();
-    assert!(
-        result.status.success(),
-        "{}",
-        String::from_utf8_lossy(&result.stderr)
+    run_consumer(&project, &[]);
+}
+
+#[test]
+fn conditional_generics_follow_the_consumers_configuration() {
+    let project = Project::new();
+    project.write(
+        "docs/a.md",
+        &fence(
+            "generated/conditional.h.rs",
+            r#"
+#[spec::private_fields]
+pub struct Conditional<
+    #[cfg(type_parameter)] 'a,
+    #[cfg(type_parameter)] T,
+    #[cfg_attr(all(), cfg_attr(not(const_parameter), cfg(any())))] const N: usize,
+> {}
+
+pub struct Measure;
+#[spec::header]
+impl Measure {
+    pub fn value<
+        #[cfg(type_parameter)] T,
+        #[cfg_attr(all(), cfg_attr(not(const_parameter), cfg(any())))] const N: usize,
+    >() -> usize;
+}
+"#,
+        ),
     );
-    assert!(Command::new(binary).status().unwrap().success());
+    dispatcher().generate(project.root()).unwrap();
+    project.write(
+        "main.rs",
+        r#"
+include!("generated/conditional.h.rs");
+
+struct ConditionalInner<
+    #[cfg(type_parameter)] 'a,
+    #[cfg(type_parameter)] T,
+    #[cfg_attr(all(), cfg_attr(not(const_parameter), cfg(any())))] const N: usize,
+> {
+    #[cfg(type_parameter)] value: &'a T,
+    #[cfg(const_parameter)] bytes: [u8; N],
+}
+
+impl Measure {
+    fn value_impl<
+        #[cfg(type_parameter)] T,
+        #[cfg_attr(all(), cfg_attr(not(const_parameter), cfg(any())))] const N: usize,
+    >() -> usize {
+        let size = 0;
+        #[cfg(type_parameter)] let size = size + std::mem::size_of::<T>();
+        #[cfg(const_parameter)] let size = size + N;
+        size
+    }
+}
+
+fn main() {
+    let conditional = Conditional {
+        inner: ConditionalInner {
+            #[cfg(type_parameter)] value: &9_u16,
+            #[cfg(const_parameter)] bytes: [7; 2],
+        },
+    };
+    let _ = &conditional.inner;
+    #[cfg(type_parameter)] assert_eq!(*conditional.inner.value, 9);
+    #[cfg(const_parameter)] assert_eq!(conditional.inner.bytes, [7, 7]);
+
+    #[cfg(all(type_parameter, const_parameter))]
+    assert_eq!(Measure::value::<u16, 5>(), 7);
+    #[cfg(all(type_parameter, not(const_parameter)))]
+    assert_eq!(Measure::value::<u16>(), 2);
+    #[cfg(all(not(type_parameter), const_parameter))]
+    assert_eq!(Measure::value::<5>(), 5);
+    #[cfg(not(any(type_parameter, const_parameter)))]
+    assert_eq!(Measure::value(), 0);
+}
+"#,
+    );
+    for configuration in [
+        &[][..],
+        &["type_parameter"],
+        &["const_parameter"],
+        &["type_parameter", "const_parameter"],
+    ] {
+        run_consumer(&project, configuration);
+    }
 }
 
 #[test]

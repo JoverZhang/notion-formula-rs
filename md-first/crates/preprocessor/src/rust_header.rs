@@ -6,6 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
@@ -89,10 +90,13 @@ fn transform(items: &mut [Item], reserved: &ReservedNames) -> syn::Result<()> {
                         ));
                     }
                     let inner = format_ident!("{}Inner", item.ident.unraw());
-                    let (_, arguments, _) = item.generics.split_for_impl();
-                    fields
-                        .named
-                        .push(syn::parse_quote!(inner: #inner #arguments));
+                    for arguments in generic_arguments(&item.generics.params)? {
+                        let cfg = arguments.configuration();
+                        let parameters = arguments.parameters();
+                        fields
+                            .named
+                            .push(syn::parse_quote!(#cfg inner: #inner #parameters));
+                    }
                 }
             }
             Item::Impl(item) => {
@@ -197,28 +201,33 @@ fn forward(mut method: Method, reserved: &ReservedNames) -> syn::Result<ImplItem
             }
         }
     }
-    let generics: Vec<_> = method
+    let generics = method
         .sig
         .generics
         .params
         .iter()
-        .filter_map(|param| match param {
-            GenericParam::Lifetime(_) => None,
-            GenericParam::Type(param) => Some(param.ident.clone()),
-            GenericParam::Const(param) => Some(param.ident.clone()),
-        })
-        .collect();
-    let parameters = if generics.is_empty() {
-        TokenStream::new()
-    } else {
-        quote!(::<#(#generics),*>)
-    };
-    let mut call = quote!(Self::#implementation #parameters (#(#arguments),*));
-    if method.sig.unsafety.is_some() {
-        call = quote!(unsafe { #call });
-    }
-    if method.sig.asyncness.is_some() {
-        call = quote!((#call).await);
+        .filter(|param| !matches!(param, GenericParam::Lifetime(_)));
+    let mut calls = Vec::new();
+    for generics in generic_arguments(generics)? {
+        let parameters = generics.parameters();
+        let parameters = if parameters.is_empty() {
+            parameters
+        } else {
+            quote!(::#parameters)
+        };
+        let mut call = quote!(Self::#implementation #parameters (#(#arguments),*));
+        if method.sig.unsafety.is_some() {
+            call = quote!(unsafe { #call });
+        }
+        if method.sig.asyncness.is_some() {
+            call = quote!((#call).await);
+        }
+        let cfg = generics.configuration();
+        calls.push(if cfg.is_empty() {
+            call
+        } else {
+            quote!(#cfg { #call })
+        });
     }
     let Method {
         attrs,
@@ -226,7 +235,95 @@ fn forward(mut method: Method, reserved: &ReservedNames) -> syn::Result<ImplItem
         defaultness,
         sig,
     } = method;
-    syn::parse2(quote!(#(#attrs)* #vis #defaultness #sig { #call }))
+    syn::parse2(quote!(#(#attrs)* #vis #defaultness #sig { #(#calls)* }))
+}
+
+#[derive(Clone, Default)]
+struct GenericArguments {
+    conditions: Vec<TokenStream>,
+    values: Vec<TokenStream>,
+}
+
+impl GenericArguments {
+    fn configuration(&self) -> TokenStream {
+        let conditions = &self.conditions;
+        if conditions.is_empty() {
+            TokenStream::new()
+        } else {
+            quote!(#[cfg(all(#(#conditions),*))])
+        }
+    }
+
+    fn parameters(&self) -> TokenStream {
+        let values = &self.values;
+        if values.is_empty() {
+            TokenStream::new()
+        } else {
+            quote!(<#(#values),*>)
+        }
+    }
+}
+
+fn generic_arguments<'a>(
+    params: impl IntoIterator<Item = &'a GenericParam>,
+) -> syn::Result<Vec<GenericArguments>> {
+    let mut variants = vec![GenericArguments::default()];
+    for param in params {
+        let (attrs, value) = match param {
+            GenericParam::Lifetime(param) => (&param.attrs, param.lifetime.to_token_stream()),
+            GenericParam::Type(param) => (&param.attrs, param.ident.to_token_stream()),
+            GenericParam::Const(param) => (&param.attrs, param.ident.to_token_stream()),
+        };
+        let conditions = attrs
+            .iter()
+            .map(|attr| cfg_predicate(&attr.meta))
+            .collect::<syn::Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        if !conditions.is_empty() {
+            // Generic arguments cannot carry cfg attributes. Emit mutually
+            // exclusive fields/calls and let the consumer's compiler select one.
+            let condition = quote!(all(#(#conditions),*));
+            let mut absent = variants.clone();
+            for variant in &mut absent {
+                variant.conditions.push(quote!(not(#condition)));
+            }
+            for variant in &mut variants {
+                variant.conditions.push(condition.clone());
+                variant.values.push(value.clone());
+            }
+            variants.extend(absent);
+        } else {
+            for variant in &mut variants {
+                variant.values.push(value.clone());
+            }
+        }
+    }
+    Ok(variants)
+}
+
+fn cfg_predicate(meta: &syn::Meta) -> syn::Result<Option<TokenStream>> {
+    if meta.path().is_ident("cfg") {
+        return Ok(Some(meta.require_list()?.tokens.clone()));
+    }
+    if !meta.path().is_ident("cfg_attr") {
+        return Ok(None);
+    }
+    let mut arguments = meta
+        .require_list()?
+        .parse_args_with(Punctuated::<syn::Meta, Token![,]>::parse_terminated)?
+        .into_iter();
+    let condition = arguments
+        .next()
+        .ok_or_else(|| syn::Error::new_spanned(meta, "cfg_attr requires a predicate"))?;
+    let predicates = arguments
+        .map(|meta| cfg_predicate(&meta))
+        .collect::<syn::Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    Ok((!predicates.is_empty()).then(|| quote!(any(not(#condition), all(#(#predicates),*)))))
 }
 
 fn require_public(vis: &Visibility, span: Span, description: &str) -> syn::Result<()> {
