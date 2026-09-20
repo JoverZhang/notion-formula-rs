@@ -1,5 +1,7 @@
 //! Rust declarations with explicit private storage and omitted method bodies.
 
+use std::collections::BTreeSet;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::ext::IdentExt;
@@ -45,7 +47,9 @@ impl Preprocessor for RustHeader {
                 return TokenStream::new();
             }
         };
-        if let Err(error) = transform(&mut file.items) {
+        let mut reserved = ReservedNames::default();
+        reserved.visit_file(&file);
+        if let Err(error) = transform(&mut file.items, &reserved) {
             report(error);
             return TokenStream::new();
         }
@@ -58,7 +62,7 @@ impl Preprocessor for RustHeader {
     }
 }
 
-fn transform(items: &mut [Item]) -> syn::Result<()> {
+fn transform(items: &mut [Item], reserved: &ReservedNames) -> syn::Result<()> {
     for item in items {
         match item {
             Item::Struct(item) => {
@@ -108,18 +112,27 @@ fn transform(items: &mut [Item]) -> syn::Result<()> {
                             "spec::header expects method declarations ending with ;",
                         ));
                     };
-                    *member = forward(syn::parse2(tokens.clone())?)?;
+                    *member = forward(syn::parse2(tokens.clone())?, reserved)?;
                 }
             }
             Item::Mod(item) => {
                 if let Some((_, items)) = &mut item.content {
-                    transform(items)?;
+                    transform(items, reserved)?;
                 }
             }
             _ => {}
         }
     }
     Ok(())
+}
+
+#[derive(Clone, Default)]
+struct ReservedNames(BTreeSet<String>);
+
+impl<'ast> Visit<'ast> for ReservedNames {
+    fn visit_ident(&mut self, ident: &'ast syn::Ident) {
+        self.0.insert(ident.unraw().to_string());
+    }
 }
 
 struct Method {
@@ -142,7 +155,7 @@ impl Parse for Method {
     }
 }
 
-fn forward(mut method: Method) -> syn::Result<ImplItem> {
+fn forward(mut method: Method, reserved: &ReservedNames) -> syn::Result<ImplItem> {
     require_public(&method.vis, method.sig.span(), "header methods")?;
     if let Some(variadic) = &method.sig.variadic {
         return Err(syn::Error::new_spanned(
@@ -151,6 +164,8 @@ fn forward(mut method: Method) -> syn::Result<ImplItem> {
         ));
     }
     let implementation = format_ident!("{}_impl", method.sig.ident.unraw());
+    let mut used = reserved.clone();
+    used.visit_signature(&method.sig);
     let mut arguments = Vec::new();
     for (index, input) in method.sig.inputs.iter_mut().enumerate() {
         match input {
@@ -160,7 +175,16 @@ fn forward(mut method: Method) -> syn::Result<ImplItem> {
                     Pat::Ident(pattern) if pattern.by_ref.is_none() && pattern.subpat.is_none() => {
                         pattern.ident.clone()
                     }
-                    _ => format_ident!("__md_first_argument_{index}"),
+                    _ => {
+                        let mut suffix = index;
+                        loop {
+                            let name = format_ident!("__md_first_argument_{suffix}");
+                            if used.0.insert(name.to_string()) {
+                                break name;
+                            }
+                            suffix += 1;
+                        }
+                    }
                 };
                 // Destructuring belongs in the handwritten method. Forward the
                 // whole value rather than trying to reconstruct a Rust pattern.

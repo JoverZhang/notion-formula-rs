@@ -86,7 +86,15 @@ fn validate_destination(root: &Path, relative: &Path) -> Result<(), Error> {
                     relative.display()
                 )));
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound && path.pop() => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                // A dangling symlink exists even though canonicalize cannot
+                // resolve it. Do not fall back to its parent and then follow it.
+                if fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.is_symlink())
+                    || !path.pop()
+                {
+                    return Err(Error::io(&path, error));
+                }
+            }
             Err(error) => return Err(Error::io(&path, error)),
         }
     }

@@ -125,7 +125,8 @@ pub struct BlockSource {
 
 ## Rust header
 
-`RustHeader` 按输入顺序合并 blocks。除下列规则外，保留标准 Rust 语法与 attributes。
+`md_first_preprocessor::rust_header::RustHeader` 按输入顺序合并 blocks；命令入口将其注册到 `.h.rs`。
+除下列规则外，保留标准 Rust 语法与 attributes。
 
 | 声明 | 规则 |
 | --- | --- |

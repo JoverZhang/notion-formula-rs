@@ -241,6 +241,46 @@ fn reports_unknown_suffixes_and_prevents_output_paths_leaving_the_project() {
     assert!(!project.root().join("generated").exists());
 }
 
+#[cfg(unix)]
+#[test]
+fn output_symlinks_cannot_create_files_outside_the_project() {
+    use std::os::unix::fs::symlink;
+
+    let project = Project::new();
+    let outside = tempfile::tempdir().unwrap();
+    let external_target = outside.path().join("escaped.h.rs");
+    project.write(
+        "docs/a.md",
+        &(fence("generated/a.h.rs", "pub struct First;")
+            + &fence("generated/z.h.rs", "pub struct Second;")),
+    );
+    project.write("generated/a.h.rs", "keep existing output");
+    let link = project.root().join("generated/z.h.rs");
+    symlink(&external_target, &link).unwrap();
+
+    let dispatcher = dispatcher();
+    let error = dispatcher.generate(project.root()).unwrap_err().to_string();
+    assert!(error.contains("generated/z.h.rs"), "{error}");
+    assert_eq!(project.read("generated/a.h.rs"), "keep existing output");
+    assert!(!external_target.exists());
+    assert!(dispatcher.check(project.root()).is_err());
+    assert!(!external_target.exists());
+
+    fs::remove_file(&link).unwrap();
+    project.write(
+        "generated/actual.h.rs",
+        "existing target inside the project",
+    );
+    symlink("actual.h.rs", &link).unwrap();
+    dispatcher.generate(project.root()).unwrap();
+    dispatcher.check(project.root()).unwrap();
+    assert!(
+        project
+            .read("generated/actual.h.rs")
+            .contains("pub struct Second;")
+    );
+}
+
 #[test]
 fn generated_header_compiles_and_calls_handwritten_implementations() {
     let project = Project::new();
@@ -262,7 +302,11 @@ impl<'a, T: Copy, const N: usize> Holder<'a, T, N> {
     pub const fn capacity() -> usize;
     pub fn boxed(self: Box<Self>) -> T;
     pub fn choose<U: Default, const M: usize>() -> (U, usize);
-    pub fn unpack((a, b): (usize, usize)) -> usize;
+    pub fn unpack((a, b): (usize, usize), r#__md_first_argument_0: usize) -> usize;
+    pub fn borrowed(ref value: String, __md_first_argument_0: usize) -> usize;
+    pub fn ignored(_: usize, __md_first_argument_0: usize) -> usize;
+    #[allow(non_upper_case_globals)]
+    pub fn constant<const __md_first_argument_0: usize>(_: usize) -> usize;
     pub fn conditional(#[cfg(any())] unused: usize, value: usize) -> usize;
     pub unsafe fn read(pointer: *const T) -> T;
     pub async fn first(&self) -> T;
@@ -290,7 +334,11 @@ impl<'a, T: Copy, const N: usize> Holder<'a, T, N> {
     const fn capacity_impl() -> usize { N }
     fn boxed_impl(self: Box<Self>) -> T { self.get(0) }
     fn choose_impl<U: Default, const M: usize>() -> (U, usize) { (U::default(), M) }
-    fn unpack_impl((a, b): (usize, usize)) -> usize { a + b }
+    fn unpack_impl((a, b): (usize, usize), extra: usize) -> usize { a + b + extra }
+    fn borrowed_impl(value: String, extra: usize) -> usize { value.len() + extra }
+    fn ignored_impl(value: usize, extra: usize) -> usize { value + extra }
+    #[allow(non_upper_case_globals)]
+    fn constant_impl<const __md_first_argument_0: usize>(value: usize) -> usize { value + __md_first_argument_0 }
     fn conditional_impl(#[cfg(any())] unused: usize, value: usize) -> usize { value }
     unsafe fn read_impl(pointer: *const T) -> T { unsafe { *pointer } }
     async fn first_impl(&self) -> T { self.get(0) }
@@ -302,7 +350,10 @@ fn main() {
     assert_eq!(holder.get(1), 22);
     assert_eq!(Holder::<u32, 2>::capacity(), 2);
     assert_eq!(Holder::<u32, 2>::choose::<String, 7>(), (String::new(), 7));
-    assert_eq!(Holder::<u32, 2>::unpack((3, 4)), 7);
+    assert_eq!(Holder::<u32, 2>::unpack((3, 4), 9), 16);
+    assert_eq!(Holder::<u32, 2>::borrowed("abcd".into(), 9), 13);
+    assert_eq!(Holder::<u32, 2>::ignored(3, 9), 12);
+    assert_eq!(Holder::<u32, 2>::constant::<7>(3), 10);
     assert_eq!(Holder::<u32, 2>::conditional(9), 9);
     assert_eq!(unsafe { Holder::<u32, 2>::read(values.as_ptr()) }, 11);
     let mut future = std::pin::pin!(holder.first());
