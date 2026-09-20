@@ -19,3 +19,5 @@ Compilers are a bridge between humans and computers. High-level languages let us
 In the era of vibe coding, we will inevitably build more complex programs, much as we did when moving from assembly to high-level languages. The leap may be even greater this time. We also need more expressive languages to understand and manage these programs.
 
 The hard part of programming to abstractions is often maintaining the abstractions themselves. Projects keep changing, so their code needs continual reorganization and refactoring, which has traditionally been expensive. Vibe coding could lower that cost, allowing both humans and agents to think through the design first, then work through the implementation details step by step.
+
+Users can describe designs in Markdown using high-level DSL declarations. md-first acts as a bridge, translating these declarations into code according to predefined rules.
