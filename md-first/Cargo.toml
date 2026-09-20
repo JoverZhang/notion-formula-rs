@@ -1,0 +1,15 @@
+[package]
+name = "md-first"
+version = "0.1.0"
+edition = "2024"
+description = "Project-side command for md-first generation and checks"
+license = "Apache-2.0"
+
+[dependencies]
+md-first-core = { path = "crates/core" }
+md-first-preprocessor = { path = "crates/preprocessor" }
+
+[dev-dependencies]
+proc-macro2 = "1"
+syn = { version = "2", features = ["full"] }
+tempfile = "3"
