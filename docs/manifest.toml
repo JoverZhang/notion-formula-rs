@@ -8,6 +8,7 @@ bilingual_landing_files = [
 
 bilingual_directories = [
   "docs",
+  "md-first/docs",
 ]
 
 english_only_files = [

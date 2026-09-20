@@ -1,0 +1,38 @@
+name: md-first
+
+on:
+  pull_request:
+    paths:
+      - "md-first/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "justfile"
+      - ".github/workflows/md-first.yml"
+  push:
+    branches: [master]
+    paths:
+      - "md-first/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "justfile"
+      - ".github/workflows/md-first.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Self-hosting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test committed interfaces
+        run: cargo test --locked -p md-first -p md-first-core -p md-first-preprocessor
+
+      - name: Generate, rebuild, and compare
+        run: |
+          cargo run --locked -p md-first -- .
+          cargo run --locked -p md-first -- --check .
+          git diff --exit-code -- 'md-first/crates/core/src/*.h.rs'

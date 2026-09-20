@@ -50,6 +50,10 @@ fix:
 
 # Build and dev
 
+bootstrap-md-first:
+  cargo run --locked -p md-first -- .
+  cargo run --locked -p md-first -- --check .
+
 gen-ts:
   cargo run -p analyzer_wasm --bin export_ts
 
@@ -70,7 +74,7 @@ clean:
 
 test: test-rust test-example-vite
 
-test-rust: test-builtin_fn test-analyzer test-evaluator test-ide test-analyzer_wasm test-spec-codegen
+test-rust: test-builtin_fn test-analyzer test-evaluator test-ide test-analyzer_wasm test-spec-codegen test-md-first
 
 test-builtin_fn:
   cargo test -p builtin_fn
@@ -90,6 +94,10 @@ test-analyzer_wasm:
 
 test-spec-codegen:
   cargo test -p spec-codegen -p spec_header
+
+test-md-first:
+  cargo test --locked -p md-first -p md-first-core -p md-first-preprocessor
+  just bootstrap-md-first
 
 test-analyzer-bless:
   BLESS=1 cargo test -p analyzer

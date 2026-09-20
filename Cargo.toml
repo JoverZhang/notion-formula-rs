@@ -6,8 +6,15 @@ members = [
     "evaluator",
     "analyzer_wasm",
     "ide",
+    "md-first",
+    "md-first/crates/core",
+    "md-first/crates/preprocessor",
     "tools/spec-codegen",
     "tools/spec-codegen/header-support",
 ]
 
 resolver = "2"
+
+[workspace.metadata.md-first]
+include = ["md-first/docs/specs/README.zh-CN.md"]
+exclude = []

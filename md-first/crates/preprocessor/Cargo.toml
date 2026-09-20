@@ -1,0 +1,12 @@
+[package]
+name = "md-first-preprocessor"
+version = "0.1.0"
+edition = "2024"
+description = "Preprocessor implementations for md-first"
+license = "Apache-2.0"
+
+[dependencies]
+md-first-core = { path = "../core" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+syn = { version = "2", features = ["full", "visit"] }
