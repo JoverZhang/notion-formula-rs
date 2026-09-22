@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
-translation_status: needs-update
+translation_status: synced
 last_verified: 2026-09-18
 ---
 
@@ -123,6 +123,27 @@ a ? b : c: a=true → b; a=false/null → c; condition accepts only boolean/null
 Skipped expressions produce no row errors; prepare still discovers every property reference.
 ```
 
+### Planned Number
+
+FormulaEngine Number values, arithmetic, and comparisons follow
+[ECMAScript Number](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-ecmascript-language-types-number-type).
+Numeric builtins with an equivalent operation follow the same rules; `sqrt`, `ln`, and similar functions correspond to
+[Math](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math-object).
+
+```text
+Inputs and results may be NaN, +Infinity, -Infinity, +0, or -0; these are neither nulls nor row errors.
+1 / 0, divide(1, 0)         → +Infinity
+-1 / 0                     → -Infinity
+0 / 0, 1 % 0, sqrt(-1)      → NaN
+ln(0)                      → -Infinity
+1e308 * 1e308               → +Infinity
+NaN in ==, <, <=, >, >=     → false
+NaN in !=                  → true
++0 == -0                   → true
+
+Individual functions may still constrain argument values; for example, repeat requires a finite, nonnegative count.
+```
+
 ## Analysis and failure boundaries
 
 ```text
@@ -133,7 +154,7 @@ evaluate            → runtime failures are row-local; other rows can continue
 Current inference permits unknown, unions, and nested unknown.
 Unbound identifiers or indeterminate inference need not be rejected immediately; syntax diagnostics block evaluation.
 For example, "count: " + 3 can infer unknown while still concatenating at runtime.
-Diagnostic messages are not a machine interface; Planned Engine Ready requires concrete Type, a stricter target contract.
+Diagnostic messages are not a machine interface; Planned Engine Ready requires concrete ValueType, a stricter target contract.
 ```
 
 See [builtins](builtin-functions.md) for signatures and controlled evaluation.

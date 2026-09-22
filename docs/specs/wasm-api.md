@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./wasm-api.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: needs-update
+translation_status: synced
 last_verified: 2026-09-19
 ---
 
@@ -26,21 +26,22 @@ Dependency analysis, cycle checks, compilation, evaluation, and text editing sta
 
 ```ts
 interface FormulaEngineClient {
+  getProperty(id: PropertyId): Promise<PropertyState | null>;
+  getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
-  upsert(property: PropertyDefinition): Promise<ChangeResult>;
-  remove(id: PropertyId): Promise<ChangeResult | null>;
-  // Target errors are returned in EvaluateResult; only request-level errors reject the Promise.
+  upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
+  remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
+  // EvaluateInputError rejects the Promise; formula and row errors are returned in EvaluateResult.
   evaluate(input: EvaluateInput): Promise<EvaluateResult>;
   createDraft(formula: FormulaDefinition): Promise<FormulaDraftClient>;
   close(): Promise<void>;
 }
 interface FormulaDraftClient {
   getState(): Promise<FormulaDraftState>;
-  setExpression(expression: string): Promise<void>;
   help(cursor: number): Promise<CursorHelp>;
   quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
   formatEdits(): Promise<FormulaEdit>;
-  applyEdits(edit: FormulaEdit, cursor: number): Promise<ApplyEditsResult>;
+  updateExpression(update: ExpressionUpdate): Promise<UpdateExpressionResult>;
   intoDefinition(): Promise<FormulaDefinition>;
   close(): Promise<void>;
 }

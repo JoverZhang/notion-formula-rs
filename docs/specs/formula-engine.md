@@ -6,30 +6,218 @@ source_language: zh-CN
 counterpart: ./formula-engine.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: needs-update
+translation_status: synced
 last_verified: 2026-09-19
 ---
 
 # FormulaEngine: compilation and evaluation
 
-- [简体中文](formula-engine.zh-CN.md)
-- [Specification index](README.md)
+[简体中文](formula-engine.zh-CN.md)
 
-> Planned: not yet released; error enum variants are not finalized.
+> Planned: not yet released; error enums are still being defined.
 
-## FormulaEngine
+**Contents**
 
-```rust
+- [Type definitions](#type-definitions)
+- [FormulaEngine API](#formulaengine-api)
+
+## Type definitions
+
+```rust spec=formula_engine.h.rs
+use std::collections::HashMap;
+
+pub struct FormulaSchema {
+    pub properties: Vec<PropertyDefinition>,
+}
+pub enum PropertyDefinition {
+    Input { id: PropertyId, ty: ValueType },
+    Formula(FormulaDefinition),
+}
+#[derive(Clone)]
+pub struct FormulaDefinition {
+    pub id: PropertyId,
+    /// Formula expression; prop("id") references another Property by ID in the same FormulaSchema.
+    pub expression: String,
+}
+
+/// Stable ID assigned by the caller.
+///
+/// - Input and Formula share a namespace; Engine validates that IDs are nonempty and unique within FormulaSchema.
+/// - No string-format restrictions; case-sensitive, without Unicode normalization.
+#[derive(Clone, PartialEq, Eq, Hash, derive_more::From)]
+#[from(String, &str)]
+pub struct PropertyId(pub String);
+
+/// Declares each Property's type in the Schema.
+/// Used for runtime type checks.
+#[derive(Clone)]
+pub enum ValueType {
+    /// See [Planned Number](formula-language.md#planned-number) for numeric behavior.
+    Number,
+    String, Boolean, Date,
+    List(Box<ValueType>),
+    Union(Vec<ValueType>),
+}
+
+/// Stores runtime data in columns, with a bitmap marking invalid positions.
+pub enum Column {
+    Number(ColumnData<f64>),
+    String(ColumnData<String>),
+    Boolean(ColumnData<bool>),
+    Date(ColumnData<i64>),
+    List(ColumnData<Vec<Option<Value>>>),
+    Union(ColumnData<Value>),
+}
+pub struct ColumnData<T> {
+    /// Length equals the evaluation row count; null positions hold placeholders that must not be read.
+    pub values: Vec<T>,
+    /// See [Arrow NullBuffer](https://arrow.apache.org/rust/arrow_buffer/buffer/struct.NullBuffer.html).
+    /// Length equals values.len(); both ordinary nulls and row errors are marked null.
+    pub validity: NullBuffer,
+}
+pub enum Value {
+    Number(f64), String(String), Boolean(bool),
+    /// UTC Unix timestamp in milliseconds.
+    Date(i64),
+    List(Vec<Option<Value>>),
+}
+
+pub enum FormulaEngineState<'a> {
+    /// No cycles, and every formula is Ready.
+    AllReady,
+    /// Ready formulas can still be evaluated.
+    NotAllReady {
+        /// Returns one cycle when present; each ID directly depends on the next, and the first and last IDs are equal.
+        /// - empty: No cycle, but some formulas are not Ready.
+        /// - [A, A]: Self-reference A -> A
+        /// - [A, B, C, A]: Cycle A -> B -> C -> A
+        cycle_path: &'a [PropertyId],
+    },
+}
+
+/// Independent snapshot of a property definition and its state; later Engine updates do not change it.
+#[derive(Clone)]
+pub enum PropertyState {
+    Input { id: PropertyId, ty: ValueType },
+    Formula(FormulaState),
+}
+#[derive(Clone)]
+pub struct FormulaState {
+    pub definition: FormulaDefinition,
+    pub status: FormulaStatus,
+}
+#[derive(Clone)]
+pub enum FormulaStatus {
+    /// The formula and its dependencies are executable.
+    Ready { output_type: ValueType },
+    NotReady,
+}
+
+/// Result of a FormulaEngine::upsert / remove change.
+pub struct FormulaEngineChangeResult {
+    /// Formula IDs affected by this change, including direct and transitive dependents.
+    /// - Includes only Formulas that still exist after the change.
+    /// - When upsert adds or changes a Formula, includes that Formula itself.
+    /// - Empty when the definition has not changed.
+    pub affected_formulas: Vec<PropertyId>,
+}
+
+/// Arguments to FormulaEngine::evaluate().
+pub struct EvaluateInput {
+    /// Values in input and result columns follow this order.
+    /// IDs are nonempty and unique within the batch; zero rows are allowed.
+    pub row_ids: Vec<RowId>,
+    /// Matches every Input in Engine by ID, including columns unused in this evaluation.
+    /// evaluate() validates column and nested-value types, and the lengths of values and validity, at runtime.
+    pub columns: HashMap<PropertyId, Column>,
+    pub runtime: RuntimeContext,
+    /// Formula IDs whose results are requested; Engine evaluates their formula dependencies automatically.
+    /// Nonempty, without duplicates; every ID must identify a Formula in Engine.
+    pub formula_ids: Vec<PropertyId>,
+}
+#[derive(derive_more::From)]
+#[from(String, &str)]
+pub struct RowId(pub String);
+
+/// All rows and formulas in one evaluation share this time and time-zone snapshot.
+pub struct RuntimeContext {
+    /// UTC Unix timestamp in milliseconds used by now(), supplied by the caller; Engine does not read the clock.
+    /// For live evaluation, capture the time at request start; tests and replays may use a fixed value.
+    pub evaluated_at_epoch_ms: i64,
+    /// Local time minus UTC, in minutes: UTC+08:00 = 480, UTC-05:00 = -300.
+    /// Use the business/user time zone's offset at evaluated_at_epoch_ms for today() and date operations.
+    /// The offset stays fixed throughout evaluation; daylight-saving rules are not applied to the dates being computed.
+    pub timezone_offset_minutes: i32,
+}
+
+pub struct EvaluateResult {
+    /// One entry per input.formula_ids ID, including formulas whose evaluation failed.
+    pub formulas: HashMap<PropertyId, Result<FormulaOutput, FormulaEvaluationError>>,
+}
+/// Even if every row fails, returns Ok(FormulaOutput), with failures recorded in errors.
+pub struct FormulaOutput {
+    /// Output type at the time of this evaluation.
+    pub output_type: ValueType,
+    pub column: Column,
+    /// A row may have multiple errors.
+    /// Error order is consistent for the same definitions and input; sorting by row_index is not guaranteed.
+    pub errors: Vec<RowError>,
+}
+/// A row evaluation failure marks the corresponding result position null; other rows continue.
+/// Dependency errors propagate only through executed branches and do not change FormulaStatus.
+pub struct RowError {
+    /// Index into input.row_ids.
+    pub row_index: usize,
+    /// Formula ID where the error originated; may identify a dependency of the requested formula.
+    pub origin_formula_id: PropertyId,
+    pub error: RuntimeError,
+}
+/// constraint and detail are for display only.
+pub enum RuntimeError {
+    /// The runtime value's type is not accepted by the current operation.
+    InvalidValueType {
+        expected: ValueType,
+        actual: ValueType,
+    },
+    /// The type is accepted, but the value violates a function constraint; regex and date failures use the specific variants below.
+    InvalidValue {
+        actual: Value,
+        /// For example, "repeat count must be nonnegative".
+        constraint: String,
+    },
+    InvalidRegex {
+        pattern: String,
+        /// Explanation of the regex compilation failure.
+        detail: String,
+    },
+    /// Date text cannot be parsed.
+    InvalidDateText {
+        text: String,
+    },
+    /// A date operation exceeds the supported range.
+    DateOutOfRange,
+}
+/// Returned when a formula cannot begin evaluation; see RowError for row evaluation failures.
+pub enum FormulaEvaluationError {
+    /// The Formula's FormulaStatus is NotReady.
+    NotReady,
+}
+```
+
+## FormulaEngine API
+
+```rust spec=formula_engine.h.rs
 /// # Examples
 ///
 /// ```
+/// use std::collections::HashMap;
 /// use std::time::{SystemTime, UNIX_EPOCH};
 ///
 /// // 1. Define schema
-/// let schema = Schema {
+/// let schema = FormulaSchema {
 ///     properties: vec![
-///         PropertyDefinition::Input { id: "text".into(), ty: Type::String },
-///         PropertyDefinition::Input { id: "number".into(), ty: Type::Number },
+///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
+///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
 ///         PropertyDefinition::Formula(FormulaDefinition {
 ///             id: "formula".into(),
 ///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
@@ -39,6 +227,7 @@ last_verified: 2026-09-19
 ///
 /// // 2. Create the engine
 /// let engine = FormulaEngine::new(schema).expect("valid definitions");
+/// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
 ///
 /// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
 /// let since_epoch = SystemTime::now()
@@ -55,32 +244,32 @@ last_verified: 2026-09-19
 /// // row-2     "go"    3
 /// let input = EvaluateInput {
 ///     row_ids: vec!["row-1".into(), "row-2".into()],
-///     columns: vec![
-///         InputColumn {
-///             id: "text".into(),
-///             data: Column::String(ColumnData {
+///     columns: HashMap::from([
+///         (
+///             "text".into(),
+///             Column::String(ColumnData {
 ///                 values: vec!["ha".into(), "go".into()],
-///                 validity: Validity::AllValid,
+///                 validity: NullBuffer::new_valid(2),
 ///             }),
-///         },
-///         InputColumn {
-///             id: "number".into(),
-///             data: Column::Number(ColumnData {
+///         ),
+///         (
+///             "number".into(),
+///             Column::Number(ColumnData {
 ///                 values: vec![2.0, 3.0],
-///                 validity: Validity::AllValid,
+///                 validity: NullBuffer::new_valid(2),
 ///             }),
-///         },
-///     ],
+///         ),
+///     ]),
 ///     runtime,
-///     targets: vec!["formula".into()],
+///     formula_ids: vec!["formula".into()],
 /// };
 ///
-/// // 5. Evaluate the target formula
+/// // 5. Evaluate the requested formula
 /// let result = engine.evaluate(&input).expect("valid request");
 ///
 /// // 6. Read the result column in row_ids order
-/// let Ok(output) = &result.targets[0].result else {
-///     panic!("expected a computed target");
+/// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
+///     panic!("expected a computed formula");
 /// };
 /// let Column::String(column) = &output.column else {
 ///     panic!("expected a string column");
@@ -88,71 +277,97 @@ last_verified: 2026-09-19
 /// assert_eq!(column.values, ["haha", "gogogo"]);
 /// assert!(output.errors.is_empty());
 /// ```
+#[spec::private_fields]
 pub struct FormulaEngine {}
 
+#[spec::header]
 impl FormulaEngine {
-    /// - allow: Definitions in any order.
-    /// - allow: Syntax/type errors, missing or unrunnable dependencies, and cycles → Ok, with definitions retained. - See state()
-    /// - error: Empty or duplicate IDs.
-    pub fn new(schema: Schema) -> Result<Self, FormulaEngineInitError>;
-
-    /// Inspect the current FormulaEngine state.
+    /// allows:
+    /// - Definitions in any order.
+    /// - Saving formula definitions with syntax/type errors, missing or unready dependencies, or dependency cycles.
     ///
-    /// Inspect status and diagnostics through state().formulas.
-    pub fn state(&self) -> &FormulaEngineState;
+    /// errors:
+    /// - Empty ID.
+    /// - Duplicate ID.
+    pub fn new(schema: FormulaSchema) -> Result<Self, FormulaEngineInitError>;
 
-    /// Atomically updates a PropertyDefinition.
-    /// Reanalyzes the ID's direct and transitive formula dependents and any new Formula definition before returning.
+    pub fn property(&self, id: &PropertyId) -> Option<PropertyState>;
+    pub fn properties(&self) -> Vec<PropertyState>;
+    pub fn state(&self) -> FormulaEngineState<'_>;
+
+    /// Atomically updates PropertyDefinition.
+    /// Reanalyzes direct and transitive formula dependents of this ID, and the new Formula definition, before returning.
     ///
-    /// - no-op: The definition content has not changed.
-    /// - allow: Switching between Input and Formula under the same ID.
-    /// - allow: Formula definitions with syntax/type errors, missing or unrunnable dependencies, or cycles. - See state()
-    /// - error: The ID is an empty string.
+    /// no-op: The definition has not changed.
+    ///
+    /// allows:
+    /// - Switching the same ID between Input and Formula.
+    /// - Saving formula definitions with syntax/type errors, missing or unready dependencies, or dependency cycles.
+    ///
+    /// error: Empty ID string.
     pub fn upsert(&mut self, property: PropertyDefinition)
-        -> Result<ChangeResult, EngineChangeError>;
+        -> Result<FormulaEngineChangeResult, EngineChangeError>;
 
-    /// Formulas still depending on the removed ID become Blocked.
-    pub fn remove(&mut self, id: &PropertyId) -> Option<ChangeResult>;
+    /// After removal, formulas that still depend on this ID become NotReady.
+    pub fn remove(&mut self, id: &PropertyId) -> Option<FormulaEngineChangeResult>;
 
-    /// Returns a separate result for each target; one target's failure does not affect the others.
+    /// Returns Ok(EvaluateResult) once input validation passes, even if every requested formula fails.
+    /// Formula and row errors are returned with the result; other formulas continue.
     ///
-    /// - allow: Invalid or Blocked formulas in targets.
-    /// - allow: Missing Input columns; only targets depending on them fail.
-    /// - error: Input violates EvaluateInput's ID, type, or length constraints; no target is evaluated.
-    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateError>;
-
-    /// Analyze a candidate against Engine; edits do not change Engine.
+    /// allows: NotReady formulas in formula_ids.
     ///
-    /// - allow: New IDs; replacing a same-ID Input or Formula for analysis within Draft.
-    /// - allow: Formula definitions with syntax/type errors, missing or unrunnable dependencies, or cycles. - See FormulaDraft::state()
-    /// - error: The ID is an empty string.
+    /// errors: Input validation fails; no formulas are evaluated.
+    /// - EvaluateInputError::MissingInputs: Missing Input columns; reports all missing IDs, deduplicated and sorted by ID.
+    /// - Extra columns, or invalid IDs, types, or lengths.
+    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
+
+    /// Analyzes the candidate formula against Engine; edits do not modify Engine.
+    ///
+    /// allows:
+    /// - A new ID; replacing the same-ID Input or Formula in the Draft's analysis.
+    /// - Formula definitions with syntax/type errors, missing or nonexecutable dependencies, or dependency cycles. See FormulaDraft::state().
+    ///
+    /// error: Empty ID string.
     ///
     /// # Examples
     ///
     /// ```
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///
     /// // 1. Create an engine with a saved formula
-    /// let mut engine = FormulaEngine::new(Schema {
+    /// let mut engine = FormulaEngine::new(FormulaSchema {
     ///     properties: vec![PropertyDefinition::Formula(FormulaDefinition {
     ///         id: "formula".into(),
     ///         expression: "1 + 1".into(),
     ///     })],
-    /// }).expect("valid definitions");
+    /// })?;
     ///
     /// // 2. Create a draft from the saved definition
-    /// let definition = engine.state().formulas[0].definition.clone();
-    /// let mut draft = engine.create_draft(definition).expect("valid draft ID");
+    /// let Some(PropertyState::Formula(saved)) = engine.property(&"formula".into()) else {
+    ///     panic!("expected a saved formula");
+    /// };
+    /// let mut draft = engine.create_draft(saved.definition)?;
     /// assert_eq!(draft.state().definition.expression, "1 + 1");
     ///
     /// // 3. Edit the draft; the engine keeps the saved definition
-    /// draft.set_expression("1 + 2".into());
+    /// draft.update_expression(ExpressionUpdate::Replace("1 + 2".into()))?;
     /// assert_eq!(draft.state().definition.expression, "1 + 2");
     /// assert!(draft.state().diagnostics.is_empty());
-    /// assert_eq!(engine.state().formulas[0].definition.expression, "1 + 1");
+    /// assert!(matches!(
+    ///     engine.property(&"formula".into()),
+    ///     Some(PropertyState::Formula(saved)) if saved.definition.expression == "1 + 1"
+    /// ));
     ///
     /// // 4. Finish editing and save the definition
     /// let definition = draft.into_definition();
-    /// engine.upsert(PropertyDefinition::Formula(definition)).expect("valid definition");
-    /// assert_eq!(engine.state().formulas[0].definition.expression, "1 + 2");
+    /// engine.upsert(PropertyDefinition::Formula(definition))?;
+    /// let Some(PropertyState::Formula(saved)) = engine.property(&"formula".into()) else {
+    ///     panic!("expected a saved formula");
+    /// };
+    /// assert_eq!(saved.definition.expression, "1 + 2");
+    ///
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn create_draft(&self, formula: FormulaDefinition)
         -> Result<FormulaDraft<'_>, CreateDraftError>;
@@ -160,205 +375,3 @@ impl FormulaEngine {
 ```
 
 - [FormulaDraft](ide.md)
-- [WASM API](wasm-api.md)
-
-## Schema and PropertyDefinition
-
-```rust
-/// A stable, caller-assigned ID with no required string format; Input and Formula share one namespace.
-/// From conversions preserve the original string; the Engine checks that IDs are nonempty and unique within Schema.
-/// Case-sensitive and not Unicode-normalized. The host owns display names and preserves IDs when renaming.
-#[derive(Clone)]
-pub struct PropertyId(String);
-
-impl From<&str> for PropertyId {
-    fn from(value: &str) -> Self;
-}
-impl From<String> for PropertyId {
-    fn from(value: String) -> Self;
-}
-
-/// Caller-assigned; From conversions preserve the original string, and row IDs are validated during evaluation.
-pub struct RowId(String);
-
-impl From<&str> for RowId {
-    fn from(value: &str) -> Self;
-}
-impl From<String> for RowId {
-    fn from(value: String) -> Self;
-}
-
-pub struct DiagnosticId(String);
-
-/// UTF-8 byte offsets defining the interval [start, end).
-pub struct Span { pub start: usize, pub end: usize }
-
-/// Every property allows null.
-pub struct Schema {
-    pub properties: Vec<PropertyDefinition>,
-}
-pub enum PropertyDefinition {
-    /// Values come from the input columns of each evaluate call.
-    Input { id: PropertyId, ty: Type },
-    /// Values are evaluated from expression; the Engine infers the type.
-    Formula(FormulaDefinition),
-}
-/// The static type of a non-null value.
-pub enum Type {
-    Number, String, Boolean, Date,
-    List(Box<Type>),
-    Union(Vec<Type>),
-}
-#[derive(Clone)]
-pub struct FormulaDefinition {
-    pub id: PropertyId,
-    /// prop("id") refers by ID to an Input or Formula in the same Schema.
-    pub expression: String,
-}
-```
-
-## Compilation state
-
-```rust
-pub struct FormulaDiagnostic {
-    pub id: DiagnosticId,
-    pub code: DiagnosticCode,
-    /// For display only; use code to identify the error programmatically.
-    pub message: String,
-    pub span: Option<Span>,
-}
-
-pub struct FormulaEngineState {
-    pub schema: Schema,
-    /// Corresponds to the Formula definitions in Schema, sorted by definition.id.
-    pub formulas: Vec<FormulaState>,
-}
-pub struct FormulaState {
-    pub definition: FormulaDefinition,
-    pub status: FormulaStatus,
-    /// Must have a value when Ready.
-    pub output_type: Option<Type>,
-    pub diagnostics: Vec<FormulaDiagnostic>,
-}
-pub enum FormulaStatus {
-    /// The formula and its dependencies can all execute.
-    Ready,
-    /// The formula itself has a syntax or type error.
-    Invalid,
-    /// A dependency is missing or cannot execute, or there is a dependency cycle.
-    Blocked,
-}
-pub struct ChangeResult {
-    /// Sorted by ID; empty when nothing changed.
-    /// After a change, includes the updated ID if its definition is a Formula.
-    /// Removal or replacement with Input includes only formula dependents that remain after the change.
-    pub affected_formulas: Vec<PropertyId>,
-}
-```
-
-## Evaluation
-
-### Input
-
-```rust
-pub struct EvaluateInput {
-    /// IDs are nonempty and unique within the batch; zero rows are allowed.
-    pub row_ids: Vec<RowId>,
-    /// IDs are unique and refer to Inputs in Schema; column order does not affect evaluation.
-    /// Missing required columns produce MissingInputs for the corresponding target; extra Input columns do not participate in evaluation.
-    pub columns: Vec<InputColumn>,
-    /// Every row and formula in this request shares this snapshot.
-    pub runtime: RuntimeContext,
-    /// Nonempty, with unique IDs referring to formulas.
-    pub targets: Vec<PropertyId>,
-}
-pub struct InputColumn {
-    pub id: PropertyId,
-    /// The variant must match the corresponding Input definition's ty.
-    pub data: Column,
-}
-pub struct RuntimeContext {
-    /// The UTC Unix timestamp in milliseconds used by now(); the Engine does not read the clock itself.
-    /// For real-time evaluation, the caller captures the current time once at request start; tests or replay may supply a fixed time.
-    pub evaluated_at_epoch_ms: i64,
-    /// Local time minus UTC, in minutes: UTC+08:00 = 480, UTC-05:00 = -300, UTC = 0.
-    /// The caller supplies the business/user time zone's offset at evaluated_at_epoch_ms, used by today() and date operations.
-    /// The offset stays fixed throughout evaluation; daylight-saving rules are not applied per evaluated date.
-    pub timezone_offset_minutes: i32,
-}
-```
-
-### Column and null
-
-```rust
-pub struct ColumnData<T> {
-    /// Length equals the number of evaluation rows, including when AllNull.
-    /// Invalid positions contain only placeholders, which must not be read.
-    pub values: Vec<T>,
-    pub validity: Validity,
-}
-pub enum Validity {
-    AllValid,
-    AllNull,
-    /// Length equals values.len(); false means null or a row error.
-    Bitmap(Vec<bool>),
-}
-pub enum Value {
-    Number(f64), String(String), Boolean(bool),
-    /// UTC Unix timestamp in milliseconds.
-    Date(i64),
-    List(Vec<Option<Value>>),
-}
-/// Retains the column type when every row is null.
-pub enum Column {
-    Number(ColumnData<f64>),
-    String(ColumnData<String>),
-    Boolean(ColumnData<bool>),
-    Date(ColumnData<i64>),
-    List(ColumnData<Vec<Option<Value>>>),
-    Union(ColumnData<Value>),
-}
-```
-
-### Results and row errors
-
-```rust
-pub struct EvaluateResult {
-    /// One entry per input.targets item, in the same order; errors are returned even when all targets fail.
-    pub targets: Vec<TargetResult>,
-}
-pub struct TargetResult {
-    pub id: PropertyId,
-    pub result: Result<TargetOutput, TargetError>,
-}
-pub struct TargetOutput {
-    pub output_type: Type,
-    /// A complete column; both ordinary nulls and row errors mark their positions as invalid.
-    pub column: Column,
-    /// Row errors only; one row can have multiple errors.
-    /// In deterministic evaluation-traversal order, without an additional sort by row.
-    pub errors: Vec<RowError>,
-}
-pub enum TargetError {
-    /// The diagnostics match this target's FormulaState.
-    Invalid { diagnostics: Vec<FormulaDiagnostic> },
-    /// The diagnostics match this target's FormulaState.
-    Blocked { diagnostics: Vec<FormulaDiagnostic> },
-    /// The target is Ready, but Input columns required directly or transitively are missing.
-    MissingInputs {
-        /// All missing Input IDs; nonempty, deduplicated, and sorted by ID.
-        property_ids: Vec<PropertyId>,
-    },
-}
-pub struct RowError {
-    /// Position in input.row_ids.
-    pub row_index: usize,
-    /// The formula where the error occurred, which may be a dependency of the target.
-    pub origin_formula_id: PropertyId,
-    pub code: RowErrorCode,
-    pub message: String,
-}
-```
-
-- [Formula grammar](formula-language.md)
-- [Builtins](builtin-functions.md)

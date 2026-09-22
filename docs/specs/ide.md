@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./ide.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: needs-update
+translation_status: synced
 last_verified: 2026-09-19
 ---
 
@@ -18,21 +18,17 @@ last_verified: 2026-09-19
 
 ## FormulaDraft
 
-```rust
+```rust spec=formula_draft.h.rs
 /// Borrows Engine immutably for analysis; same-ID dependencies follow the definition being edited.
 /// Multiple Drafts may borrow one Engine; saving requires ending every Draft's borrow first.
+#[spec::private_fields]
 pub struct FormulaDraft<'engine> {}
 
+#[spec::header]
 impl FormulaDraft<'_> {
     pub fn state(&self) -> &FormulaDraftState;
 
-    /// Replace expression and update output_type, diagnostics, and tokens before returning.
-    /// A changed expression advances version, invalidating earlier FormulaEdits.
-    ///
-    /// - allow: Invalid expression; inspect diagnostics through state().
-    pub fn set_expression(&mut self, expression: String);
-
-    /// Query completion, postfix completion, and signature help together.
+    /// Queries completion, postfix completion, and signature help together.
     /// Candidates that would create a dependency cycle remain present but disabled.
     pub fn help(&self, cursor: TextOffset) -> CursorHelp;
 
@@ -42,13 +38,12 @@ impl FormulaDraft<'_> {
     /// Requires formattable syntax, not semantic validity.
     pub fn format_edits(&self) -> Result<FormulaEdit, FormatError>;
 
-    /// Validate version, pre-edit ranges, cursor, and non-overlap, then apply every edit atomically.
-    /// Rebase cursor, update analysis, and advance version before returning.
+    /// Atomically updates expression, then updates output_type, diagnostics, and tokens before returning.
     ///
     /// - allow: Invalid expression; inspect diagnostics through state().
-    /// - error: Validation fails; Draft remains unchanged.
-    pub fn apply_edits(&mut self, edit: FormulaEdit, cursor: TextOffset)
-        -> Result<ApplyEditsResult, ApplyEditsError>;
+    /// - error: Edits fails version, range, cursor, or non-overlap validation; Draft remains unchanged.
+    pub fn update_expression(&mut self, update: ExpressionUpdate)
+        -> Result<UpdateExpressionResult, UpdateExpressionError>;
 
     /// Does not commit automatically; pass the returned definition to FormulaEngine::upsert to save it.
     pub fn into_definition(self) -> FormulaDefinition;
@@ -57,21 +52,35 @@ impl FormulaDraft<'_> {
 
 [FormulaEngine](formula-engine.md) defines shared types, the `create_draft` entry point, and the editing and saving example.
 
-```rust
+```rust spec=formula_draft.h.rs
 /// UTF-8 byte offset.
-pub struct TextOffset(usize);
-pub struct DraftVersion(u64);
+#[derive(derive_more::From)]
+pub struct TextOffset(pub usize);
+
+/// UTF-8 byte offsets, with range [start, end).
+pub struct Span { pub start: usize, pub end: usize }
+
+#[derive(Clone, Copy)]
+pub struct DraftVersion(pub u64);
 
 pub struct FormulaDraftState {
-    /// Advances when expression changes or apply_edits succeeds.
+    /// Increments by 1 when Replace changes the text or Edits succeeds.
     pub version: DraftVersion,
     pub definition: FormulaDefinition,
     /// None when no concrete type can be inferred; never Unknown/Null.
-    pub output_type: Option<Type>,
-    /// Cursor-independent; includes direct and transitive self-reference.
-    pub diagnostics: Vec<FormulaDiagnostic>,
+    pub output_type: Option<ValueType>,
+    /// Syntax and semantic diagnostics, independent of cursor; includes direct and transitive self-reference.
+    pub diagnostics: Vec<ExpressionDiagnostic>,
     pub tokens: Vec<Token>,
 }
+pub struct ExpressionDiagnostic {
+    pub id: DiagnosticId,
+    /// Location in the current Draft's expression.
+    pub span: Span,
+    pub message: String,
+}
+pub struct DiagnosticId(pub String);
+
 pub struct CursorHelp {
     pub completions: Vec<Completion>,
     pub signature_help: Option<SignatureHelp>,
@@ -82,19 +91,28 @@ pub struct TextEdit {
     pub new_text: String,
 }
 pub struct FormulaEdit {
-    /// Must equal current state.version.
+    /// Must equal current state.version to prevent stale edits from being applied to a changed expression.
     pub base_version: DraftVersion,
     /// Ranges must not overlap.
     pub edits: Vec<TextEdit>,
+}
+pub enum ExpressionUpdate {
+    /// Replaces the current expression without requiring base_version.
+    Replace(String),
+    Edits {
+        edit: FormulaEdit,
+        /// Position in the pre-edit expression, rebased through the edits.
+        cursor: TextOffset,
+    },
 }
 pub struct QuickFix {
     pub title: String,
     /// Version bound to the Draft that produced the diagnostic.
     pub edit: FormulaEdit,
 }
-pub struct ApplyEditsResult {
+pub struct UpdateExpressionResult {
     pub state: FormulaDraftState,
-    /// Position in the edited expression.
+    /// Replace returns the new expression.len(), or 0 for an empty string; Edits returns the rebased position.
     pub cursor: TextOffset,
 }
 ```
