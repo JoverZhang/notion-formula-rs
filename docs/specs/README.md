@@ -14,22 +14,12 @@ last_verified: 2026-09-18
 
 [简体中文](README.zh-CN.md)
 
-Five consumer-facing boundaries, not a crate inventory. Each rule has one owner; other documents link to it.
-
-| Document | Contract owned | Status |
+| Document | What it covers | Status |
 | --- | --- | --- |
-| [FormulaEngine](formula-runtime.md) | Definitions, dependency compilation, state, columnar evaluation | Planned |
-| [WASM API](formula-runtime-wasm.md) | Worker, thin clients, DTOs, coordinates, lifetime | Planned; Current Analyzer kept separately |
-| [IDE / FormulaDraft](formula-draft.md) | Drafts, help, quick fixes, format, edits, commit/discard | Planned; Current IDE kept separately |
+| [FormulaEngine](formula-engine.md) | Definitions, dependency compilation, state, columnar evaluation | Planned |
+| [WASM API](wasm-api.md) | Worker clients, data formats, coordinates, lifetime | Planned (Worker clients); Current (Analyzer) |
+| [IDE / FormulaDraft](ide.md) | Drafts, completion and signature help, quick fixes, formatting, edits, commit and discard | Planned (FormulaDraft); Current (IDE) |
 | [Formula grammar](formula-language.md) | EBNF, property references, operators, nulls, failure boundaries | Current |
 | [Builtins](builtin-functions.md) | Supported functions, signature notation, call rules | Current |
 
-```text
-Current = observable behavior of existing implementations.
-Planned = an interface awaiting implementation; a synced English version does not mean it has shipped.
-Bodyless Rust impl blocks are interface declarations, not independently compilable ordinary Rust modules.
-Only explicitly marked header=<key> blocks feed header generation; these specifications are not wired into it yet.
-```
-
-See [spec-codegen](../contributing/spec-codegen.md) for generation rules
-and the [implementation guides](../how/README.md) for algorithms and internal modules.
+Current describes existing observable behavior; Planned describes draft interfaces that are not yet implemented.

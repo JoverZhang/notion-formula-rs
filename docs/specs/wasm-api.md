@@ -1,18 +1,18 @@
 ---
-doc_id: specs.formula-runtime-wasm
+doc_id: specs.wasm-api
 title: "WASM API and Worker"
 language: en
 source_language: zh-CN
-counterpart: ./formula-runtime-wasm.zh-CN.md
+counterpart: ./wasm-api.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-18
+translation_status: needs-update
+last_verified: 2026-09-19
 ---
 
 # WASM API and Worker
 
-[简体中文](formula-runtime-wasm.zh-CN.md) · [Specification index](README.md)
+[简体中文](wasm-api.zh-CN.md) · [Specification index](README.md)
 
 > Planned Worker clients and Current Analyzer are defined separately; Current WASM has no Engine evaluation entry point.
 
@@ -27,16 +27,16 @@ Dependency analysis, cycle checks, compilation, evaluation, and text editing sta
 ```ts
 interface FormulaEngineClient {
   getState(): Promise<FormulaEngineState>;
-  upsertProperty(property: PropertySchema): Promise<ChangeResult>;
-  removeProperty(id: PropertyId): Promise<ChangeResult | null>;
-  upsertFormula(formula: FormulaDefinition): Promise<ChangeResult>;
-  removeFormula(id: PropertyId): Promise<ChangeResult | null>;
+  upsert(property: PropertyDefinition): Promise<ChangeResult>;
+  remove(id: PropertyId): Promise<ChangeResult | null>;
+  // Target errors are returned in EvaluateResult; only request-level errors reject the Promise.
   evaluate(input: EvaluateInput): Promise<EvaluateResult>;
   createDraft(formula: FormulaDefinition): Promise<FormulaDraftClient>;
   close(): Promise<void>;
 }
 interface FormulaDraftClient {
   getState(): Promise<FormulaDraftState>;
+  setExpression(expression: string): Promise<void>;
   help(cursor: number): Promise<CursorHelp>;
   quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
   formatEdits(): Promise<FormulaEdit>;
@@ -54,7 +54,7 @@ engine.close()
 draft.close()
   Release this draft: discard.
 draft.intoDefinition()
-  Consume this draft; explicit upsertFormula is still required to mutate Engine.
+  Consume this draft; wrap it in the Formula variant of PropertyDefinition and explicitly upsert to mutate Engine.
 coordinates
   JS cursors/spans use UTF-16 code units; Rust uses UTF-8 bytes.
 DTO
@@ -63,7 +63,7 @@ DTO
   the Current DTOs below are not substitutes.
 ```
 
-Only [Engine](formula-runtime.md) and [Draft](formula-draft.md) define domain semantics.
+Only [Engine](formula-engine.md) and [Draft](ide.md) define domain semantics.
 
 ## Current: synchronous Analyzer
 
@@ -152,7 +152,7 @@ format / apply_edits
   Return full updated source and cursor; neither retain source nor modify Analyzer configuration.
 ```
 
-[Current IDE behavior](formula-draft.md) owns candidates, ranking, diagnostic order, formatting, and edits.
+[Current IDE behavior](ide.md) owns candidates, ranking, diagnostic order, formatting, and edits.
 
 ### Current coordinates and exceptions
 

@@ -6,13 +6,13 @@ source_language: zh-CN
 counterpart: ./formula-language.md
 implementation_status: current
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-18
 ---
 
 # 公式文法与求值规则
 
-[English](formula-language.md) · [规格索引](README.zh-CN.md)
+[English](formula-language.md) · [Specification index](README.zh-CN.md)
 
 Current：描述本仓库接受的完整表达式，不承诺与上游 Notion 完全兼容。IDE 对残缺源码的恢复不扩展此文法。
 
@@ -94,7 +94,7 @@ boundary
   demo 的 FormulaId 只是界面身份；Planned Engine 的 ID/依赖模型不能当作 Current 行为。
 ```
 
-Planned 定义见 [FormulaEngine](formula-runtime.zh-CN.md)。
+Planned 定义见 [FormulaEngine](formula-engine.zh-CN.md)。
 
 ## 运算与空值
 
@@ -122,6 +122,27 @@ a ? b : c：a=true → b；a=false/null → c；condition 只接受 boolean/null
 被跳过的 expression 不产生行错误；这不改变 prepare 时发现全部 property 的规则。
 ```
 
+### Planned Number
+
+FormulaEngine 的 Number 取值、数值运算和比较遵循
+[ECMAScript Number](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-ecmascript-language-types-number-type)；
+有对应运算的 numeric builtin 使用相同规则，`sqrt`、`ln` 等对应
+[Math](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math-object)。
+
+```text
+输入和结果均允许 NaN、+Infinity、-Infinity、+0、-0；它们不标为 null，也不产生行错误。
+1 / 0、divide(1, 0)         → +Infinity
+-1 / 0                     → -Infinity
+0 / 0、1 % 0、sqrt(-1)      → NaN
+ln(0)                      → -Infinity
+1e308 * 1e308               → +Infinity
+NaN 参与 ==、<、<=、>、>=   → false
+NaN 参与 !=                → true
++0 == -0                   → true
+
+具体函数仍可限制参数值，例如 repeat 的次数须有限且非负。
+```
+
 ## 分析与失败边界
 
 ```text
@@ -132,7 +153,7 @@ evaluate          → 运行时问题是逐行错误；其他行可继续
 Current 推断允许 unknown、union，以及嵌套 unknown。
 未知标识符或不确定推断不必立即拒绝；语法诊断阻止求值。
 例如 "count: " + 3 可推断为 unknown，但运行时仍可拼接文本。
-诊断 message 不是机器接口；Planned Engine Ready 必须有明确 Type，是更严格的目标契约。
+诊断 message 不是机器接口；Planned Engine Ready 必须有明确 ValueType，是更严格的目标契约。
 ```
 
 函数调用签名和受控求值见 [builtin](builtin-functions.zh-CN.md)。

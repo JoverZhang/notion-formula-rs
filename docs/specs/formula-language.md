@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-18
 ---
 
@@ -95,7 +95,7 @@ boundary
   The demo's FormulaId is UI identity only; the Planned Engine ID/dependency model is not Current behavior.
 ```
 
-See [FormulaEngine](formula-runtime.md) for Planned definitions.
+See [FormulaEngine](formula-engine.md) for Planned definitions.
 
 ## Operators and nulls
 

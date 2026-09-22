@@ -1,108 +1,126 @@
 ---
-doc_id: specs.formula-draft
+doc_id: specs.ide
 title: "FormulaDraft：编辑器能力"
 language: zh-CN
 source_language: zh-CN
-counterpart: ./formula-draft.md
+counterpart: ./ide.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-18
+translation_status: needs-update
+last_verified: 2026-09-19
 ---
 
 # FormulaDraft：编辑器能力
 
-[English](formula-draft.md) · [规格索引](README.zh-CN.md)
+[English](ide.md) · [Specification index](README.zh-CN.md)
 
-> Planned：FormulaDraft 尚未实现。末节单独保留 Current IDE 行为，不将其 DTO 自动视为新接口。
+> Planned：FormulaDraft 尚未实现；Token、Completion、SignatureHelp 和错误枚举待细化。末节单独保留 Current IDE 行为。
 
-## 独立草稿
+## FormulaDraft
 
-```rust
-// 由 FormulaEngine::create_draft(definition) 创建；只编辑一个 expression。
-// 快照包含当时的 Schema、其他公式类型和依赖图，不随 Engine 后续修改更新。
-// candidate 替换同 ID 公式的依赖边，再检查类型和环；新 formula ID 也允许。
-// ID 已属于 property → CreateDraftError；source 无效 → 仍创建 Draft，通过 diagnostics 报告。
-// Draft 不隐式修改 Engine；v1 不承诺增量编译性能。
-pub struct FormulaDraft { /* private */ }
+```rust spec=formula_draft.h.rs
+/// 共享借用 Engine 进行分析；同 ID 的依赖关系按正在编辑的定义计算。
+/// 同一 Engine 可同时创建多个 Draft；保存前须结束所有 Draft 的借用。
+#[spec::private_fields]
+pub struct FormulaDraft<'engine> {}
 
-impl FormulaDraft {
+#[spec::header]
+impl FormulaDraft<'_> {
     pub fn state(&self) -> &FormulaDraftState;
 
-    // completion、postfix completion、signature help 合并查询；可反复移动 cursor。
-    // 会形成依赖环的候选仍返回，但标为 disabled。
+    /// 同时查询 completion、postfix completion 和 signature help。
+    /// 会形成依赖环的候选仍返回，但标为 disabled。
     pub fn help(&self, cursor: TextOffset) -> CursorHelp;
-    // 不修改 source；未知或非当前版本的 diagnostic ID → 空列表。
+
+    /// 未知或非当前版本的 diagnostic ID 返回空列表。
     pub fn quick_fixes(&self, diagnostic_id: &DiagnosticId) -> Vec<QuickFix>;
-    // 不修改 source；只要求语法可格式化，不要求语义有效。
+
+    /// 只要求语法可格式化，不要求语义有效。
     pub fn format_edits(&self) -> Result<FormulaEdit, FormatError>;
 
-    // 唯一修改 Draft 的方法：校验版本、原文区间、cursor、非重叠条件后原子应用。
-    // 成功 → 应用全部 edits、重定位 cursor、重新编译、推进 version。
-    // 新 source 可以无效；问题进入新 state。失败 → Err，Draft 不变。
-    pub fn apply_edits(&mut self, edit: FormulaEdit, cursor: TextOffset)
-        -> Result<ApplyEditsResult, ApplyEditsError>;
+    /// 原子更新 expression，返回前更新 output_type、diagnostics 和 tokens。
+    ///
+    /// - allow: 无效 expression；通过 state() 查看 diagnostics。
+    /// - error: Edits 的版本、区间、cursor 或非重叠校验失败，Draft 不变。
+    pub fn update_expression(&mut self, update: ExpressionUpdate)
+        -> Result<UpdateExpressionResult, UpdateExpressionError>;
 
-    pub fn into_definition(self) -> FormulaDefinition; // 消耗 Draft，不自动提交
+    /// 不自动提交；保存时将返回的定义交给 FormulaEngine::upsert。
+    pub fn into_definition(self) -> FormulaDefinition;
 }
 ```
 
-共享类型和 `create_draft` 入口由 [Engine](formula-runtime.zh-CN.md) 定义。
+[FormulaEngine](formula-engine.zh-CN.md) 定义共享类型、`create_draft` 入口及编辑、保存示例。
 
-```rust
-pub struct TextOffset(usize); // UTF-8 byte offset
-pub struct DraftVersion(u64);
+```rust spec=formula_draft.h.rs
+/// UTF-8 字节偏移。
+#[derive(derive_more::From)]
+pub struct TextOffset(pub usize);
+
+/// UTF-8 字节偏移，区间为 [start, end)。
+pub struct Span { pub start: usize, pub end: usize }
+
+#[derive(Clone, Copy)]
+pub struct DraftVersion(pub u64);
 
 pub struct FormulaDraftState {
-    pub version: DraftVersion, // 每次成功 apply_edits 后推进
+    /// Replace 改变文本或 Edits 成功时加 1。
+    pub version: DraftVersion,
     pub definition: FormulaDefinition,
-    pub output_type: Option<Type>, // 推断不出明确类型 → None；不返回 Unknown/Null
-    pub diagnostics: Vec<FormulaDiagnostic>, // 不依赖 cursor；包含直接/间接自引用问题
+    /// 推断不出明确类型时为 None，不返回 Unknown/Null。
+    pub output_type: Option<ValueType>,
+    /// 语法与语义诊断，不依赖 cursor；包含直接和间接自引用问题。
+    pub diagnostics: Vec<ExpressionDiagnostic>,
     pub tokens: Vec<Token>,
 }
+pub struct ExpressionDiagnostic {
+    pub id: DiagnosticId,
+    /// 当前 Draft 的 expression 中的位置。
+    pub span: Span,
+    pub message: String,
+}
+pub struct DiagnosticId(pub String);
+
 pub struct CursorHelp {
     pub completions: Vec<Completion>,
     pub signature_help: Option<SignatureHelp>,
 }
 pub struct TextEdit {
-    pub range: Span, // 所有 edits 均基于修改前的同一份 source
+    /// 所有 edits 均基于修改前的同一份 expression。
+    pub range: Span,
     pub new_text: String,
 }
 pub struct FormulaEdit {
-    pub base_version: DraftVersion, // 必须等于当前 state.version
-    pub edits: Vec<TextEdit>, // 不得重叠
+    /// 必须等于当前 state.version，防止旧 edits 应用到已修改的 expression。
+    pub base_version: DraftVersion,
+    /// 区间不得重叠。
+    pub edits: Vec<TextEdit>,
+}
+pub enum ExpressionUpdate {
+    /// 覆盖当前 expression，不要求 base_version。
+    Replace(String),
+    Edits {
+        edit: FormulaEdit,
+        /// 修改前的 expression 坐标，按 edits 重定位。
+        cursor: TextOffset,
+    },
 }
 pub struct QuickFix {
     pub title: String,
-    pub edit: FormulaEdit, // version 绑定到产生 diagnostic 时的 Draft
+    /// version 绑定到产生 diagnostic 时的 Draft。
+    pub edit: FormulaEdit,
 }
-pub struct ApplyEditsResult {
+pub struct UpdateExpressionResult {
     pub state: FormulaDraftState,
-    pub cursor: TextOffset, // 修改后的 source 坐标
-}
-// Token、Completion、SignatureHelp 的最终 Rust 字段和错误枚举成员尚待细化。
-// 下文与 WASM 规格保留现有行为/DTO，不用临时别名冒充这些新类型。
-```
-
-## 提交与丢弃
-
-```rust
-let mut draft = engine.create_draft(formula)?;
-let result = draft.apply_edits(edit, cursor)?; // 不只是移动 cursor：还修改 source、重新分析
-
-if save {
-    // Engine 按最新状态重新分析，而非信任 Draft 的旧快照。
-    let change = engine.upsert_formula(draft.into_definition())?;
-    let state = engine.state(); // 提交结果以它和 ChangeResult 为准
-} else {
-    drop(draft); // 未提交 source 从未进入 Engine
+    /// Replace 返回新 expression.len()，空串为 0；Edits 返回重定位后的坐标。
+    pub cursor: TextOffset,
 }
 ```
 
 ## Current：IDE 行为
 
 当前服务按请求处理 source，没有持久化 FormulaDraft。此节拥有编辑行为；
-JS 序列化、坐标校验和异常由 [WASM API](formula-runtime-wasm.zh-CN.md) 定义。
+JS 序列化、坐标校验和异常由 [WASM API](wasm-api.zh-CN.md) 定义。
 
 ```text
 diagnostics

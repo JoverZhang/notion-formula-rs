@@ -1,63 +1,75 @@
 ---
-doc_id: specs.formula-draft
+doc_id: specs.ide
 title: "FormulaDraft: editor services"
 language: en
 source_language: zh-CN
-counterpart: ./formula-draft.zh-CN.md
+counterpart: ./ide.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-18
+translation_status: needs-update
+last_verified: 2026-09-19
 ---
 
 # FormulaDraft: editor services
 
-[简体中文](formula-draft.zh-CN.md) · [Specification index](README.md)
+[简体中文](ide.zh-CN.md) · [Specification index](README.md)
 
-> Planned: FormulaDraft is not implemented. The final section preserves Current IDE behavior separately; its DTOs do not automatically become the new API.
+> Planned: FormulaDraft is not implemented; Token, Completion, SignatureHelp, and error enums need further definition. The final section preserves Current IDE behavior separately.
 
-## Detached draft
+## FormulaDraft
 
 ```rust
-// Created by FormulaEngine::create_draft(definition); edits one expression.
-// Captures Schema, other formula types, and the dependency graph; never follows later Engine mutations.
-// The candidate replaces same-ID dependency edges before type/cycle checks; new formula IDs are allowed.
-// Property ID collision → CreateDraftError; invalid source → a Draft with diagnostics.
-// No implicit Engine mutation; v1 makes no incremental-compilation performance guarantee.
-pub struct FormulaDraft { /* private */ }
+/// Borrows Engine immutably for analysis; same-ID dependencies follow the definition being edited.
+/// Multiple Drafts may borrow one Engine; saving requires ending every Draft's borrow first.
+pub struct FormulaDraft<'engine> {}
 
-impl FormulaDraft {
+impl FormulaDraft<'_> {
     pub fn state(&self) -> &FormulaDraftState;
 
-    // Combined completion, postfix completion, and signature help; cursor may be queried repeatedly.
-    // Candidates that would create a dependency cycle remain present but disabled.
+    /// Replace expression and update output_type, diagnostics, and tokens before returning.
+    /// A changed expression advances version, invalidating earlier FormulaEdits.
+    ///
+    /// - allow: Invalid expression; inspect diagnostics through state().
+    pub fn set_expression(&mut self, expression: String);
+
+    /// Query completion, postfix completion, and signature help together.
+    /// Candidates that would create a dependency cycle remain present but disabled.
     pub fn help(&self, cursor: TextOffset) -> CursorHelp;
-    // Does not modify source; unknown or stale diagnostic ID → empty list.
+
+    /// Unknown diagnostic IDs or IDs from an earlier version return an empty list.
     pub fn quick_fixes(&self, diagnostic_id: &DiagnosticId) -> Vec<QuickFix>;
-    // Does not modify source; requires formattable syntax, not semantic validity.
+
+    /// Requires formattable syntax, not semantic validity.
     pub fn format_edits(&self) -> Result<FormulaEdit, FormatError>;
 
-    // The only Draft mutation: validate version, original-source ranges, cursor, and non-overlap atomically.
-    // Success → apply every edit, rebase cursor, recompile, advance version.
-    // New source may be invalid; diagnostics belong to the new state. Failure → Err, Draft unchanged.
+    /// Validate version, pre-edit ranges, cursor, and non-overlap, then apply every edit atomically.
+    /// Rebase cursor, update analysis, and advance version before returning.
+    ///
+    /// - allow: Invalid expression; inspect diagnostics through state().
+    /// - error: Validation fails; Draft remains unchanged.
     pub fn apply_edits(&mut self, edit: FormulaEdit, cursor: TextOffset)
         -> Result<ApplyEditsResult, ApplyEditsError>;
 
-    pub fn into_definition(self) -> FormulaDefinition; // Consumes Draft without committing
+    /// Does not commit automatically; pass the returned definition to FormulaEngine::upsert to save it.
+    pub fn into_definition(self) -> FormulaDefinition;
 }
 ```
 
-[Engine](formula-runtime.md) defines shared types and the `create_draft` entry point.
+[FormulaEngine](formula-engine.md) defines shared types, the `create_draft` entry point, and the editing and saving example.
 
 ```rust
-pub struct TextOffset(usize); // UTF-8 byte offset
+/// UTF-8 byte offset.
+pub struct TextOffset(usize);
 pub struct DraftVersion(u64);
 
 pub struct FormulaDraftState {
-    pub version: DraftVersion, // Advances after every successful apply_edits
+    /// Advances when expression changes or apply_edits succeeds.
+    pub version: DraftVersion,
     pub definition: FormulaDefinition,
-    pub output_type: Option<Type>, // No concrete inference → None, never Unknown/Null
-    pub diagnostics: Vec<FormulaDiagnostic>, // Cursor-independent; includes direct/transitive self-reference
+    /// None when no concrete type can be inferred; never Unknown/Null.
+    pub output_type: Option<Type>,
+    /// Cursor-independent; includes direct and transitive self-reference.
+    pub diagnostics: Vec<FormulaDiagnostic>,
     pub tokens: Vec<Token>,
 }
 pub struct CursorHelp {
@@ -65,44 +77,32 @@ pub struct CursorHelp {
     pub signature_help: Option<SignatureHelp>,
 }
 pub struct TextEdit {
-    pub range: Span, // All edits refer to the same pre-edit source
+    /// All edits refer to the same pre-edit expression.
+    pub range: Span,
     pub new_text: String,
 }
 pub struct FormulaEdit {
-    pub base_version: DraftVersion, // Must equal current state.version
-    pub edits: Vec<TextEdit>, // No overlap
+    /// Must equal current state.version.
+    pub base_version: DraftVersion,
+    /// Ranges must not overlap.
+    pub edits: Vec<TextEdit>,
 }
 pub struct QuickFix {
     pub title: String,
-    pub edit: FormulaEdit, // Version bound to the Draft that produced the diagnostic
+    /// Version bound to the Draft that produced the diagnostic.
+    pub edit: FormulaEdit,
 }
 pub struct ApplyEditsResult {
     pub state: FormulaDraftState,
-    pub cursor: TextOffset, // Position in the edited source
-}
-// Final Rust fields for Token, Completion, SignatureHelp, and error variants remain unspecified.
-// Current behavior/DTOs are preserved below and in WASM API, not substituted as aliases for these new types.
-```
-
-## Commit or discard
-
-```rust
-let mut draft = engine.create_draft(formula)?;
-let result = draft.apply_edits(edit, cursor)?; // Changes source and reanalyzes, not merely cursor rebasing
-
-if save {
-    // Engine reanalyzes against its latest state rather than trusting the Draft's old snapshot.
-    let change = engine.upsert_formula(draft.into_definition())?;
-    let state = engine.state(); // This and ChangeResult determine the commit outcome
-} else {
-    drop(draft); // Uncommitted source never entered Engine
+    /// Position in the edited expression.
+    pub cursor: TextOffset,
 }
 ```
 
 ## Current: IDE behavior
 
 Current services process source per request; they do not retain a FormulaDraft. This section owns editing behavior;
-[WASM API](formula-runtime-wasm.md) owns JS serialization, coordinate validation, and exceptions.
+[WASM API](wasm-api.md) owns JS serialization, coordinate validation, and exceptions.
 
 ```text
 diagnostics

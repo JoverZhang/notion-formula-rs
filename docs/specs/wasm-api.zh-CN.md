@@ -1,18 +1,18 @@
 ---
-doc_id: specs.formula-runtime-wasm
+doc_id: specs.wasm-api
 title: "WASM API 与 Worker"
 language: zh-CN
 source_language: zh-CN
-counterpart: ./formula-runtime-wasm.md
+counterpart: ./wasm-api.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-18
+translation_status: needs-update
+last_verified: 2026-09-19
 ---
 
 # WASM API 与 Worker
 
-[English](formula-runtime-wasm.md) · [规格索引](README.zh-CN.md)
+[English](wasm-api.md) · [Specification index](README.zh-CN.md)
 
 > Planned Worker client 与 Current Analyzer 分节定义；当前 WASM 尚无 Engine 求值入口。
 
@@ -26,11 +26,12 @@ wrapper 只负责 RPC/session 路由、无损 DTO 转换、UTF-8 ↔ UTF-16、Re
 
 ```ts
 interface FormulaEngineClient {
+  getProperty(id: PropertyId): Promise<PropertyState | null>;
+  getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
-  upsertProperty(property: PropertySchema): Promise<ChangeResult>;
-  removeProperty(id: PropertyId): Promise<ChangeResult | null>;
-  upsertFormula(formula: FormulaDefinition): Promise<ChangeResult>;
-  removeFormula(id: PropertyId): Promise<ChangeResult | null>;
+  upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
+  remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
+  // EvaluateInputError 拒绝 Promise；公式与行错误随 EvaluateResult 返回。
   evaluate(input: EvaluateInput): Promise<EvaluateResult>;
   createDraft(formula: FormulaDefinition): Promise<FormulaDraftClient>;
   close(): Promise<void>;
@@ -40,7 +41,7 @@ interface FormulaDraftClient {
   help(cursor: number): Promise<CursorHelp>;
   quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
   formatEdits(): Promise<FormulaEdit>;
-  applyEdits(edit: FormulaEdit, cursor: number): Promise<ApplyEditsResult>;
+  updateExpression(update: ExpressionUpdate): Promise<UpdateExpressionResult>;
   intoDefinition(): Promise<FormulaDefinition>;
   close(): Promise<void>;
 }
@@ -54,7 +55,7 @@ engine.close()
 draft.close()
   释放该草稿，即 discard。
 draft.intoDefinition()
-  消耗该草稿；仍需显式 upsertFormula 才修改 Engine。
+  消耗该草稿；仍需包装为 PropertyDefinition 的 Formula 分支并显式 upsert 才修改 Engine。
 coordinates
   JS cursor/span 使用 UTF-16 code units；Rust 使用 UTF-8 bytes。
 DTO
@@ -62,7 +63,7 @@ DTO
   新接口的具体 JS 编码、初始化入口和错误载荷待随实现细化；不能套用下节 Current DTO。
 ```
 
-业务语义仅由 [Engine](formula-runtime.zh-CN.md) 与 [Draft](formula-draft.zh-CN.md) 定义。
+业务语义仅由 [Engine](formula-engine.zh-CN.md) 与 [Draft](ide.zh-CN.md) 定义。
 
 ## Current：同步 Analyzer
 
@@ -151,7 +152,7 @@ format / apply_edits
   返回更新后的完整 source 与 cursor；不保存 source，也不修改 Analyzer 配置。
 ```
 
-候选、排序、诊断顺序、格式和编辑语义归 [IDE 的 Current 章节](formula-draft.zh-CN.md) 所有。
+候选、排序、诊断顺序、格式和编辑语义归 [IDE 的 Current 章节](ide.zh-CN.md) 所有。
 
 ### Current 坐标与异常
 

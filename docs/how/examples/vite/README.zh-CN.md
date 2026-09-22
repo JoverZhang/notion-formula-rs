@@ -20,7 +20,7 @@ Vite 示例通过浏览器调用 stateful WASM Analyzer。它展示一个应用�
 
 本文提到的面板 ID、debounce 时长、分组行、chip、焦点、popover 布局和错误处理都属于
 **example policy**，不是稳定的产品契约。用户可见的保证由 editor-services 和 WASM API specification
-负责，对应的仓库路径是 `docs/specs/formula-draft.*` 与 `docs/specs/formula-runtime-wasm.*`。本文只解释 demo 如何
+负责，对应的仓库路径是 `docs/specs/ide.*` 与 `docs/specs/wasm-api.*`。本文只解释 demo 如何
 使用这些接口，不会重新定义 Analyzer、IDE 或 WASM 算法。
 
 ## 启动时共用一个边界 client，用两个 ID 区分面板
