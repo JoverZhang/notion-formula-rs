@@ -6,7 +6,8 @@ source_language: zh-CN
 counterpart: ./ide.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: needs-update
+translation_status: synced
+translation_model: gpt-6-luna
 last_verified: 2026-09-23
 ---
 
@@ -190,7 +191,7 @@ signature help
 format
   Any lexer/parser diagnostic → failure; semantic diagnostics do not prevent formatting.
   Full and deterministic; formatting is idempotent for covered syntax. Indent by 2 spaces, use conventional spaces around binary/ternary operators and commas, and end with one newline.
-  Preserve attached comments; inline only if indentation plus rendered UTF-8 byte length is <= 80, otherwise use multiple lines.
+  Preserve attached comments; inline only when inlining is permitted and indentation plus rendered UTF-8 byte length is <= 80; otherwise use multiple lines.
   Atomic expressions are exempt from this width check; there are no formatting options.
   Current returns the complete source and relocates the cursor as a whole-document replacement edit: internal positions usually move to zero, while the end follows the new end.
   Planned format_edits returns edits; the Current return structure cannot be treated as its structure.

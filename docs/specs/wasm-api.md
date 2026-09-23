@@ -6,7 +6,8 @@ source_language: zh-CN
 counterpart: ./wasm-api.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: needs-update
+translation_status: synced
+translation_model: gpt-6-luna
 last_verified: 2026-09-23
 ---
 

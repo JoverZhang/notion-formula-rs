@@ -6,7 +6,8 @@ source_language: zh-CN
 counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
-translation_status: needs-update
+translation_status: synced
+translation_model: gpt-6-luna
 last_verified: 2026-09-23
 ---
 
@@ -44,7 +45,7 @@ digits      = digit, { digit } ;
 digit       = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 string      = '"', { string-char | escape }, '"' ;
 string-char = ? Any Unicode scalar other than double quote or backslash; includes raw newlines ? ;
-escape      = '\\', ( "n" | "t" | '"' | '\\' ) ;
+escape      = '\', ( "n" | "t" | '"' | '\' ) ;
 identifier  = identifier-token - keyword ;
 identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
 letter      = ? Rust char::is_alphabetic ? ;
@@ -156,7 +157,7 @@ a - * / % ^ b  two numbers → number; divisor/modulus of 0 → row error
 a == b / !=    any non-null values; different value kinds are unequal
 a < <= >= > b  same kind among number/string/boolean/date → boolean; NaN cannot be ordered → row type error
 
-Unary/non-logical binary operand combinations not listed above → row type error; ==/!= accept different kinds and are not in this category.
+Unary/non-logical binary non-null operand combinations not listed above → row type error; ==/!= accept different kinds and are not in this category.
 Comparison order: numbers by numeric value, strings lexicographically, booleans false < true, dates chronologically.
 Text conversion: integers have no .0, booleans are lowercase, dates are epoch-millisecond integers,
                  lists use square brackets and commas around recursively converted elements.
@@ -202,7 +203,7 @@ evaluate          → runtime issues are per-row errors; other rows can continue
 Current inference allows unknown, unions, and nested unknown.
 Unknown identifiers or uncertain inference need not be rejected immediately; syntax diagnostics prevent evaluation.
 For example, "count: " + 3 may infer as unknown, but at runtime it can still concatenate text.
-Diagnostic message is not a machine interface; Planned Engine Ready must have a definite ValueType, a stricter target contract.
+Diagnostic messages are not a machine interface; Planned Engine Ready must have a definite ValueType, a stricter target contract.
 ```
 
 See [builtins](builtin-functions.md) for function call signatures and controlled evaluation.
