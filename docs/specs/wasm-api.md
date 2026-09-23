@@ -14,14 +14,14 @@ last_verified: 2026-09-23
 
 [简体中文](wasm-api.zh-CN.md) · [Specification index](README.md)
 
-> The Planned Worker client and Current Analyzer are specified in separate sections; Current WASM has no Engine evaluation entry point.
+> The Planned Worker client and Current Analyzer are defined in separate sections; the current WASM has no Engine evaluation entry point.
 
-## Planned: thin clients
+## Planned: Thin Client
 
 ```text
 Main thread → FormulaEngineClient / FormulaDraftClient → Worker RPC → WASM → Rust
-Wrapper owns only RPC/session routing, lossless DTO conversion, UTF-8 ↔ UTF-16, Result ↔ Promise, and lifetime.
-Dependency analysis, cycle checks, compilation, evaluation, and text editing stay in Rust; Worker/pool counts are unspecified.
+The wrapper handles only RPC/session routing, lossless DTO conversion, UTF-8 ↔ UTF-16, Result ↔ Promise, and lifecycle.
+Dependency analysis, cycle detection, compilation, evaluation, and text editing stay in Rust; Worker/thread-pool count is not part of the interface.
 ```
 
 ```ts
@@ -49,27 +49,26 @@ interface FormulaDraftClient {
 
 ```text
 queue
-  One Engine and all its Draft clients share one FIFO queue; every call executes serially in enqueue order.
+  One Engine and all its Draft clients share one FIFO queue; all calls execute serially in enqueue order.
 engine.close()
-  Idempotent: reject new calls → drain queued calls → release Engine and associated Drafts → terminate Worker.
+  Idempotent; reject new calls → wait for queued calls to finish → release Engine and associated Drafts → terminate Worker.
 draft.close()
-  Release this draft: discard.
+  Releases that draft, that is, discards it.
 draft.intoDefinition()
-  Consume this draft; wrap it in the Formula variant of PropertyDefinition and explicitly upsert to mutate Engine.
+  Consumes the draft; the returned definition must still be wrapped in the Formula branch of a PropertyDefinition and explicitly upserted to modify Engine.
 coordinates
-  JS cursors/spans use UTF-16 code units; Rust uses UTF-8 bytes.
+  JS cursor/span use UTF-16 code units; Rust uses UTF-8 bytes.
 DTO
-  Names above refer to Rust contracts, not directly transferable Rust memory layouts.
-  New JS encodings, initialization entry point, and error payloads need specification alongside implementation;
-  the Current DTOs below are not substitutes.
+  The names above correspond to the Rust contract; they do not declare that Rust memory layouts can be transferred directly.
+  Concrete JS encoding, initialization entry point, and error payloads for the new interface will be refined with implementation; the Current DTO in the next section cannot be applied to it.
 ```
 
-Only [Engine](formula-engine.md) and [Draft](ide.md) define domain semantics.
+Business semantics are defined only by [Engine](formula-engine.md) and [Draft](ide.md).
 
-## Current: synchronous Analyzer
+## Current: Synchronous Analyzer
 
 ```ts
-// Analyzer is exported after package initialization; exact default async initializer / initSync signatures are not stable contract.
+// The initialized generated package exports Analyzer; the exact signatures of default async initializer / initSync are not a stable contract.
 declare class Analyzer {
   constructor(config: AnalyzerConfig);
   analyze(source: string): AnalyzeResult;
@@ -78,28 +77,28 @@ declare class Analyzer {
   help(source: string, cursor_utf16: number): HelpResult;
   free(): void;
 }
-// Retains fixed properties/preferred_limit, never source, results, edit history, or cursor.
-// Reusable across documents with the same config; no configuration mutation.
-// Generated glue also installs disposal when the host defines Symbol.dispose.
-// No domain calls after free/dispose; resulting failures are uncontrolled.
+// Retains only fixed properties/preferred_limit; does not store source, results, edit history, or cursor.
+// Can be reused for multiple documents with the same configuration; has no configuration update method.
+// When the host has Symbol.dispose, the generated glue also exposes the corresponding destructor method.
+// Do not call after free/dispose; the resulting failure is outside the controlled contract.
 
 type Ty = "Number" | "String" | "Boolean" | "Date" | { List: Ty };
 type Property = { name: string; type: Ty };
 type AnalyzerConfig = { properties: Property[]; preferred_limit: number | null };
-// Generated TS requires both fields; JS runtime acceptance is defined below.
+// These are generated TS declarations; both fields are required. The accepted JS runtime range is described below.
 ```
 
 ```text
 config
   Omitted properties → []; explicit undefined → invalid.
-  Array<Property> is supported; incidental serde acceptance of other iterables is not a stable guarantee.
+  Supports Array<Property>; serde's incidental acceptance of other iterables is not a stable guarantee.
   Omitted/undefined/null preferred_limit → 5; 0 → no preferred_indices.
-  Supplied limit must be a nonnegative WASM usize integer; missing property fields, invalid types/shapes → whole config fails.
-  Unknown top-level fields rejected, including functions; extra Property fields ignored; property names must be unique.
-  Builtins are fixed, not configurable or replaceable. TS callers should satisfy the generated declaration.
+  A specified value must be a non-negative integer within the WASM usize range; missing property fields, invalid types, or invalid shape → the entire config fails.
+  Unknown top-level fields are rejected (including functions); extra fields inside Property are ignored; property names must be unique.
+  The builtin set is fixed; configuration cannot extend or replace it. TS callers should satisfy the generated type.
 ```
 
-### Current DTOs
+### Current DTO
 
 ```ts
 type Span = { start: number; end: number };
@@ -141,59 +140,59 @@ type HelpResult = { completion: CompletionResult; signature_help: SignatureHelp 
 
 ```text
 analyze
-  Formula problems return diagnostics, not exceptions merely because a formula is invalid.
-  Internal diagnostic codes/labels/notes are not exposed; kind currently only "error".
-  Tokens exclude comments/newlines but include Eof; Token.kind is an open string.
-  output_type is always a string; unknown/failed inference is "unknown", not null.
+  Formula problems are returned as diagnostics; invalid formulas do not throw.
+  Internal diagnostic codes/labels/notes are not exposed; kind currently has only "error".
+  Comments/newlines are removed from tokens, but Eof is retained; Token.kind is an open string.
+  output_type is always a string; failed/unknown inference is "unknown", not null.
 help
   Tolerates incomplete source; arrays such as items/additional_edits/preferred_indices are always present.
-  Current discrepancy: generated TS declares Option as null, but the serializer retains the fields and emits undefined.
-  Affects signature_help, primary_edit, cursor, detail, disabled_reason, and param_index.
+  Note the current discrepancy: generated TS maps Option to null, but the actual serializer retains the field and outputs undefined.
+  This affects signature_help, primary_edit, cursor, detail, disabled_reason, and param_index.
 format / apply_edits
-  Return full updated source and cursor; neither retain source nor modify Analyzer configuration.
+  Return the updated complete source and cursor; do not store source or modify Analyzer configuration.
 ```
 
-[Current IDE behavior](ide.md) owns candidates, ranking, diagnostic order, formatting, and edits.
+Candidate, ordering, diagnostic-order, formatting, and editing semantics belong to the [Current section of IDE](ide.md).
 
-### Current coordinates and exceptions
+### Current Coordinates and Exceptions
 
 ```text
 strings
-  Source, property names, new_text, etc. must be well-formed Unicode without isolated surrogates.
-  Generated bindings replace isolated surrogates with U+FFFD; inputs depending on this normalization are unsupported.
+  source/property name/new_text, etc. must be valid Unicode, with no unpaired surrogate.
+  The generated boundary replaces an unpaired surrogate with U+FFFD; inputs relying on this normalization are unsupported.
 positions
-  Every JS cursor/span/edit endpoint uses UTF-16 code units and half-open [start,end) ranges.
-  Input ranges refer to original source; returned cursors refer to returned updated source.
-  Supported numbers are finite integers 0..=4_294_967_295.
-  Invalid direct cursor numbers may be coerced by the ABI before validation; such inputs are unsupported.
-  Invalid numbers inside edit DTOs → Invalid edits.
-  Inside a surrogate pair → floor to the scalar's start, for cursors and both endpoints.
-  A nonempty UTF-16 range may therefore collapse to empty; such positions are not universally rejected.
+  All JS cursor/span/edit endpoints are UTF-16 code units, using half-open ranges [start,end).
+  Input ranges are based on the original source; returned cursor is based on the returned new source.
+  Supported numeric values are finite integers 0..=4_294_967_295.
+  Invalid numeric values for a direct cursor parameter may first be coerced by the ABI; such inputs are unsupported.
+  Invalid numeric values in an edit DTO → Invalid edits.
+  A position inside a surrogate pair → floored to the start of that scalar; this applies to cursor and both endpoints.
+  Thus a non-empty UTF-16 range may collapse to empty; it is not always rejected.
 past end
-  help cursor → clamp to source end
+  help cursor → clamp to end of document
   format/apply_edits cursor → Invalid cursor
   apply_edits endpoint → Invalid edit range
 diagnostic location
-  line/col are 1-based; col counts Unicode scalars, not UTF-16. An emoji takes one column but two span units.
+  line/col start at 1; col counts Unicode scalars, not UTF-16; an emoji counts as 1 in col and 2 in span.
 
 controlled failures
   constructor → throws primitive string "Invalid analyzer config"
   methods → Error("Invalid edits" | "Invalid cursor" | "Invalid edit range" |
-                  "Overlapping edits" | "Format error" | "Serialize error")
-  Reversed/past-end ranges → Invalid edit range; lexer/parser diagnostics → Format error.
-  analyze/help have only Serialize error as a controlled exception; formula/incomplete-source problems return data.
+                "Overlapping edits" | "Format error" | "Serialize error")
+  Reversed/out-of-bounds range → Invalid edit range; lexer/parser diagnostic → Format error.
+  The only controlled exceptions from analyze/help are Serialize error; formula/incomplete-source problems are returned as data.
 
 validation order
-  constructor → object/top-level field checks → deserialize → construct
+  constructor → object/top-level field validation → deserialize → construct
   analyze     → analyze/convert → serialize
-  format      → validate/convert cursor → format → serialize
-  apply_edits → deserialize edits → validate/convert ranges in supplied order → validate/convert cursor
+  format      → cursor validation/conversion → format → serialize
+  apply_edits → deserialize edits → validate/convert ranges in input order → validate/convert cursor
               → sort/check overlap/apply → serialize
   help        → clamp/floor cursor → help → serialize
-  Endpoint flooring precedes overlap checks; the order above determines which coexisting failure is reported first.
+  Endpoint flooring happens before overlap checks; when multiple errors coexist, the order above determines which one is reported first.
 ```
 
-Current exports expose no evaluator, plans, or business rows, and specify no demo UI policy.
-Implementation anchors: [exports](../../analyzer_wasm/src/lib.rs), [DTOs](../../analyzer_wasm/src/dto/v1.rs),
+The current boundary does not expose the evaluator, plan, or business rows, and does not define demo UI policy.
+Implementation anchors: [exports](../../analyzer_wasm/src/lib.rs), [DTO](../../analyzer_wasm/src/dto/v1.rs),
 [coordinates](../../analyzer_wasm/src/offsets.rs),
 [generated TS](../../examples/vite/src/analyzer/generated/wasm_dto.ts).
