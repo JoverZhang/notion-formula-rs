@@ -8,6 +8,7 @@ implementation_status: current
 document_status: stable
 translation_status: synced
 translation_model: gpt-6-luna
+translation_review_model: gpt-6-astra
 last_verified: 2026-09-23
 ---
 
