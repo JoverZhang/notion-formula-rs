@@ -7,12 +7,12 @@ counterpart: ./formula-language.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-18
+last_verified: 2026-09-23
 ---
 
 # 公式文法与求值规则
 
-[English](formula-language.md) · [规格索引](README.zh-CN.md)
+[English](formula-language.md) · [Specification index](README.zh-CN.md)
 
 Current：描述本仓库接受的完整表达式，不承诺与上游 Notion 完全兼容。IDE 对残缺源码的恢复不扩展此文法。
 
@@ -71,6 +71,55 @@ f(1).method(2)              // 可链式 member call；能否求值还取决于 
 null、date literal          // 不支持；空值和日期由 property 或函数产生
 ```
 
+## 词法结构
+
+以下为 Rust Analyzer 的词法类型，Planned FormulaDraft 复用这些类型。
+tokens 按源码顺序排列，保留注释、换行和 Eof，不包含空格、tab 和 CR；词法错误可能使扫描提前结束。
+
+```rust
+/// UTF-8 字节区间 [start, end)。
+pub struct Span {
+    pub start: u32,
+    pub end: u32,
+}
+
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+pub enum TokenKind {
+    Lt, Le, EqEq, Ne, Ge, Gt,
+    AndAnd, OrOr, Bang, Not,
+    Plus, Minus, Star, Slash, Percent, Caret,
+    Dot, Comma, Colon, Pound, Question,
+    OpenParen, CloseParen, OpenBracket, CloseBracket,
+    Literal(Lit),
+    Ident(Symbol),
+    /// Symbol.text 不包含注释的起止标记。
+    DocComment(CommentKind, Symbol),
+    Newline,
+    /// span 为源码末尾的空区间。
+    Eof,
+}
+
+pub struct Symbol {
+    pub text: String,
+}
+
+pub struct Lit {
+    pub kind: LitKind,
+    /// 保留原始拼写；String 包含双引号，转义序列不解码。
+    pub symbol: Symbol,
+}
+
+pub enum LitKind { Bool, Number, String }
+pub enum CommentKind { Line, Block }
+```
+
+[Token 类型](../../analyzer/src/lexer/token.rs)由 Analyzer 提供；
+前端可结合 kind 和 span 为原表达式着色，或将 `prop("id")` 显示为字段标签。
+
 ## Property reference
 
 ```text
@@ -94,7 +143,7 @@ boundary
   demo 的 FormulaId 只是界面身份；Planned Engine 的 ID/依赖模型不能当作 Current 行为。
 ```
 
-Planned 定义见 [FormulaEngine](formula-runtime.zh-CN.md)。
+Planned 定义见 [FormulaEngine](formula-engine.zh-CN.md)。
 
 ## 运算与空值
 
@@ -122,6 +171,27 @@ a ? b : c：a=true → b；a=false/null → c；condition 只接受 boolean/null
 被跳过的 expression 不产生行错误；这不改变 prepare 时发现全部 property 的规则。
 ```
 
+### Planned Number
+
+FormulaEngine 的 Number 取值、数值运算和比较遵循
+[ECMAScript Number](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-ecmascript-language-types-number-type)；
+有对应运算的 numeric builtin 使用相同规则，`sqrt`、`ln` 等对应
+[Math](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math-object)。
+
+```text
+输入和结果均允许 NaN、+Infinity、-Infinity、+0、-0；它们不标为 null，也不产生行错误。
+1 / 0、divide(1, 0)         → +Infinity
+-1 / 0                     → -Infinity
+0 / 0、1 % 0、sqrt(-1)      → NaN
+ln(0)                      → -Infinity
+1e308 * 1e308               → +Infinity
+NaN 参与 ==、<、<=、>、>=   → false
+NaN 参与 !=                → true
++0 == -0                   → true
+
+具体函数仍可限制参数值，例如 repeat 的次数须有限且非负。
+```
+
 ## 分析与失败边界
 
 ```text
@@ -132,7 +202,7 @@ evaluate          → 运行时问题是逐行错误；其他行可继续
 Current 推断允许 unknown、union，以及嵌套 unknown。
 未知标识符或不确定推断不必立即拒绝；语法诊断阻止求值。
 例如 "count: " + 3 可推断为 unknown，但运行时仍可拼接文本。
-诊断 message 不是机器接口；Planned Engine Ready 必须有明确 Type，是更严格的目标契约。
+诊断 message 不是机器接口；Planned Engine Ready 必须有明确 ValueType，是更严格的目标契约。
 ```
 
 函数调用签名和受控求值见 [builtin](builtin-functions.zh-CN.md)。

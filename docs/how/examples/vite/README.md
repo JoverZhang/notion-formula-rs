@@ -22,7 +22,7 @@ Current TypeScript implementation for maintainers who need to change or debug th
 Everything described here about panel identity, debounce delays, grouped rows, chips, focus,
 popover layout, and error fallback is **example policy**. It is not a stable product contract. The
 user-visible guarantees belong to the editor-services and WASM API specifications, whose repository
-paths are `docs/specs/formula-draft.*` and `docs/specs/formula-runtime-wasm.*`. This guide explains how the
+paths are `docs/specs/ide.*` and `docs/specs/wasm-api.*`. This guide explains how the
 demo consumes those surfaces; it does not redefine Analyzer, IDE, or WASM algorithms.
 
 ## Startup creates one boundary client and two panel identities
