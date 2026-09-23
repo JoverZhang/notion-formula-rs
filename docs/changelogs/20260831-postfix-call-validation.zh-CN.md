@@ -33,4 +33,4 @@ Semantic analysis 开始为不受支持或未知的 postfix member call 报告 d
 
 ## Links
 
-- [Analyzer 实现](../how/analyzer/README.zh-CN.md)
+- [Analyzer 源码](../../analyzer/src/lib.rs)

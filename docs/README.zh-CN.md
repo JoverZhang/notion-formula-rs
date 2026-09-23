@@ -25,10 +25,6 @@ last_verified: 2026-09-02
 从[规格索引](specs/README.zh-CN.md)开始。公式作者、编辑器客户端和 WASM 集成方可以在这里
 找到各自需要的当前用户契约。
 
-## 阅读或修改实现
-
-先查看[实现导读](how/README.zh-CN.md)中的跨 crate 流程，再进入相应 crate 或示例维护的实现文档。
-
 ## 参与贡献
 
 - [测试指南](contributing/testing.zh-CN.md)

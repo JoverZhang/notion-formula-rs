@@ -26,11 +26,6 @@ server-and-browser direction, the project's DSL practice, and its boundaries.
 Start from the [specification index](specs/README.md). It routes formula authors, editor
 clients, and WASM integrations to the current user-visible contract they need.
 
-## Read or change the implementation
-
-Start from the [implementation map](how/README.md) for the cross-crate flow, then continue
-into the guide owned by the relevant crate or example.
-
 ## Contribute safely
 
 - [Testing guide](contributing/testing.md)

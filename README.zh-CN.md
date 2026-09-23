@@ -2,8 +2,9 @@
 
 一个用 Rust 实现的 Formula 引擎，用于分析、编辑和求值 Notion 风格公式。
 
-[在线演示](https://joverzhang.github.io/notion-formula-rs/) ·
-[项目文档](docs/README.zh-CN.md) · [English](README.md)
+- [在线演示](https://joverzhang.github.io/notion-formula-rs/)
+- [项目文档](docs/README.zh-CN.md)
+- [English](README.md)
 
 ![浏览器演示中的补全候选、签名帮助和推断结果类型](docs/assets/browser-demo.webp)
 
@@ -22,8 +23,8 @@
 
 ## 继续了解
 
-[项目意图](docs/intent/README.zh-CN.md) · [当前规格](docs/specs/README.zh-CN.md) ·
-[实现导读](docs/how/README.zh-CN.md)
+- [项目意图](docs/intent/README.zh-CN.md)
+- [当前规格](docs/specs/README.zh-CN.md)
 
 ## License
 

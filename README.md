@@ -2,8 +2,9 @@
 
 A Rust Formula engine for analyzing, editing, and evaluating Notion-style formulas.
 
-[Live demo](https://joverzhang.github.io/notion-formula-rs/) ·
-[Documentation](docs/README.md) · [简体中文](README.zh-CN.md)
+- [Live demo](https://joverzhang.github.io/notion-formula-rs/)
+- [Documentation](docs/README.md)
+- [简体中文](README.zh-CN.md)
 
 ![The browser demo showing completion suggestions, signature help, and inferred result types](docs/assets/browser-demo.webp)
 
@@ -24,8 +25,8 @@ by the Rust evaluator rather than the demo. The
 
 ## Explore the project
 
-[Project intent](docs/intent/README.md) · [Current specifications](docs/specs/README.md) ·
-[Implementation map](docs/how/README.md)
+- [Project intent](docs/intent/README.md)
+- [Current specifications](docs/specs/README.md)
 
 ## License
 

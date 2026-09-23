@@ -37,5 +37,5 @@ Formatting behavior was tightened:
 
 ## Links
 
-- [WASM boundary implementation](../how/analyzer_wasm/README.md)
-- [Vite example implementation](../how/examples/vite/README.md)
+- [WASM boundary source](../../analyzer_wasm/src/lib.rs)
+- [Vite example source](../../examples/vite/src/main.ts)
