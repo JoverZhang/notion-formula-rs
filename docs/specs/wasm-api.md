@@ -6,15 +6,15 @@ source_language: zh-CN
 counterpart: ./wasm-api.zh-CN.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-19
+translation_status: needs-update
+last_verified: 2026-09-23
 ---
 
 # WASM API and Worker
 
 [简体中文](wasm-api.zh-CN.md) · [Specification index](README.md)
 
-> Planned Worker clients and Current Analyzer are defined separately; Current WASM has no Engine evaluation entry point.
+> The Planned Worker client and Current Analyzer are specified in separate sections; Current WASM has no Engine evaluation entry point.
 
 ## Planned: thin clients
 
@@ -38,7 +38,7 @@ interface FormulaEngineClient {
 }
 interface FormulaDraftClient {
   getState(): Promise<FormulaDraftState>;
-  help(cursor: number): Promise<CursorHelp>;
+  help(cursor: number, config: CompletionConfig): Promise<CursorHelp>;
   quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
   formatEdits(): Promise<FormulaEdit>;
   updateExpression(update: ExpressionUpdate): Promise<UpdateExpressionResult>;
@@ -142,12 +142,12 @@ type HelpResult = { completion: CompletionResult; signature_help: SignatureHelp 
 ```text
 analyze
   Formula problems return diagnostics, not exceptions merely because a formula is invalid.
-  No internal diagnostic codes/labels/notes; kind currently only "error".
+  Internal diagnostic codes/labels/notes are not exposed; kind currently only "error".
   Tokens exclude comments/newlines but include Eof; Token.kind is an open string.
   output_type is always a string; unknown/failed inference is "unknown", not null.
 help
   Tolerates incomplete source; arrays such as items/additional_edits/preferred_indices are always present.
-  Current discrepancy: generated TS uses null for Option, but the serializer retains the fields with undefined values.
+  Current discrepancy: generated TS declares Option as null, but the serializer retains the fields and emits undefined.
   Affects signature_help, primary_edit, cursor, detail, disabled_reason, and param_index.
 format / apply_edits
   Return full updated source and cursor; neither retain source nor modify Analyzer configuration.

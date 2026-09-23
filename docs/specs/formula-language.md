@@ -6,8 +6,8 @@ source_language: zh-CN
 counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
-translation_status: synced
-last_verified: 2026-09-18
+translation_status: needs-update
+last_verified: 2026-09-23
 ---
 
 # Formula grammar and evaluation rules
@@ -71,6 +71,55 @@ f(1).method(2)              // Member calls chain; evaluation also requires buil
 (f)(1), f()(1), value.field // Unsupported: ordinary calls require an identifier callee; no bare member access
 null and date literals      // Unsupported; nulls and dates enter through properties or functions
 ```
+
+## Lexical structure
+
+The following are Rust Analyzer lexical types; Planned FormulaDraft reuses them.
+Tokens are ordered by source position and retain comments, newlines, and Eof, but exclude spaces, tabs, and CR. A lexical error may stop scanning early.
+
+```rust
+/// UTF-8 byte range [start, end).
+pub struct Span {
+    pub start: u32,
+    pub end: u32,
+}
+
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+pub enum TokenKind {
+    Lt, Le, EqEq, Ne, Ge, Gt,
+    AndAnd, OrOr, Bang, Not,
+    Plus, Minus, Star, Slash, Percent, Caret,
+    Dot, Comma, Colon, Pound, Question,
+    OpenParen, CloseParen, OpenBracket, CloseBracket,
+    Literal(Lit),
+    Ident(Symbol),
+    /// Symbol.text excludes the comment delimiters.
+    DocComment(CommentKind, Symbol),
+    Newline,
+    /// span is the empty range at the end of the source.
+    Eof,
+}
+
+pub struct Symbol {
+    pub text: String,
+}
+
+pub struct Lit {
+    pub kind: LitKind,
+    /// Preserves original spelling; String includes double quotes and escape sequences are not decoded.
+    pub symbol: Symbol,
+}
+
+pub enum LitKind { Bool, Number, String }
+pub enum CommentKind { Line, Block }
+```
+
+[Token types](../../analyzer/src/lexer/token.rs) are provided by Analyzer;
+a frontend can combine kind and span to highlight the original expression or display `prop("id")` as a field label.
 
 ## Property references
 
