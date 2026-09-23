@@ -1,3 +1,9 @@
+<!-- PR title: <type>(<scope>): <summary>; scope is optional.
+Use a change type: feat, fix, refactor, perf, docs, test, build, ci, or chore.
+Write a concise English summary in the imperative that describes the actual change.
+Example: docs: add GitHub templates and retire implementation guides
+Keep tool/model attribution in the PR body. -->
+
 ## Summary
 
 <!-- Describe the problem and the resulting behavior. Explain the approach when it needs justification.
