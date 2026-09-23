@@ -20,11 +20,12 @@ This is the repository's only authoritative documentation-maintenance standard. 
 
 - `docs/intent/` states why the system exists and owns human-approved motivations, direction, goals, non-goals, boundaries, trade-offs, and reevaluation conditions. It is not a checklist; keep it short.
 - `docs/specs/` states the current, user-observable contract without mirroring the crate layout or preserving design history.
-- `docs/how/` explains how the current implementation works. Its directories follow source crate names, with one implementation guide per crate by default.
 - `docs/contributing/` explains repository-specific development practices such as testing and changelog writing.
 - `docs/changelogs/` records user-visible changes. Root `GLOSSARY.md` is the English-only terminology authority.
 
 Own each fact in one document. Other documents link to that owner instead of restating it. Keep Planned, Exploratory, Deprecated, and Historical claims separate from Current behavior.
+
+Source code is the authority for implementation structure and execution; tests verify behavior. Keep necessary implementation rationale beside the relevant code, without maintaining separate implementation guides.
 
 ## Respect human-controlled documents
 
@@ -32,15 +33,15 @@ Own each fact in one document. Other documents link to that owner instead of res
 
 If a code change requires an unauthorized update in a human-controlled area, stop and ask the user. Treat that missing authorization as a code-review blocker.
 
-Agents may update `docs/how/` and `docs/contributing/` when the implementation or development workflow in their assigned task materially changes.
+Agents may update `docs/contributing/` when the development workflow in their assigned task materially changes.
 
 ## Update the layer that owns the change
 
-| Change | Documentation owner |
+| Change | Owner |
 |---|---|
 | Goals, non-goals, system boundaries, or accepted trade-offs | `docs/intent/` |
 | User-visible behavior, schemas, errors, ordering, or compatibility | `docs/specs/` |
-| Crate structure, algorithms, data flow, internal interfaces, or debugging paths | `docs/how/` |
+| Crate structure, algorithms, data flow, internal interfaces, or debugging paths | Source code, tests, and nearby comments |
 | Testing or contributor workflow | `docs/contributing/` |
 
 When documented facts did not change, do not make a ceremonial documentation edit.

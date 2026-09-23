@@ -1,0 +1,35 @@
+name: Bug report
+description: Report incorrect formula, editor, or WASM behavior.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened
+      description: Describe the problem and the result you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include steps or an example. Add the expression, schema, input values, and result when relevant. For intermittent issues, describe when they occur.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the version or commit and where it runs. Add OS, browser, or toolchain versions when relevant.
+      placeholder: |
+        Version or commit:
+        Runtime: Rust / browser or WASM / demo
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, or other details that help explain the problem.
+    validations:
+      required: false

@@ -20,11 +20,12 @@ last_verified: 2026-09-01
 
 - `docs/intent/` 说明系统为什么存在，承载 human 明确确认的动机、方向、目标、非目标、边界、取舍和重新评估条件。它不是必须逐项填满的清单，内容应保持精简。
 - `docs/specs/` 说明当前可被使用者观察到的契约，不照搬 crate 结构，也不记录设计演进。
-- `docs/how/` 说明当前实现如何工作。目录名与源码 crate 一致，默认每个 crate 只有一篇实现指南。
 - `docs/contributing/` 说明测试、changelog 编写等项目特有的开发规范。
 - `docs/changelogs/` 记录使用者可见的变化。根目录 `GLOSSARY.md` 是 English-only 的术语权威来源。
 
 每项事实只在一个文档中维护，其他文档通过链接引用。Planned、Exploratory、Deprecated 和 Historical 内容必须与 Current 行为明确分开。
+
+实现结构和执行过程以代码为准，测试用于验证行为。必要的实现原因写在相关代码附近，不另维护实现说明文档。
 
 ## 尊重 human-controlled 文档
 
@@ -32,15 +33,15 @@ last_verified: 2026-09-01
 
 如果代码变更要求更新 human-controlled 区域，但用户没有授权，应停止并询问用户；缺少授权属于 code review 阻塞问题。
 
-当任务范围内的实现或开发流程发生实质变化时，agent 可以同步更新 `docs/how/` 和 `docs/contributing/`。
+当任务范围内的开发流程发生实质变化时，agent 可以同步更新 `docs/contributing/`。
 
 ## 根据变化选择文档层级
 
-| 变化 | 文档 owner |
+| 变化 | 维护位置 |
 |---|---|
 | 目标、非目标、系统边界或已接受的取舍 | `docs/intent/` |
 | 使用者可见行为、schema、错误、顺序或兼容性 | `docs/specs/` |
-| `crate` 结构、算法、数据流、内部接口或调试入口 | `docs/how/` |
+| `crate` 结构、算法、数据流、内部接口或调试入口 | 源码、测试与相关代码附近的注释 |
 | 测试或贡献流程 | `docs/contributing/` |
 
 文档中的事实没有变化时，不做形式性的文档修改。

@@ -15,19 +15,12 @@ english_only_files = [
   "GLOSSARY.md",
 ]
 
-neutral_redirect_files = [
-  "evaluator/README.md",
-  "builtin_fn/README.md",
-  "builtin_fn_macros/README.md",
-  "analyzer/README.md",
-  "ide/README.md",
-  "analyzer_wasm/README.md",
-  "examples/vite/README.md",
-]
+neutral_redirect_files = []
 
 control_files = [
   "AGENTS.md",
   "CLAUDE.md",
+  ".github/pull_request_template.md",
 ]
 
 ignored_directories = [

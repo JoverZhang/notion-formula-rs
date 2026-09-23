@@ -37,5 +37,5 @@ Formatting 行为变得更严格：
 
 ## Links
 
-- [WASM boundary 实现](../how/analyzer_wasm/README.zh-CN.md)
-- [Vite example 实现](../how/examples/vite/README.zh-CN.md)
+- [WASM boundary 源码](../../analyzer_wasm/src/lib.rs)
+- [Vite example 源码](../../examples/vite/src/main.ts)

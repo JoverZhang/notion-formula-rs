@@ -22,8 +22,7 @@
 
 ## 继续了解
 
-[项目意图](docs/intent/README.zh-CN.md) · [当前规格](docs/specs/README.zh-CN.md) ·
-[实现导读](docs/how/README.zh-CN.md)
+[项目意图](docs/intent/README.zh-CN.md) · [当前规格](docs/specs/README.zh-CN.md)
 
 ## License
 

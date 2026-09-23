@@ -24,8 +24,7 @@ by the Rust evaluator rather than the demo. The
 
 ## Explore the project
 
-[Project intent](docs/intent/README.md) · [Current specifications](docs/specs/README.md) ·
-[Implementation map](docs/how/README.md)
+[Project intent](docs/intent/README.md) · [Current specifications](docs/specs/README.md)
 
 ## License
 

@@ -49,7 +49,6 @@ type。
 
 ## Links
 
-- [Builtin declaration 实现](../how/builtin_fn/README.zh-CN.md)
-- [Evaluator 实现](../how/evaluator/README.zh-CN.md)
+- [Builtin declaration 源码](../../builtin_fn/src/lib.rs)
+- [Evaluator 源码](../../evaluator/src/lib.rs)
 - [Builtin function 规格](../specs/builtin-functions.zh-CN.md)
-- [`builtin_fn/README.md`](../../builtin_fn/README.md)

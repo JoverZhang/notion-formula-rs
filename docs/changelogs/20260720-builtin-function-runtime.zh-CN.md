@@ -40,7 +40,6 @@ typed argument 到达 handwritten kernel boundary 时仍保留具体类型，不
 
 ## Links
 
-- [Builtin declaration 实现](../how/builtin_fn/README.zh-CN.md)
-- [Evaluator 实现](../how/evaluator/README.zh-CN.md)
+- [Builtin declaration 源码](../../builtin_fn/src/lib.rs)
+- [Evaluator 源码](../../evaluator/src/lib.rs)
 - [Builtin function 规格](../specs/builtin-functions.zh-CN.md)
-- [`evaluator/README.md`](../../evaluator/README.md)
