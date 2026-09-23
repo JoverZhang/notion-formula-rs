@@ -684,7 +684,11 @@ function checkBilingualDocumentation(repositoryRoot, documents) {
       errors.push(`${basePath}: pair must contain one en and one zh-CN document`);
     }
 
-    for (const field of SHARED_BILINGUAL_METADATA) {
+    const needsTranslation =
+      source.metadata?.translation_status === "needs-update" ||
+      translation.metadata?.translation_status === "needs-update";
+    const sharedFields = needsTranslation ? ["doc_id"] : SHARED_BILINGUAL_METADATA;
+    for (const field of sharedFields) {
       if (
         source.metadata?.[field] &&
         translation.metadata?.[field] &&
@@ -710,10 +714,7 @@ function checkBilingualDocumentation(repositoryRoot, documents) {
       }
     }
 
-    if (
-      source.metadata?.translation_status === "needs-update" ||
-      translation.metadata?.translation_status === "needs-update"
-    ) {
+    if (needsTranslation) {
       translationDebt.push(`${basePath}: translation needs update`);
     }
   }

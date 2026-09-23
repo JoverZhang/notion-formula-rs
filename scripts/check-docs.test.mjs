@@ -37,6 +37,8 @@ function bilingualDocument({
   body,
   counterpart,
   docId = "docs.guide",
+  documentStatus = "stable",
+  implementationStatus = "current",
   language,
   lastVerified = "2026-08-30",
   sourceLanguage = "en",
@@ -49,8 +51,8 @@ title: "${title}"
 language: ${language}
 source_language: ${sourceLanguage}
 counterpart: ${counterpart}
-implementation_status: current
-document_status: stable
+implementation_status: ${implementationStatus}
+document_status: ${documentStatus}
 translation_status: ${translationStatus}
 last_verified: ${lastVerified}
 ---
@@ -587,6 +589,62 @@ for (const fixture of fixtures) {
     const actual = checkFixtureRepository(fixture.repository);
 
     assert.deepEqual(actual, fixture.expected);
+  });
+}
+
+for (const preferredLanguage of ["en", "zh-CN"]) {
+  const workingPath = preferredLanguage === "en" ? "guide.md" : "guide.zh-CN.md";
+  const docs = {
+    "manifest.toml": documentationManifest({ bilingual_directories: ["docs"] }),
+  };
+  for (const language of ["en", "zh-CN"]) {
+    const file = language === "en" ? "guide.md" : "guide.zh-CN.md";
+    const counterpart = language === "en" ? "guide.zh-CN.md" : "guide.md";
+    const isWorkingVersion = language === preferredLanguage;
+    docs[file] = bilingualDocument({
+      body: `# Guide\n\n[Counterpart](${counterpart})`,
+      counterpart: `./${counterpart}`,
+      documentStatus: isWorkingVersion ? "draft" : "stable",
+      implementationStatus: isWorkingVersion ? "planned" : "current",
+      language,
+      lastVerified: isWorkingVersion ? "2026-09-19" : "2026-08-30",
+      sourceLanguage: isWorkingVersion ? preferredLanguage : "en",
+      title: "Guide",
+      translationStatus: isWorkingVersion ? "needs-update" : "synced",
+    });
+  }
+
+  test(`allows editing only the preferred ${preferredLanguage} version before translation`, () => {
+    assert.deepEqual(checkFixtureRepository({ docs }), {
+      documentCount: 2,
+      errors: [],
+      pairCount: 1,
+      translationDebt: ["docs/guide.md: translation needs update"],
+    });
+  });
+
+  test(`requires shared metadata to match when ${preferredLanguage} is marked synced`, () => {
+    const synced = {
+      ...docs,
+      [workingPath]: docs[workingPath].replace("needs-update", "synced"),
+    };
+    const result = checkFixtureRepository({ docs: synced });
+    assert(result.errors.some((error) => error.includes("last_verified does not match")));
+    assert(result.errors.some((error) => error.includes("implementation_status does not match")));
+    assert(result.errors.some((error) => error.includes("document_status does not match")));
+    assert.deepEqual(result.translationDebt, []);
+  });
+
+  test(`still validates identity, metadata, and links while ${preferredLanguage} awaits translation`, () => {
+    for (const [contents, diagnostic] of [
+      [docs[workingPath].replace("doc_id: docs.guide", "doc_id: docs.other"), "doc_id does not match"],
+      [docs[workingPath].replace("2026-09-19", "2026-09-99"), "last_verified must be a valid"],
+      [`${docs[workingPath]}\n[Missing](missing.md)\n`, "missing local link target"],
+    ]) {
+      const result = checkFixtureRepository({ docs: { ...docs, [workingPath]: contents } });
+      assert(result.errors.some((error) => error.includes(diagnostic)), result.errors.join("\n"));
+      assert.deepEqual(result.translationDebt, ["docs/guide.md: translation needs update"]);
+    }
   });
 }
 
