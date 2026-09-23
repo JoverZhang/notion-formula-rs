@@ -6,19 +6,25 @@ source_language: zh-CN
 counterpart: ./ide.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-19
+translation_status: needs-update
+last_verified: 2026-09-23
 ---
 
 # FormulaDraft：编辑器能力
 
 [English](ide.md) · [Specification index](README.zh-CN.md)
 
-> Planned：FormulaDraft 尚未实现；Token、Completion、SignatureHelp 和错误枚举待细化。末节单独保留 Current IDE 行为。
+> Planned：FormulaDraft 尚未实现。补全、参数提示和文本编辑沿用末节的 Current IDE 行为。
 
 ## FormulaDraft
 
 ```rust spec=formula_draft.h.rs
+pub use analyzer::{Span, TextEdit, Token};
+pub use ide::{
+    CompletionConfig, CompletionItem, CompletionKind, CompletionResult,
+    DisplaySegment, SignatureHelp, SignatureItem,
+};
+
 /// 共享借用 Engine 进行分析；同 ID 的依赖关系按正在编辑的定义计算。
 /// 同一 Engine 可同时创建多个 Draft；保存前须结束所有 Draft 的借用。
 #[spec::private_fields]
@@ -30,12 +36,13 @@ impl FormulaDraft<'_> {
 
     /// 同时查询 completion、postfix completion 和 signature help。
     /// 会形成依赖环的候选仍返回，但标为 disabled。
-    pub fn help(&self, cursor: TextOffset) -> CursorHelp;
+    /// CompletionConfig::default() 的 preferred_limit 为 5；0 禁用 preferred_indices。
+    pub fn help(&self, cursor: TextOffset, config: CompletionConfig) -> CursorHelp;
 
-    /// 未知或非当前版本的 diagnostic ID 返回空列表。
+    /// 返回 diagnostic 附带的修改建议；未知或非当前版本的 ID 返回空列表。
     pub fn quick_fixes(&self, diagnostic_id: &DiagnosticId) -> Vec<QuickFix>;
 
-    /// 只要求语法可格式化，不要求语义有效。
+    /// 返回整段 expression 的替换 edit；lexer/parser diagnostic 阻止格式化，语义错误不阻止。
     pub fn format_edits(&self) -> Result<FormulaEdit, FormatError>;
 
     /// 原子更新 expression，返回前更新 output_type、diagnostics 和 tokens。
@@ -51,14 +58,14 @@ impl FormulaDraft<'_> {
 ```
 
 [FormulaEngine](formula-engine.zh-CN.md) 定义共享类型、`create_draft` 入口及编辑、保存示例。
+[Token 与 Span](formula-language.zh-CN.md#词法结构) 由 language spec 定义。
+Completion 沿用 [IDE 返回结构](../../ide/src/lib.rs)与[候选类型](../../ide/src/completion/mod.rs)；
+SignatureHelp 沿用[签名结构](../../ide/src/signature/mod.rs)和[显示片段](../../ide/src/display.rs)。
 
 ```rust spec=formula_draft.h.rs
 /// UTF-8 字节偏移。
 #[derive(derive_more::From)]
 pub struct TextOffset(pub usize);
-
-/// UTF-8 字节偏移，区间为 [start, end)。
-pub struct Span { pub start: usize, pub end: usize }
 
 #[derive(Clone, Copy)]
 pub struct DraftVersion(pub u64);
@@ -71,6 +78,7 @@ pub struct FormulaDraftState {
     pub output_type: Option<ValueType>,
     /// 语法与语义诊断，不依赖 cursor；包含直接和间接自引用问题。
     pub diagnostics: Vec<ExpressionDiagnostic>,
+    /// 当前 definition.expression 的词法 tokens，保留注释、换行和 Eof。
     pub tokens: Vec<Token>,
 }
 pub struct ExpressionDiagnostic {
@@ -82,18 +90,15 @@ pub struct ExpressionDiagnostic {
 pub struct DiagnosticId(pub String);
 
 pub struct CursorHelp {
-    pub completions: Vec<Completion>,
+    /// 应用本次补全的 edits 时，使用此版本作为 FormulaEdit.base_version。
+    pub base_version: DraftVersion,
+    pub completion: CompletionResult,
     pub signature_help: Option<SignatureHelp>,
-}
-pub struct TextEdit {
-    /// 所有 edits 均基于修改前的同一份 expression。
-    pub range: Span,
-    pub new_text: String,
 }
 pub struct FormulaEdit {
     /// 必须等于当前 state.version，防止旧 edits 应用到已修改的 expression。
     pub base_version: DraftVersion,
-    /// 区间不得重叠。
+    /// 所有区间均基于修改前的 expression，且不得重叠。
     pub edits: Vec<TextEdit>,
 }
 pub enum ExpressionUpdate {
@@ -115,7 +120,23 @@ pub struct UpdateExpressionResult {
     /// Replace 返回新 expression.len()，空串为 0；Edits 返回重定位后的坐标。
     pub cursor: TextOffset,
 }
+
+/// expression 存在 lexer/parser diagnostic，无法格式化。
+pub struct FormatError;
+
+pub enum UpdateExpressionError {
+    VersionMismatch,
+    /// 越界或不在 UTF-8 字符边界上。
+    InvalidCursor,
+    /// 区间倒置、越界或端点不在 UTF-8 字符边界上。
+    InvalidEditRange,
+    OverlappingEdits,
+}
 ```
+
+补全的 primary/additional edits 合为一个 `FormulaEdit`，交给 `update_expression()` 应用。
+补全的光标使用 `CompletionItem.cursor`，缺省时位于 primary edit 插入文本之后；
+再计入 primary edit 之前的 additional edits，得到编辑后的坐标供编辑器定位。
 
 ## Current：IDE 行为
 

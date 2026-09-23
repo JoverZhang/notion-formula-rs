@@ -6,8 +6,8 @@ source_language: zh-CN
 counterpart: ./wasm-api.md
 implementation_status: planned
 document_status: draft
-translation_status: synced
-last_verified: 2026-09-19
+translation_status: needs-update
+last_verified: 2026-09-23
 ---
 
 # WASM API 与 Worker
@@ -38,7 +38,7 @@ interface FormulaEngineClient {
 }
 interface FormulaDraftClient {
   getState(): Promise<FormulaDraftState>;
-  help(cursor: number): Promise<CursorHelp>;
+  help(cursor: number, config: CompletionConfig): Promise<CursorHelp>;
   quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
   formatEdits(): Promise<FormulaEdit>;
   updateExpression(update: ExpressionUpdate): Promise<UpdateExpressionResult>;
