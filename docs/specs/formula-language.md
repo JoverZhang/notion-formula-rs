@@ -7,8 +7,7 @@ counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-translation_model: gpt-6-luna
-translation_review_model: gpt-6-astra
+translation_model: gpt-6-sol
 last_verified: 2026-09-23
 ---
 
@@ -204,7 +203,7 @@ evaluate          → runtime issues are per-row errors; other rows can continue
 Current inference allows unknown, unions, and nested unknown.
 Unknown identifiers or uncertain inference need not be rejected immediately; syntax diagnostics prevent evaluation.
 For example, "count: " + 3 may infer as unknown, but at runtime it can still concatenate text.
-Diagnostic messages are not a machine interface; Planned Engine Ready must have a definite ValueType, a stricter target contract.
+Diagnostic messages are not a machine interface.
 ```
 
 See [builtins](builtin-functions.md) for function call signatures and controlled evaluation.

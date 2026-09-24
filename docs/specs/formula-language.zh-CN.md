@@ -202,7 +202,7 @@ evaluate          → 运行时问题是逐行错误；其他行可继续
 Current 推断允许 unknown、union，以及嵌套 unknown。
 未知标识符或不确定推断不必立即拒绝；语法诊断阻止求值。
 例如 "count: " + 3 可推断为 unknown，但运行时仍可拼接文本。
-诊断 message 不是机器接口；Planned Engine Ready 必须有明确 ValueType，是更严格的目标契约。
+诊断 message 不是机器接口。
 ```
 
 函数调用签名和受控求值见 [builtin](builtin-functions.zh-CN.md)。
