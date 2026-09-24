@@ -244,6 +244,59 @@ fn cycles_ids_and_snapshots() {
     );
 }
 
+#[test]
+fn long_chain_cycle_and_recovery_fit_worker_stack() {
+    const COUNT: usize = 2_500;
+    std::thread::Builder::new()
+        .name("formula-engine-long-chain".into())
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            let properties = (0..COUNT)
+                .rev()
+                .map(|index| {
+                    let id = format!("f{index:05}");
+                    let expression = if index + 1 == COUNT {
+                        "1".to_owned()
+                    } else {
+                        format!("prop(\"f{:05}\")", index + 1)
+                    };
+                    formula(&id, &expression)
+                })
+                .collect();
+            let mut engine = make_engine(properties);
+            assert_eq!(engine_state(&engine), "AllReady");
+            assert_eq!(status(&engine, "f00000"), "Ready(Number)");
+            assert_eq!(status(&engine, "f02499"), "Ready(Number)");
+
+            let affected = engine
+                .upsert(formula("f02499", r#"prop("f00000")"#))
+                .unwrap()
+                .affected_formulas;
+            assert_eq!(affected.len(), COUNT);
+            {
+                let FormulaEngineState::NotAllReady { cycle_path } = engine.state() else {
+                    panic!("expected a cycle");
+                };
+                assert_eq!(cycle_path.len(), COUNT + 1);
+                assert_eq!(cycle_path.first(), cycle_path.last());
+                for pair in cycle_path.windows(2) {
+                    let from: usize = pair[0].0.strip_prefix('f').unwrap().parse().unwrap();
+                    let to: usize = pair[1].0.strip_prefix('f').unwrap().parse().unwrap();
+                    assert_eq!(to, (from + 1) % COUNT);
+                }
+            }
+            assert_eq!(status(&engine, "f00000"), "NotReady");
+
+            let affected = engine.upsert(formula("f02499", "1")).unwrap();
+            assert_eq!(affected.affected_formulas.len(), COUNT);
+            assert_eq!(engine_state(&engine), "AllReady");
+            assert_eq!(status(&engine, "f00000"), "Ready(Number)");
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
 fn assert_cycle(engine: &FormulaEngine, direct_edges: &[(&str, &str)]) {
     let FormulaEngineState::NotAllReady { cycle_path } = engine.state() else {
         panic!("expected cycle");

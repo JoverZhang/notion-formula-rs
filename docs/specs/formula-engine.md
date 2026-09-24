@@ -25,8 +25,6 @@ last_verified: 2026-09-24
 
 ## Type definitions
 
-The definition and state types below are Current. Evaluation data types remain Planned.
-
 ```rust
 use std::collections::HashMap;
 ```
@@ -248,8 +246,6 @@ pub enum FormulaEvaluationError {
 ```
 
 ## FormulaEngine API
-
-The definition and state methods are Current. Evaluation and Draft methods below remain Planned.
 
 ### Planned evaluation example
 

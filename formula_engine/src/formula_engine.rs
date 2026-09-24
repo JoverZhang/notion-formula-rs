@@ -144,7 +144,6 @@ impl FormulaEngineInner {
             parsed: &mut parsed,
             functions: analysis::builtins_functions(),
             resolved: BTreeMap::new(),
-            stack: Vec::new(),
             cycle_path: Vec::new(),
         };
         for id in self.dependencies.keys() {
@@ -259,60 +258,99 @@ struct DependencyAnalysis<'a> {
     parsed: &'a mut BTreeMap<PropertyId, ParsedFormula>,
     functions: Vec<FunctionSig>,
     resolved: BTreeMap<PropertyId, Option<Ty>>,
-    stack: Vec<PropertyId>,
     cycle_path: Vec<PropertyId>,
 }
 
-impl DependencyAnalysis<'_> {
-    fn resolve(&mut self, id: &PropertyId) -> Option<Ty> {
-        if let Some(ty) = self.resolved.get(id) {
-            return ty.clone();
+struct DependencyFrame {
+    id: PropertyId,
+    dependencies: Vec<PropertyId>,
+    next: usize,
+    properties: Vec<Property>,
+    dependencies_ready: bool,
+}
+
+impl DependencyFrame {
+    fn new(id: &PropertyId, parsed: &BTreeMap<PropertyId, ParsedFormula>) -> Self {
+        let dependencies: Vec<_> = parsed[id].dependencies.iter().cloned().collect();
+        Self {
+            id: id.clone(),
+            properties: Vec::with_capacity(dependencies.len()),
+            dependencies,
+            next: 0,
+            dependencies_ready: true,
         }
-        if let Some(start) = self.stack.iter().position(|item| item == id) {
-            if self.cycle_path.is_empty() {
-                self.cycle_path = self.stack[start..].to_vec();
-                self.cycle_path.push(id.clone());
-            }
-            return None;
+    }
+
+    fn accept(&mut self, dependency: PropertyId, ty: Option<Ty>) {
+        self.next += 1;
+        match ty {
+            Some(ty) => self.properties.push(Property {
+                name: dependency.0,
+                ty,
+                disabled_reason: None,
+            }),
+            None => self.dependencies_ready = false,
+        }
+    }
+}
+
+impl DependencyAnalysis<'_> {
+    fn resolve(&mut self, root: &PropertyId) {
+        if self.resolved.contains_key(root) {
+            return;
         }
 
-        self.stack.push(id.clone());
-        let dependencies = self.parsed[id].dependencies.clone();
-        let mut properties = Vec::with_capacity(dependencies.len());
-        let mut dependencies_ready = true;
-        for dependency in dependencies {
+        // Keep dependency frames on the heap: a long, valid formula chain must
+        // not consume one native call frame per formula.
+        let mut frames = vec![DependencyFrame::new(root, self.parsed)];
+        let mut active = BTreeMap::from([(root.clone(), 0)]);
+        while let Some(current) = frames.len().checked_sub(1) {
+            if frames[current].next == frames[current].dependencies.len() {
+                let frame = frames.pop().expect("current frame exists");
+                active.remove(&frame.id);
+                let parsed = self
+                    .parsed
+                    .get_mut(&frame.id)
+                    .expect("every formula has a parsed expression");
+                let ty = if frame.dependencies_ready && parsed.syntax_valid {
+                    let context = Context {
+                        properties: frame.properties,
+                        functions: self.functions.clone(),
+                    };
+                    let (ty, diagnostics) = analysis::analyze_expr(&mut parsed.expr, &context);
+                    diagnostics.is_empty().then_some(ty)
+                } else {
+                    None
+                };
+                self.resolved.insert(frame.id, ty);
+                continue;
+            }
+
+            let dependency = frames[current].dependencies[frames[current].next].clone();
             let ty = match self.definitions.get(&dependency) {
                 Some(PropertyDefinition::Input { ty, .. }) => Some(to_analyzer_type(ty)),
-                Some(PropertyDefinition::Formula(_)) => self.resolve(&dependency),
+                Some(PropertyDefinition::Formula(_)) => {
+                    if let Some(ty) = self.resolved.get(&dependency) {
+                        ty.clone()
+                    } else if let Some(&start) = active.get(&dependency) {
+                        if self.cycle_path.is_empty() {
+                            self.cycle_path = frames[start..]
+                                .iter()
+                                .map(|frame| frame.id.clone())
+                                .chain(std::iter::once(dependency.clone()))
+                                .collect();
+                        }
+                        None
+                    } else {
+                        active.insert(dependency.clone(), frames.len());
+                        frames.push(DependencyFrame::new(&dependency, self.parsed));
+                        continue;
+                    }
+                }
                 None => None,
             };
-            match ty {
-                Some(ty) => properties.push(Property {
-                    name: dependency.0,
-                    ty,
-                    disabled_reason: None,
-                }),
-                None => dependencies_ready = false,
-            }
+            frames[current].accept(dependency, ty);
         }
-
-        let parsed = self
-            .parsed
-            .get_mut(id)
-            .expect("every formula has a parsed expression");
-        let ty = if dependencies_ready && parsed.syntax_valid {
-            let context = Context {
-                properties,
-                functions: self.functions.clone(),
-            };
-            let (ty, diagnostics) = analysis::analyze_expr(&mut parsed.expr, &context);
-            diagnostics.is_empty().then_some(ty)
-        } else {
-            None
-        };
-        self.stack.pop();
-        self.resolved.insert(id.clone(), ty.clone());
-        ty
     }
 }
 

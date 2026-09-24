@@ -23,8 +23,6 @@ last_verified: 2026-09-24
 
 ## 类型定义
 
-下面的定义与状态类型属于 Current；求值数据类型仍属于 Planned。
-
 ```rust
 use std::collections::HashMap;
 ```
@@ -247,8 +245,6 @@ pub enum FormulaEvaluationError {
 ```
 
 ## FormulaEngine API
-
-定义和状态方法属于 Current。下方的求值与 Draft 方法仍属于 Planned。
 
 ### 计划中的求值示例
 
