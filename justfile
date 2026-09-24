@@ -74,7 +74,7 @@ clean:
 
 test: test-rust test-example-vite
 
-test-rust: test-builtin_fn test-analyzer test-evaluator test-ide test-analyzer_wasm test-spec-codegen test-md-first
+test-rust: test-builtin_fn test-analyzer test-evaluator test-formula_engine test-ide test-analyzer_wasm test-spec-codegen test-md-first
 
 test-builtin_fn:
   cargo test -p builtin_fn
@@ -84,6 +84,9 @@ test-analyzer:
 
 test-evaluator:
   cargo test -p evaluator
+
+test-formula_engine:
+  cargo test --locked -p formula_engine
 
 test-ide:
   cargo test -p ide

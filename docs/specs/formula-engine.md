@@ -4,19 +4,19 @@ title: "FormulaEngine: compilation and evaluation"
 language: en
 source_language: zh-CN
 counterpart: ./formula-engine.zh-CN.md
-implementation_status: planned
+implementation_status: current
 document_status: draft
 translation_status: synced
 translation_model: gpt-6-sol
 translation_review_model: gpt-6-astra
-last_verified: 2026-09-19
+last_verified: 2026-09-24
 ---
 
 # FormulaEngine: compilation and evaluation
 
 [简体中文](formula-engine.zh-CN.md)
 
-> Planned: not yet released; error enums are still being defined.
+> Current: definition management, dependency analysis, and state queries. Planned: evaluation and FormulaDraft.
 
 **Contents**
 
@@ -25,17 +25,19 @@ last_verified: 2026-09-19
 
 ## Type definitions
 
-```rust spec=formula_engine.h.rs
-use std::collections::HashMap;
+**Current schema types**
 
+```rust out=formula_engine/src/formula_engine.h.rs
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaSchema {
     pub properties: Vec<PropertyDefinition>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PropertyDefinition {
     Input { id: PropertyId, ty: ValueType },
     Formula(FormulaDefinition),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaDefinition {
     pub id: PropertyId,
     /// Formula expression; prop("id") references another Property by ID in the same FormulaSchema.
@@ -46,12 +48,12 @@ pub struct FormulaDefinition {
 ///
 /// - Input and Formula share a namespace; Engine validates that IDs are nonempty and unique within FormulaSchema.
 /// - No string-format restrictions; case-sensitive, without Unicode normalization.
-#[derive(Clone, PartialEq, Eq, Hash, derive_more::From)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
 #[from(String, &str)]
 pub struct PropertyId(pub String);
 
 /// Declared types for Inputs and inferred types for Formulas.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueType {
     /// See [Planned Number](formula-language.md#planned-number) for numeric behavior.
     Number,
@@ -63,6 +65,11 @@ pub enum ValueType {
     Union(Vec<ValueType>),
 }
 
+```
+
+**Planned runtime value types**
+
+```rust
 /// Stores runtime data in columns, with a bitmap marking invalid positions.
 pub enum Column {
     Number(ColumnData<f64>),
@@ -87,10 +94,16 @@ pub enum Value {
     List(Vec<Option<Value>>),
 }
 
+```
+
+**Current state and change types**
+
+```rust out=formula_engine/src/formula_engine.h.rs
+#[derive(Debug, PartialEq, Eq)]
 pub enum FormulaEngineState<'a> {
     /// No cycles, and every formula is Ready.
     AllReady,
-    /// Ready formulas can still be evaluated.
+    /// Other formulas may remain Ready when one formula is not.
     NotAllReady {
         /// Returns one cycle when present; each ID directly depends on the next, and the first and last IDs are equal.
         /// - empty: No cycle, but some formulas are not Ready.
@@ -101,17 +114,17 @@ pub enum FormulaEngineState<'a> {
 }
 
 /// Independent snapshot of a property definition and its state; later Engine updates do not change it.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PropertyState {
     Input { id: PropertyId, ty: ValueType },
     Formula(FormulaState),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaState {
     pub definition: FormulaDefinition,
     pub status: FormulaStatus,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FormulaStatus {
     /// The formula and its dependencies are executable.
     /// output_type may contain Unknown; for example, [] is Ready with type List(Unknown).
@@ -120,6 +133,7 @@ pub enum FormulaStatus {
 }
 
 /// Result of a FormulaEngine::upsert / remove change.
+#[derive(Debug, PartialEq, Eq)]
 pub struct FormulaEngineChangeResult {
     /// Formula IDs affected by this change, including direct and transitive dependents.
     /// - Includes only Formulas that still exist after the change.
@@ -128,6 +142,23 @@ pub struct FormulaEngineChangeResult {
     pub affected_formulas: Vec<PropertyId>,
 }
 
+/// Invalid definitions supplied to FormulaEngine::new.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormulaEngineInitError {
+    EmptyId,
+    DuplicateId(PropertyId),
+}
+
+/// Invalid definition supplied to FormulaEngine::upsert.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EngineChangeError {
+    EmptyId,
+}
+```
+
+**Planned evaluation request and result types**
+
+```rust
 /// Arguments to FormulaEngine::evaluate().
 pub struct EvaluateInput {
     /// Values in input and result columns follow this order.
@@ -212,7 +243,9 @@ pub enum FormulaEvaluationError {
 
 ## FormulaEngine API
 
-```rust spec=formula_engine.h.rs
+### Planned evaluation example
+
+```rust
 /// # Examples
 ///
 /// ```
@@ -283,6 +316,11 @@ pub enum FormulaEvaluationError {
 /// assert_eq!(column.values, ["haha", "gogogo"]);
 /// assert!(output.errors.is_empty());
 /// ```
+```
+
+### Current definition methods
+
+```rust out=formula_engine/src/formula_engine.h.rs
 #[spec::private_fields]
 pub struct FormulaEngine {}
 
@@ -316,6 +354,13 @@ impl FormulaEngine {
 
     /// After removal, formulas that still depend on this ID become NotReady.
     pub fn remove(&mut self, id: &PropertyId) -> Option<FormulaEngineChangeResult>;
+}
+```
+
+### Planned evaluation and Draft methods
+
+```rust
+impl FormulaEngine {
 
     /// Returns Ok(EvaluateResult) once input validation passes, even if every requested formula fails.
     /// Formula and row errors are returned with the result; other formulas continue.
