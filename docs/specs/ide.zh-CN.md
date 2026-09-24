@@ -74,9 +74,10 @@ pub struct FormulaDraftState {
     /// Replace 改变文本或 Edits 成功时加 1。
     pub version: DraftVersion,
     pub definition: FormulaDefinition,
-    /// 保留推断结果中的 Unknown；例如 [] 返回 Some(List(Unknown))。
-    /// 无推断结果时为 None。
-    pub output_type: Option<ValueType>,
+    /// - 返回最外层 expression 的推断类型，允许局部语法错误。
+    /// - 无法确定的类型用 Unknown 表示，如 [] → List(Unknown)。
+    /// - 空 expression → Unknown。
+    pub output_type: ValueType,
     /// 语法与语义诊断，不依赖 cursor；包含直接和间接自引用问题。
     pub diagnostics: Vec<ExpressionDiagnostic>,
     /// 当前 definition.expression 的词法 tokens，保留注释、换行和 Eof。

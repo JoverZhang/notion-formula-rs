@@ -78,9 +78,10 @@ pub struct FormulaDraftState {
     /// Incremented by 1 when Replace changes text or Edits succeeds.
     pub version: DraftVersion,
     pub definition: FormulaDefinition,
-    /// Preserves Unknown in inferred types; for example, [] returns Some(List(Unknown)).
-    /// None means inference produced no result.
-    pub output_type: Option<ValueType>,
+    /// - Returns the root expression's inferred type, even with local syntax errors.
+    /// - Uses Unknown for undetermined types, e.g. [] → List(Unknown).
+    /// - An empty expression → Unknown.
+    pub output_type: ValueType,
     /// Syntax and semantic diagnostics, independent of cursor; includes direct and indirect self-reference problems.
     pub diagnostics: Vec<ExpressionDiagnostic>,
     /// Lexical tokens of the current definition.expression, retaining comments, newlines, and Eof.
