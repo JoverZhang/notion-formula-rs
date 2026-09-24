@@ -23,10 +23,6 @@ last_verified: 2026-09-24
 
 ## 类型定义
 
-```rust
-use std::collections::HashMap;
-```
-
 **当前 Schema 类型**
 
 ```rust out=formula_engine/src/formula_engine.h.rs

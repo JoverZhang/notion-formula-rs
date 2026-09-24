@@ -25,10 +25,6 @@ last_verified: 2026-09-24
 
 ## Type definitions
 
-```rust
-use std::collections::HashMap;
-```
-
 **Current schema types**
 
 ```rust out=formula_engine/src/formula_engine.h.rs
