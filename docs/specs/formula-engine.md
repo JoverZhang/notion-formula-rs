@@ -7,6 +7,8 @@ counterpart: ./formula-engine.zh-CN.md
 implementation_status: planned
 document_status: draft
 translation_status: synced
+translation_model: gpt-6-sol
+translation_review_model: gpt-6-astra
 last_verified: 2026-09-19
 ---
 
@@ -48,13 +50,15 @@ pub struct FormulaDefinition {
 #[from(String, &str)]
 pub struct PropertyId(pub String);
 
-/// Declares each Property's type in the Schema.
-/// Used for runtime type checks.
+/// Declared types for Inputs and inferred types for Formulas.
 #[derive(Clone)]
 pub enum ValueType {
     /// See [Planned Number](formula-language.md#planned-number) for numeric behavior.
     Number,
     String, Boolean, Date,
+    /// Static type is undetermined; allowed in Input declarations and inferred types, including nested types.
+    /// Accepts any Value variant at this position; operations check the concrete type at runtime.
+    Unknown,
     List(Box<ValueType>),
     Union(Vec<ValueType>),
 }
@@ -66,6 +70,7 @@ pub enum Column {
     Boolean(ColumnData<bool>),
     Date(ColumnData<i64>),
     List(ColumnData<Vec<Option<Value>>>),
+    /// Can carry Union or Unknown; each non-null value retains its concrete type.
     Union(ColumnData<Value>),
 }
 pub struct ColumnData<T> {
@@ -109,6 +114,7 @@ pub struct FormulaState {
 #[derive(Clone)]
 pub enum FormulaStatus {
     /// The formula and its dependencies are executable.
+    /// output_type may contain Unknown; for example, [] is Ready with type List(Unknown).
     Ready { output_type: ValueType },
     NotReady,
 }

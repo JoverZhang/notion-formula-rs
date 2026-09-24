@@ -7,7 +7,7 @@ counterpart: ./ide.zh-CN.md
 implementation_status: planned
 document_status: draft
 translation_status: synced
-translation_model: gpt-6-luna
+translation_model: gpt-6-sol
 translation_review_model: gpt-6-astra
 last_verified: 2026-09-23
 ---
@@ -78,8 +78,10 @@ pub struct FormulaDraftState {
     /// Incremented by 1 when Replace changes text or Edits succeeds.
     pub version: DraftVersion,
     pub definition: FormulaDefinition,
-    /// None when no definite type can be inferred; Unknown/Null is not returned.
-    pub output_type: Option<ValueType>,
+    /// - Returns the root expression's inferred type, even with local syntax errors.
+    /// - Uses Unknown for undetermined types, e.g. [] → List(Unknown).
+    /// - An empty expression → Unknown.
+    pub output_type: ValueType,
     /// Syntax and semantic diagnostics, independent of cursor; includes direct and indirect self-reference problems.
     pub diagnostics: Vec<ExpressionDiagnostic>,
     /// Lexical tokens of the current definition.expression, retaining comments, newlines, and Eof.

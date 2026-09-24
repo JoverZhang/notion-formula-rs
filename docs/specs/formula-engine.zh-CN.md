@@ -48,13 +48,15 @@ pub struct FormulaDefinition {
 #[from(String, &str)]
 pub struct PropertyId(pub String);
 
-/// 用于声明 Schema 中各 Property 的类型
-/// 会被用于运行时类型检查
+/// Input 的声明类型与 Formula 的推断类型。
 #[derive(Clone)]
 pub enum ValueType {
     /// 数值规则见 [Planned Number](formula-language.zh-CN.md#planned-number)。
     Number,
     String, Boolean, Date,
+    /// 静态类型未确定；可用于 Input 声明和推断结果，包括嵌套类型。
+    /// 未知部分允许所有 Value 类型，具体操作在运行时校验实际类型。
+    Unknown,
     List(Box<ValueType>),
     Union(Vec<ValueType>),
 }
@@ -67,6 +69,7 @@ pub enum Column {
     Boolean(ColumnData<bool>),
     Date(ColumnData<i64>),
     List(ColumnData<Vec<Option<Value>>>),
+    /// 可承载 Union 或 Unknown；每个非 null 值保留实际类型。
     Union(ColumnData<Value>),
 }
 pub struct ColumnData<T> {
@@ -110,6 +113,7 @@ pub struct FormulaState {
 #[derive(Clone)]
 pub enum FormulaStatus {
     /// 公式自身及其依赖都可以执行。
+    /// output_type 可包含 Unknown；例如 [] 为 Ready，类型为 List(Unknown)。
     Ready { output_type: ValueType },
     NotReady,
 }
