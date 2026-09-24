@@ -4,6 +4,7 @@ members = [
     "builtin_fn",
     "analyzer",
     "evaluator",
+    "formula_engine",
     "analyzer_wasm",
     "ide",
     "md-first",
@@ -16,5 +17,5 @@ members = [
 resolver = "2"
 
 [workspace.metadata.md-first]
-include = ["md-first/docs/specs/README.md"]
+include = ["md-first/docs/specs/README.md", "docs/specs/formula-engine.md"]
 exclude = []

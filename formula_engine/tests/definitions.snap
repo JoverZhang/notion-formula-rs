@@ -1,0 +1,21 @@
+order and types: AllReady copied=Ready(Union([List(Unknown), Number])) dynamic_copy=Ready(Unknown) empty=Ready(List(Unknown)) first=Ready(Number) length=Ready(Number) quoted=Ready(String) refined=Ready(List(Number))
+missing B: NotAllReady([]) A=NotReady B=Missing C=NotReady U=Ready(Number)
+add B affected=["A", "B", "C"]
+after add: AllReady A=Ready(Number) B=Ready(Number) C=Ready(Number) U=Ready(Number)
+same B affected=[]
+syntax error affected=["A", "B", "C"]
+after syntax error: NotAllReady([]) A=NotReady B=NotReady C=NotReady U=Ready(Number)
+type error affected=["A", "B", "C"]
+after type error: NotAllReady([]) A=NotReady B=NotReady C=NotReady U=Ready(Number)
+repair B affected=["A", "B", "C"]
+after repair: AllReady A=Ready(Number) B=Ready(Number) C=Ready(Number) U=Ready(Number)
+formula to input affected=["A", "C"]
+after input: AllReady A=Ready(Number) B=Input(Number) C=Ready(Number) U=Ready(Number)
+input type change affected=["A", "C"]
+after string input: NotAllReady([]) A=NotReady B=Input(String) C=NotReady U=Ready(Number)
+input repair affected=["A", "C"]
+after input repair: AllReady A=Ready(Number) B=Input(Number) C=Ready(Number) U=Ready(Number)
+input to formula affected=["A", "B", "C"]
+after formula: AllReady A=Ready(Number) B=Ready(Number) C=Ready(Number) U=Ready(Number)
+remove B affected=["A", "C"]
+after remove: NotAllReady([]) A=NotReady B=Missing C=NotReady U=Ready(Number)

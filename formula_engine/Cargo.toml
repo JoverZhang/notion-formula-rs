@@ -1,0 +1,8 @@
+[package]
+name = "formula_engine"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+analyzer = { path = "../analyzer" }
+derive_more = { version = "2.1.1", features = ["from"] }

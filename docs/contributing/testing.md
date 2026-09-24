@@ -7,7 +7,7 @@ counterpart: ./testing.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-01
+last_verified: 2026-09-24
 ---
 
 # How to test a change
@@ -29,6 +29,7 @@ generated expectations.
 | Procedural macro parsing or expansion | `cargo test -p builtin_fn_macros` and `cargo test -p builtin_fn` | Macro implementation units plus the consuming crate's declaration-DSL and compile-pass/compile-fail contracts |
 | Lexing, parsing, semantic analysis, or diagnostics | `cargo test -p analyzer` | Analyzer unit, integration, and diagnostic golden tests |
 | Formula preparation or row evaluation | `cargo test -p evaluator` | Generated contracts, input/runtime invariants, and builtin behavior |
+| Formula definitions, dependencies, or readiness | `just test-formula_engine` | Generated Engine API, real analyzer inference, and definition change scenarios |
 | Completion, signature help, formatting, or text edits | `cargo test -p ide` | IDE unit, integration, and formatting golden tests |
 | Rust-to-JavaScript conversion or exported WASM methods | `cargo test -p analyzer_wasm` and `wasm-pack test --node analyzer_wasm` | Native helpers and tests that execute through `wasm-bindgen` |
 | Vite example behavior | `just test-example-vite` | WASM build, Vitest unit tests, and Playwright end-to-end tests |

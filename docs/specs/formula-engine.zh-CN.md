@@ -4,17 +4,17 @@ title: "FormulaEngine：编译与求值"
 language: zh-CN
 source_language: zh-CN
 counterpart: ./formula-engine.md
-implementation_status: planned
+implementation_status: current
 document_status: draft
 translation_status: synced
-last_verified: 2026-09-19
+last_verified: 2026-09-24
 ---
 
 # FormulaEngine：编译与求值
 
 [English](formula-engine.md)
 
-> Planned：尚未发布，错误枚举的成员待定。
+> Current：定义管理、依赖分析与状态查询。Planned：求值与 FormulaDraft。
 
 **目录**
 
@@ -23,17 +23,25 @@ last_verified: 2026-09-19
 
 ## 类型定义
 
-```rust spec=formula_engine.h.rs
-use std::collections::HashMap;
+下面的定义与状态类型属于 Current；求值数据类型仍属于 Planned。
 
+```rust
+use std::collections::HashMap;
+```
+
+**当前 Schema 类型**
+
+```rust out=formula_engine/src/formula_engine.h.rs
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaSchema {
     pub properties: Vec<PropertyDefinition>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PropertyDefinition {
     Input { id: PropertyId, ty: ValueType },
     Formula(FormulaDefinition),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaDefinition {
     pub id: PropertyId,
     /// 公式定义，可通过 prop("id") 按 ID 引用同一 FormulaSchema 中其它 Property。
@@ -44,12 +52,12 @@ pub struct FormulaDefinition {
 ///
 /// - Input 与 Formula 共用同一命名空间；Engine 校验 ID 非空及 FormulaSchema 内唯一。
 /// - 不限制字符串格式；区分大小写，不做 Unicode 归一化。
-#[derive(Clone, PartialEq, Eq, Hash, derive_more::From)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
 #[from(String, &str)]
 pub struct PropertyId(pub String);
 
 /// Input 的声明类型与 Formula 的推断类型。
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueType {
     /// 数值规则见 [Planned Number](formula-language.zh-CN.md#planned-number)。
     Number,
@@ -61,6 +69,11 @@ pub enum ValueType {
     Union(Vec<ValueType>),
 }
 
+```
+
+**计划中的运行时值类型**
+
+```rust
 /// 用于存放运行时数据
 /// 列式结构，内部使用 bitmap 标记无效位
 pub enum Column {
@@ -86,10 +99,16 @@ pub enum Value {
     List(Vec<Option<Value>>),
 }
 
+```
+
+**当前状态与变更类型**
+
+```rust out=formula_engine/src/formula_engine.h.rs
+#[derive(Debug, PartialEq, Eq)]
 pub enum FormulaEngineState<'a> {
     /// 无环且所有公式均为 Ready。
     AllReady,
-    /// Ready 的公式仍可求值。
+    /// 即使有公式尚未就绪，其他公式仍可保持 Ready。
     NotAllReady {
         /// 有环时返回一条路径；前一个 ID 直接依赖后一个 ID，首尾 ID 相同。
         /// - empty: 无环路，仍有未 Ready 的公式。
@@ -100,17 +119,17 @@ pub enum FormulaEngineState<'a> {
 }
 
 /// 字段定义与状态的独立快照，不随 Engine 后续更新而变化。
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PropertyState {
     Input { id: PropertyId, ty: ValueType },
     Formula(FormulaState),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaState {
     pub definition: FormulaDefinition,
     pub status: FormulaStatus,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FormulaStatus {
     /// 公式自身及其依赖都可以执行。
     /// output_type 可包含 Unknown；例如 [] 为 Ready，类型为 List(Unknown)。
@@ -119,6 +138,7 @@ pub enum FormulaStatus {
 }
 
 /// FormulaEngine::upsert / remove 的变更结果。
+#[derive(Debug, PartialEq, Eq)]
 pub struct FormulaEngineChangeResult {
     /// 受本次变更影响的 Formula ID，包括直接、间接依赖者。
     /// - 仅包含变更后仍存在的 Formula。
@@ -127,6 +147,23 @@ pub struct FormulaEngineChangeResult {
     pub affected_formulas: Vec<PropertyId>,
 }
 
+/// FormulaEngine::new 接收的定义不合法。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormulaEngineInitError {
+    EmptyId,
+    DuplicateId(PropertyId),
+}
+
+/// FormulaEngine::upsert 接收的定义不合法。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EngineChangeError {
+    EmptyId,
+}
+```
+
+**计划中的求值请求与结果类型**
+
+```rust
 /// FormulaEngine::evaluate() 的参数
 pub struct EvaluateInput {
     /// 输入列和结果列中的值均按此顺序排列。
@@ -211,7 +248,11 @@ pub enum FormulaEvaluationError {
 
 ## FormulaEngine API
 
-```rust spec=formula_engine.h.rs
+定义和状态方法属于 Current。下方的求值与 Draft 方法仍属于 Planned。
+
+### 计划中的求值示例
+
+```rust
 /// # Examples
 ///
 /// ```
@@ -282,6 +323,11 @@ pub enum FormulaEvaluationError {
 /// assert_eq!(column.values, ["haha", "gogogo"]);
 /// assert!(output.errors.is_empty());
 /// ```
+```
+
+### 当前的定义管理方法
+
+```rust out=formula_engine/src/formula_engine.h.rs
 #[spec::private_fields]
 pub struct FormulaEngine {}
 
@@ -315,6 +361,13 @@ impl FormulaEngine {
 
     /// 删除后，仍依赖该 ID 的公式变为 NotReady。
     pub fn remove(&mut self, id: &PropertyId) -> Option<FormulaEngineChangeResult>;
+}
+```
+
+### 计划中的求值与 Draft 方法
+
+```rust
+impl FormulaEngine {
 
     /// 输入校验通过即返回 Ok(EvaluateResult)，包括所有请求的公式都失败的情况。
     /// 公式与行错误随结果返回；其他公式继续求值。
