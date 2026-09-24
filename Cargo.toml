@@ -17,5 +17,5 @@ members = [
 resolver = "2"
 
 [workspace.metadata.md-first]
-include = ["md-first/docs/specs/README.md", "docs/specs/formula-engine.md"]
+include = ["md-first/docs/specs/README.md", "docs/specs/formula-engine.zh-CN.md"]
 exclude = []

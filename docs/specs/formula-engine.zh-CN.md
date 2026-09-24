@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./formula-engine.md
 implementation_status: current
 document_status: draft
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-24
 ---
 
@@ -68,31 +68,68 @@ pub enum ValueType {
 **计划中的运行时值类型**
 
 ```rust
-/// 用于存放运行时数据
-/// 列式结构，内部使用 bitmap 标记无效位
+/// 列式结构以 bitmap 标记 null 位置。
 pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
     Boolean(ColumnData<bool>),
     Date(ColumnData<i64>),
     List(ColumnData<Vec<Option<Value>>>),
-    /// 可承载 Union 或 Unknown；每个非 null 值保留实际类型。
+    /// 承载 Union 或 Unknown；每个非 null 值保留实际类型。
     Union(ColumnData<Value>),
 }
 pub struct ColumnData<T> {
     /// 长度等于本次求值的行数；null 位置仅保留占位值，不得读取。
     pub values: Vec<T>,
     /// 参考 [Arrow NullBuffer](https://arrow.apache.org/rust/arrow_buffer/buffer/struct.NullBuffer.html)。
-    /// 长度等于 values.len()；普通 null 和行错误均标为 null。
+    /// 长度等于 values.len()；false 对应 None，null 位置不得读取 values 占位值。
+    /// 行错误也标为 null，并通过 RowError 单独报告。
     pub validity: NullBuffer,
 }
+```
+
+```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
 pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix 毫秒时间戳。
     Date(i64),
+    /// 元素 None 表示该位置没有值；null 列表、空列表和含 null 元素的列表不同。
     List(Vec<Option<Value>>),
 }
 
+/// Input 声明类型对应的列种类；只看最外层类型语法。
+#[derive(Debug, PartialEq, Eq)]
+pub enum ColumnKind { Number, String, Boolean, Date, List, Union }
+
+/// 空列、全 null 列及单成员 Union 均不改变声明类型对应的列种类。
+fn column_kind(ty: &ValueType) -> ColumnKind {
+    match ty {
+        ValueType::Number => ColumnKind::Number,
+        ValueType::String => ColumnKind::String,
+        ValueType::Boolean => ColumnKind::Boolean,
+        ValueType::Date => ColumnKind::Date,
+        ValueType::List(_) => ColumnKind::List,
+        ValueType::Union(_) | ValueType::Unknown => ColumnKind::Union,
+    }
+}
+
+/// 判断某个位置的值是否属于 Input 的声明类型。
+/// - None 表示该位置没有值；所有声明类型均允许，ValueType 和 Value 均无 Null 成员。
+/// - 有值时，List 和 Union 递归匹配成员；Unknown 接受任意 Value。
+/// - 求值时的类型检查只针对操作约束与动态分派，不重复检查 Input 类型成员关系。
+fn accepts(ty: &ValueType, value: Option<&Value>) -> bool {
+    use Value as V;
+    use ValueType as T;
+    let Some(value) = value else { return true };
+    match (ty, value) {
+        (T::Unknown, _) => true,
+        (T::Number, V::Number(_)) | (T::String, V::String(_))
+        | (T::Boolean, V::Boolean(_)) | (T::Date, V::Date(_)) => true,
+        (T::List(t), V::List(items)) => items.iter().all(|v| accepts(t, v.as_ref())),
+        (T::Union(ts), v) => ts.iter().any(|t| accepts(t, Some(v))),
+        _ => false,
+    }
+}
 ```
 
 **当前状态与变更类型**
@@ -163,8 +200,8 @@ pub struct EvaluateInput {
     /// 输入列和结果列中的值均按此顺序排列。
     /// ID 非空且在本批次内唯一；允许零行。
     pub row_ids: Vec<RowId>,
-    /// 按 ID 与 Engine 中的全部 Input 一一对应，包括本次求值未使用的列。
-    /// evaluate() 运行时校验列及嵌套值的类型，以及 values 和 validity 的长度。
+    /// 按 ID 与 Engine 中的全部 Input 一一对应，包括本次求值未使用的列；缺列不等于 null 单元格。
+    /// 求值前校验列种类、所有有值位置及嵌套值的类型、values 和 validity 的长度。
     pub columns: HashMap<PropertyId, Column>,
     pub runtime: RuntimeContext,
     /// 请求返回结果的 Formula ID；依赖公式由 Engine 自动求值。
@@ -174,6 +211,31 @@ pub struct EvaluateInput {
 #[derive(derive_more::From)]
 #[from(String, &str)]
 pub struct RowId(pub String);
+
+/// 入参校验失败时，不执行任何公式；一次只返回一个错误。
+/// 同一定义和输入返回同一个错误。
+pub enum EvaluateInputError {
+    EmptyRowId { row_index: usize },
+    DuplicateRowId { id: RowId },
+    EmptyFormulaIds,
+    /// ID 为空、不存在，或对应 Input 而非 Formula。
+    InvalidFormulaId { id: PropertyId },
+    DuplicateFormulaId { id: PropertyId },
+    /// 报告全部缺失的 ID，去重并按 PropertyId 排序。
+    MissingInputs { ids: Vec<PropertyId> },
+    /// 报告全部多余的 ID，去重并按 PropertyId 排序。
+    UnexpectedInputs { ids: Vec<PropertyId> },
+    InvalidColumnType { id: PropertyId, expected: ColumnKind, actual: ColumnKind },
+    /// expected 是行数；同时报告两个实际长度。
+    InvalidColumnLength {
+        id: PropertyId, expected: usize, values_len: usize, validity_len: usize,
+    },
+    /// expected 和 actual 属于不匹配位置；路径从外到内记录列表下标，空路径表示根值。
+    InvalidValueType {
+        id: PropertyId, row_index: usize, element_path: Vec<usize>,
+        expected: ValueType, actual: ValueType,
+    },
+}
 
 /// 一次求值中，所有行和公式共用这份时间与时区快照。
 pub struct RuntimeContext {
@@ -366,9 +428,7 @@ impl FormulaEngine {
     ///
     /// allows: formula_ids 中存在 NotReady 的公式。
     ///
-    /// errors: 入参校验失败，不执行任何公式。
-    /// - EvaluateInputError::MissingInputs：缺少 Input 列，报告全部缺失的 ID，去重并按 ID 排序。
-    /// - 多余列，或 ID、类型、长度不合法。
+    /// error: 任一入参校验失败，不执行任何公式；只返回一个 EvaluateInputError。
     pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
 
     /// 基于 Engine 分析候选公式；编辑结果不写入 Engine。
