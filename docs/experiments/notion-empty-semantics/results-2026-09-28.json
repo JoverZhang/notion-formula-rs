@@ -645,6 +645,364 @@
           }
         }
       ]
+    },
+    {
+      "name": "list_rendering",
+      "inputs": {},
+      "results": [
+        {
+          "expression": "[1, empty()]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1"
+          }
+        },
+        {
+          "expression": "format([1, empty()])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": "1,"
+          }
+        },
+        {
+          "expression": "join([1, empty()], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": "1,"
+          }
+        },
+        {
+          "expression": "length([1, empty()])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 2
+          }
+        },
+        {
+          "expression": "[empty(), 1]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1"
+          }
+        },
+        {
+          "expression": "format([empty(), 1])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": ",1"
+          }
+        },
+        {
+          "expression": "join([empty(), 1], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": ",1"
+          }
+        },
+        {
+          "expression": "length([empty(), 1])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 2
+          }
+        },
+        {
+          "expression": "[1, empty(), 2]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,2"
+          }
+        },
+        {
+          "expression": "format([1, empty(), 2])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": "1,,2"
+          }
+        },
+        {
+          "expression": "join([1, empty(), 2], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": "1,,2"
+          }
+        },
+        {
+          "expression": "length([1, empty(), 2])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 3
+          }
+        },
+        {
+          "expression": "[1, empty(), empty()]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1"
+          }
+        },
+        {
+          "expression": "format([1, empty(), empty()])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": "1,,"
+          }
+        },
+        {
+          "expression": "join([1, empty(), empty()], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": "1,,"
+          }
+        },
+        {
+          "expression": "length([1, empty(), empty()])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 3
+          }
+        },
+        {
+          "expression": "[empty()]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "format([empty()])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "join([empty()], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "length([empty()])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 1
+          }
+        },
+        {
+          "expression": "[empty(), empty()]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "format([empty(), empty()])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": ","
+          }
+        },
+        {
+          "expression": "join([empty(), empty()], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": ","
+          }
+        },
+        {
+          "expression": "length([empty(), empty()])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 2
+          }
+        },
+        {
+          "expression": "[1, \"\"]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,"
+          }
+        },
+        {
+          "expression": "format([1, \"\"])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": "1,"
+          }
+        },
+        {
+          "expression": "join([1, \"\"], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": "1,"
+          }
+        },
+        {
+          "expression": "length([1, \"\"])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 2
+          }
+        },
+        {
+          "expression": "[\"\", 1]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": ",1"
+          }
+        },
+        {
+          "expression": "format([\"\", 1])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": ",1"
+          }
+        },
+        {
+          "expression": "join([\"\", 1], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": ",1"
+          }
+        },
+        {
+          "expression": "length([\"\", 1])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 2
+          }
+        },
+        {
+          "expression": "[1, \"\", 2]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,,2"
+          }
+        },
+        {
+          "expression": "format([1, \"\", 2])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": "1,,2"
+          }
+        },
+        {
+          "expression": "join([1, \"\", 2], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": "1,,2"
+          }
+        },
+        {
+          "expression": "length([1, \"\", 2])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 3
+          }
+        },
+        {
+          "expression": "[1, \"\", \"\"]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,,"
+          }
+        },
+        {
+          "expression": "format([1, \"\", \"\"])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": "1,,"
+          }
+        },
+        {
+          "expression": "join([1, \"\", \"\"], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": "1,,"
+          }
+        },
+        {
+          "expression": "length([1, \"\", \"\"])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 3
+          }
+        },
+        {
+          "expression": "[]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "format([])",
+          "operation": "format",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "join([], \",\")",
+          "operation": "join",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "length([])",
+          "operation": "length",
+          "formula": {
+            "type": "number",
+            "number": 0
+          }
+        }
+      ]
     }
   ],
   "formula_creation_errors": [

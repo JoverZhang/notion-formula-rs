@@ -87,6 +87,19 @@ RUNTIME = [
     ("parse_date", 'parseDate(prop("Date Text"))'),
     ("parse_date_empty", 'empty(parseDate(prop("Date Text")))'),
 ]
+RENDERING_ARRAYS = [
+    "[1, empty()]", "[empty(), 1]", "[1, empty(), 2]",
+    "[1, empty(), empty()]", "[empty()]", "[empty(), empty()]",
+    '[1, ""]', '["", 1]', '[1, "", 2]', '[1, "", ""]', "[]",
+]
+RENDERING = [
+    (f"render_{i}_{operation}", expression, operation)
+    for i, array in enumerate(RENDERING_ARRAYS)
+    for operation, expression in (
+        ("direct", array), ("format", f"format({array})"),
+        ("join", f'join({array}, ",")'), ("length", f"length({array})"),
+    )
+]
 REJECTED = [
     "map(empty(), current)", 'join(empty(), ",")',
     "empty().map(current)", "[empty()].map(current.map(current))",
@@ -154,7 +167,7 @@ def main():
     })
     database = request(token, "POST", "databases", {
         "parent": {"type": "page_id", "page_id": page["id"]},
-        "title": rich_text("Empty values and defaults"),
+        "title": rich_text("Empty values, rendering and failures"),
         "initial_data_source": {"properties": {
             "Name": {"title": {}}, "N": {"number": {}},
             "T": {"rich_text": {}}, "D": {"date": {}},
@@ -164,7 +177,8 @@ def main():
     })
     source_id = database["data_sources"][0]["id"]
     names = {}
-    for i, (label, expression) in enumerate(FORMULAS + CONTEXTUAL_LIST + RUNTIME):
+    for i, (label, expression) in enumerate(FORMULAS + CONTEXTUAL_LIST + RUNTIME
+                                            + [(label, expression) for label, expression, _ in RENDERING]):
         name = f"{i:02d}_{label}"
         request(token, "PATCH", f"data_sources/{source_id}", {
             "properties": {name: {"formula": {"expression": expression}}},
@@ -236,6 +250,10 @@ def main():
             {"name": "invalid_pattern",
              "inputs": {"Pattern": "[", "Date Text": "not-a-date", "Divisor": 0},
              "results": results(invalid_pattern, RUNTIME)},
+            {"name": "list_rendering", "inputs": {},
+             "results": [{"expression": expression, "operation": operation,
+                          "formula": formula_value(blank, names[label])[0]}
+                         for label, expression, operation in RENDERING]},
         ],
         "formula_creation_errors": [
             {"expression": expression, "status": 400,
