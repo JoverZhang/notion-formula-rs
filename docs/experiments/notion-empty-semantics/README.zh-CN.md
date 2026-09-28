@@ -6,11 +6,13 @@ source_language: zh-CN
 counterpart: ./README.md
 implementation_status: historical
 document_status: stable
-translation_status: pending
+translation_status: synced
 last_verified: 2026-09-28
 ---
 
 # Notion 的 `empty()` 与空值行为
+
+[English](README.md)
 
 无参 `empty()` 返回 null，行为类似 JavaScript 的 `null`。本实验关注空值如何参与求值，以及它与执行失败在输出上的区别。
 
