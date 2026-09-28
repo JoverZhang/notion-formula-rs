@@ -18,7 +18,7 @@ last_verified: 2026-09-28
 
 ## 正常值与空值
 
-`N`、`T`、`D` 是未填写的 Number、Text、Date 属性。Boolean 空值由 `if(false, true, empty())` 产生；日期对照取 Unix epoch。表中的 `N`、`T`、`D` 简写属性读取；`L` 对照 `if(false, [], empty())` 与 `[]`。
+`N`、`T`、`D` 是未填写的 Number、Text、Date 属性。Boolean 空值由 `if(false, true, empty())` 产生；日期对照取 Unix epoch。表中的 `N`、`T`、`D` 简写属性读取；`L` 对照 `if(false, [1], empty())` 与 `[]`。
 
 | 观察 | 空值 | 类型默认值 |
 |---|---|---|
@@ -44,7 +44,7 @@ length(map([1, 2, 3], if(current == 2, empty(), current))) → 3
 join(map([1, 2, 3], if(current == 2, empty(), current)), ",") → "1,,3"
 ```
 
-下面的对照区分创建阶段的类型拒绝与运行时空值传播：
+下面的对照区分创建阶段的类型拒绝与通过检查后的 null 输出：
 
 ```text
 empty().map(current)                     → HTTP 400 validation_error: Type error with formula
