@@ -100,6 +100,22 @@ RENDERING = [
         ("join", f'join({array}, ",")'), ("length", f"length({array})"),
     )
 ]
+NESTED_ARRAYS = [
+    "[[1, 2], [3, 4]]",
+    "[[[1, 2]], 3]",
+    "[[[]]]",
+    "[[[], []], []]",
+    "[[1, empty(), 2]]",
+    "[[empty()], 1]",
+    "[[\"\"], 1]",
+    "[[[]], 1]",
+    "[[1, []], 2]",
+    "[[empty()]]",
+    "[[\"\", \"\"]]",
+    "[[0], [false]]"
+]
+RENDERING += [(f"nested_{i}", array, "direct")
+              for i, array in enumerate(NESTED_ARRAYS)]
 REJECTED = [
     "map(empty(), current)", 'join(empty(), ",")',
     "empty().map(current)", "[empty()].map(current.map(current))",

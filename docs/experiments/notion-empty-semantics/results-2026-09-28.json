@@ -1001,6 +1001,102 @@
             "type": "number",
             "number": 0
           }
+        },
+        {
+          "expression": "[[1, 2], [3, 4]]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,2,3,4"
+          }
+        },
+        {
+          "expression": "[[[1, 2]], 3]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,2,3"
+          }
+        },
+        {
+          "expression": "[[[]]]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "[[[], []], []]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "[[1, empty(), 2]]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,2"
+          }
+        },
+        {
+          "expression": "[[empty()], 1]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1"
+          }
+        },
+        {
+          "expression": "[[\"\"], 1]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": ",1"
+          }
+        },
+        {
+          "expression": "[[[]], 1]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1"
+          }
+        },
+        {
+          "expression": "[[1, []], 2]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "1,2"
+          }
+        },
+        {
+          "expression": "[[empty()]]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "[[\"\", \"\"]]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": ","
+          }
+        },
+        {
+          "expression": "[[0], [false]]",
+          "operation": "direct",
+          "formula": {
+            "type": "string",
+            "string": "0,false"
+          }
         }
       ]
     }

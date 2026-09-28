@@ -37,19 +37,30 @@ if(false, [], empty()).map(current).length() → {"type":"number","number":null}
 
 ## 输出表示
 
-直接 API 输出取自 `GET /v1/pages/{page_id}` 的 `properties[公式属性名].formula`。下面并列比较直接返回数组、显式 `format` 和 `join` 三条路径；字符串按 JSON 记法展示。
+直接 API 输出取自 `GET /v1/pages/{page_id}` 的 `properties[公式属性名].formula`。根据实测，列表输出可用下面的模型解释：
 
-| 数组表达式 A | API 直接返回值 | `format(A)` | `join(A, ",")` | `length(A)` |
-|---|---|---|---|---|
-| `[1, empty()]` | `"1"` | `"1,"` | `"1,"` | 2 |
-| `[empty(), 1]` | `"1"` | `",1"` | `",1"` | 2 |
-| `[1, empty(), 2]` | `"1,2"` | `"1,,2"` | `"1,,2"` | 3 |
-| `[1, empty(), empty()]` | `"1"` | `"1,,"` | `"1,,"` | 3 |
-| `[empty(), empty()]` | `null` | `","` | `","` | 2 |
-| `[1, ""]` | `"1,"` | `"1,"` | `"1,"` | 2 |
-| `[]` | `null` | `""` | `""` | 0 |
+```js
+const values = arr.flat(Infinity).filter(value => value !== null);
+return values.length === 0 ? null : values.join(",");
+```
 
-这些案例中，API 直接输出省略空元素，`format` 和 `join` 保留对应分隔符；列表长度始终保留空位置。直接输出中的空字符串也保留分隔符。
+这是对 Notion database API 列表输出逻辑的推测。JS `null` 对应 Notion 的 `empty()`；模型覆盖下列已测值，不延伸为其他类型的字符串转换规则。
+
+| 数组表达式 | API 返回值 | 观察 |
+|---|---|---|
+| `[[[1, 2]], 3]` | `"1,2,3"` | 递归展开 |
+| `[[1, empty(), 2]]` | `"1,2"` | 过滤空值 |
+| `[[[]]]` | `null` | 展开后无元素 |
+| `[[""], 1]` | `",1"` | 保留空字符串 |
+| `[[0], [false]]` | `"0,false"` | 保留零和 false |
+
+显式 `format`、`join` 保留空元素对应的分隔符，行为与直接 API 输出不同：
+
+```text
+[1, empty()]           → API: "1"
+format([1, empty()])   → "1,"
+join([1, empty()], ",") → "1,"
+```
 
 ## 执行失败
 
