@@ -199,7 +199,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (ApiError, RuntimeError, OSError) as exc:
+    except (ApiError, RuntimeError, OSError, ValueError) as exc:
         message = str(exc) if isinstance(exc, (ApiError, RuntimeError)) else type(exc).__name__
         print(f"Probe failed: {message}", file=sys.stderr)
         sys.exit(1)
