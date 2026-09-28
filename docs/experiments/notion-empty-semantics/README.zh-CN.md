@@ -12,9 +12,9 @@ last_verified: 2026-09-28
 
 # Notion 的 `empty()` 与空值行为
 
-无参 `empty()` 返回 null，行为类似 JavaScript 的 `null`；具体差异见下方实验。
+无参 `empty()` 返回 null，行为类似 JavaScript 的 `null`。本实验关注空值如何参与求值，以及它与执行失败在输出上的区别。
 
-实验用于确认空值的求值与输出行为。2026-09-28 使用 Notion API `2025-09-03` 实测，完整公式、输入和响应见[结果文件](results-2026-09-28.json)。
+实测日期：2026-09-28；Notion API：`2025-09-03`。完整输入与响应见[结果文件](results-2026-09-28.json)。
 
 ## 空值
 
@@ -23,16 +23,14 @@ last_verified: 2026-09-28
 ```text
 length([1, empty(), 2]) → 3
 join(map([1, empty(), 2], index), ",") → "0,1,2"
-length(map([1, 2, 3], if(current == 2, empty(), current))) → 3
 join(map([1, 2, 3], if(current == 2, empty(), current)), ",") → "1,,3"
 ```
 
-类型上下文会影响公式是否被接受：
+具有列表类型上下文的空值可以通过类型检查，求值结果为空：
 
 ```text
-empty().map(current) → 创建时 HTTP 400 validation_error
-if(false, [], empty()).map(current) → {"type":"string","string":null}
-if(false, [], empty()).map(current).length() → {"type":"number","number":null}
+if(false, [], empty()).map(current) → null
+if(false, [], empty()).map(current).length() → null
 ```
 
 ## 输出表示
@@ -62,11 +60,15 @@ format([1, empty()])   → "1,"
 join([1, empty()], ",") → "1,"
 ```
 
-## 执行失败
+## 运行时失败
 
-同一公式 `test("abc", prop("Pattern"))`，在 `Pattern="a"` 时返回 `true`，在 `Pattern="["` 时执行失败，API 返回 `{"type":"boolean","boolean":null}`。
+公式 `test("abc", prop("Pattern"))` 可以通过类型检查。`Pattern="a"` 时返回 `true`；输入改为非法正则 `"["` 后，API 返回：
 
-以下对照使用非法正则行，区分执行失败和普通空值：
+```json
+{"type":"boolean","boolean":null}
+```
+
+虽然输出也是 null，失败结果与普通空值的后续行为不同。以下均使用 `Pattern="["`：
 
 ```text
 empty(empty()) → true
@@ -75,7 +77,7 @@ format(empty()) → ""
 format(test("abc", prop("Pattern"))) → null
 ```
 
-执行位置也影响结果：
+外层操作也影响失败如何传播：
 
 ```text
 if(false, test("abc", prop("Pattern")), true) → true
@@ -84,14 +86,16 @@ if(false, test("abc", prop("Pattern")), true) → true
 [1].map(test("abc", prop("Pattern"))).join(",") → ""
 ```
 
-本次非法正则失败在 API 中表现为 null；传播行为依赖外层操作。API 的 null 输出本身不足以区分普通空值与执行失败。
+因此，API 的 null 输出本身不足以区分普通空值与运行时失败。
 
 ---
 
-复现：设置环境变量 `NOTION_TOKEN` 和 `NOTION_PARENT_PAGE_ID`（integration 已获授权的父页面 ID），在仓库根目录运行：
+**类型检查。** `empty().map(current)` 在创建公式时返回 HTTP 400 `validation_error`，尚未进入求值。结果文件中的 `formula_creation_errors` 单独记录此类拒绝。
+
+**复现。** 设置环境变量 `NOTION_TOKEN` 和 `NOTION_PARENT_PAGE_ID`（integration 已获授权的父页面 ID），在仓库根目录运行：
 
 ```sh
 python3 -B docs/experiments/notion-empty-semantics/probe.py --output /tmp/notion-empty-results.json
 ```
 
-脚本创建独立实验页面和数据库。`rows` 记录具名输入行及求值结果；`list_rendering` 行用 `operation` 区分输出路径；`formula_creation_errors` 记录创建阶段被拒绝的公式，不对应数据行。输出不含私人资源标识或凭据。复测使用新的日期文件，保留既有记录。
+脚本创建独立实验页面和数据库。`rows` 记录具名输入行及求值结果；`list_rendering` 行用 `operation` 区分输出路径。输出不含私人资源标识或凭据。复测使用新的日期文件，保留既有记录。
