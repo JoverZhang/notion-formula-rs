@@ -7,6 +7,8 @@ counterpart: ./builtin-functions.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
+translation_model: gpt-6-luna
+translation_review_model: gpt-6-astra
 last_verified: 2026-09-18
 ---
 
@@ -203,6 +205,27 @@ runtime
   today() → local midnight for that same snapshot and timezone offset
   id()    → current row ID as text, not formula ID
 ```
+
+## Planned Empty Values and Lists
+
+```builtin
+empty() -> any;
+empty(value: any) -> boolean;
+```
+
+```text
+empty() returns a null value with inferred type Unknown.
+empty(value) follows the current null-checking rules.
+map evaluates each element in input order and returns a list with the same length as the input.
+join converts null elements to empty strings and preserves their separators.
+If the list argument to map or join is null, the function returns null.
+If a list element or an executed callback errors, the current row fails and records a RowError.
+
+join([1, empty(), 2], ",") → "1,,2"
+```
+
+Null means that a position has no value; it does not introduce a Null type. Null propagation in arithmetic follows the grammar rules.
+See the [Notion experiment](../experiments/notion-empty-semantics/README.md) for the observation basis; the API's list-to-string output model does not define evaluation rules.
 
 See [grammar](formula-language.md) for formula-call syntax.
 Implementation anchors: [type resolution](../../builtin_fn/src/resolution.rs),

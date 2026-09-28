@@ -7,7 +7,7 @@ counterpart: ./formula-engine.zh-CN.md
 implementation_status: current
 document_status: draft
 translation_status: synced
-translation_model: gpt-6-sol
+translation_model: gpt-6-luna
 translation_review_model: gpt-6-astra
 last_verified: 2026-09-24
 ---
@@ -70,30 +70,69 @@ pub enum ValueType {
 **Planned runtime value types**
 
 ```rust
-/// Stores runtime data in columns, with a bitmap marking invalid positions.
+/// Columnar data uses a bitmap to mark null positions.
 pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
     Boolean(ColumnData<bool>),
     Date(ColumnData<i64>),
     List(ColumnData<Vec<Option<Value>>>),
-    /// Can carry Union or Unknown; each non-null value retains its concrete type.
+    /// Carries Union or Unknown; each non-null value retains its concrete type.
     Union(ColumnData<Value>),
 }
 pub struct ColumnData<T> {
     /// Length equals the evaluation row count; null positions hold placeholders that must not be read.
     pub values: Vec<T>,
     /// See [Arrow NullBuffer](https://arrow.apache.org/rust/arrow_buffer/buffer/struct.NullBuffer.html).
-    /// Length equals values.len(); both ordinary nulls and row errors are marked null.
+    /// Length equals values.len(); false corresponds to None, and values at null positions must not be read.
+    /// Row errors are also marked null and reported separately through RowError.
     pub validity: NullBuffer,
 }
+
+```
+
+```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
 pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix timestamp in milliseconds.
     Date(i64),
+    /// An element None means that position has no value; a null list, an empty list, and a list with null elements differ.
     List(Vec<Option<Value>>),
 }
 
+/// The column kind for an Input's declared type; examines only the outermost type syntax.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ColumnKind { Number, String, Boolean, Date, List, Union }
+
+/// Empty columns, all-null columns, and single-member Unions do not change the column kind for the declared type.
+fn column_kind(ty: &ValueType) -> ColumnKind {
+    match ty {
+        ValueType::Number => ColumnKind::Number,
+        ValueType::String => ColumnKind::String,
+        ValueType::Boolean => ColumnKind::Boolean,
+        ValueType::Date => ColumnKind::Date,
+        ValueType::List(_) => ColumnKind::List,
+        ValueType::Union(_) | ValueType::Unknown => ColumnKind::Union,
+    }
+}
+
+/// Checks whether the value at a position belongs to the Input's declared type.
+/// - None means that the position has no value; every declared type allows it, and neither ValueType nor Value has a Null variant.
+/// - For a present value, List and Union recursively match their members; Unknown accepts any Value.
+/// - Evaluation-time type checks cover operation constraints and dynamic dispatch; they do not repeat Input member checks.
+fn accepts(ty: &ValueType, value: Option<&Value>) -> bool {
+    use Value as V;
+    use ValueType as T;
+    let Some(value) = value else { return true };
+    match (ty, value) {
+        (T::Unknown, _) => true,
+        (T::Number, V::Number(_)) | (T::String, V::String(_))
+        | (T::Boolean, V::Boolean(_)) | (T::Date, V::Date(_)) => true,
+        (T::List(t), V::List(items)) => items.iter().all(|v| accepts(t, v.as_ref())),
+        (T::Union(ts), v) => ts.iter().any(|t| accepts(t, Some(v))),
+        _ => false,
+    }
+}
 ```
 
 **Current state and change types**
@@ -164,8 +203,8 @@ pub struct EvaluateInput {
     /// Values in input and result columns follow this order.
     /// IDs are nonempty and unique within the batch; zero rows are allowed.
     pub row_ids: Vec<RowId>,
-    /// Matches every Input in Engine by ID, including columns unused in this evaluation.
-    /// evaluate() validates column and nested-value types, and the lengths of values and validity, at runtime.
+    /// Matches every Input in Engine by ID, including columns unused in this evaluation; a missing column is not a null cell.
+    /// Before evaluation, validates column kinds, all present positions and nested-value types, and the lengths of values and validity.
     pub columns: HashMap<PropertyId, Column>,
     pub runtime: RuntimeContext,
     /// Formula IDs whose results are requested; Engine evaluates their formula dependencies automatically.
@@ -176,15 +215,44 @@ pub struct EvaluateInput {
 #[from(String, &str)]
 pub struct RowId(pub String);
 
+/// Input validation failures prevent all formula evaluation; only one error is returned.
+/// The same definition and input return the same error.
+pub enum EvaluateInputError {
+    /// UTC time or local time after applying time_zone is outside Gregorian years 0001–9999.
+    InvalidNow { now: i64 },
+    /// time_zone does not match the fixed UTC offset format or range.
+    InvalidTimeZone { time_zone: String },
+    EmptyRowId { row_index: usize },
+    DuplicateRowId { id: RowId },
+    EmptyFormulaIds,
+    /// The ID is empty, does not exist, or identifies an Input instead of a Formula.
+    InvalidFormulaId { id: PropertyId },
+    DuplicateFormulaId { id: PropertyId },
+    /// Reports all missing IDs, deduplicated and sorted by PropertyId.
+    MissingInputs { ids: Vec<PropertyId> },
+    /// Reports all extra IDs, deduplicated and sorted by PropertyId.
+    UnexpectedInputs { ids: Vec<PropertyId> },
+    InvalidColumnType { id: PropertyId, expected: ColumnKind, actual: ColumnKind },
+    /// expected is the row count; also reports both actual lengths.
+    InvalidColumnLength {
+        id: PropertyId, expected: usize, values_len: usize, validity_len: usize,
+    },
+    /// expected and actual belong to the mismatching position; the path records list indexes from outer to inner, and an empty path means the root value.
+    InvalidValueType {
+        id: PropertyId, row_index: usize, element_path: Vec<usize>,
+        expected: ValueType, actual: ValueType,
+    },
+}
+
 /// All rows and formulas in one evaluation share this time and time-zone snapshot.
 pub struct RuntimeContext {
     /// UTC Unix timestamp in milliseconds used by now(), supplied by the caller; Engine does not read the clock.
     /// For live evaluation, capture the time at request start; tests and replays may use a fixed value.
-    pub evaluated_at_epoch_ms: i64,
-    /// Local time minus UTC, in minutes: UTC+08:00 = 480, UTC-05:00 = -300.
-    /// Use the business/user time zone's offset at evaluated_at_epoch_ms for today() and date operations.
-    /// The offset stays fixed throughout evaluation; daylight-saving rules are not applied to the dates being computed.
-    pub timezone_offset_minutes: i32,
+    /// Before evaluation, UTC time and local time after applying the offset are checked to be within Gregorian years 0001–9999, inclusive.
+    pub now: i64,
+    /// Fixed UTC offset in ASCII +HH:MM or -HH:MM format, with hours 00–23 and minutes 00–59, for example +08:00.
+    /// Used by today() and date operations; named time zones and daylight-saving time are not supported.
+    pub time_zone: String,
 }
 
 pub struct EvaluateResult {
@@ -273,8 +341,8 @@ pub enum FormulaEvaluationError {
 ///     .duration_since(UNIX_EPOCH)
 ///     .expect("system clock is before Unix epoch");
 /// let runtime = RuntimeContext {
-///     evaluated_at_epoch_ms: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
-///     timezone_offset_minutes: 8 * 60, // Use the business/user time zone's offset.
+///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
+///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
 /// };
 ///
 /// // 4. Build input columns in row_ids order
@@ -367,9 +435,7 @@ impl FormulaEngine {
     ///
     /// allows: NotReady formulas in formula_ids.
     ///
-    /// errors: Input validation fails; no formulas are evaluated.
-    /// - EvaluateInputError::MissingInputs: Missing Input columns; reports all missing IDs, deduplicated and sorted by ID.
-    /// - Extra columns, or invalid IDs, types, or lengths.
+    /// error: Any input validation failure prevents all formula evaluation; only one EvaluateInputError is returned.
     pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
 
     /// Analyzes the candidate formula against Engine; edits do not modify Engine.

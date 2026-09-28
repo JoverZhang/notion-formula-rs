@@ -7,7 +7,7 @@ counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-translation_model: gpt-6-sol
+translation_model: gpt-6-luna
 translation_review_model: gpt-6-astra
 last_verified: 2026-09-23
 ---
@@ -172,6 +172,15 @@ a || b: a=true → true, skip b; a=false/null → evaluate b, result is boolean/
 a ? b : c: a=true → b; a=false/null → c; condition accepts only boolean/null.
 A skipped expression produces no row error; this does not change the rule that all properties are discovered during prepare.
 ```
+
+### Planned List
+
+```text
+List literal: evaluate every element; if any evaluation errors, the current row fails; otherwise, retain every element, including empty values.
+[1, empty(), 2] → length 3, with no value at the middle position.
+```
+
+See [Builtin function signatures](builtin-functions.md#planned-empty-values-and-lists) for the null rules of `empty()`, `map`, and `join`.
 
 ### Planned Number
 

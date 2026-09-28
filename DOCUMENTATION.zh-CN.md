@@ -51,6 +51,8 @@ last_verified: 2026-09-01
 
 除 `docs/manifest.toml` 声明的类别外，正式 Markdown 使用相邻的英文 `.md` 与简体中文 `.zh-CN.md` counterpart。每轮编辑可以选择任一 source language；先核验其中的事实，再以相同技术层次写出自然的 counterpart。
 
+开发和 review 期间，从当前编辑语言的文档生成代码；review 通过后同步英文，并在合并前切回英文重新生成、验证。
+
 翻译状态只有三种：
 
 - `synced`：两个 counterpart 都存在，并且技术语义一致；
