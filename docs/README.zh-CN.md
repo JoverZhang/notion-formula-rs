@@ -6,7 +6,7 @@ source_language: en
 counterpart: ./README.md
 implementation_status: current
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-02
 ---
 
@@ -36,3 +36,7 @@ last_verified: 2026-09-02
 
 - [项目术语表](../GLOSSARY.md)
 - [历史 changelog](changelogs/)
+
+## 查阅实验
+
+- [Notion 的 empty() 与空值行为](experiments/notion-empty-semantics/README.zh-CN.md)
