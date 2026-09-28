@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./builtin-functions.md
 implementation_status: current
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-18
 ---
 
@@ -202,6 +202,27 @@ runtime
   today() → 同一时间快照与时区偏移所对应的本地零点
   id()    → 当前行 ID 的文本，不是 formula ID
 ```
+
+## Planned 空值与列表
+
+```builtin
+empty() -> any;
+empty(value: any) -> boolean;
+```
+
+```text
+empty()：返回空值，推断类型为 Unknown。
+empty(value)：沿用当前空值判断规则。
+map：按输入顺序逐元素求值，输出长度与输入相同。
+join：空元素转为空字符串，保留分隔符。
+map / join：列表参数为空时返回空值。
+执行错误：列表元素或已执行的 callback 出错时，当前行失败，记录 RowError。
+
+join([1, empty(), 2], ",") → "1,,2"
+```
+
+空值表示某个位置没有值，不引入 Null 类型。算术中的空值传播沿用文法规则。
+观察依据见 [Notion 实验](../experiments/notion-empty-semantics/README.zh-CN.md)；API 的列表字符串输出模型不作为求值规则。
 
 公式调用语法见[文法](formula-language.zh-CN.md)。
 实现锚点：[类型解析](../../builtin_fn/src/resolution.rs)、

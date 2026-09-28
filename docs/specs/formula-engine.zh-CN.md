@@ -215,6 +215,10 @@ pub struct RowId(pub String);
 /// 入参校验失败时，不执行任何公式；一次只返回一个错误。
 /// 同一定义和输入返回同一个错误。
 pub enum EvaluateInputError {
+    /// UTC 时间或应用 time_zone 后的本地时间超出公历 0001–9999 年。
+    InvalidNow { now: i64 },
+    /// time_zone 不符合固定 UTC 偏移格式或范围。
+    InvalidTimeZone { time_zone: String },
     EmptyRowId { row_index: usize },
     DuplicateRowId { id: RowId },
     EmptyFormulaIds,
@@ -241,11 +245,11 @@ pub enum EvaluateInputError {
 pub struct RuntimeContext {
     /// now() 使用的 UTC Unix 毫秒时间戳，由调用方提供；Engine 不读取时钟。
     /// 实时求值取请求开始时的时间；测试或重放可传固定值。
-    pub evaluated_at_epoch_ms: i64,
-    /// 本地时间减 UTC 的分钟数：UTC+08:00 = 480，UTC-05:00 = -300。
-    /// 取 evaluated_at_epoch_ms 时业务/用户时区的偏移，供 today() 和日期操作使用。
-    /// 整次求值使用固定偏移，不随被计算日期应用夏令时规则。
-    pub timezone_offset_minutes: i32,
+    /// 求值前校验 UTC 时间及偏移后的本地时间均在公历 0001–9999 年内（含首尾年份）。
+    pub now: i64,
+    /// 固定 UTC 偏移，格式为 +HH:MM 或 -HH:MM（ASCII）；小时 00–23，分钟 00–59，例如 +08:00。
+    /// 供 today() 和日期操作使用；不支持时区名称或夏令时。
+    pub time_zone: String,
 }
 
 pub struct EvaluateResult {
@@ -334,8 +338,8 @@ pub enum FormulaEvaluationError {
 ///     .duration_since(UNIX_EPOCH)
 ///     .expect("system clock is before Unix epoch");
 /// let runtime = RuntimeContext {
-///     evaluated_at_epoch_ms: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
-///     timezone_offset_minutes: 8 * 60, // Use the business/user time zone's offset.
+///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
+///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
 /// };
 ///
 /// // 4. Build input columns in row_ids order
