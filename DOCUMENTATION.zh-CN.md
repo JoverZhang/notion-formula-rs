@@ -20,6 +20,7 @@ last_verified: 2026-09-01
 
 - `docs/intent/` 说明系统为什么存在，承载 human 明确确认的动机、方向、目标、非目标、边界、取舍和重新评估条件。它不是必须逐项填满的清单，内容应保持精简。
 - `docs/specs/` 说明当前可被使用者观察到的契约，不照搬 crate 结构，也不记录设计演进。
+- `docs/experiments/` 保存带日期的实验条件、观察结果和复现入口。原始结果可存放在相邻的数据文件中；复测追加记录，保留既有证据。当前契约仍由 `docs/specs/` 维护，并按需引用实验。
 - `docs/contributing/` 说明测试、changelog 编写等项目特有的开发规范。
 - `docs/changelogs/` 记录使用者可见的变化。根目录 `GLOSSARY.md` 是 English-only 的术语权威来源。
 

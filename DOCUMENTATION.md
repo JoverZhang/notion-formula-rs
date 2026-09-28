@@ -20,6 +20,7 @@ This is the repository's only authoritative documentation-maintenance standard. 
 
 - `docs/intent/` states why the system exists and owns human-approved motivations, direction, goals, non-goals, boundaries, trade-offs, and reevaluation conditions. It is not a checklist; keep it short.
 - `docs/specs/` states the current, user-observable contract without mirroring the crate layout or preserving design history.
+- `docs/experiments/` records dated experimental conditions, observations, and reproduction entry points. Raw results may live in adjacent data files; reruns append records while preserving existing evidence. The current contract remains maintained in `docs/specs/`, which may link to experiments as needed.
 - `docs/contributing/` explains repository-specific development practices such as testing and changelog writing.
 - `docs/changelogs/` records user-visible changes. Root `GLOSSARY.md` is the English-only terminology authority.
 
