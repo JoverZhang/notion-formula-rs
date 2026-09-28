@@ -64,7 +64,33 @@ FORMULAS = [
     ("join_two_empty", 'join([empty(), empty()], ",")'),
     ("join_empty_list", 'join([], ",")'),
 ]
-REJECTED = ["map(empty(), current)", 'join(empty(), ",")']
+CONTEXTUAL_LIST = [
+    ("typed_empty_map", "if(false, [], empty()).map(current)"),
+    ("typed_empty_length", "if(false, [], empty()).map(current).length()"),
+    ("typed_empty_join", 'if(false, [], empty()).join(",")'),
+    ("nested_map_length", "[[], empty()].map(current.map(current)).length()"),
+    ("nested_flat_length", "[[], empty()].map(current.map(current)).flat().length()"),
+]
+RUNTIME = [
+    ("regex_test", 'test("abc", prop("Pattern"))'),
+    ("regex_empty", 'empty(test("abc", prop("Pattern")))'),
+    ("regex_format", 'format(test("abc", prop("Pattern")))'),
+    ("regex_lazy", 'if(false, test("abc", prop("Pattern")), true)'),
+    ("regex_literal_length", '[test("abc", prop("Pattern"))].length()'),
+    ("regex_map_length", '[1].map(test("abc", prop("Pattern"))).length()'),
+    ("regex_map_join", '[1].map(test("abc", prop("Pattern"))).join(",")'),
+    ("empty_format", "format(empty())"),
+    ("empty_check_runtime", "empty(empty())"),
+    ("division", '1 / prop("Divisor")'),
+    ("division_empty", 'empty(1 / prop("Divisor"))'),
+    ("division_format", 'format(1 / prop("Divisor"))'),
+    ("parse_date", 'parseDate(prop("Date Text"))'),
+    ("parse_date_empty", 'empty(parseDate(prop("Date Text")))'),
+]
+REJECTED = [
+    "map(empty(), current)", 'join(empty(), ",")',
+    "empty().map(current)", "[empty()].map(current.map(current))",
+]
 CONTROL = {"number_equal", "number_unique", "number_mean", "date_empty", "date_timestamp"}
 
 
@@ -132,11 +158,13 @@ def main():
         "initial_data_source": {"properties": {
             "Name": {"title": {}}, "N": {"number": {}},
             "T": {"rich_text": {}}, "D": {"date": {}},
+            "Pattern": {"rich_text": {}}, "Date Text": {"rich_text": {}},
+            "Divisor": {"number": {}},
         }},
     })
     source_id = database["data_sources"][0]["id"]
     names = {}
-    for i, (label, expression) in enumerate(FORMULAS):
+    for i, (label, expression) in enumerate(FORMULAS + CONTEXTUAL_LIST + RUNTIME):
         name = f"{i:02d}_{label}"
         request(token, "PATCH", f"data_sources/{source_id}", {
             "properties": {name: {"formula": {"expression": expression}}},
@@ -171,6 +199,21 @@ def main():
     explicit = add_row("N = 0; D = Unix epoch", {
         "N": {"number": 0}, "D": {"date": {"start": "1970-01-01T00:00:00.000Z"}},
     })
+    contextual = add_row("Contextual empty list")
+    valid_pattern = add_row("Valid regex and numeric inputs", {
+        "Pattern": {"rich_text": rich_text("a")},
+        "Date Text": {"rich_text": rich_text("2026-09-28")},
+        "Divisor": {"number": 2},
+    })
+    invalid_pattern = add_row("Invalid regex and empty-like inputs", {
+        "Pattern": {"rich_text": rich_text("[")},
+        "Date Text": {"rich_text": rich_text("not-a-date")},
+        "Divisor": {"number": 0},
+    })
+
+    def results(row, cases):
+        return [{"expression": expression, "formula": formula_value(row, names[label])[0]}
+                for label, expression in cases]
 
     report = {
         "observed_on": str(datetime.now(timezone.utc).date()),
@@ -179,18 +222,26 @@ def main():
         "response_field": "properties[formula_name].formula",
         "rows": [
             {"name": "blank", "inputs": {"N": None, "T": None, "D": None},
-             "results": [{"expression": expression,
-                          "formula": formula_value(blank, names[label])[0]}
-                         for label, expression in FORMULAS]},
+             "results": results(blank, FORMULAS)},
             {"name": "control", "inputs": {"N": 0, "T": None,
                                             "D": "1970-01-01T00:00:00.000Z"},
-             "results": [{"expression": expression,
-                          "formula": formula_value(explicit, names[label])[0]}
-                         for label, expression in FORMULAS if label in CONTROL]},
+             "results": results(explicit, [case for case in FORMULAS
+                                           if case[0] in CONTROL])},
+            {"name": "contextual_empty_list",
+             "inputs": {"N": None, "T": None, "D": None},
+             "results": results(contextual, CONTEXTUAL_LIST)},
+            {"name": "valid_pattern",
+             "inputs": {"Pattern": "a", "Date Text": "2026-09-28", "Divisor": 2},
+             "results": results(valid_pattern, RUNTIME)},
+            {"name": "invalid_pattern",
+             "inputs": {"Pattern": "[", "Date Text": "not-a-date", "Divisor": 0},
+             "results": results(invalid_pattern, RUNTIME)},
         ],
-        "rejected": [{"expression": expression, "status": 400,
-                      "code": "validation_error", "message": message}
-                     for expression, message in errors],
+        "formula_creation_errors": [
+            {"expression": expression, "status": 400,
+             "code": "validation_error", "message": message}
+            for expression, message in errors
+        ],
     }
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print("Experiment results saved.")

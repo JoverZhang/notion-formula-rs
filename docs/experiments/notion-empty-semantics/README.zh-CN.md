@@ -14,41 +14,77 @@ last_verified: 2026-09-28
 
 无参 `empty()` 返回 null，行为类似 JavaScript 的 `null`；具体差异见下方实验。
 
-本次于 2026-09-28 使用 Notion API `2025-09-03` 验证。`N`、`T`、`D` 分别是未填写的 Number、Text、Date 属性；Boolean 空值由 `if(false, true, empty())` 产生。对照值为 `0`、`""`、`false`、Unix epoch 和 `[]`。完整结果见 [results-2026-09-28.json](results-2026-09-28.json)。
+实验目的：确定复现 Notion 行为需要区分哪些求值状态。以下是 2026-09-28、Notion API `2025-09-03` 的实测；完整公式、输入和响应保存在[结果文件](results-2026-09-28.json)。
 
-## 关键结果
+## 正常值与空值
 
-- 空 Number 与 `0`、空 Text 与 `""`、空 Boolean 与 `false` 能被相等比较区分。
-- `mean([2, 空 Number, 4])` 为 `3`，替换成 `0` 后为 `2`。
-- 列表保留空元素；`map` 保留空结果的位置；`join` 保留对应分隔符。
-- `map(empty(), current)` 与 `join(empty(), ",")` 在设置公式时返回类型错误。
+`N`、`T`、`D` 是未填写的 Number、Text、Date 属性。Boolean 空值由 `if(false, true, empty())` 产生；日期对照取 Unix epoch。
 
-## API 中的列表结果
+| 观察 | 空值 | 类型默认值 |
+|---|---|---|
+| `N == 0` | `false` | `true` |
+| `length(unique([N, 0]))` | `2` | `1` |
+| `mean([2, N, 4])` | `3` | `2` |
+| `T == ""` | `false` | `true` |
+| Boolean 与 `false` 比较 | `false` | `true` |
+| `empty(D)` | `true` | `false` |
+| `length(flat([空列表或空值]))` | `1` | `0` |
 
-将 `[1, empty(), 2]` 保存为 Formula 属性，调用 `GET /v1/pages/{page_id}`，读取 `properties[formula_name].formula`，实际得到：
+空值必须保留。`empty(N)` 和 `N + 1` 却分别与 `0` 的结果相同：`true`、`1`，单测这些操作会漏掉区别。
 
-```json
-{"type": "string", "string": "1,2"}
-```
+## 列表中的空位与公式创建
 
-这是 API 返回的字段，脚本未调用 `join` 或自行拼接。Notion 的 [Formula 响应类型](https://developers.notion.com/reference/page-property-values#formula)没有数组；本例返回了字符串。空元素被省略的具体转换机制未公开。
-
-对同一列表另建公式进行求值：
+列表中的空元素保留索引；`map` 回调返回空值也保留该位置。
 
 ```text
-length([1, empty(), 2])                → 3
-join(map([1, empty(), 2], index), ",") → "0,1,2"
-join([1, empty(), 2], ",")             → "1,,2"
+length([1, empty(), 2])                              → 3
+join(map([1, empty(), 2], index), ",")                 → "0,1,2"
+join([1, empty(), 2], ",")                            → "1,,2"
+length(map([1, 2, 3], if(current == 2, empty(), current))) → 3
+join(map([1, 2, 3], if(current == 2, empty(), current)), ",") → "1,,3"
 ```
 
-求值时空位置仍存在，不能用直接返回的字符串判断列表长度。记录范围为当日 Notion 的可观察行为；本项目采用的规则由[语言规格](../../specs/formula-language.zh-CN.md)维护。
+下面的对照区分创建阶段的类型拒绝与运行时空值传播：
+
+```text
+empty().map(current)                     → HTTP 400 validation_error: Type error with formula
+if(false, [], empty()).map(current)      → {"type":"string","string":null}
+if(false, [], empty()).map(current).length() → {"type":"number","number":null}
+```
+
+## 非法正则的求值结果
+
+`Pattern="a"` 时 `test("abc", prop("Pattern"))` 为 `true`；`Pattern="["` 时该公式已创建，但求值结果为 `{"type":"boolean","boolean":null}`。以下是非法正则行的对照：
+
+```text
+empty(empty())                                      → true
+empty(test("abc", prop("Pattern")))                → null
+format(empty())                                     → ""
+format(test("abc", prop("Pattern")))               → null
+if(false, test("abc", prop("Pattern")), true)       → true
+[test("abc", prop("Pattern"))].length()            → null
+[1].map(test("abc", prop("Pattern"))).length()    → 1
+[1].map(test("abc", prop("Pattern"))).join(",") → ""
+```
+
+这组执行失败在 API 中输出 `null`，但公式中的传播与普通空值不同。`Divisor=0` 的对照也返回 `number:null`，但 `empty(1 / prop("Divisor"))` 为 `true`，`format(1 / prop("Divisor"))` 为 `""`。API 中的 `null` 同时覆盖了不同的求值状态。
+
+## API 返回字段
+
+将 `[1, empty(), 2]` 保存为公式，通过 `GET /v1/pages/{page_id}` 读取 `properties[公式属性名].formula`，得到：
+
+```json
+{"type":"string","string":"1,2"}
+```
+
+同一列表的 `length` 为 `3`、`join` 为 `"1,,2"`。这个字符串是 API 的输出表示，不能用它还原列表结构。实验只记录当日 Notion 的外部行为；本项目采用的规则见[语言规格](../../specs/formula-language.zh-CN.md)。
 
 ## 复现
 
-设置环境变量 `NOTION_TOKEN` 和 `NOTION_PARENT_PAGE_ID`，后者为 integration 已获授权的父页面 ID。在仓库根目录运行：
+设置 `NOTION_TOKEN` 和 `NOTION_PARENT_PAGE_ID`，后者为 integration 已获授权的父页面 ID。在仓库根目录运行：
 
 ```sh
-python3 docs/experiments/notion-empty-semantics/probe.py --output /tmp/notion-empty-results.json
+python3 -B docs/experiments/notion-empty-semantics/probe.py --output /tmp/notion-empty-results.json
 ```
 
-脚本创建独立实验页面、数据库和空值／默认值控制行。结果文件只保存实验条件、公式、Formula 返回字段和预期错误，不输出工作区链接、资源 ID 或凭据。复测使用新的日期文件，保留既有记录。
+脚本创建独立实验页面、数据库和带明确输入的对照行。`rows` 标注各输入行及求值结果；`formula_creation_errors` 是定义阶段被拒绝的公式，不对应数据行。输出不包含页面链接、资源 ID 或凭据。复测使用新的日期文件，保留既有记录。
