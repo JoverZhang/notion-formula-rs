@@ -18,7 +18,7 @@ last_verified: 2026-09-28
 
 ## 正常值与空值
 
-`N`、`T`、`D` 是未填写的 Number、Text、Date 属性。Boolean 空值由 `if(false, true, empty())` 产生；日期对照取 Unix epoch。
+`N`、`T`、`D` 是未填写的 Number、Text、Date 属性。Boolean 空值由 `if(false, true, empty())` 产生；日期对照取 Unix epoch。表中的 `N`、`T`、`D` 简写属性读取；`L` 对照 `if(false, [], empty())` 与 `[]`。
 
 | 观察 | 空值 | 类型默认值 |
 |---|---|---|
@@ -28,7 +28,7 @@ last_verified: 2026-09-28
 | `T == ""` | `false` | `true` |
 | Boolean 与 `false` 比较 | `false` | `true` |
 | `empty(D)` | `true` | `false` |
-| `length(flat([空列表或空值]))` | `1` | `0` |
+| `length(flat([L]))` | `1` | `0` |
 
 空值必须保留。`empty(N)` 和 `N + 1` 却分别与 `0` 的结果相同：`true`、`1`，单测这些操作会漏掉区别。
 

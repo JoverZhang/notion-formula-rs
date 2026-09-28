@@ -380,9 +380,274 @@
           }
         }
       ]
+    },
+    {
+      "name": "contextual_empty_list",
+      "inputs": {
+        "N": null,
+        "T": null,
+        "D": null
+      },
+      "results": [
+        {
+          "expression": "if(false, [], empty()).map(current)",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "if(false, [], empty()).map(current).length()",
+          "formula": {
+            "type": "number",
+            "number": null
+          }
+        },
+        {
+          "expression": "if(false, [], empty()).join(\",\")",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "[[], empty()].map(current.map(current)).length()",
+          "formula": {
+            "type": "number",
+            "number": 2
+          }
+        },
+        {
+          "expression": "[[], empty()].map(current.map(current)).flat().length()",
+          "formula": {
+            "type": "number",
+            "number": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "valid_pattern",
+      "inputs": {
+        "Pattern": "a",
+        "Date Text": "2026-09-28",
+        "Divisor": 2
+      },
+      "results": [
+        {
+          "expression": "test(\"abc\", prop(\"Pattern\"))",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        },
+        {
+          "expression": "empty(test(\"abc\", prop(\"Pattern\")))",
+          "formula": {
+            "type": "boolean",
+            "boolean": false
+          }
+        },
+        {
+          "expression": "format(test(\"abc\", prop(\"Pattern\")))",
+          "formula": {
+            "type": "string",
+            "string": "true"
+          }
+        },
+        {
+          "expression": "if(false, test(\"abc\", prop(\"Pattern\")), true)",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        },
+        {
+          "expression": "[test(\"abc\", prop(\"Pattern\"))].length()",
+          "formula": {
+            "type": "number",
+            "number": 1
+          }
+        },
+        {
+          "expression": "[1].map(test(\"abc\", prop(\"Pattern\"))).length()",
+          "formula": {
+            "type": "number",
+            "number": 1
+          }
+        },
+        {
+          "expression": "[1].map(test(\"abc\", prop(\"Pattern\"))).join(\",\")",
+          "formula": {
+            "type": "string",
+            "string": "true"
+          }
+        },
+        {
+          "expression": "format(empty())",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "empty(empty())",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        },
+        {
+          "expression": "1 / prop(\"Divisor\")",
+          "formula": {
+            "type": "number",
+            "number": 0.5
+          }
+        },
+        {
+          "expression": "empty(1 / prop(\"Divisor\"))",
+          "formula": {
+            "type": "boolean",
+            "boolean": false
+          }
+        },
+        {
+          "expression": "format(1 / prop(\"Divisor\"))",
+          "formula": {
+            "type": "string",
+            "string": "0.5"
+          }
+        },
+        {
+          "expression": "parseDate(prop(\"Date Text\"))",
+          "formula": {
+            "type": "date",
+            "date": {
+              "start": "2026-09-28",
+              "end": null,
+              "time_zone": null
+            }
+          }
+        },
+        {
+          "expression": "empty(parseDate(prop(\"Date Text\")))",
+          "formula": {
+            "type": "boolean",
+            "boolean": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "invalid_pattern",
+      "inputs": {
+        "Pattern": "[",
+        "Date Text": "not-a-date",
+        "Divisor": 0
+      },
+      "results": [
+        {
+          "expression": "test(\"abc\", prop(\"Pattern\"))",
+          "formula": {
+            "type": "boolean",
+            "boolean": null
+          }
+        },
+        {
+          "expression": "empty(test(\"abc\", prop(\"Pattern\")))",
+          "formula": {
+            "type": "boolean",
+            "boolean": null
+          }
+        },
+        {
+          "expression": "format(test(\"abc\", prop(\"Pattern\")))",
+          "formula": {
+            "type": "string",
+            "string": null
+          }
+        },
+        {
+          "expression": "if(false, test(\"abc\", prop(\"Pattern\")), true)",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        },
+        {
+          "expression": "[test(\"abc\", prop(\"Pattern\"))].length()",
+          "formula": {
+            "type": "number",
+            "number": null
+          }
+        },
+        {
+          "expression": "[1].map(test(\"abc\", prop(\"Pattern\"))).length()",
+          "formula": {
+            "type": "number",
+            "number": 1
+          }
+        },
+        {
+          "expression": "[1].map(test(\"abc\", prop(\"Pattern\"))).join(\",\")",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "format(empty())",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "empty(empty())",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        },
+        {
+          "expression": "1 / prop(\"Divisor\")",
+          "formula": {
+            "type": "number",
+            "number": null
+          }
+        },
+        {
+          "expression": "empty(1 / prop(\"Divisor\"))",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        },
+        {
+          "expression": "format(1 / prop(\"Divisor\"))",
+          "formula": {
+            "type": "string",
+            "string": ""
+          }
+        },
+        {
+          "expression": "parseDate(prop(\"Date Text\"))",
+          "formula": {
+            "type": "date",
+            "date": null
+          }
+        },
+        {
+          "expression": "empty(parseDate(prop(\"Date Text\")))",
+          "formula": {
+            "type": "boolean",
+            "boolean": true
+          }
+        }
+      ]
     }
   ],
-  "rejected": [
+  "formula_creation_errors": [
     {
       "expression": "map(empty(), current)",
       "status": 400,
@@ -391,6 +656,18 @@
     },
     {
       "expression": "join(empty(), \",\")",
+      "status": 400,
+      "code": "validation_error",
+      "message": "Type error with formula"
+    },
+    {
+      "expression": "empty().map(current)",
+      "status": 400,
+      "code": "validation_error",
+      "message": "Type error with formula"
+    },
+    {
+      "expression": "[empty()].map(current.map(current))",
       "status": 400,
       "code": "validation_error",
       "message": "Type error with formula"
