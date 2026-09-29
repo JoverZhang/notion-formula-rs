@@ -197,9 +197,9 @@ ln(0)                      → -Infinity
 NaN 参与 ==、<、<=、>、>=   → false
 NaN 参与 !=                → true
 +0 == -0                   → true
-
-具体函数仍可限制参数值，例如 repeat 的次数须有限且非负。
 ```
+
+具体函数的参数值域与空值处理见 [Planned Builtin 规则](builtin-functions.zh-CN.md#planned-聚合sortflat-与-repeat)。
 
 ## 分析与失败边界
 

@@ -79,7 +79,8 @@ repetitions = min(10000, max(0, ceil(count)))
 
 A blank Count property produced API null for the repeat length, `empty` check, and preview. Counts expressed as `0 / 0`, `1 / 0`, and `-1 / 0` did too; those cases do not isolate `repeat` from evaluation of the count expression. A bare `empty()` count was rejected at creation. Empty text produced an empty string for counts 3, -1, and 1,000,001.
 
-The finite-count observations differ from the [planned nonnegative constraint](../../specs/formula-language.md#planned-number) and the current evaluator's truncation and 1,000,000-count limit. Adopting them requires a contract decision; this experiment does not change those rules or their implementation.
+The finite-count observations differ from the nonnegative constraint planned at the time of the experiment and the evaluator's truncation and 1,000,000-count limit at that time.
+The subsequently adopted contract is [Planned repeat](../../specs/builtin-functions.md#planned-repeat); this experiment preserves the original observations and does not define the current contract.
 
 ## Reproduce and interpret
 

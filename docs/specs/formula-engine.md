@@ -290,7 +290,7 @@ pub enum RuntimeError {
     /// The type is accepted, but the value violates a function constraint; regex and date failures use the specific variants below.
     InvalidValue {
         actual: Value,
-        /// For example, "repeat count must be nonnegative".
+        /// For example, "repeat count must be finite"; function constraints are defined in the Builtin specification.
         constraint: String,
     },
     InvalidRegex {
