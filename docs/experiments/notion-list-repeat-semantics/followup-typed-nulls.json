@@ -1,0 +1,476 @@
+{
+  "name": "Typed null follow-up",
+  "cases": [
+    {
+      "label": "conditional_direct",
+      "expression": "if(false, 1, empty())",
+      "category": "null_source_control"
+    },
+    {
+      "label": "conditional_format",
+      "expression": "format(if(false, 1, empty()))",
+      "category": "null_source_control"
+    },
+    {
+      "label": "conditional_list_length",
+      "expression": "length([2, if(false, 1, empty()), 4])",
+      "category": "null_source_control"
+    },
+    {
+      "label": "sum_conditional_mixed",
+      "expression": "sum([2, if(false, 1, empty()), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_conditional_negative",
+      "expression": "sum([-2, if(false, 1, empty()), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_conditional_single",
+      "expression": "sum([if(false, 1, empty())])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_conditional_variadic",
+      "expression": "sum(2, if(false, 1, empty()), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_conditional_mixed",
+      "expression": "mean([2, if(false, 1, empty()), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_conditional_negative",
+      "expression": "mean([-2, if(false, 1, empty()), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_conditional_single",
+      "expression": "mean([if(false, 1, empty())])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_conditional_variadic",
+      "expression": "mean(2, if(false, 1, empty()), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_conditional_mixed",
+      "expression": "median([2, if(false, 1, empty()), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_conditional_negative",
+      "expression": "median([-2, if(false, 1, empty()), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_conditional_single",
+      "expression": "median([if(false, 1, empty())])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_conditional_variadic",
+      "expression": "median(2, if(false, 1, empty()), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_conditional_mixed",
+      "expression": "min([2, if(false, 1, empty()), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_conditional_negative",
+      "expression": "min([-2, if(false, 1, empty()), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_conditional_single",
+      "expression": "min([if(false, 1, empty())])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_conditional_variadic",
+      "expression": "min(2, if(false, 1, empty()), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_conditional_mixed",
+      "expression": "max([2, if(false, 1, empty()), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_conditional_negative",
+      "expression": "max([-2, if(false, 1, empty()), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_conditional_single",
+      "expression": "max([if(false, 1, empty())])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_conditional_variadic",
+      "expression": "max(2, if(false, 1, empty()), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "find_direct",
+      "expression": "find([1], current < 0)",
+      "category": "null_source_control"
+    },
+    {
+      "label": "find_format",
+      "expression": "format(find([1], current < 0))",
+      "category": "null_source_control"
+    },
+    {
+      "label": "find_list_length",
+      "expression": "length([2, find([1], current < 0), 4])",
+      "category": "null_source_control"
+    },
+    {
+      "label": "sum_find_mixed",
+      "expression": "sum([2, find([1], current < 0), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_find_negative",
+      "expression": "sum([-2, find([1], current < 0), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_find_single",
+      "expression": "sum([find([1], current < 0)])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_find_variadic",
+      "expression": "sum(2, find([1], current < 0), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_find_mixed",
+      "expression": "mean([2, find([1], current < 0), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_find_negative",
+      "expression": "mean([-2, find([1], current < 0), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_find_single",
+      "expression": "mean([find([1], current < 0)])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_find_variadic",
+      "expression": "mean(2, find([1], current < 0), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_find_mixed",
+      "expression": "median([2, find([1], current < 0), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_find_negative",
+      "expression": "median([-2, find([1], current < 0), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_find_single",
+      "expression": "median([find([1], current < 0)])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_find_variadic",
+      "expression": "median(2, find([1], current < 0), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_find_mixed",
+      "expression": "min([2, find([1], current < 0), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_find_negative",
+      "expression": "min([-2, find([1], current < 0), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_find_single",
+      "expression": "min([find([1], current < 0)])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_find_variadic",
+      "expression": "min(2, find([1], current < 0), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_find_mixed",
+      "expression": "max([2, find([1], current < 0), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_find_negative",
+      "expression": "max([-2, find([1], current < 0), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_find_single",
+      "expression": "max([find([1], current < 0)])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_find_variadic",
+      "expression": "max(2, find([1], current < 0), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "property_direct",
+      "expression": "prop(\"N\")",
+      "category": "null_source_control"
+    },
+    {
+      "label": "property_format",
+      "expression": "format(prop(\"N\"))",
+      "category": "null_source_control"
+    },
+    {
+      "label": "property_list_length",
+      "expression": "length([2, prop(\"N\"), 4])",
+      "category": "null_source_control"
+    },
+    {
+      "label": "sum_property_mixed",
+      "expression": "sum([2, prop(\"N\"), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_property_negative",
+      "expression": "sum([-2, prop(\"N\"), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_property_single",
+      "expression": "sum([prop(\"N\")])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sum_property_variadic",
+      "expression": "sum(2, prop(\"N\"), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_property_mixed",
+      "expression": "mean([2, prop(\"N\"), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_property_negative",
+      "expression": "mean([-2, prop(\"N\"), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_property_single",
+      "expression": "mean([prop(\"N\")])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "mean_property_variadic",
+      "expression": "mean(2, prop(\"N\"), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_property_mixed",
+      "expression": "median([2, prop(\"N\"), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_property_negative",
+      "expression": "median([-2, prop(\"N\"), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_property_single",
+      "expression": "median([prop(\"N\")])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "median_property_variadic",
+      "expression": "median(2, prop(\"N\"), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_property_mixed",
+      "expression": "min([2, prop(\"N\"), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_property_negative",
+      "expression": "min([-2, prop(\"N\"), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_property_single",
+      "expression": "min([prop(\"N\")])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "min_property_variadic",
+      "expression": "min(2, prop(\"N\"), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_property_mixed",
+      "expression": "max([2, prop(\"N\"), 4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_property_negative",
+      "expression": "max([-2, prop(\"N\"), -4])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_property_single",
+      "expression": "max([prop(\"N\")])",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "max_property_variadic",
+      "expression": "max(2, prop(\"N\"), 4)",
+      "category": "typed_aggregate"
+    },
+    {
+      "label": "sort_middle_at_0",
+      "expression": "at(sort([2, empty(), 1]), 0)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "sort_middle_at_1",
+      "expression": "at(sort([2, empty(), 1]), 1)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "sort_middle_at_2",
+      "expression": "at(sort([2, empty(), 1]), 2)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "sort_zeros_at_0",
+      "expression": "at(sort([1, empty(), 0, -1, empty()]), 0)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "sort_zeros_at_1",
+      "expression": "at(sort([1, empty(), 0, -1, empty()]), 1)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "sort_zeros_at_2",
+      "expression": "at(sort([1, empty(), 0, -1, empty()]), 2)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "flat_nested_at_0",
+      "expression": "at(flat([[1, empty()], [2]]), 0)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "flat_nested_at_1",
+      "expression": "at(flat([[1, empty()], [2]]), 1)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "flat_nested_at_2",
+      "expression": "at(flat([[1, empty()], [2]]), 2)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "flat_outer_null_at_0",
+      "expression": "at(flat([[], empty(), [2]]), 0)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "flat_outer_null_at_1",
+      "expression": "at(flat([[], empty(), [2]]), 1)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "flat_outer_null_at_2",
+      "expression": "at(flat([[], empty(), [2]]), 2)",
+      "category": "indexed_list_observer"
+    },
+    {
+      "label": "sum_typed_empty_list",
+      "expression": "sum(filter([1], current < 0))",
+      "category": "typed_empty_list"
+    },
+    {
+      "label": "sum_typed_empty_list_format",
+      "expression": "format(sum(filter([1], current < 0)))",
+      "category": "typed_empty_list_observer"
+    },
+    {
+      "label": "mean_typed_empty_list",
+      "expression": "mean(filter([1], current < 0))",
+      "category": "typed_empty_list"
+    },
+    {
+      "label": "mean_typed_empty_list_format",
+      "expression": "format(mean(filter([1], current < 0)))",
+      "category": "typed_empty_list_observer"
+    },
+    {
+      "label": "median_typed_empty_list",
+      "expression": "median(filter([1], current < 0))",
+      "category": "typed_empty_list"
+    },
+    {
+      "label": "median_typed_empty_list_format",
+      "expression": "format(median(filter([1], current < 0)))",
+      "category": "typed_empty_list_observer"
+    },
+    {
+      "label": "min_typed_empty_list",
+      "expression": "min(filter([1], current < 0))",
+      "category": "typed_empty_list"
+    },
+    {
+      "label": "min_typed_empty_list_format",
+      "expression": "format(min(filter([1], current < 0)))",
+      "category": "typed_empty_list_observer"
+    },
+    {
+      "label": "max_typed_empty_list",
+      "expression": "max(filter([1], current < 0))",
+      "category": "typed_empty_list"
+    },
+    {
+      "label": "max_typed_empty_list_format",
+      "expression": "format(max(filter([1], current < 0)))",
+      "category": "typed_empty_list_observer"
+    }
+  ],
+  "rows": [
+    {
+      "name": "blank_number",
+      "inputs": {
+        "N": null,
+        "Pattern": "a"
+      }
+    },
+    {
+      "name": "number_control",
+      "inputs": {
+        "N": 7,
+        "Pattern": "a"
+      }
+    }
+  ]
+}

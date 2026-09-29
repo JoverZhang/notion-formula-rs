@@ -41,3 +41,4 @@ clients, and WASM integrations to the current user-visible contract they need.
 ## Browse experiments
 
 - [Notion `empty()` and null behavior](experiments/notion-empty-semantics/README.md)
+- [Notion list nulls and repeat counts](experiments/notion-list-repeat-semantics/README.md)

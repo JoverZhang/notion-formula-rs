@@ -235,6 +235,7 @@ pub enum EvaluateInputError {
         id: PropertyId, expected: usize, values_len: usize, validity_len: usize,
     },
     /// expected 和 actual 属于不匹配位置；路径从外到内记录列表下标，空路径表示根值。
+    /// Union 的所有成员均不匹配时，报告 Union 所在位置及完整的 expected Union；actual 描述实际值的结构，不采用某个候选成员的失败位置。
     InvalidValueType {
         id: PropertyId, row_index: usize, element_path: Vec<usize>,
         expected: ValueType, actual: ValueType,
@@ -262,6 +263,8 @@ pub struct FormulaOutput {
     pub output_type: ValueType,
     pub column: Column,
     /// 同一行可有多个错误。
+    /// 在本输出的同一行中，每个原始失败只报告一次，即使通过重复读取或多条依赖路径传入。
+    /// 不同的失败事件分别保留，即使来源 Formula ID 和错误载荷相同。
     /// 相同定义和输入下，错误顺序一致；不保证按 row_index 排序。
     pub errors: Vec<RowError>,
 }
@@ -296,7 +299,8 @@ pub enum RuntimeError {
     InvalidDateText {
         text: String,
     },
-    /// 日期运算超出支持范围。
+    /// 日期操作使用或产生的 UTC 时间或偏移后的本地时间超出公历 0001–9999 年。
+    /// 越界的 Date 输入值通过类型校验；日期操作使用该值时产生此行错误。
     DateOutOfRange,
 }
 /// 公式无法开始求值时返回；单行求值错误见 RowError。

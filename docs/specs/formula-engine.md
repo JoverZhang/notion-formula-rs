@@ -238,6 +238,7 @@ pub enum EvaluateInputError {
         id: PropertyId, expected: usize, values_len: usize, validity_len: usize,
     },
     /// expected and actual belong to the mismatching position; the path records list indexes from outer to inner, and an empty path means the root value.
+    /// If no Union member matches, report the Union's position and complete expected Union; actual describes the value's structure, not one candidate member's failure.
     InvalidValueType {
         id: PropertyId, row_index: usize, element_path: Vec<usize>,
         expected: ValueType, actual: ValueType,
@@ -265,6 +266,8 @@ pub struct FormulaOutput {
     pub output_type: ValueType,
     pub column: Column,
     /// A row may have multiple errors.
+    /// Within this output and row, report each originating failure once, even if it arrives through repeated reads or multiple dependency paths.
+    /// Distinct failure occurrences remain separate, even when their origin Formula ID and error payload are identical.
     /// Error order is consistent for the same definitions and input; sorting by row_index is not guaranteed.
     pub errors: Vec<RowError>,
 }
@@ -299,7 +302,8 @@ pub enum RuntimeError {
     InvalidDateText {
         text: String,
     },
-    /// A date operation exceeds the supported range.
+    /// UTC or offset-adjusted local time used or produced by a date operation is outside Gregorian years 0001–9999.
+    /// Out-of-range Date input values pass type validation; using them in a date operation produces this row error.
     DateOutOfRange,
 }
 /// Returned when a formula cannot begin evaluation; see RowError for row evaluation failures.
