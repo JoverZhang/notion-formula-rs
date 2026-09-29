@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./formula-language.md
 implementation_status: current
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-23
 ---
 
@@ -178,7 +178,7 @@ list literal：求值所有元素；有错误则报当前行错误，否则保�
 [1, empty(), 2] → 长度为 3，中间位置为空。
 ```
 
-`empty()`、`map` 和 `join` 的空值规则见 [Builtin](builtin-functions.zh-CN.md#planned-空值与列表)。
+`empty()`、`map` 和 `join` 的空值规则见 [Builtin 声明](builtin-functions.zh-CN.md#支持的函数)。
 
 ### Planned Number
 
@@ -199,7 +199,7 @@ NaN 参与 !=                → true
 +0 == -0                   → true
 ```
 
-具体函数的参数值域与空值处理见 [Planned Builtin 规则](builtin-functions.zh-CN.md#planned-聚合sortflat-与-repeat)。
+具体函数的参数值域与空值处理见 [Builtin 声明](builtin-functions.zh-CN.md#支持的函数)。
 
 ## 分析与失败边界
 

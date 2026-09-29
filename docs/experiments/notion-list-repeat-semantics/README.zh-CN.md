@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./README.md
 implementation_status: historical
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-29
 ---
 
@@ -80,7 +80,7 @@ repetitions = min(10000, max(0, ceil(count)))
 Count 属性为空时，重复结果的长度、`empty` 检查和预览都返回 API null。次数表达式为 `0 / 0`、`1 / 0`、`-1 / 0` 时也如此；这些案例没有把 `repeat` 与次数表达式本身的求值分离。直接用 `empty()` 作为次数会在创建时被拒绝。文本为空时，次数 3、-1、1,000,001 均得到空字符串。
 
 有限次数的观察结果与实验时计划中的非负约束，以及当时 evaluator 的小数截断、1,000,000 次上限不同。
-随后采用的契约见 [Planned repeat](../../specs/builtin-functions.zh-CN.md#planned-repeat)；本实验保留原始观察，不定义当前契约。
+随后采用的契约见 [repeat 声明](../../specs/builtin-functions.zh-CN.md#text)；本实验保留原始观察，不定义当前契约。
 
 ## 复现与解释限制
 
