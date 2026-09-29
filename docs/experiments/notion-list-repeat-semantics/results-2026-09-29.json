@@ -1,0 +1,3167 @@
+{
+  "observed_on": "2026-09-29",
+  "api_version": "2025-09-03",
+  "endpoint": "GET /v1/pages/{page_id}",
+  "response_field": "properties[formula_name].formula",
+  "groups": [
+    {
+      "name": "List nulls and literal counts",
+      "formula_creation_errors": [
+        {
+          "label": "sum_mixed",
+          "expression": "sum([2, empty(), 4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_all_null",
+          "expression": "sum([empty(), empty()])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_all_null_format",
+          "expression": "format(sum([empty(), empty()]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_empty_list",
+          "expression": "sum([])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_empty_list_format",
+          "expression": "format(sum([]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_negative",
+          "expression": "sum([empty(), -2, -4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_variadic",
+          "expression": "sum(2, empty(), 4)",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "sum_null_argument",
+          "expression": "sum(empty())",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_mixed",
+          "expression": "mean([2, empty(), 4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_all_null",
+          "expression": "mean([empty(), empty()])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_all_null_format",
+          "expression": "format(mean([empty(), empty()]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_empty_list",
+          "expression": "mean([])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_empty_list_format",
+          "expression": "format(mean([]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_negative",
+          "expression": "mean([empty(), -2, -4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_variadic",
+          "expression": "mean(2, empty(), 4)",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "mean_null_argument",
+          "expression": "mean(empty())",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_mixed",
+          "expression": "median([2, empty(), 4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_all_null",
+          "expression": "median([empty(), empty()])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_all_null_format",
+          "expression": "format(median([empty(), empty()]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_empty_list",
+          "expression": "median([])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_empty_list_format",
+          "expression": "format(median([]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_negative",
+          "expression": "median([empty(), -2, -4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_variadic",
+          "expression": "median(2, empty(), 4)",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "median_null_argument",
+          "expression": "median(empty())",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_mixed",
+          "expression": "min([2, empty(), 4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_all_null",
+          "expression": "min([empty(), empty()])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_all_null_format",
+          "expression": "format(min([empty(), empty()]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_empty_list",
+          "expression": "min([])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_empty_list_format",
+          "expression": "format(min([]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_negative",
+          "expression": "min([empty(), -2, -4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_variadic",
+          "expression": "min(2, empty(), 4)",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "min_null_argument",
+          "expression": "min(empty())",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_mixed",
+          "expression": "max([2, empty(), 4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_all_null",
+          "expression": "max([empty(), empty()])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_all_null_format",
+          "expression": "format(max([empty(), empty()]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_empty_list",
+          "expression": "max([])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_empty_list_format",
+          "expression": "format(max([]))",
+          "category": "aggregate_observer",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_negative",
+          "expression": "max([empty(), -2, -4])",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_variadic",
+          "expression": "max(2, empty(), 4)",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "max_null_argument",
+          "expression": "max(empty())",
+          "category": "aggregate",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "repeat_literal_null_length",
+          "expression": "length(repeat(\"ab\", empty()))",
+          "category": "repeat_literal",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "repeat_literal_null_empty",
+          "expression": "empty(repeat(\"ab\", empty()))",
+          "category": "repeat_literal",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "repeat_literal_null_preview",
+          "expression": "substring(repeat(\"ab\", empty()), 0, 12)",
+          "category": "repeat_literal",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        }
+      ],
+      "rows": [
+        {
+          "name": "blank_number_invalid_regex",
+          "inputs": {
+            "N": null,
+            "Pattern": "["
+          },
+          "results": [
+            {
+              "label": "sum_zero_control",
+              "expression": "sum([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "sum_property_null",
+              "expression": "sum([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "mean_zero_control",
+              "expression": "mean([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "mean_property_null",
+              "expression": "mean([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "median_zero_control",
+              "expression": "median([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "median_property_null",
+              "expression": "median([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "min_zero_control",
+              "expression": "min([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "min_property_null",
+              "expression": "min([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "max_zero_control",
+              "expression": "max([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 4
+              }
+            },
+            {
+              "label": "max_property_null",
+              "expression": "max([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 4
+              }
+            },
+            {
+              "label": "sort_middle_length",
+              "expression": "length(sort([2, empty(), 1]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_middle_join",
+              "expression": "join(sort([2, empty(), 1]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "1|2"
+              }
+            },
+            {
+              "label": "sort_middle_marked",
+              "expression": "join(map(sort([2, empty(), 1]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<2>"
+              }
+            },
+            {
+              "label": "sort_head_length",
+              "expression": "length(sort([empty(), 2, 1]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_head_join",
+              "expression": "join(sort([empty(), 2, 1]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "1|2"
+              }
+            },
+            {
+              "label": "sort_head_marked",
+              "expression": "join(map(sort([empty(), 2, 1]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<2>"
+              }
+            },
+            {
+              "label": "sort_tail_length",
+              "expression": "length(sort([2, 1, empty()]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_tail_join",
+              "expression": "join(sort([2, 1, empty()]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "1|2"
+              }
+            },
+            {
+              "label": "sort_tail_marked",
+              "expression": "join(map(sort([2, 1, empty()]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<2>"
+              }
+            },
+            {
+              "label": "sort_zeros_length",
+              "expression": "length(sort([1, empty(), 0, -1, empty()]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "sort_zeros_join",
+              "expression": "join(sort([1, empty(), 0, -1, empty()]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "-1|0|1"
+              }
+            },
+            {
+              "label": "sort_zeros_marked",
+              "expression": "join(map(sort([1, empty(), 0, -1, empty()]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<-1>|<0>|<1>"
+              }
+            },
+            {
+              "label": "sort_all_null_length",
+              "expression": "length(sort([empty(), empty()]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "sort_all_null_join",
+              "expression": "join(sort([empty(), empty()]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "sort_all_null_marked",
+              "expression": "join(map(sort([empty(), empty()]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "sort_text_length",
+              "expression": "length(sort([\"b\", empty(), \"a\"]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_text_join",
+              "expression": "join(sort([\"b\", empty(), \"a\"]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "a|b"
+              }
+            },
+            {
+              "label": "sort_text_marked",
+              "expression": "join(map(sort([\"b\", empty(), \"a\"]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<a>|<b>"
+              }
+            },
+            {
+              "label": "flat_scalar_length",
+              "expression": "length(flat([1, empty(), 2]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "flat_scalar_join",
+              "expression": "join(flat([1, empty(), 2]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "1||2"
+              }
+            },
+            {
+              "label": "flat_scalar_marked",
+              "expression": "join(map(flat([1, empty(), 2]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<>|<2>"
+              }
+            },
+            {
+              "label": "flat_nested_length",
+              "expression": "length(flat([[1, empty()], [2]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "flat_nested_join",
+              "expression": "join(flat([[1, empty()], [2]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "1||2"
+              }
+            },
+            {
+              "label": "flat_nested_marked",
+              "expression": "join(map(flat([[1, empty()], [2]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<>|<2>"
+              }
+            },
+            {
+              "label": "flat_inner_null_length",
+              "expression": "length(flat([[empty()], []]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 1
+              }
+            },
+            {
+              "label": "flat_inner_null_join",
+              "expression": "join(flat([[empty()], []]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "flat_inner_null_marked",
+              "expression": "join(map(flat([[empty()], []]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "flat_outer_null_length",
+              "expression": "length(flat([[], empty(), [2]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "flat_outer_null_join",
+              "expression": "join(flat([[], empty(), [2]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "|2"
+              }
+            },
+            {
+              "label": "flat_outer_null_marked",
+              "expression": "join(map(flat([[], empty(), [2]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>|<2>"
+              }
+            },
+            {
+              "label": "flat_typed_null_length",
+              "expression": "length(flat([[], if(false, [1], empty()), [2]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "flat_typed_null_join",
+              "expression": "join(flat([[], if(false, [1], empty()), [2]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "|2"
+              }
+            },
+            {
+              "label": "flat_typed_null_marked",
+              "expression": "join(map(flat([[], if(false, [1], empty()), [2]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>|<2>"
+              }
+            },
+            {
+              "label": "flat_depth_length",
+              "expression": "length(flat([[[]]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 1
+              }
+            },
+            {
+              "label": "flat_depth_join",
+              "expression": "join(flat([[[]]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "flat_depth_marked",
+              "expression": "join(map(flat([[[]]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "flat_depth_element_length",
+              "expression": "join(map(flat([[[]]]), length(current)), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "0"
+              }
+            },
+            {
+              "label": "invalid_regex",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "aggregate_failure",
+              "expression": "sum([2, if(test(\"abc\", prop(\"Pattern\")), 1, 1), 4])",
+              "category": "failure_control",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "aggregate_failure_empty",
+              "expression": "empty(sum([2, if(test(\"abc\", prop(\"Pattern\")), 1, 1), 4]))",
+              "category": "failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "aggregate_failure_format",
+              "expression": "format(sum([2, if(test(\"abc\", prop(\"Pattern\")), 1, 1), 4]))",
+              "category": "failure_control",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_length",
+              "expression": "length(repeat(\"ab\", -1))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "repeat_literal_negative_empty",
+              "expression": "empty(repeat(\"ab\", -1))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "repeat_literal_negative_preview",
+              "expression": "substring(repeat(\"ab\", -1), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_negative_count_format",
+              "expression": "format(-1)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": "-1"
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_length",
+              "expression": "length(repeat(\"ab\", 2.9))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_empty",
+              "expression": "empty(repeat(\"ab\", 2.9))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_preview",
+              "expression": "substring(repeat(\"ab\", 2.9), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": "ababab"
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_count_format",
+              "expression": "format(2.9)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": "2.9"
+              }
+            },
+            {
+              "label": "repeat_literal_nan_length",
+              "expression": "length(repeat(\"ab\", 0 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "repeat_literal_nan_empty",
+              "expression": "empty(repeat(\"ab\", 0 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "repeat_literal_nan_preview",
+              "expression": "substring(repeat(\"ab\", 0 / 0), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_nan_count_format",
+              "expression": "format(0 / 0)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_length",
+              "expression": "length(repeat(\"ab\", 1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_empty",
+              "expression": "empty(repeat(\"ab\", 1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_preview",
+              "expression": "substring(repeat(\"ab\", 1 / 0), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_count_format",
+              "expression": "format(1 / 0)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_length",
+              "expression": "length(repeat(\"ab\", -1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_empty",
+              "expression": "empty(repeat(\"ab\", -1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_preview",
+              "expression": "substring(repeat(\"ab\", -1 / 0), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_count_format",
+              "expression": "format(-1 / 0)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_null_count_format",
+              "expression": "format(empty())",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "number_and_valid_regex",
+          "inputs": {
+            "N": 7,
+            "Pattern": "a"
+          },
+          "results": [
+            {
+              "label": "sum_zero_control",
+              "expression": "sum([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "sum_property_null",
+              "expression": "sum([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 13
+              }
+            },
+            {
+              "label": "mean_zero_control",
+              "expression": "mean([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "mean_property_null",
+              "expression": "mean([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 4.333333333333
+              }
+            },
+            {
+              "label": "median_zero_control",
+              "expression": "median([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "median_property_null",
+              "expression": "median([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 4
+              }
+            },
+            {
+              "label": "min_zero_control",
+              "expression": "min([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "min_property_null",
+              "expression": "min([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "max_zero_control",
+              "expression": "max([2, 0, 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 4
+              }
+            },
+            {
+              "label": "max_property_null",
+              "expression": "max([2, prop(\"N\"), 4])",
+              "category": "aggregate",
+              "formula": {
+                "type": "number",
+                "number": 7
+              }
+            },
+            {
+              "label": "sort_middle_length",
+              "expression": "length(sort([2, empty(), 1]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_middle_join",
+              "expression": "join(sort([2, empty(), 1]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "1|2"
+              }
+            },
+            {
+              "label": "sort_middle_marked",
+              "expression": "join(map(sort([2, empty(), 1]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<2>"
+              }
+            },
+            {
+              "label": "sort_head_length",
+              "expression": "length(sort([empty(), 2, 1]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_head_join",
+              "expression": "join(sort([empty(), 2, 1]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "1|2"
+              }
+            },
+            {
+              "label": "sort_head_marked",
+              "expression": "join(map(sort([empty(), 2, 1]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<2>"
+              }
+            },
+            {
+              "label": "sort_tail_length",
+              "expression": "length(sort([2, 1, empty()]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_tail_join",
+              "expression": "join(sort([2, 1, empty()]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "1|2"
+              }
+            },
+            {
+              "label": "sort_tail_marked",
+              "expression": "join(map(sort([2, 1, empty()]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<2>"
+              }
+            },
+            {
+              "label": "sort_zeros_length",
+              "expression": "length(sort([1, empty(), 0, -1, empty()]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "sort_zeros_join",
+              "expression": "join(sort([1, empty(), 0, -1, empty()]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "-1|0|1"
+              }
+            },
+            {
+              "label": "sort_zeros_marked",
+              "expression": "join(map(sort([1, empty(), 0, -1, empty()]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<-1>|<0>|<1>"
+              }
+            },
+            {
+              "label": "sort_all_null_length",
+              "expression": "length(sort([empty(), empty()]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "sort_all_null_join",
+              "expression": "join(sort([empty(), empty()]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "sort_all_null_marked",
+              "expression": "join(map(sort([empty(), empty()]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "sort_text_length",
+              "expression": "length(sort([\"b\", empty(), \"a\"]))",
+              "category": "sort",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "sort_text_join",
+              "expression": "join(sort([\"b\", empty(), \"a\"]), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "a|b"
+              }
+            },
+            {
+              "label": "sort_text_marked",
+              "expression": "join(map(sort([\"b\", empty(), \"a\"]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "sort",
+              "formula": {
+                "type": "string",
+                "string": "<a>|<b>"
+              }
+            },
+            {
+              "label": "flat_scalar_length",
+              "expression": "length(flat([1, empty(), 2]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "flat_scalar_join",
+              "expression": "join(flat([1, empty(), 2]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "1||2"
+              }
+            },
+            {
+              "label": "flat_scalar_marked",
+              "expression": "join(map(flat([1, empty(), 2]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<>|<2>"
+              }
+            },
+            {
+              "label": "flat_nested_length",
+              "expression": "length(flat([[1, empty()], [2]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "flat_nested_join",
+              "expression": "join(flat([[1, empty()], [2]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "1||2"
+              }
+            },
+            {
+              "label": "flat_nested_marked",
+              "expression": "join(map(flat([[1, empty()], [2]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<1>|<>|<2>"
+              }
+            },
+            {
+              "label": "flat_inner_null_length",
+              "expression": "length(flat([[empty()], []]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 1
+              }
+            },
+            {
+              "label": "flat_inner_null_join",
+              "expression": "join(flat([[empty()], []]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "flat_inner_null_marked",
+              "expression": "join(map(flat([[empty()], []]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "flat_outer_null_length",
+              "expression": "length(flat([[], empty(), [2]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "flat_outer_null_join",
+              "expression": "join(flat([[], empty(), [2]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "|2"
+              }
+            },
+            {
+              "label": "flat_outer_null_marked",
+              "expression": "join(map(flat([[], empty(), [2]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>|<2>"
+              }
+            },
+            {
+              "label": "flat_typed_null_length",
+              "expression": "length(flat([[], if(false, [1], empty()), [2]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "flat_typed_null_join",
+              "expression": "join(flat([[], if(false, [1], empty()), [2]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "|2"
+              }
+            },
+            {
+              "label": "flat_typed_null_marked",
+              "expression": "join(map(flat([[], if(false, [1], empty()), [2]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>|<2>"
+              }
+            },
+            {
+              "label": "flat_depth_length",
+              "expression": "length(flat([[[]]]))",
+              "category": "flat",
+              "formula": {
+                "type": "number",
+                "number": 1
+              }
+            },
+            {
+              "label": "flat_depth_join",
+              "expression": "join(flat([[[]]]), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "flat_depth_marked",
+              "expression": "join(map(flat([[[]]]), \"<\" + format(current) + \">\"), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "flat_depth_element_length",
+              "expression": "join(map(flat([[[]]]), length(current)), \"|\")",
+              "category": "flat",
+              "formula": {
+                "type": "string",
+                "string": "0"
+              }
+            },
+            {
+              "label": "invalid_regex",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "aggregate_failure",
+              "expression": "sum([2, if(test(\"abc\", prop(\"Pattern\")), 1, 1), 4])",
+              "category": "failure_control",
+              "formula": {
+                "type": "number",
+                "number": 7
+              }
+            },
+            {
+              "label": "aggregate_failure_empty",
+              "expression": "empty(sum([2, if(test(\"abc\", prop(\"Pattern\")), 1, 1), 4]))",
+              "category": "failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "aggregate_failure_format",
+              "expression": "format(sum([2, if(test(\"abc\", prop(\"Pattern\")), 1, 1), 4]))",
+              "category": "failure_control",
+              "formula": {
+                "type": "string",
+                "string": "7"
+              }
+            },
+            {
+              "label": "repeat_literal_negative_length",
+              "expression": "length(repeat(\"ab\", -1))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "repeat_literal_negative_empty",
+              "expression": "empty(repeat(\"ab\", -1))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "repeat_literal_negative_preview",
+              "expression": "substring(repeat(\"ab\", -1), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_negative_count_format",
+              "expression": "format(-1)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": "-1"
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_length",
+              "expression": "length(repeat(\"ab\", 2.9))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_empty",
+              "expression": "empty(repeat(\"ab\", 2.9))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_preview",
+              "expression": "substring(repeat(\"ab\", 2.9), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": "ababab"
+              }
+            },
+            {
+              "label": "repeat_literal_fraction_count_format",
+              "expression": "format(2.9)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": "2.9"
+              }
+            },
+            {
+              "label": "repeat_literal_nan_length",
+              "expression": "length(repeat(\"ab\", 0 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "repeat_literal_nan_empty",
+              "expression": "empty(repeat(\"ab\", 0 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "repeat_literal_nan_preview",
+              "expression": "substring(repeat(\"ab\", 0 / 0), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_nan_count_format",
+              "expression": "format(0 / 0)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_length",
+              "expression": "length(repeat(\"ab\", 1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_empty",
+              "expression": "empty(repeat(\"ab\", 1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_preview",
+              "expression": "substring(repeat(\"ab\", 1 / 0), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_infinity_count_format",
+              "expression": "format(1 / 0)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_length",
+              "expression": "length(repeat(\"ab\", -1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_empty",
+              "expression": "empty(repeat(\"ab\", -1 / 0))",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_preview",
+              "expression": "substring(repeat(\"ab\", -1 / 0), 0, 12)",
+              "category": "repeat_literal",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "repeat_literal_negative_infinity_count_format",
+              "expression": "format(-1 / 0)",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "repeat_literal_null_count_format",
+              "expression": "format(empty())",
+              "category": "repeat_count_control",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        }
+      ]
+    },
+    {
+      "name": "Repeat property counts",
+      "formula_creation_errors": [],
+      "rows": [
+        {
+          "name": "count_-2",
+          "inputs": {
+            "Count": -2,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "-2"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_-1.9",
+          "inputs": {
+            "Count": -1.9,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "-1.9"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_-1",
+          "inputs": {
+            "Count": -1,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "-1"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_-0.9",
+          "inputs": {
+            "Count": -0.9,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "-0.9"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_-0.1",
+          "inputs": {
+            "Count": -0.1,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "-0.1"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_0",
+          "inputs": {
+            "Count": 0,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "0"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_0.1",
+          "inputs": {
+            "Count": 0.1,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "ab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "0.1"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_0.9",
+          "inputs": {
+            "Count": 0.9,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "ab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "0.9"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1",
+          "inputs": {
+            "Count": 1,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "ab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1.1",
+          "inputs": {
+            "Count": 1.1,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 4
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1.1"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1.9",
+          "inputs": {
+            "Count": 1.9,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 4
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1.9"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_2.9",
+          "inputs": {
+            "Count": 2.9,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "ababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "2.9"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_10",
+          "inputs": {
+            "Count": 10,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 20
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "10"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_100",
+          "inputs": {
+            "Count": 100,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 200
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "100"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_999",
+          "inputs": {
+            "Count": 999,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 1998
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "999"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1000",
+          "inputs": {
+            "Count": 1000,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2000
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1000"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1001",
+          "inputs": {
+            "Count": 1001,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2002
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1001"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_9999",
+          "inputs": {
+            "Count": 9999,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 19998
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "9999"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_10000",
+          "inputs": {
+            "Count": 10000,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 20000
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "10000"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_10001",
+          "inputs": {
+            "Count": 10001,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 20000
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "10001"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_100000",
+          "inputs": {
+            "Count": 100000,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 20000
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "100000"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1000000",
+          "inputs": {
+            "Count": 1000000,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 20000
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1000000"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "count_1000001",
+          "inputs": {
+            "Count": 1000001,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 20000
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "abababababab"
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1000001"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "missing_count",
+          "inputs": {
+            "Count": null,
+            "Text": "ab"
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "empty_text",
+          "inputs": {
+            "Count": 3,
+            "Text": ""
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "3"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "empty_text_negative",
+          "inputs": {
+            "Count": -1,
+            "Text": ""
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "-1"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "empty_text_large",
+          "inputs": {
+            "Count": 1000001,
+            "Text": ""
+          },
+          "results": [
+            {
+              "label": "length",
+              "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            },
+            {
+              "label": "empty",
+              "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "preview",
+              "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": ""
+              }
+            },
+            {
+              "label": "count_format",
+              "expression": "format(prop(\"Count\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "string",
+                "string": "1000001"
+              }
+            },
+            {
+              "label": "text_length",
+              "expression": "length(prop(\"Text\"))",
+              "category": "repeat_property",
+              "formula": {
+                "type": "number",
+                "number": 0
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        }
+      ]
+    }
+  ],
+  "complete": true
+}

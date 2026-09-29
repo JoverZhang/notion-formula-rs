@@ -1,0 +1,93 @@
+{
+  "name": "Repeat boundary follow-up",
+  "cases": [
+    {
+      "label": "direct",
+      "expression": "repeat(prop(\"Text\"), prop(\"Count\"))",
+      "category": "repeat_boundary"
+    },
+    {
+      "label": "length",
+      "expression": "length(repeat(prop(\"Text\"), prop(\"Count\")))",
+      "category": "repeat_boundary"
+    },
+    {
+      "label": "empty",
+      "expression": "empty(repeat(prop(\"Text\"), prop(\"Count\")))",
+      "category": "repeat_boundary"
+    },
+    {
+      "label": "preview",
+      "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), 0, 12)",
+      "category": "repeat_boundary"
+    },
+    {
+      "label": "suffix",
+      "expression": "substring(repeat(prop(\"Text\"), prop(\"Count\")), length(repeat(prop(\"Text\"), prop(\"Count\"))) - 8)",
+      "category": "repeat_boundary"
+    },
+    {
+      "label": "text_length",
+      "expression": "length(prop(\"Text\"))",
+      "category": "repeat_boundary"
+    }
+  ],
+  "rows": [
+    {
+      "name": "x_1e-06",
+      "inputs": {
+        "Text": "x",
+        "Count": 1e-06
+      }
+    },
+    {
+      "name": "x_1.5",
+      "inputs": {
+        "Text": "x",
+        "Count": 1.5
+      }
+    },
+    {
+      "name": "x_9999.1",
+      "inputs": {
+        "Text": "x",
+        "Count": 9999.1
+      }
+    },
+    {
+      "name": "x_10000",
+      "inputs": {
+        "Text": "x",
+        "Count": 10000
+      }
+    },
+    {
+      "name": "x_10000.1",
+      "inputs": {
+        "Text": "x",
+        "Count": 10000.1
+      }
+    },
+    {
+      "name": "x_10001",
+      "inputs": {
+        "Text": "x",
+        "Count": 10001
+      }
+    },
+    {
+      "name": "abc_over_limit",
+      "inputs": {
+        "Text": "abc",
+        "Count": 10001
+      }
+    },
+    {
+      "name": "emoji_over_limit",
+      "inputs": {
+        "Text": "🦊",
+        "Count": 10001
+      }
+    }
+  ]
+}
