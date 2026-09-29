@@ -171,6 +171,15 @@ a ? b : c：a=true → b；a=false/null → c；condition 只接受 boolean/null
 被跳过的 expression 不产生行错误；这不改变 prepare 时发现全部 property 的规则。
 ```
 
+### Planned List
+
+```text
+list literal：求值所有元素；有错误则报当前行错误，否则保留所有元素，包括空值。
+[1, empty(), 2] → 长度为 3，中间位置为空。
+```
+
+`empty()`、`map` 和 `join` 的空值规则见 [Builtin](builtin-functions.zh-CN.md#planned-空值与列表)。
+
 ### Planned Number
 
 FormulaEngine 的 Number 取值、数值运算和比较遵循

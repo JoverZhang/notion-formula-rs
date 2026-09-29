@@ -1,0 +1,31 @@
+accepts
+number: true
+string: true
+boolean: true
+date: true
+wrong scalar: false
+absent scalar: true
+absent empty union: true
+absent unknown: true
+unknown scalar: true
+unknown list: true
+list with absent element: true
+list with wrong element: false
+nested wrong element: false
+empty list: true
+absent list: true
+list with only absent element: true
+list of union accepts mixed elements: true
+union of lists rejects mixed elements: false
+union second member: true
+union excludes other kind: false
+empty union excludes present value: false
+column kind
+number: Number
+string: String
+boolean: Boolean
+date: Date
+list: List
+unknown: Union
+empty union: Union
+single-member union: Union

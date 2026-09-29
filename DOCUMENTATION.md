@@ -51,6 +51,8 @@ When documented facts did not change, do not make a ceremonial documentation edi
 
 Except for categories declared in `docs/manifest.toml`, formal Markdown uses adjacent English `.md` and Simplified Chinese `.zh-CN.md` counterparts. Choose either language as the source for an editing cycle, verify its facts, then write the counterpart as natural prose at the same technical altitude.
 
+During development and review, generate code from the document in the language being edited. Once review passes, synchronize the English version, then regenerate and validate from English before merging.
+
 Use these translation states:
 
 - `synced`: both counterparts exist and carry the same technical meaning;
