@@ -55,13 +55,28 @@ repeat(min = n) {...}  // 整组参数重复至少 n 次；不是一个 list 参
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
 
-/// Planned：无参签名改为 empty() -> any，返回 null，推断为 Unknown；有参时仍作空值判断。
-empty(value?: any) -> boolean;
+/// Planned：无参返回 null；有参时沿用空值判断。返回类型由 resolve_empty 按实参个数确定。
+#[resolver(resolve_empty)]
+empty(value?: any) -> any;
 length(value: string | any[]) -> number;
 format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
+```
+
+#### Planned empty 类型推断
+
+```rust
+fn resolve_empty(input: &builtin_fn::ResolverInput<'_>) -> builtin_fn::Ty {
+    use builtin_fn::Ty;
+
+    match input.arguments {
+        [] => Ty::Unknown,
+        [_] => Ty::Boolean,
+        _ => input.default_return_ty.clone(),
+    }
+}
 ```
 
 ### Text
