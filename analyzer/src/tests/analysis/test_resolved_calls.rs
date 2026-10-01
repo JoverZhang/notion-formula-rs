@@ -34,6 +34,12 @@ fn semantic_map_keeps_flat_resolver_output_for_planning() {
     let (ty, map, diagnostics) = analyze_expr_with_semantic_map(&mut syntax.expr, &context);
 
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
-    assert_eq!(ty, Ty::List(Box::new(Ty::Number)));
+    assert_eq!(
+        ty,
+        Ty::List(Box::new(Ty::Union(vec![
+            Ty::Number,
+            Ty::List(Box::new(Ty::Number)),
+        ])))
+    );
     assert_eq!(map.builtin_calls[&call_id].return_ty, ty);
 }

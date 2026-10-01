@@ -1,6 +1,6 @@
 //! Tests for SigResolver infrastructure and new builtin signatures.
 //!
-//! - `flat()` uses a custom resolver for depth-sensitive return types.
+//! - `empty()` and `flat()` refine their return types with custom resolvers.
 //! - `padStart`, `padEnd`, `formatNumber`, `splice` are new builtins added alongside the resolver.
 
 use crate::semantic::{self, Context, Ty, builtins_functions};
@@ -53,6 +53,34 @@ fn builtins_ctx() -> Context {
 }
 
 // ---------------------------------------------------------------------------
+// empty() -- SigResolver tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn empty_return_type_depends_on_arity() {
+    let ctx = builtins_ctx();
+    assert_eq!(infer_ok("empty()", &ctx), Ty::Unknown);
+    assert_eq!(infer_ok("empty(0)", &ctx), Ty::Boolean);
+    assert_eq!(infer_ok("empty(empty())", &ctx), Ty::Boolean);
+    assert_eq!(
+        infer_ok("[1, empty(), 2]", &ctx),
+        Ty::List(Box::new(Ty::Unknown))
+    );
+}
+
+#[test]
+fn empty_extra_arguments_still_report_an_arity_error() {
+    let ctx = builtins_ctx();
+    assert_single_diag(
+        "empty(1, 2)",
+        &ctx,
+        "empty() expects at most 1 argument",
+        Span { start: 0, end: 11 },
+    );
+    assert_eq!(infer_with_diags("empty(1, 2)", &ctx).0, Ty::Number);
+}
+
+// ---------------------------------------------------------------------------
 // flat() -- SigResolver tests
 // ---------------------------------------------------------------------------
 
@@ -74,18 +102,29 @@ fn flat_already_flat_list_returns_same_type() {
 }
 
 #[test]
-fn flat_triple_nested_deep_flattens() {
-    // flat(number[][][]) -> number[] (deep flatten, not just one level)
-    // [[[1, 2]]] is number[][][]
+fn flat_triple_nested_preserves_the_remaining_list_layer() {
     let ctx = builtins_ctx();
     let ty = infer_ok("flat([[[1, 2]]])", &ctx);
-    assert_eq!(ty, Ty::List(Box::new(Ty::Number)));
+    assert_eq!(ty, Ty::List(Box::new(Ty::List(Box::new(Ty::Number)))));
+}
+
+#[test]
+fn flat_union_of_list_types_flattens_each_member_once() {
+    let ctx = builtins_ctx();
+    let ty = infer_ok("flat(if(true, [[1]], [[[\"x\"]]]))", &ctx);
+    assert_eq!(
+        ty,
+        Ty::List(Box::new(Ty::Union(vec![
+            Ty::Number,
+            Ty::List(Box::new(Ty::String)),
+        ])))
+    );
 }
 
 #[test]
 fn flat_mixed_types_produces_union() {
     // flat([1, ["hello"]]) -> (number | string)[]
-    // The outer list is (number | string[])[], flattening collects leaves: number, string
+    // The outer list is (number | string[])[]; one-level flattening yields number | string.
     let ctx = builtins_ctx();
     let ty = infer_ok("flat([1, [\"hello\"]])", &ctx);
     // normalize_union sorts: Number < String
@@ -96,15 +135,11 @@ fn flat_mixed_types_produces_union() {
 }
 
 #[test]
-fn flat_unknown_list_returns_generic_fallback() {
-    // flat(unknown[]) -> unknown[] (via generic fallback T0[])
-    // Using an identifier `x` gives Ty::Unknown, wrapping in a list gives List(Unknown)
+fn flat_unknown_and_unknown_list_preserve_unknown() {
     let ctx = builtins_ctx();
-    let (ty, diags) = infer_with_diags("flat([x])", &ctx);
-    // [x] infers to List(Unknown); flat(List(Unknown)) -> resolver sees non-List inner, returns
-    // the sig.ret fallback which after generic unification would be List(Unknown).
-    assert!(diags.is_empty(), "unexpected diagnostics: {:?}", diags);
-    assert_eq!(ty, Ty::List(Box::new(Ty::Unknown)));
+    for source in ["flat([x])", "flat(empty())"] {
+        assert_eq!(infer_ok(source, &ctx), Ty::List(Box::new(Ty::Unknown)));
+    }
 }
 
 #[test]

@@ -74,8 +74,11 @@ fn whole_catalog_is_self_consistent() {
 }
 
 #[test]
-fn resolver_is_attached_only_for_flat() {
+fn resolver_is_attached_only_for_empty_and_flat() {
     for function in builtins_functions() {
-        assert_eq!(function.resolver.is_some(), function.name == "flat");
+        assert_eq!(
+            function.resolver.is_some(),
+            matches!(function.name.as_str(), "empty" | "flat")
+        );
     }
 }

@@ -3,6 +3,14 @@ use crate::{
     normalize_union,
 };
 
+fn resolve_empty(input: &ResolverInput<'_>) -> Ty {
+    match input.arguments {
+        [] => Ty::Unknown,
+        [_] => Ty::Boolean,
+        _ => input.default_return_ty.clone(),
+    }
+}
+
 fn general_definitions() -> BuiltinCategory {
     builtin_functions! {
         category: General;
@@ -37,7 +45,8 @@ fn general_definitions() -> BuiltinCategory {
         /// Currently expressed by the `not` prefix operator rather than a builtin call.
         not(condition: boolean) -> boolean;
 
-        empty(value?: any) -> boolean;
+        #[resolver(resolve_empty)]
+        empty(value?: any) -> any;
         length(value: string | any[]) -> number;
         format(value: any) -> string;
         equal(a: any, b: any) -> boolean;
@@ -188,26 +197,35 @@ fn people_definitions() -> BuiltinCategory {
 }
 
 fn resolve_flat(input: &ResolverInput<'_>) -> Ty {
-    match input.arguments.first() {
-        Some(ArgumentObservation::Typed(Ty::List(element))) => {
-            let mut leaves = Vec::new();
-            collect_leaf_types(element, &mut leaves);
-            Ty::List(Box::new(normalize_union(leaves)))
+    fn flatten_element(ty: &Ty) -> Ty {
+        match ty {
+            // Remove this List layer without flattening inner lists.
+            Ty::List(inner) => inner.as_ref().clone(),
+            Ty::Union(members) => normalize_union(members.iter().map(flatten_element)),
+            other => other.clone(),
         }
-        _ => input.default_return_ty.clone(),
     }
-}
 
-fn collect_leaf_types(ty: &Ty, out: &mut Vec<Ty>) {
-    match ty {
-        Ty::List(inner) => collect_leaf_types(inner, out),
-        Ty::Union(members) => {
-            for member in members {
-                collect_leaf_types(member, out);
+    fn collect_elements(ty: &Ty, elements: &mut Vec<Ty>) {
+        match ty {
+            Ty::List(inner) => elements.push(flatten_element(inner)),
+            Ty::Unknown => elements.push(Ty::Unknown),
+            Ty::Union(members) => {
+                for member in members {
+                    collect_elements(member, elements);
+                }
             }
+            // Call validation rejects mismatches; they contribute no successful result type.
+            _ => {}
         }
-        other => out.push(other.clone()),
     }
+
+    let Some(ArgumentObservation::Typed(argument)) = input.arguments.first() else {
+        return input.default_return_ty.clone();
+    };
+    let mut elements = Vec::new();
+    collect_elements(argument, &mut elements);
+    Ty::List(Box::new(normalize_union(elements)))
 }
 
 fn list_definitions() -> BuiltinCategory {
