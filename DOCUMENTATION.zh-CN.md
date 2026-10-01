@@ -2,11 +2,11 @@
 doc_id: documentation.policy
 title: "文档维护规范"
 language: zh-CN
-source_language: en
+source_language: zh-CN
 counterpart: ./DOCUMENTATION.md
 implementation_status: current
 document_status: stable
-translation_status: synced
+translation_status: needs-update
 last_verified: 2026-09-01
 ---
 
@@ -66,6 +66,11 @@ last_verified: 2026-09-01
 ## 从读者问题出发
 
 - 从读者需要回答的问题开始，使用直接、具体的句子。
+- Spec 以声明和代码表达精确定义，以就地注释补充语义，正文只说明跨声明的约定与依据。
+- 函数用法、返回值、约束和必要示例写在对应声明的简短注释中；类型、字段和 variant 的契约同样就地描述。不要另设散文章节重复维护这些内容。
+- 能用 Rust 精确表达的转换规则直接写成函数，注释只补充必要语义。例如 `flat` 的类型转换写在类型推断函数中，不再用正文、伪代码或输入输出类型表复述算法。
+- 通用语义已有语言或行业惯例可复用时，简述采用的约定及适用范围，并引用规范或调研报告；只展开本项目的差异和必要例外，避免逐函数重复解释。
+- 作为生成源的 Spec 遵循 [spec-codegen](docs/contributing/spec-codegen.zh-CN.md)，修改后校验声明；已有实现时实际生成 Rust，核对接口与契约注释。
 - 技术结论必须来自代码、测试、schema、运行时证据或 human 明确作出的决定，不得从实现结构反推设计意图。
 - 在结论附近提供少量有用的实现或测试入口。本次核验过程和命令记录放在 PR 中。
 - 两种语言应保持相同的范围、确定程度、保证、限制、失败行为、示例和生命周期状态，同时分别使用自然表达。

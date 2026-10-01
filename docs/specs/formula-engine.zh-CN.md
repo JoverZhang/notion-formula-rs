@@ -287,7 +287,7 @@ pub enum RuntimeError {
     /// 类型正确，但值违反函数约束；正则和日期问题使用下方的具体分类。
     InvalidValue {
         actual: Value,
-        /// 例如“repeat 的次数必须非负”。
+        /// 例如“repeat 的次数必须有限”；函数值域规则见 Builtin 规范。
         constraint: String,
     },
     InvalidRegex {

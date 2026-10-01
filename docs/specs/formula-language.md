@@ -199,9 +199,9 @@ ln(0)                       → -Infinity
 NaN in ==, <, <=, >, >=      → false
 NaN in !=                    → true
 +0 == -0                     → true
-
-An individual function may still restrict argument values, for example repeat requires a finite, non-negative count.
 ```
+
+Function-specific argument constraints and null handling are defined in the [Planned Builtin rules](builtin-functions.md#planned-aggregates-sort-flat-and-repeat).
 
 ## Analysis and Failure Boundaries
 
