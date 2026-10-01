@@ -340,11 +340,13 @@ enum ListInitial {
     Bool(bool),
 }
 
+type RowList = Option<Vec<Option<Value>>>;
+
 fn initialize_lists(
     list: &EvalBlock,
     mask: &Mask,
     initial: ListInitial,
-) -> (Vec<Option<Vec<Option<Value>>>>, Vec<RowOutcome>, Mask) {
+) -> (Vec<RowList>, Vec<RowOutcome>, Mask) {
     let mut lists = Vec::with_capacity(mask.len());
     let mut outcomes = Vec::with_capacity(mask.len());
     let mut active = Mask::none(mask.len());
@@ -386,18 +388,13 @@ fn initialize_lists(
     (lists, outcomes, active)
 }
 
-fn element_mask(
-    lists: &[Option<Vec<Option<Value>>>],
-    active: &Mask,
-    index: usize,
-    len: usize,
-) -> Mask {
+fn element_mask(lists: &[RowList], active: &Mask, index: usize, len: usize) -> Mask {
     (0..len)
         .map(|row| active[row] && lists[row].as_ref().is_some_and(|list| index < list.len()))
         .collect()
 }
 
-fn element_binding(lists: &[Option<Vec<Option<Value>>>], index: usize, mask: &Mask) -> Column {
+fn element_binding(lists: &[RowList], index: usize, mask: &Mask) -> Column {
     let mut valid = Vec::with_capacity(mask.len());
     let values = (0..mask.len())
         .map(|row| {
