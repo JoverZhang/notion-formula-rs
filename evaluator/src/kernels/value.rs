@@ -425,8 +425,8 @@ pub(crate) fn eval_format_number(
                 "precision must be finite and between 0 and 1000000",
             )?
             .min(100);
-            let format = format.to_ascii_lowercase();
-            match format.as_str() {
+            let selector = format.to_ascii_lowercase();
+            match selector.as_str() {
                 "number" | "decimal" => Ok(render_fixed(*value, precision, false)),
                 "number_with_commas" | "commas" => Ok(render_fixed(*value, precision, true)),
                 "percent" | "%" => {

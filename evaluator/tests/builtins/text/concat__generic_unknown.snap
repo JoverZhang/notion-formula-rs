@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Value": any = [true, 2, null]
+
+concat([1], [prop("Value")])
+=== OUTPUT ===
+row-0: error(InvalidValueType { expected: List(Number), actual: List(Boolean) })
+row-1: [1, 2]
+row-2: [1, null]

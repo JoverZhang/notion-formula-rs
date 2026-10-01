@@ -1,0 +1,3 @@
+// @prop "Value": any = [true, 2, null]
+
+splice([1], 0, 0, prop("Value"))

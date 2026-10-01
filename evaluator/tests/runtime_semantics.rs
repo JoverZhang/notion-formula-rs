@@ -589,3 +589,255 @@ fn unbound_variables_are_rejected_before_runtime_but_lexical_scopes_remain_execu
         Some(Value::Number(3.0)),
     );
 }
+
+#[test]
+fn resolved_generic_constraints_reject_dynamic_values_without_panicking() {
+    let list_number = || Ty::List(Box::new(Ty::Number));
+    let list_boolean = || Ty::List(Box::new(Ty::Boolean));
+    for (source, expected, actual, number_result, null_result) in [
+        (
+            r#"splice([1], 0, 0, prop("X"))"#,
+            Ty::Number,
+            Ty::Boolean,
+            Some(list(vec![n(2.0), n(1.0)])),
+            Some(list(vec![None, n(1.0)])),
+        ),
+        (
+            r#"concat([1], [prop("X")])"#,
+            list_number(),
+            list_boolean(),
+            Some(list(vec![n(1.0), n(2.0)])),
+            Some(list(vec![n(1.0), None])),
+        ),
+        (
+            r#"concat([prop("X")], [1])"#,
+            list_number(),
+            list_boolean(),
+            Some(list(vec![n(2.0), n(1.0)])),
+            Some(list(vec![None, n(1.0)])),
+        ),
+        (
+            r#"splice([prop("X")], 0, 0, 1)"#,
+            list_number(),
+            list_boolean(),
+            Some(list(vec![n(1.0), n(2.0)])),
+            Some(list(vec![n(1.0), None])),
+        ),
+        (
+            r#"includes([1], prop("X"))"#,
+            Ty::Number,
+            Ty::Boolean,
+            Some(Value::Bool(false)),
+            Some(Value::Bool(false)),
+        ),
+        (
+            r#"concat(empty(), [1], [prop("X")])"#,
+            list_number(),
+            list_boolean(),
+            None,
+            None,
+        ),
+        (
+            r#"map([1], concat([prop("X")], [1]))"#,
+            list_number(),
+            list_boolean(),
+            Some(list(vec![Some(list(vec![n(2.0), n(1.0)]))])),
+            Some(list(vec![Some(list(vec![None, n(1.0)]))])),
+        ),
+    ] {
+        let column = Column::Any(KernelColumn::<AnyKind>::from_values(
+            vec![Value::Bool(true), Value::Number(2.0), Value::Bool(true)],
+            Validity::from_valid_bits(vec![true, true, false]),
+        ));
+        let result = evaluate(source, vec![("X", Ty::Unknown, column)]);
+        assert_eq!(result.ok.as_slice(), &[false, true, true], "{source}");
+        assert_eq!(
+            result.errors,
+            vec![(0, EvalError::InvalidValueType { expected, actual })],
+            "{source}"
+        );
+        assert_eq!(result.column.row_value(1), number_result, "{source}");
+        assert_eq!(result.column.row_value(2), null_result, "{source}");
+    }
+}
+
+#[test]
+fn resolved_nested_generic_constraints_are_checked_through_controlled_calls() {
+    let list_number = Ty::List(Box::new(Ty::Number));
+    let list_boolean = Ty::List(Box::new(Ty::Boolean));
+    let nested_list_number = Ty::List(Box::new(list_number.clone()));
+    for (source, expected, number_result) in [
+        (
+            r#"concat([1], prop("X"))"#,
+            list_number.clone(),
+            Some(list(vec![n(1.0), None, n(2.0)])),
+        ),
+        (
+            r#"concat(prop("X"), [1])"#,
+            list_number.clone(),
+            Some(list(vec![None, n(2.0), n(1.0)])),
+        ),
+        (
+            r#"splice(prop("X"), 0, 0, 1)"#,
+            list_number.clone(),
+            Some(list(vec![n(1.0), None, n(2.0)])),
+        ),
+        (
+            r#"let(x, prop("X"), concat([1], x))"#,
+            list_number.clone(),
+            Some(list(vec![n(1.0), None, n(2.0)])),
+        ),
+        (
+            r#"flat(concat(prop("X"), [[1]]))"#,
+            nested_list_number.clone(),
+            None,
+        ),
+    ] {
+        let good = if expected == nested_list_number {
+            list(vec![Some(list(vec![None, n(2.0)]))])
+        } else {
+            list(vec![None, n(2.0)])
+        };
+        let column = Column::Any(KernelColumn::<AnyKind>::from_values(
+            vec![
+                list(vec![None, Some(Value::Bool(true))]),
+                good,
+                Value::Bool(true),
+            ],
+            Validity::from_valid_bits(vec![true, true, false]),
+        ));
+        let result = evaluate(source, vec![("X", Ty::Unknown, column)]);
+        assert_eq!(result.ok.as_slice(), &[false, true, true], "{source}");
+        assert_eq!(
+            result.errors,
+            vec![(
+                0,
+                EvalError::InvalidValueType {
+                    expected,
+                    actual: list_boolean.clone()
+                }
+            )],
+            "{source}"
+        );
+        let expected_good = if source.starts_with("flat") {
+            Some(list(vec![None, n(2.0), n(1.0)]))
+        } else {
+            number_result
+        };
+        assert_eq!(result.column.row_value(1), expected_good, "{source}");
+        assert_eq!(result.column.row_value(2), None, "{source}");
+    }
+    let source = r#"concat([[1]], prop("X"))"#;
+    let result = evaluate(
+        source,
+        vec![(
+            "X",
+            Ty::Unknown,
+            any(vec![
+                list(vec![Some(list(vec![None, Some(Value::Bool(true))]))]),
+                list(vec![Some(list(vec![None, n(2.0)]))]),
+            ]),
+        )],
+    );
+    assert_eq!(result.ok.as_slice(), &[false, true]);
+    assert_eq!(
+        result.errors,
+        vec![(
+            0,
+            EvalError::InvalidValueType {
+                expected: nested_list_number,
+                actual: Ty::List(Box::new(list_boolean))
+            }
+        )]
+    );
+    assert_eq!(
+        result.column.row_value(1),
+        Some(list(vec![
+            Some(list(vec![n(1.0)])),
+            Some(list(vec![None, n(2.0)]))
+        ]))
+    );
+}
+
+#[test]
+fn runtime_actual_types_ignore_ordinary_null_list_positions() {
+    let values = [
+        list(vec![None, n(1.0)]),
+        list(vec![None]),
+        list(vec![]),
+        list(vec![Some(list(vec![None, n(1.0)]))]),
+    ];
+    let actual_types = [
+        Ty::List(Box::new(Ty::Number)),
+        Ty::List(Box::new(Ty::Unknown)),
+        Ty::List(Box::new(Ty::Unknown)),
+        Ty::List(Box::new(Ty::List(Box::new(Ty::Number)))),
+    ];
+    let result = evaluate(
+        r#"abs(prop("X"))"#,
+        vec![("X", Ty::Unknown, any(values.to_vec()))],
+    );
+    assert_eq!(
+        result.errors,
+        actual_types
+            .into_iter()
+            .enumerate()
+            .map(|(row, actual)| (
+                row,
+                EvalError::InvalidValueType {
+                    expected: Ty::Number,
+                    actual
+                }
+            ))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn invalid_number_format_keeps_the_original_text() {
+    let result = evaluate(r#"formatNumber(1, "NO_SUCH_FORMAT", 0)"#, vec![]);
+    assert_eq!(
+        result.errors,
+        vec![(
+            0,
+            EvalError::InvalidValue {
+                actual: Value::Text("NO_SUCH_FORMAT".to_string()),
+                constraint: "unsupported number format".to_string()
+            }
+        )]
+    );
+}
+
+#[test]
+fn resolved_generic_checks_obey_controlled_execution_masks() {
+    let result = evaluate(
+        r#"if(prop("C"), concat([1], [prop("X")]), [7])"#,
+        vec![
+            (
+                "C",
+                Ty::Boolean,
+                Column::Boolean(KernelColumn::<BooleanKind>::from_values(
+                    vec![false, true],
+                    Validity::AllValid,
+                )),
+            ),
+            (
+                "X",
+                Ty::Unknown,
+                any(vec![Value::Bool(true), Value::Bool(true)]),
+            ),
+        ],
+    );
+    assert_eq!(result.ok.as_slice(), &[true, false]);
+    assert_eq!(result.column.row_value(0), Some(list(vec![n(7.0)])));
+    assert_eq!(
+        result.errors,
+        vec![(
+            1,
+            EvalError::InvalidValueType {
+                expected: Ty::List(Box::new(Ty::Number)),
+                actual: Ty::List(Box::new(Ty::Boolean))
+            }
+        )]
+    );
+}

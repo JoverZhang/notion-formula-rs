@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Value": any = [true, 2, null]
+
+splice([1], 0, 0, prop("Value"))
+=== OUTPUT ===
+row-0: error(InvalidValueType { expected: Number, actual: Boolean })
+row-1: [2, 1]
+row-2: [null, 1]

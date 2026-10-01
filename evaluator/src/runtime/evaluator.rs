@@ -14,7 +14,8 @@ use crate::core::types::{EvalBlock, Mask, RowBatch};
 use crate::ir::{ExecNode, ExecPlan, PlanId, PlannedArgumentKind};
 
 use super::operators::{
-    eval_binary, eval_cast, eval_list, eval_logical_and, eval_logical_or, eval_unary, literal_block,
+    eval_binary, eval_cast, eval_list, eval_logical_and, eval_logical_or, eval_type_check,
+    eval_unary, literal_block,
 };
 
 pub(crate) struct Runtime<'a> {
@@ -112,6 +113,10 @@ impl<'a> Runtime<'a> {
             ExecNode::Cast { input, target } => {
                 let input = self.eval_node(input, mask);
                 eval_cast(input, target, mask)
+            }
+            ExecNode::TypeCheck { input, expected } => {
+                let input = self.eval_node(input, mask);
+                eval_type_check(input, &expected, mask)
             }
             ExecNode::Builtin(call) => match call.key.evaluation_mode() {
                 BuiltinEvaluationMode::Value => {

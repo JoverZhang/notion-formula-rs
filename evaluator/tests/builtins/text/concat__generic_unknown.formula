@@ -1,0 +1,3 @@
+// @prop "Value": any = [true, 2, null]
+
+concat([1], [prop("Value")])

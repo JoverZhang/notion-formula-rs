@@ -86,6 +86,10 @@ pub(crate) enum ExecNode {
         input: PlanId,
         target: AbiKind,
     },
+    TypeCheck {
+        input: PlanId,
+        expected: Ty,
+    },
     Builtin(BuiltinCallNode),
 }
 

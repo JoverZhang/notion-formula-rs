@@ -7,7 +7,7 @@ use crate::core::columns::{
     NumberKind, TextKind, Validity,
 };
 use crate::core::errors::EvalError;
-use crate::core::types::{EvalBlock, Mask, Value};
+use crate::core::types::{EvalBlock, Mask, Value, value_type_accepts};
 
 pub(crate) fn literal_block(value: Value, mask: &Mask) -> EvalBlock {
     let len = mask.len();
@@ -52,6 +52,29 @@ pub(crate) fn eval_cast(input: EvalBlock, target: AbiKind, mask: &Mask) -> EvalB
         AbiKind::List => cast_rows::<ListKind>(input, mask),
         AbiKind::Any => cast_rows::<AnyKind>(input, mask),
     }
+}
+
+pub(crate) fn eval_type_check(mut input: EvalBlock, expected: &Ty, mask: &Mask) -> EvalBlock {
+    for row in 0..mask.len() {
+        if !mask[row] || !input.ok[row] {
+            continue;
+        }
+        let Some(value) = input.column.row_value(row) else {
+            continue;
+        };
+        let actual = value.value_type();
+        if !value_type_accepts(expected, &actual) {
+            input.ok.set(row, false);
+            input.errors.push((
+                row,
+                EvalError::InvalidValueType {
+                    expected: expected.clone(),
+                    actual,
+                },
+            ));
+        }
+    }
+    input
 }
 
 fn cast_rows<K: ColumnKind>(input: EvalBlock, mask: &Mask) -> EvalBlock {

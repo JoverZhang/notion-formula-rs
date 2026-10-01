@@ -90,9 +90,31 @@ impl Value {
             Self::List(values) => Ty::List(Box::new(builtin_fn::normalize_union(
                 values
                     .iter()
-                    .map(|value| value.as_ref().map_or(Ty::Null, Self::value_type)),
+                    .filter_map(Option::as_ref)
+                    .map(Self::value_type),
             ))),
         }
+    }
+}
+
+pub(crate) fn value_type_accepts(
+    expected: &analyzer::analysis::Ty,
+    actual: &analyzer::analysis::Ty,
+) -> bool {
+    use analyzer::analysis::Ty;
+    match actual {
+        Ty::Null => true,
+        Ty::Union(members) => members
+            .iter()
+            .all(|member| value_type_accepts(expected, member)),
+        Ty::List(inner) => match expected {
+            Ty::List(expected) => value_type_accepts(expected, inner),
+            Ty::Union(members) => members
+                .iter()
+                .any(|member| value_type_accepts(member, actual)),
+            _ => builtin_fn::type_accepts(expected, actual),
+        },
+        _ => builtin_fn::type_accepts(expected, actual),
     }
 }
 

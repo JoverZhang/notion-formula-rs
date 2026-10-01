@@ -1,11 +1,9 @@
 #[cfg(debug_assertions)]
 use analyzer::analysis::Ty;
-#[cfg(debug_assertions)]
-use builtin_fn::type_accepts;
 
 use crate::builtins::BuiltinKey;
 #[cfg(debug_assertions)]
-use crate::core::types::Value;
+use crate::core::types::value_type_accepts;
 use crate::core::types::{EvalBlock, Mask};
 use crate::ir::{DebugArgumentContract, DebugCallContract};
 
@@ -211,33 +209,10 @@ pub(crate) fn assert_runtime_type_rows(
             continue;
         }
         let value = block.column.row_value(row).expect("valid row");
-        let actual = runtime_ty(&value);
+        let actual = value.value_type();
         assert!(
-            type_accepts_nullable(expected, &actual),
+            value_type_accepts(expected, &actual),
             "{context} row {row} expected {expected}, observed {actual}"
         );
-    }
-}
-
-#[cfg(debug_assertions)]
-pub(crate) fn runtime_ty(value: &Value) -> Ty {
-    value.value_type()
-}
-
-#[cfg(debug_assertions)]
-fn type_accepts_nullable(expected: &Ty, actual: &Ty) -> bool {
-    match actual {
-        Ty::Null => true,
-        Ty::Union(members) => members
-            .iter()
-            .all(|member| type_accepts_nullable(expected, member)),
-        Ty::List(inner) => match expected {
-            Ty::List(expected) => type_accepts_nullable(expected, inner),
-            Ty::Union(members) => members
-                .iter()
-                .any(|member| type_accepts_nullable(member, actual)),
-            _ => type_accepts(expected, actual),
-        },
-        _ => type_accepts(expected, actual),
     }
 }
