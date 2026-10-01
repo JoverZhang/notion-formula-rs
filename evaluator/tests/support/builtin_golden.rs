@@ -543,7 +543,15 @@ fn property_column(path: &Path, name: &str, ty: &Ty, values: &[JsonValue]) -> Co
 
 fn json_to_typed_value(value: &JsonValue, ty: &Ty) -> Option<Value> {
     match ty {
-        Ty::Number => value.as_f64().map(Value::Number),
+        Ty::Number => value
+            .as_f64()
+            .or_else(|| match value.as_str()? {
+                "NaN" => Some(f64::NAN),
+                "Infinity" => Some(f64::INFINITY),
+                "-Infinity" => Some(f64::NEG_INFINITY),
+                _ => None,
+            })
+            .map(Value::Number),
         Ty::String => value.as_str().map(|value| Value::Text(value.to_owned())),
         Ty::Boolean => value.as_bool().map(Value::Bool),
         Ty::Date => DateTime::parse_from_rfc3339(value.as_str()?)
@@ -552,7 +560,13 @@ fn json_to_typed_value(value: &JsonValue, ty: &Ty) -> Option<Value> {
         Ty::List(element) => value
             .as_array()?
             .iter()
-            .map(|value| json_to_typed_value(value, element))
+            .map(|value| {
+                if value.is_null() {
+                    Some(None)
+                } else {
+                    json_to_typed_value(value, element).map(Some)
+                }
+            })
             .collect::<Option<Vec<_>>>()
             .map(Value::List),
         Ty::Union(members) => members
@@ -570,7 +584,13 @@ fn json_to_value(value: &JsonValue) -> Option<Value> {
         JsonValue::String(value) => Some(Value::Text(value.clone())),
         JsonValue::Array(values) => values
             .iter()
-            .map(json_to_value)
+            .map(|value| {
+                if value.is_null() {
+                    Some(None)
+                } else {
+                    json_to_value(value).map(Some)
+                }
+            })
             .collect::<Option<Vec<_>>>()
             .map(Value::List),
         JsonValue::Null | JsonValue::Object(_) => None,
@@ -630,9 +650,9 @@ fn render_snapshot(
                 .filter(|(error_row, _)| *error_row == row)
                 .map(|(_, error)| format!("{error:?}"))
                 .collect::<Vec<_>>();
-            assert_eq!(errors.len(), 1, "row {row_id} must have exactly one error");
+            assert!(!errors.is_empty(), "failed row {row_id} must have an error");
             rendered.push_str("error(");
-            rendered.push_str(&errors[0]);
+            rendered.push_str(&errors.join(", "));
             rendered.push(')');
         } else if let Some(value) = output.column.row_value(row) {
             render_value(&value, offset, &mut rendered);
@@ -647,7 +667,11 @@ fn render_snapshot(
 fn render_value(value: &Value, offset: FixedOffset, output: &mut String) {
     match value {
         Value::Number(value) => {
-            if *value == 0.0 && value.is_sign_negative() {
+            if *value == f64::INFINITY {
+                output.push_str("Infinity");
+            } else if *value == f64::NEG_INFINITY {
+                output.push_str("-Infinity");
+            } else if *value == 0.0 && value.is_sign_negative() {
                 output.push_str("-0");
             } else {
                 output.push_str(&value.to_string());
@@ -676,7 +700,11 @@ fn render_value(value: &Value, offset: FixedOffset, output: &mut String) {
                 if index > 0 {
                     output.push_str(", ");
                 }
-                render_value(value, offset, output);
+                if let Some(value) = value {
+                    render_value(value, offset, output);
+                } else {
+                    output.push_str("null");
+                }
             }
             output.push(']');
         }

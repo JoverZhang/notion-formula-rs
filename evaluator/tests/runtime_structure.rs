@@ -170,20 +170,20 @@ fn execution_mask_row_ok_and_null_validity_are_independent() {
 #[test]
 fn row_error_does_not_become_null_or_execution_state() {
     let prepared = prepare(
-        r#"prop("A") / prop("B")"#,
-        &[("A", Ty::Number), ("B", Ty::Number)],
+        r#"repeat(prop("A"), prop("B"))"#,
+        &[("A", Ty::String), ("B", Ty::Number)],
     );
     let mut builder = EvalInputsBuilder::new(runtime());
     builder.insert(
         prepared.required_columns()[0].slot,
-        number_column(
-            vec![1.0, 0.0, 3.0],
+        Column::Text(KernelColumn::<TextKind>::from_values(
+            vec!["a".to_string(), String::new(), "c".to_string()],
             Validity::Bitmap(SharedBitmap::new(vec![true, false, true])),
-        ),
+        )),
     );
     builder.insert(
         prepared.required_columns()[1].slot,
-        number_column(vec![0.0, 2.0, 0.0], Validity::AllValid),
+        number_column(vec![f64::INFINITY, 2.0, f64::INFINITY], Validity::AllValid),
     );
     let output = prepared
         .evaluate_with_mask(
@@ -197,7 +197,16 @@ fn row_error_does_not_become_null_or_execution_state() {
     assert!(output.validity().is_valid(0));
     assert!(!output.validity().is_valid(1));
     assert!(output.validity().is_valid(2));
-    assert_eq!(output.errors, vec![(0, evaluator::EvalError::DivideByZero)]);
+    assert_eq!(
+        output.errors,
+        vec![(
+            0,
+            evaluator::EvalError::InvalidValue {
+                actual: Value::Number(f64::INFINITY),
+                constraint: "repeat count must be finite".to_string(),
+            }
+        )]
+    );
 }
 
 #[test]

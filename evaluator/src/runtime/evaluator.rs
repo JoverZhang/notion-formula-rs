@@ -50,14 +50,10 @@ impl<'a> Runtime<'a> {
                 eval_list(blocks, mask)
             }
             ExecNode::Input(slot) => {
-                let Some(column) = self.inputs.column(slot).cloned() else {
+                let Some(block) = self.inputs.block(slot).cloned() else {
                     return EvalBlock::fail_mask(mask, EvalError::PropertyDisabled);
                 };
-                EvalBlock::new(
-                    column.normalize_inactive(mask),
-                    Mask::all(mask.len()),
-                    Vec::new(),
-                )
+                block.select(mask)
             }
             ExecNode::Variable(name) => {
                 let column = self

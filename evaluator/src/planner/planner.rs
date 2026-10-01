@@ -25,6 +25,7 @@ pub(crate) struct Planner<'a> {
     nodes: Vec<ExecNode>,
     required_columns: Vec<RequiredColumn>,
     property_slots: HashMap<String, InputSlot>,
+    bound_names: Vec<Box<[String]>>,
 }
 
 impl<'a> Planner<'a> {
@@ -44,6 +45,7 @@ impl<'a> Planner<'a> {
             nodes: Vec::new(),
             required_columns: Vec::new(),
             property_slots: HashMap::new(),
+            bound_names: Vec::new(),
         }
     }
 
@@ -89,7 +91,18 @@ impl<'a> Planner<'a> {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(self.push(ExecNode::List(items.into_boxed_slice())))
             }
-            ExprKind::Ident(symbol) => Ok(self.push(ExecNode::Variable(symbol.text.clone()))),
+            ExprKind::Ident(symbol) => {
+                if self
+                    .bound_names
+                    .iter()
+                    .rev()
+                    .any(|names| names.contains(&symbol.text))
+                {
+                    Ok(self.push(ExecNode::Variable(symbol.text.clone())))
+                } else {
+                    Err(PrepareError::UnboundVariable(symbol.text.clone()))
+                }
+            }
             ExprKind::Unary { op, expr } => {
                 let input = self.lower(expr)?;
                 Ok(self.push(ExecNode::Unary { op: *op, input }))
@@ -121,7 +134,12 @@ impl<'a> Planner<'a> {
             ExprKind::Call { callee, args } => {
                 self.lower_builtin(expression.id, &callee.text, args)
             }
-            ExprKind::ImplicitLambda { body, .. } => self.lower(body),
+            ExprKind::ImplicitLambda { params, body } => {
+                self.bound_names.push(params.clone().into_boxed_slice());
+                let result = self.lower(body);
+                self.bound_names.pop();
+                result
+            }
             ExprKind::MemberCall { .. } | ExprKind::Error => {
                 Err(PrepareError::UnsupportedExpression)
             }
@@ -198,7 +216,11 @@ impl<'a> Planner<'a> {
                     else {
                         return Err(PrepareError::UnsupportedExpression);
                     };
-                    let body = self.lower(body)?;
+                    self.bound_names
+                        .push(inferred_params.clone().into_boxed_slice());
+                    let body = self.lower(body);
+                    self.bound_names.pop();
+                    let body = body?;
                     let body = self.ensure_abi(body, abi_kind_for_ty(ret));
                     if params.is_empty() {
                         PlannedArgumentKind::Thunk { body }

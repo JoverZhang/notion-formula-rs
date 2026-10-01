@@ -3,17 +3,56 @@ use std::fmt;
 
 use super::columns::AbiKind;
 use super::inputs::InputSlot;
+use super::types::Value;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EvalError {
+    InvalidValueType {
+        expected: Ty,
+        actual: Ty,
+    },
+    InvalidValue {
+        actual: Value,
+        constraint: String,
+    },
+    InvalidRegex {
+        pattern: String,
+        detail: String,
+    },
+    InvalidDateText {
+        text: String,
+    },
+    DateOutOfRange,
+    /// Formula boundaries assign an identity once, then dependency reads preserve it.
+    Originated {
+        origin_formula_id: String,
+        occurrence: u64,
+        error: Box<EvalError>,
+    },
+    // Retained for internal plan/ABI invariants and compatibility.
     TypeMismatch,
     DivideByZero,
     InvalidArgument,
-    InvalidRegex,
     InvalidDate,
     UnknownFunction,
     CycleDetected,
     PropertyDisabled,
+}
+
+impl EvalError {
+    pub(crate) fn invalid_type(expected: Ty, actual: &Value) -> Self {
+        Self::InvalidValueType {
+            expected,
+            actual: actual.value_type(),
+        }
+    }
+
+    pub(crate) fn invalid_value(actual: Value, constraint: &str) -> Self {
+        Self::InvalidValue {
+            actual,
+            constraint: constraint.to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,6 +84,7 @@ pub enum PrepareError {
     MissingResolvedCall,
     InvalidResolvedShape,
     UnknownProperty(String),
+    UnboundVariable(String),
     UnsupportedType(Ty),
 }
 

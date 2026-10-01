@@ -10,4 +10,4 @@ ifs(
 === OUTPUT ===
 row-0: 10
 row-1: 30
-row-2: error(DivideByZero)
+row-2: Infinity

@@ -75,7 +75,25 @@ pub enum Value {
     Text(String),
     Bool(bool),
     Date(i64),
-    List(Vec<Value>),
+    List(Vec<Option<Value>>),
+}
+
+impl Value {
+    /// Observed runtime structure; empty lists have an unknown element type.
+    pub fn value_type(&self) -> analyzer::analysis::Ty {
+        use analyzer::analysis::Ty;
+        match self {
+            Self::Number(_) => Ty::Number,
+            Self::Text(_) => Ty::String,
+            Self::Bool(_) => Ty::Boolean,
+            Self::Date(_) => Ty::Date,
+            Self::List(values) => Ty::List(Box::new(builtin_fn::normalize_union(
+                values
+                    .iter()
+                    .map(|value| value.as_ref().map_or(Ty::Null, Self::value_type)),
+            ))),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -173,6 +191,18 @@ impl EvalBlock {
 
     pub fn validity(&self) -> &Validity {
         self.column.validity()
+    }
+
+    pub(crate) fn select(self, mask: &Mask) -> Self {
+        let ok = (0..mask.len())
+            .map(|row| !mask[row] || self.ok[row])
+            .collect();
+        let errors = self
+            .errors
+            .into_iter()
+            .filter(|(row, _)| mask[*row])
+            .collect();
+        Self::new(self.column.normalize_inactive(mask), ok, errors)
     }
 
     pub(crate) fn fail_mask(mask: &Mask, error: EvalError) -> Self {

@@ -1,0 +1,3 @@
+// @prop "Exponent": number = ["NaN", "Infinity", "-Infinity"]
+
+pow(1, prop("Exponent"))

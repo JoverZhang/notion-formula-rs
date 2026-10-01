@@ -1,0 +1,10 @@
+=== INPUT ===
+// @prop "Value": number = ["NaN", "Infinity", "-Infinity", -0.0, 0.0]
+
+min(prop("Value"), 0)
+=== OUTPUT ===
+row-0: NaN
+row-1: 0
+row-2: -Infinity
+row-3: -0
+row-4: 0

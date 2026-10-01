@@ -1,0 +1,3 @@
+// @prop "Pattern": string = ["[", "x", null]
+
+test("text", prop("Pattern"))

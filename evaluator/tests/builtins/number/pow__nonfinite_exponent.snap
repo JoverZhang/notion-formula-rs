@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Exponent": number = ["NaN", "Infinity", "-Infinity"]
+
+pow(1, prop("Exponent"))
+=== OUTPUT ===
+row-0: NaN
+row-1: NaN
+row-2: NaN

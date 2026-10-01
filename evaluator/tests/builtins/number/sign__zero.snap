@@ -4,4 +4,4 @@
 sign(prop("Value"))
 === OUTPUT ===
 row-0: 0
-row-1: 0
+row-1: -0

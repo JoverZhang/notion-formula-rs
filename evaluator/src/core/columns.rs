@@ -15,6 +15,20 @@ pub enum AbiKind {
     Any,
 }
 
+impl AbiKind {
+    pub(crate) fn value_type(self) -> analyzer::analysis::Ty {
+        use analyzer::analysis::Ty;
+        match self {
+            Self::Number => Ty::Number,
+            Self::Boolean => Ty::Boolean,
+            Self::Text => Ty::String,
+            Self::Date => Ty::Date,
+            Self::List => Ty::List(Box::new(Ty::Unknown)),
+            Self::Any => Ty::Unknown,
+        }
+    }
+}
+
 pub struct SharedStorage<S> {
     inner: Arc<S>,
 }
@@ -344,12 +358,12 @@ define_kind!(
 );
 define_kind!(
     ListKind,
-    Vec<Value>,
+    Vec<Option<Value>>,
     List,
     List,
     Vec::new(),
     Value::List(value) => value,
-    |value: &Vec<Value>| Value::List(value.clone())
+    |value: &Vec<Option<Value>>| Value::List(value.clone())
 );
 
 #[derive(Clone, Copy, Debug)]

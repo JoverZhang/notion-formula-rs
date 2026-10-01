@@ -1,0 +1,3 @@
+// @prop "Times": number = [-1.9, 1.1, 10000.1, "Infinity", "-Infinity", "NaN", null]
+
+length(repeat("ab", prop("Times")))

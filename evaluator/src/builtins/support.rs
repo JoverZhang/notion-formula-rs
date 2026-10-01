@@ -123,11 +123,14 @@ pub(crate) fn rows_to_kernel<K: ColumnKind>(rows: Vec<RowOutcome>, mask: &Mask) 
                     values.push(value);
                     valid.push(true);
                 }
-                Err(_) => {
+                Err(value) => {
                     values.push(K::placeholder());
                     valid.push(true);
                     ok.set(index, false);
-                    errors.push((index, EvalError::TypeMismatch));
+                    errors.push((
+                        index,
+                        EvalError::invalid_type(K::ABI_KIND.value_type(), &value),
+                    ));
                 }
             },
             RowOutcome::Null => {

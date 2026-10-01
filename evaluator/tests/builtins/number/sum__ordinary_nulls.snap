@@ -1,0 +1,9 @@
+=== INPUT ===
+// @prop "Values": number | number[] = [null, [], [null, 2, 4], [null, null]]
+
+sum(prop("Values"), empty())
+=== OUTPUT ===
+row-0: 0
+row-1: 0
+row-2: 6
+row-3: 0

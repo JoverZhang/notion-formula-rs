@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use analyzer::analysis::Ty;
+
 use chrono::{Datelike, FixedOffset, Months, NaiveDate, TimeZone, Timelike, Utc};
 use regex::Regex;
 
@@ -11,7 +13,7 @@ use crate::core::columns::{
 use crate::core::context::BuiltinValueContext;
 use crate::core::errors::EvalError;
 use crate::core::types::{Mask, Value};
-use crate::runtime::operators::stringify_value;
+use crate::runtime::operators::{pow_number, stringify_value};
 
 #[derive(Clone, Debug)]
 enum TypedRow<T> {
@@ -112,9 +114,12 @@ fn eval_ternary<A: ColumnKind, B: ColumnKind, C: ColumnKind, O: ColumnKind>(
 pub(crate) fn eval_empty(
     value: Option<KernelColumn<AnyKind>>,
     mask: &Mask,
-) -> KernelResult<BooleanKind> {
+) -> KernelResult<AnyKind> {
+    let Some(value) = value else {
+        return eval_rows(mask, |_| TypedRow::Null);
+    };
     eval_rows(mask, |row| {
-        let is_empty = match value.as_ref().and_then(|value| value.value(row)) {
+        let is_empty = match value.value(row) {
             None => true,
             Some(Value::Number(value)) => *value == 0.0,
             Some(Value::Text(value)) => value.is_empty(),
@@ -122,7 +127,7 @@ pub(crate) fn eval_empty(
             Some(Value::Bool(value)) => !value,
             Some(Value::Date(_)) => false,
         };
-        TypedRow::Value(is_empty)
+        TypedRow::Value(Value::Bool(is_empty))
     })
 }
 
@@ -130,7 +135,10 @@ pub(crate) fn eval_length(value: KernelColumn<AnyKind>, mask: &Mask) -> KernelRe
     eval_unary(&value, mask, |value| match value {
         Value::Text(value) => Ok(value.chars().count() as f64),
         Value::List(value) => Ok(value.len() as f64),
-        _ => Err(EvalError::TypeMismatch),
+        value => Err(EvalError::invalid_type(
+            Ty::Union(vec![Ty::String, Ty::List(Box::new(Ty::Unknown))]),
+            value,
+        )),
     })
 }
 
@@ -176,7 +184,10 @@ pub(crate) fn eval_substring(
             return TypedRow::Null;
         };
         if !start.is_finite() {
-            return TypedRow::Error(EvalError::InvalidArgument);
+            return TypedRow::Error(EvalError::invalid_value(
+                Value::Number(*start),
+                "substring start must be finite",
+            ));
         }
         let characters = text.chars().collect::<Vec<_>>();
         let start = normalize_index(*start, characters.len(), true);
@@ -187,7 +198,10 @@ pub(crate) fn eval_substring(
                     return TypedRow::Null;
                 };
                 if !end.is_finite() {
-                    return TypedRow::Error(EvalError::InvalidArgument);
+                    return TypedRow::Error(EvalError::invalid_value(
+                        Value::Number(*end),
+                        "substring end must be finite",
+                    ));
                 }
                 normalize_index(*end, characters.len(), true)
             }
@@ -241,14 +255,19 @@ pub(crate) fn eval_regex<O: ColumnKind>(
         };
         let regex = match Regex::new(pattern) {
             Ok(regex) => regex,
-            Err(_) => return TypedRow::Error(EvalError::InvalidRegex),
+            Err(error) => {
+                return TypedRow::Error(EvalError::InvalidRegex {
+                    pattern: pattern.clone(),
+                    detail: error.to_string(),
+                });
+            }
         };
         let value = match operation {
             RegexOperation::Test => Value::Bool(regex.is_match(text)),
             RegexOperation::Match => Value::List(
                 regex
                     .find_iter(text)
-                    .map(|matched| Value::Text(matched.as_str().to_string()))
+                    .map(|matched| Some(Value::Text(matched.as_str().to_string())))
                     .collect(),
             ),
             RegexOperation::ReplaceOne | RegexOperation::ReplaceAll => {
@@ -296,7 +315,13 @@ pub(crate) fn eval_repeat(
     mask: &Mask,
 ) -> KernelResult<TextKind> {
     eval_binary(&text, &times, mask, |text, times| {
-        Ok(text.repeat(bounded_count(*times)?))
+        if !times.is_finite() {
+            return Err(EvalError::invalid_value(
+                Value::Number(*times),
+                "repeat count must be finite",
+            ));
+        }
+        Ok(text.repeat(times.ceil().clamp(0.0, 10_000.0) as usize))
     })
 }
 
@@ -311,9 +336,17 @@ pub(crate) fn eval_pad(
         let text = match value {
             Value::Text(text) => text.clone(),
             Value::Number(number) => stringify_value(&Value::Number(*number)),
-            _ => return Err(EvalError::TypeMismatch),
+            value => {
+                return Err(EvalError::invalid_type(
+                    Ty::Union(vec![Ty::Number, Ty::String]),
+                    value,
+                ));
+            }
         };
-        let desired = bounded_count(*length)?;
+        let desired = bounded_count(
+            *length,
+            "padding length must be finite and between 0 and 1000000",
+        )?;
         let current = text.chars().count();
         if current >= desired || pad.is_empty() {
             return Ok(text);
@@ -349,7 +382,7 @@ pub(crate) fn eval_join(
     eval_binary(&list, &separator, mask, |list, separator| {
         Ok(list
             .iter()
-            .map(stringify_value)
+            .map(|value| value.as_ref().map_or(String::new(), stringify_value))
             .collect::<Vec<_>>()
             .join(separator))
     })
@@ -364,12 +397,12 @@ pub(crate) fn eval_split(
         if separator.is_empty() {
             Ok(text
                 .chars()
-                .map(|character| Value::Text(character.to_string()))
+                .map(|character| Some(Value::Text(character.to_string())))
                 .collect())
         } else {
             Ok(text
                 .split(separator)
-                .map(|part| Value::Text(part.to_string()))
+                .map(|part| Some(Value::Text(part.to_string())))
                 .collect())
         }
     })
@@ -387,19 +420,17 @@ pub(crate) fn eval_format_number(
         &precision,
         mask,
         |value, format, precision| {
-            if !value.is_finite() {
-                return Err(EvalError::InvalidArgument);
-            }
-            let precision = bounded_count(*precision)?.min(100);
+            let precision = bounded_count(
+                *precision,
+                "precision must be finite and between 0 and 1000000",
+            )?
+            .min(100);
             let format = format.to_ascii_lowercase();
             match format.as_str() {
                 "number" | "decimal" => Ok(render_fixed(*value, precision, false)),
                 "number_with_commas" | "commas" => Ok(render_fixed(*value, precision, true)),
                 "percent" | "%" => {
                     let percent = *value * 100.0;
-                    if !percent.is_finite() {
-                        return Err(EvalError::InvalidArgument);
-                    }
                     Ok(format!("{}%", render_fixed(percent, precision, false)))
                 }
                 "scientific" => Ok(format!("{value:.*e}", precision)),
@@ -413,7 +444,10 @@ pub(crate) fn eval_format_number(
                 "cad" => Ok(render_currency(*value, precision, "CA$")),
                 "aud" => Ok(render_currency(*value, precision, "A$")),
                 "chf" => Ok(render_currency(*value, precision, "CHF ")),
-                _ => Err(EvalError::InvalidArgument),
+                _ => Err(EvalError::invalid_value(
+                    Value::Text(format.clone()),
+                    "unsupported number format",
+                )),
             }
         },
     )
@@ -475,12 +509,11 @@ pub(crate) fn eval_numeric_binary(
             NumericBinary::Add => *a + *b,
             NumericBinary::Subtract => *a - *b,
             NumericBinary::Multiply => *a * *b,
-            NumericBinary::Mod if *b != 0.0 => *a % *b,
-            NumericBinary::Pow => a.powf(*b),
-            NumericBinary::Divide if *b != 0.0 => *a / *b,
-            NumericBinary::Mod | NumericBinary::Divide => return Err(EvalError::DivideByZero),
+            NumericBinary::Mod => *a % *b,
+            NumericBinary::Pow => pow_number(*a, *b),
+            NumericBinary::Divide => *a / *b,
         };
-        finite_number(value)
+        Ok(value)
     })
 }
 
@@ -502,29 +535,45 @@ pub(crate) fn eval_aggregate(
         let mut values = Vec::new();
         for column in &columns {
             let Some(value) = column.value(row) else {
-                return TypedRow::Null;
+                continue;
             };
             match value {
-                Value::Number(value) if value.is_finite() => values.push(*value),
+                Value::Number(value) => values.push(*value),
                 Value::List(items) => {
-                    for item in items {
+                    for item in items.iter().flatten() {
                         match item {
-                            Value::Number(value) if value.is_finite() => values.push(*value),
-                            _ => return TypedRow::Error(EvalError::TypeMismatch),
+                            Value::Number(value) => values.push(*value),
+                            value => {
+                                return TypedRow::Error(EvalError::invalid_type(Ty::Number, value));
+                            }
                         }
                     }
                 }
-                _ => return TypedRow::Error(EvalError::TypeMismatch),
+                value => {
+                    return TypedRow::Error(EvalError::invalid_type(
+                        Ty::Union(vec![Ty::Number, Ty::List(Box::new(Ty::Number))]),
+                        value,
+                    ));
+                }
             }
         }
+        if values.iter().any(|value| value.is_nan()) {
+            return TypedRow::Value(f64::NAN);
+        }
         if values.is_empty() {
-            return TypedRow::Null;
+            return if matches!(operation, Aggregate::Sum) {
+                TypedRow::Value(0.0)
+            } else {
+                TypedRow::Null
+            };
         }
         let result = match operation {
-            Aggregate::Min => values.into_iter().fold(f64::INFINITY, f64::min),
-            Aggregate::Max => values.into_iter().fold(f64::NEG_INFINITY, f64::max),
-            Aggregate::Sum => values.into_iter().sum(),
-            Aggregate::Mean => values.iter().sum::<f64>() / values.len() as f64,
+            Aggregate::Min => values.into_iter().min_by(f64::total_cmp).expect("nonempty"),
+            Aggregate::Max => values.into_iter().max_by(f64::total_cmp).expect("nonempty"),
+            Aggregate::Sum => values.into_iter().fold(0.0, |sum, value| sum + value),
+            Aggregate::Mean => {
+                values.iter().fold(0.0, |sum, value| sum + value) / values.len() as f64
+            }
             Aggregate::Median => {
                 values.sort_by(f64::total_cmp);
                 let middle = values.len() / 2;
@@ -535,9 +584,7 @@ pub(crate) fn eval_aggregate(
                 }
             }
         };
-        finite_number(result)
-            .map(TypedRow::Value)
-            .unwrap_or_else(TypedRow::Error)
+        TypedRow::Value(result)
     })
 }
 
@@ -557,15 +604,16 @@ pub(crate) fn eval_round(
                     return TypedRow::Null;
                 };
                 if !places.is_finite() {
-                    return TypedRow::Error(EvalError::InvalidArgument);
+                    return TypedRow::Error(EvalError::invalid_value(
+                        Value::Number(*places),
+                        "round places must be finite",
+                    ));
                 }
                 places.trunc().clamp(-308.0, 308.0) as i32
             }
         };
         let factor = 10_f64.powi(places);
-        finite_number((value * factor).round() / factor)
-            .map(TypedRow::Value)
-            .unwrap_or_else(TypedRow::Error)
+        TypedRow::Value(round_number(*value * factor) / factor)
     })
 }
 
@@ -590,16 +638,13 @@ pub(crate) fn eval_numeric_unary(
             NumericUnary::Floor => value.floor(),
             NumericUnary::Cbrt => value.cbrt(),
             NumericUnary::Exp => value.exp(),
-            NumericUnary::Ln if *value > 0.0 => value.ln(),
-            NumericUnary::Log10 if *value > 0.0 => value.log10(),
-            NumericUnary::Log2 if *value > 0.0 => value.log2(),
-            NumericUnary::Sign if *value == 0.0 => 0.0,
+            NumericUnary::Ln => value.ln(),
+            NumericUnary::Log10 => value.log10(),
+            NumericUnary::Log2 => value.log2(),
+            NumericUnary::Sign if *value == 0.0 => *value,
             NumericUnary::Sign => value.signum(),
-            NumericUnary::Ln | NumericUnary::Log10 | NumericUnary::Log2 => {
-                return Err(EvalError::InvalidArgument);
-            }
         };
-        finite_number(result)
+        Ok(result)
     })
 }
 
@@ -622,13 +667,17 @@ pub(crate) fn eval_to_number(
                 }
             }
             Value::Date(value) => *value as f64,
-            Value::Text(value) => value
-                .trim()
-                .parse::<f64>()
-                .map_err(|_| EvalError::InvalidArgument)?,
-            Value::List(_) => return Err(EvalError::TypeMismatch),
+            Value::Text(value) => value.trim().parse::<f64>().map_err(|_| {
+                EvalError::invalid_value(Value::Text(value.clone()), "text must contain a number")
+            })?,
+            value @ Value::List(_) => {
+                return Err(EvalError::invalid_type(
+                    Ty::Union(vec![Ty::Boolean, Ty::Number, Ty::String, Ty::Date]),
+                    value,
+                ));
+            }
         };
-        finite_number(number)
+        Ok(number)
     })
 }
 
@@ -641,10 +690,23 @@ pub(crate) fn ceil_number(value: f64) -> f64 {
 }
 
 pub(crate) fn sqrt_number(value: f64) -> Result<f64, EvalError> {
-    if value < 0.0 || !value.is_finite() {
-        Err(EvalError::InvalidArgument)
+    Ok(value.sqrt())
+}
+
+fn round_number(value: f64) -> f64 {
+    if !value.is_finite() || value == 0.0 {
+        return value;
+    }
+    let floor = value.floor();
+    let rounded = if value - floor < 0.5 {
+        floor
     } else {
-        Ok(value.sqrt())
+        floor + 1.0
+    };
+    if rounded == 0.0 {
+        0.0_f64.copysign(value)
+    } else {
+        rounded
     }
 }
 
@@ -688,7 +750,11 @@ pub(crate) fn eval_abs(column: KernelColumn<NumberKind>, mask: &Mask) -> KernelR
 
 pub(crate) fn eval_now<C: BuiltinValueContext>(context: &C, mask: &Mask) -> KernelResult<DateKind> {
     let value = context.runtime().evaluated_at_epoch_ms();
-    eval_rows(mask, |_| TypedRow::Value(value))
+    eval_rows(mask, |_| {
+        local_datetime(value, context)
+            .map(|_| TypedRow::Value(value))
+            .unwrap_or_else(TypedRow::Error)
+    })
 }
 
 pub(crate) fn eval_today<C: BuiltinValueContext>(
@@ -747,27 +813,32 @@ pub(crate) fn eval_date_shift<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<DateKind> {
     eval_ternary(&date, &amount, &unit, mask, |date, amount, unit| {
+        local_datetime(*date, context)?;
         if !amount.is_finite() {
-            return Err(EvalError::InvalidDate);
+            return Err(EvalError::invalid_value(
+                Value::Number(*amount),
+                "date shift amount must be finite",
+            ));
         }
         let mut amount = amount.trunc() as i64;
         if matches!(direction, DateShift::Subtract) {
-            amount = amount.checked_neg().ok_or(EvalError::InvalidDate)?;
+            amount = amount.checked_neg().ok_or(EvalError::DateOutOfRange)?;
         }
         let unit = DateUnit::parse(unit)?;
         let shifted = if let Some(milliseconds) = unit.fixed_milliseconds() {
             date.checked_add(
                 amount
                     .checked_mul(milliseconds)
-                    .ok_or(EvalError::InvalidDate)?,
+                    .ok_or(EvalError::DateOutOfRange)?,
             )
         } else {
             let months = amount
                 .checked_mul(unit.month_multiplier().ok_or(EvalError::InvalidArgument)?)
-                .ok_or(EvalError::InvalidDate)?;
+                .ok_or(EvalError::DateOutOfRange)?;
             shift_months(*date, months, context)
         }
-        .ok_or(EvalError::InvalidDate)?;
+        .ok_or(EvalError::DateOutOfRange)?;
+        local_datetime(shifted, context)?;
         Ok(shifted)
     })
 }
@@ -780,10 +851,12 @@ pub(crate) fn eval_date_between<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<NumberKind> {
     eval_ternary(&a, &b, &unit, mask, |a, b, unit| {
+        local_datetime(*a, context)?;
+        local_datetime(*b, context)?;
         let unit = DateUnit::parse(unit)?;
         let value = match unit {
             DateUnit::Minute | DateUnit::Hour | DateUnit::Day | DateUnit::Week => {
-                let difference = a.checked_sub(*b).ok_or(EvalError::InvalidDate)?;
+                let difference = a.checked_sub(*b).ok_or(EvalError::DateOutOfRange)?;
                 let milliseconds = unit
                     .fixed_milliseconds()
                     .ok_or(EvalError::InvalidArgument)?;
@@ -805,7 +878,7 @@ fn complete_months_between<C: BuiltinValueContext>(
     if a < b {
         return complete_months_between(b, a, context)?
             .checked_neg()
-            .ok_or(EvalError::InvalidDate);
+            .ok_or(EvalError::DateOutOfRange);
     }
 
     let a_local = local_datetime(a, context)?;
@@ -815,10 +888,10 @@ fn complete_months_between<C: BuiltinValueContext>(
         .and_then(|years| {
             years.checked_add(i64::from(a_local.month()) - i64::from(b_local.month()))
         })
-        .ok_or(EvalError::InvalidDate)?;
-    let candidate = shift_months(b, months, context).ok_or(EvalError::InvalidDate)?;
+        .ok_or(EvalError::DateOutOfRange)?;
+    let candidate = shift_months(b, months, context).ok_or(EvalError::DateOutOfRange)?;
     if candidate > a {
-        months.checked_sub(1).ok_or(EvalError::InvalidDate)
+        months.checked_sub(1).ok_or(EvalError::DateOutOfRange)
     } else {
         Ok(months)
     }
@@ -845,7 +918,10 @@ impl DateUnit {
             "month" | "months" => Ok(Self::Month),
             "quarter" | "quarters" => Ok(Self::Quarter),
             "year" | "years" => Ok(Self::Year),
-            _ => Err(EvalError::InvalidArgument),
+            _ => Err(EvalError::invalid_value(
+                Value::Text(value.to_string()),
+                "unsupported date unit",
+            )),
         }
     }
 
@@ -869,25 +945,38 @@ impl DateUnit {
     }
 }
 
-pub(crate) fn eval_timestamp(
+pub(crate) fn eval_timestamp<C: BuiltinValueContext>(
     date: KernelColumn<DateKind>,
+    context: &C,
     mask: &Mask,
 ) -> KernelResult<NumberKind> {
-    eval_unary(&date, mask, |date| Ok(*date as f64))
+    eval_unary(&date, mask, |date| {
+        local_datetime(*date, context)?;
+        Ok(*date as f64)
+    })
 }
 
-pub(crate) fn eval_from_timestamp(
+pub(crate) fn eval_from_timestamp<C: BuiltinValueContext>(
     timestamp: KernelColumn<NumberKind>,
+    context: &C,
     mask: &Mask,
 ) -> KernelResult<DateKind> {
     eval_unary(&timestamp, mask, |timestamp| {
-        if !timestamp.is_finite() || *timestamp < i64::MIN as f64 || *timestamp >= i64::MAX as f64 {
-            return Err(EvalError::InvalidDate);
+        if !timestamp.is_finite() {
+            return Err(EvalError::invalid_value(
+                Value::Number(*timestamp),
+                "timestamp must be finite",
+            ));
+        }
+        if *timestamp < i64::MIN as f64 || *timestamp >= i64::MAX as f64 {
+            return Err(EvalError::DateOutOfRange);
         }
         let timestamp = timestamp.trunc() as i64;
-        timestamp
+        let timestamp = timestamp
             .checked_sub(timestamp.rem_euclid(60_000))
-            .ok_or(EvalError::InvalidDate)
+            .ok_or(EvalError::DateOutOfRange)?;
+        local_datetime(timestamp, context)?;
+        Ok(timestamp)
     })
 }
 
@@ -911,15 +1000,19 @@ pub(crate) fn eval_parse_date<C: BuiltinValueContext>(
 ) -> KernelResult<DateKind> {
     eval_unary(&text, mask, |text| {
         if let Ok(date) = chrono::DateTime::parse_from_rfc3339(text) {
-            return Ok(date.timestamp_millis());
+            let timestamp = date.timestamp_millis();
+            local_datetime(timestamp, context)?;
+            return Ok(timestamp);
         }
-        let date =
-            NaiveDate::parse_from_str(text, "%Y-%m-%d").map_err(|_| EvalError::InvalidDate)?;
+        let date = NaiveDate::parse_from_str(text, "%Y-%m-%d")
+            .map_err(|_| EvalError::InvalidDateText { text: text.clone() })?;
         let local = timezone(context)?
-            .from_local_datetime(&date.and_hms_opt(0, 0, 0).ok_or(EvalError::InvalidDate)?)
+            .from_local_datetime(&date.and_hms_opt(0, 0, 0).ok_or(EvalError::DateOutOfRange)?)
             .single()
-            .ok_or(EvalError::InvalidDate)?;
-        Ok(local.timestamp_millis())
+            .ok_or(EvalError::DateOutOfRange)?;
+        let timestamp = local.timestamp_millis();
+        local_datetime(timestamp, context)?;
+        Ok(timestamp)
     })
 }
 
@@ -948,12 +1041,18 @@ pub(crate) fn eval_list_pick(
                     return TypedRow::Null;
                 };
                 if !index.is_finite() {
-                    return TypedRow::Error(EvalError::InvalidArgument);
+                    return TypedRow::Error(EvalError::invalid_value(
+                        Value::Number(*index),
+                        "list index must be finite",
+                    ));
                 }
                 list_index(*index, list.len()).and_then(|index| list.get(index))
             }
         };
-        value.cloned().map_or(TypedRow::Null, TypedRow::Value)
+        value
+            .and_then(Option::as_ref)
+            .cloned()
+            .map_or(TypedRow::Null, TypedRow::Value)
     })
 }
 
@@ -968,7 +1067,10 @@ pub(crate) fn eval_slice(
             return TypedRow::Null;
         };
         if !start.is_finite() {
-            return TypedRow::Error(EvalError::InvalidArgument);
+            return TypedRow::Error(EvalError::invalid_value(
+                Value::Number(*start),
+                "slice start must be finite",
+            ));
         }
         let start = normalize_index(*start, list.len(), true);
         let end = match end.as_ref() {
@@ -978,7 +1080,10 @@ pub(crate) fn eval_slice(
                     return TypedRow::Null;
                 };
                 if !end.is_finite() {
-                    return TypedRow::Error(EvalError::InvalidArgument);
+                    return TypedRow::Error(EvalError::invalid_value(
+                        Value::Number(*end),
+                        "slice end must be finite",
+                    ));
                 }
                 normalize_index(*end, list.len(), true)
             }
@@ -1001,8 +1106,17 @@ pub(crate) fn eval_splice(args: SpliceArgs, mask: &Mask) -> KernelResult<ListKin
         ) else {
             return TypedRow::Null;
         };
-        if !start.is_finite() || !delete_count.is_finite() {
-            return TypedRow::Error(EvalError::InvalidArgument);
+        if !start.is_finite() {
+            return TypedRow::Error(EvalError::invalid_value(
+                Value::Number(*start),
+                "splice start must be finite",
+            ));
+        }
+        if !delete_count.is_finite() {
+            return TypedRow::Error(EvalError::invalid_value(
+                Value::Number(*delete_count),
+                "splice delete count must be finite",
+            ));
         }
         let start = normalize_index(*start, list.len(), true);
         let delete_count = if *delete_count > 0.0 {
@@ -1013,10 +1127,7 @@ pub(crate) fn eval_splice(args: SpliceArgs, mask: &Mask) -> KernelResult<ListKin
         let end = start.saturating_add(delete_count).min(list.len());
         let mut output = list[..start].to_vec();
         for group in &groups {
-            let Some(item) = group.items.value(row) else {
-                return TypedRow::Null;
-            };
-            output.push(item.clone());
+            output.push(group.items.value(row).cloned());
         }
         output.extend_from_slice(&list[end..]);
         TypedRow::Value(output)
@@ -1038,7 +1149,15 @@ pub(crate) fn eval_list_transform(
     eval_unary(&list, mask, |list| {
         let mut values = list.clone();
         match operation {
-            ListTransform::Sort => values.sort_by(compare_value),
+            ListTransform::Sort => {
+                values.retain(Option::is_some);
+                values.sort_by(|left, right| {
+                    compare_value(
+                        left.as_ref().expect("nonnull"),
+                        right.as_ref().expect("nonnull"),
+                    )
+                });
+            }
             ListTransform::Reverse => values.reverse(),
             ListTransform::Unique => {
                 let mut unique = Vec::with_capacity(values.len());
@@ -1059,7 +1178,10 @@ pub(crate) fn eval_includes(
     value: KernelColumn<AnyKind>,
     mask: &Mask,
 ) -> KernelResult<BooleanKind> {
-    eval_binary(&list, &value, mask, |list, value| Ok(list.contains(value)))
+    eval_rows(mask, |row| match list.value(row) {
+        Some(list) => TypedRow::Value(list.contains(&value.value(row).cloned())),
+        None => TypedRow::Null,
+    })
 }
 
 pub(crate) fn eval_flat(list: KernelColumn<ListKind>, mask: &Mask) -> KernelResult<ListKind> {
@@ -1074,16 +1196,9 @@ pub(crate) fn eval_id<C: BuiltinValueContext>(context: &C, mask: &Mask) -> Kerne
     eval_rows(mask, |row| TypedRow::Value(context.rows()[row].to_string()))
 }
 
-fn finite_number(value: f64) -> Result<f64, EvalError> {
-    value
-        .is_finite()
-        .then_some(value)
-        .ok_or(EvalError::InvalidArgument)
-}
-
-fn bounded_count(value: f64) -> Result<usize, EvalError> {
+fn bounded_count(value: f64, constraint: &str) -> Result<usize, EvalError> {
     if !value.is_finite() || !(0.0..=1_000_000.0).contains(&value) {
-        return Err(EvalError::InvalidArgument);
+        return Err(EvalError::invalid_value(Value::Number(value), constraint));
     }
     Ok(value.trunc() as usize)
 }
@@ -1094,32 +1209,39 @@ fn timezone(context: &impl BuiltinValueContext) -> Result<FixedOffset, EvalError
         .timezone_offset_minutes()
         .checked_mul(60)
         .and_then(FixedOffset::east_opt)
-        .ok_or(EvalError::InvalidDate)
+        .ok_or(EvalError::DateOutOfRange)
 }
 
 fn local_datetime(
     epoch_ms: i64,
     context: &impl BuiltinValueContext,
 ) -> Result<chrono::DateTime<FixedOffset>, EvalError> {
-    let utc =
-        chrono::DateTime::<Utc>::from_timestamp_millis(epoch_ms).ok_or(EvalError::InvalidDate)?;
-    Ok(utc.with_timezone(&timezone(context)?))
+    let utc = chrono::DateTime::<Utc>::from_timestamp_millis(epoch_ms)
+        .ok_or(EvalError::DateOutOfRange)?;
+    let local = utc.with_timezone(&timezone(context)?);
+    if !(1..=9999).contains(&utc.year()) || !(1..=9999).contains(&local.year()) {
+        return Err(EvalError::DateOutOfRange);
+    }
+    Ok(local)
 }
 
 fn today_epoch_ms(context: &impl BuiltinValueContext) -> Result<i64, EvalError> {
+    local_datetime(context.runtime().evaluated_at_epoch_ms(), context)?;
     let offset_ms = i64::from(timezone(context)?.local_minus_utc())
         .checked_mul(1_000)
-        .ok_or(EvalError::InvalidDate)?;
+        .ok_or(EvalError::DateOutOfRange)?;
     let local_epoch = context
         .runtime()
         .evaluated_at_epoch_ms()
         .checked_add(offset_ms)
-        .ok_or(EvalError::InvalidDate)?;
-    local_epoch
+        .ok_or(EvalError::DateOutOfRange)?;
+    let midnight = local_epoch
         .div_euclid(86_400_000)
         .checked_mul(86_400_000)
         .and_then(|midnight| midnight.checked_sub(offset_ms))
-        .ok_or(EvalError::InvalidDate)
+        .ok_or(EvalError::DateOutOfRange)?;
+    local_datetime(midnight, context)?;
+    Ok(midnight)
 }
 
 fn shift_months(epoch_ms: i64, amount: i64, context: &impl BuiltinValueContext) -> Option<i64> {
@@ -1228,10 +1350,10 @@ fn value_rank(value: &Value) -> u8 {
     }
 }
 
-fn flatten_values(values: &[Value], output: &mut Vec<Value>) {
+fn flatten_values(values: &[Option<Value>], output: &mut Vec<Option<Value>>) {
     for value in values {
         match value {
-            Value::List(nested) => flatten_values(nested, output),
+            Some(Value::List(nested)) => output.extend(nested.iter().cloned()),
             value => output.push(value.clone()),
         }
     }
