@@ -7,14 +7,14 @@ counterpart: ./formula-engine.md
 implementation_status: current
 document_status: draft
 translation_status: synced
-last_verified: 2026-09-24
+last_verified: 2026-10-01
 ---
 
 # FormulaEngine：编译与求值
 
 [English](formula-engine.md)
 
-> Current：定义管理、依赖分析、状态查询、求值数据类型与请求校验。Planned：求值与 FormulaDraft。
+> Current：定义管理、依赖分析、状态查询与批量求值。Planned：FormulaDraft。
 
 **目录**
 
@@ -53,7 +53,7 @@ pub struct PropertyId(pub String);
 /// Input 的声明类型与 Formula 的推断类型。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueType {
-    /// 数值规则见 [Planned Number](formula-language.zh-CN.md#planned-number)。
+    /// 数值规则见 [Current Number](formula-language.zh-CN.md#current-number)。
     Number,
     String, Boolean, Date,
     /// 静态类型未确定；可用于 Input 声明和推断结果，包括嵌套类型。
@@ -326,81 +326,6 @@ pub enum FormulaEvaluationError {
 
 ## FormulaEngine API
 
-### 计划中的求值示例
-
-```rust
-/// # Examples
-///
-/// ```
-/// use std::collections::HashMap;
-/// use std::time::{SystemTime, UNIX_EPOCH};
-///
-/// // 1. Define schema
-/// let schema = FormulaSchema {
-///     properties: vec![
-///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
-///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
-///         PropertyDefinition::Formula(FormulaDefinition {
-///             id: "formula".into(),
-///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
-///         }),
-///     ],
-/// };
-///
-/// // 2. Create the engine
-/// let engine = FormulaEngine::new(schema).expect("valid definitions");
-/// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
-///
-/// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
-/// let since_epoch = SystemTime::now()
-///     .duration_since(UNIX_EPOCH)
-///     .expect("system clock is before Unix epoch");
-/// let runtime = RuntimeContext {
-///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
-///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
-/// };
-///
-/// // 4. Build input columns in row_ids order
-/// // row_id    text    number
-/// // row-1     "ha"    2
-/// // row-2     "go"    3
-/// let input = EvaluateInput {
-///     row_ids: vec!["row-1".into(), "row-2".into()],
-///     columns: HashMap::from([
-///         (
-///             "text".into(),
-///             Column::String(ColumnData {
-///                 values: vec!["ha".into(), "go".into()],
-///                 validity: NullBuffer::new_valid(2),
-///             }),
-///         ),
-///         (
-///             "number".into(),
-///             Column::Number(ColumnData {
-///                 values: vec![2.0, 3.0],
-///                 validity: NullBuffer::new_valid(2),
-///             }),
-///         ),
-///     ]),
-///     runtime,
-///     formula_ids: vec!["formula".into()],
-/// };
-///
-/// // 5. Evaluate the requested formula
-/// let result = engine.evaluate(&input).expect("valid request");
-///
-/// // 6. Read the result column in row_ids order
-/// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
-///     panic!("expected a computed formula");
-/// };
-/// let Column::String(column) = &output.column else {
-///     panic!("expected a string column");
-/// };
-/// assert_eq!(column.values, ["haha", "gogogo"]);
-/// assert!(output.errors.is_empty());
-/// ```
-```
-
 ### 当前的定义管理方法
 
 ```rust out=formula_engine/src/formula_engine.h.rs
@@ -422,6 +347,87 @@ impl FormulaEngine {
     pub fn properties(&self) -> Vec<PropertyState>;
     pub fn state(&self) -> FormulaEngineState<'_>;
 
+    /// 输入校验通过即返回 Ok(EvaluateResult)，包括所有请求的公式都失败的情况。
+    /// 公式与行错误随结果返回；其他公式继续求值。
+    ///
+    /// allows: formula_ids 中存在 NotReady 的公式。
+    ///
+    /// error: 任一入参校验失败，不执行任何公式；只返回一个 EvaluateInputError。
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use formula_engine::{Column, ColumnData, EvaluateInput, FormulaDefinition, FormulaEngine,
+    ///     FormulaEngineState, FormulaSchema, NullBuffer, PropertyDefinition, PropertyId, RuntimeContext, ValueType};
+    /// use std::collections::HashMap;
+    /// use std::time::{SystemTime, UNIX_EPOCH};
+    ///
+    /// // 1. Define schema
+    /// let schema = FormulaSchema {
+    ///     properties: vec![
+    ///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
+    ///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
+    ///         PropertyDefinition::Formula(FormulaDefinition {
+    ///             id: "formula".into(),
+    ///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
+    ///         }),
+    ///     ],
+    /// };
+    ///
+    /// // 2. Create the engine
+    /// let engine = FormulaEngine::new(schema).expect("valid definitions");
+    /// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
+    ///
+    /// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
+    /// let since_epoch = SystemTime::now()
+    ///     .duration_since(UNIX_EPOCH)
+    ///     .expect("system clock is before Unix epoch");
+    /// let runtime = RuntimeContext {
+    ///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
+    ///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
+    /// };
+    ///
+    /// // 4. Build input columns in row_ids order
+    /// // row_id    text    number
+    /// // row-1     "ha"    2
+    /// // row-2     "go"    3
+    /// let input = EvaluateInput {
+    ///     row_ids: vec!["row-1".into(), "row-2".into()],
+    ///     columns: HashMap::from([
+    ///         (
+    ///             "text".into(),
+    ///             Column::String(ColumnData {
+    ///                 values: vec!["ha".into(), "go".into()],
+    ///                 validity: NullBuffer::new_valid(2),
+    ///             }),
+    ///         ),
+    ///         (
+    ///             "number".into(),
+    ///             Column::Number(ColumnData {
+    ///                 values: vec![2.0, 3.0],
+    ///                 validity: NullBuffer::new_valid(2),
+    ///             }),
+    ///         ),
+    ///     ]),
+    ///     runtime,
+    ///     formula_ids: vec!["formula".into()],
+    /// };
+    ///
+    /// // 5. Evaluate the requested formula
+    /// let result = engine.evaluate(&input).expect("valid request");
+    ///
+    /// // 6. Read the result column in row_ids order
+    /// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
+    ///     panic!("expected a computed formula");
+    /// };
+    /// let Column::String(column) = &output.column else {
+    ///     panic!("expected a string column");
+    /// };
+    /// assert_eq!(column.values, ["haha", "gogogo"]);
+    /// assert!(output.errors.is_empty());
+    /// ```
+    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
+
     /// 原子更新 PropertyDefinition。
     /// 返回前重新分析该 ID 的直接、间接公式依赖者及新的 Formula 定义。
     ///
@@ -440,19 +446,10 @@ impl FormulaEngine {
 }
 ```
 
-### 计划中的求值与 Draft 方法
+### 计划中的 Draft 方法
 
 ```rust
 impl FormulaEngine {
-
-    /// 输入校验通过即返回 Ok(EvaluateResult)，包括所有请求的公式都失败的情况。
-    /// 公式与行错误随结果返回；其他公式继续求值。
-    ///
-    /// allows: formula_ids 中存在 NotReady 的公式。
-    ///
-    /// error: 任一入参校验失败，不执行任何公式；只返回一个 EvaluateInputError。
-    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
-
     /// 基于 Engine 分析候选公式；编辑结果不写入 Engine。
     ///
     /// allows:

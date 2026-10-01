@@ -1,0 +1,25 @@
+conditional: Boolean
+  row 0: true
+  row 1: null
+  error row 1 origin source: InvalidRegex { pattern: "[", detail: "regex parse error:\n    [\n    ^\nerror: unclosed character class" }
+infinity: Number
+  row 0: Infinity
+  row 1: Infinity
+list: List(Unknown)
+  row 0: [1, null, 2]
+  row 1: [1, null, 2]
+nan: Number
+  row 0: NaN
+  row 1: NaN
+not_ready: NotReady
+null: Unknown
+  row 0: null
+  row 1: null
+source: Boolean
+  row 0: null
+  row 1: null
+  error row 0 origin source: InvalidRegex { pattern: "[", detail: "regex parse error:\n    [\n    ^\nerror: unclosed character class" }
+  error row 1 origin source: InvalidRegex { pattern: "[", detail: "regex parse error:\n    [\n    ^\nerror: unclosed character class" }
+zero: Number
+  row 0: -0
+  row 1: -0

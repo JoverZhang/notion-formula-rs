@@ -9,14 +9,14 @@ document_status: draft
 translation_status: synced
 translation_model: gpt-6-luna
 translation_review_model: gpt-6-astra
-last_verified: 2026-09-24
+last_verified: 2026-10-01
 ---
 
 # FormulaEngine: compilation and evaluation
 
 [简体中文](formula-engine.zh-CN.md)
 
-> Current: definition management, dependency analysis, state queries, evaluation data types, and request validation. Planned: evaluation and FormulaDraft.
+> Current: definition management, dependency analysis, state queries, and batch evaluation. Planned: FormulaDraft.
 
 **Contents**
 
@@ -55,7 +55,7 @@ pub struct PropertyId(pub String);
 /// Declared types for Inputs and inferred types for Formulas.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueType {
-    /// See [Planned Number](formula-language.md#planned-number) for numeric behavior.
+    /// See [Current Number](formula-language.md#current-number) for numeric behavior.
     Number,
     String, Boolean, Date,
     /// Static type is undetermined; allowed in Input declarations and inferred types, including nested types.
@@ -329,82 +329,7 @@ pub enum FormulaEvaluationError {
 
 ## FormulaEngine API
 
-### Planned evaluation example
-
-```rust
-/// # Examples
-///
-/// ```
-/// use std::collections::HashMap;
-/// use std::time::{SystemTime, UNIX_EPOCH};
-///
-/// // 1. Define schema
-/// let schema = FormulaSchema {
-///     properties: vec![
-///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
-///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
-///         PropertyDefinition::Formula(FormulaDefinition {
-///             id: "formula".into(),
-///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
-///         }),
-///     ],
-/// };
-///
-/// // 2. Create the engine
-/// let engine = FormulaEngine::new(schema).expect("valid definitions");
-/// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
-///
-/// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
-/// let since_epoch = SystemTime::now()
-///     .duration_since(UNIX_EPOCH)
-///     .expect("system clock is before Unix epoch");
-/// let runtime = RuntimeContext {
-///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
-///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
-/// };
-///
-/// // 4. Build input columns in row_ids order
-/// // row_id    text    number
-/// // row-1     "ha"    2
-/// // row-2     "go"    3
-/// let input = EvaluateInput {
-///     row_ids: vec!["row-1".into(), "row-2".into()],
-///     columns: HashMap::from([
-///         (
-///             "text".into(),
-///             Column::String(ColumnData {
-///                 values: vec!["ha".into(), "go".into()],
-///                 validity: NullBuffer::new_valid(2),
-///             }),
-///         ),
-///         (
-///             "number".into(),
-///             Column::Number(ColumnData {
-///                 values: vec![2.0, 3.0],
-///                 validity: NullBuffer::new_valid(2),
-///             }),
-///         ),
-///     ]),
-///     runtime,
-///     formula_ids: vec!["formula".into()],
-/// };
-///
-/// // 5. Evaluate the requested formula
-/// let result = engine.evaluate(&input).expect("valid request");
-///
-/// // 6. Read the result column in row_ids order
-/// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
-///     panic!("expected a computed formula");
-/// };
-/// let Column::String(column) = &output.column else {
-///     panic!("expected a string column");
-/// };
-/// assert_eq!(column.values, ["haha", "gogogo"]);
-/// assert!(output.errors.is_empty());
-/// ```
-```
-
-### Current definition methods
+### Current methods
 
 ```rust out=formula_engine/src/formula_engine.h.rs
 #[spec::private_fields]
@@ -425,6 +350,87 @@ impl FormulaEngine {
     pub fn properties(&self) -> Vec<PropertyState>;
     pub fn state(&self) -> FormulaEngineState<'_>;
 
+    /// Returns Ok(EvaluateResult) once input validation passes, even if every requested formula fails.
+    /// Formula and row errors are returned with the result; other formulas continue.
+    ///
+    /// allows: NotReady formulas in formula_ids.
+    ///
+    /// error: Any input validation failure prevents all formula evaluation; only one EvaluateInputError is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use formula_engine::{Column, ColumnData, EvaluateInput, FormulaDefinition, FormulaEngine,
+    ///     FormulaEngineState, FormulaSchema, NullBuffer, PropertyDefinition, PropertyId, RuntimeContext, ValueType};
+    /// use std::collections::HashMap;
+    /// use std::time::{SystemTime, UNIX_EPOCH};
+    ///
+    /// // 1. Define schema
+    /// let schema = FormulaSchema {
+    ///     properties: vec![
+    ///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
+    ///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
+    ///         PropertyDefinition::Formula(FormulaDefinition {
+    ///             id: "formula".into(),
+    ///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
+    ///         }),
+    ///     ],
+    /// };
+    ///
+    /// // 2. Create the engine
+    /// let engine = FormulaEngine::new(schema).expect("valid definitions");
+    /// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
+    ///
+    /// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
+    /// let since_epoch = SystemTime::now()
+    ///     .duration_since(UNIX_EPOCH)
+    ///     .expect("system clock is before Unix epoch");
+    /// let runtime = RuntimeContext {
+    ///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
+    ///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
+    /// };
+    ///
+    /// // 4. Build input columns in row_ids order
+    /// // row_id    text    number
+    /// // row-1     "ha"    2
+    /// // row-2     "go"    3
+    /// let input = EvaluateInput {
+    ///     row_ids: vec!["row-1".into(), "row-2".into()],
+    ///     columns: HashMap::from([
+    ///         (
+    ///             "text".into(),
+    ///             Column::String(ColumnData {
+    ///                 values: vec!["ha".into(), "go".into()],
+    ///                 validity: NullBuffer::new_valid(2),
+    ///             }),
+    ///         ),
+    ///         (
+    ///             "number".into(),
+    ///             Column::Number(ColumnData {
+    ///                 values: vec![2.0, 3.0],
+    ///                 validity: NullBuffer::new_valid(2),
+    ///             }),
+    ///         ),
+    ///     ]),
+    ///     runtime,
+    ///     formula_ids: vec!["formula".into()],
+    /// };
+    ///
+    /// // 5. Evaluate the requested formula
+    /// let result = engine.evaluate(&input).expect("valid request");
+    ///
+    /// // 6. Read the result column in row_ids order
+    /// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
+    ///     panic!("expected a computed formula");
+    /// };
+    /// let Column::String(column) = &output.column else {
+    ///     panic!("expected a string column");
+    /// };
+    /// assert_eq!(column.values, ["haha", "gogogo"]);
+    /// assert!(output.errors.is_empty());
+    /// ```
+    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
+
     /// Atomically updates PropertyDefinition.
     /// Reanalyzes direct and transitive formula dependents of this ID, and the new Formula definition, before returning.
     ///
@@ -443,19 +449,10 @@ impl FormulaEngine {
 }
 ```
 
-### Planned evaluation and Draft methods
+### Planned Draft methods
 
 ```rust
 impl FormulaEngine {
-
-    /// Returns Ok(EvaluateResult) once input validation passes, even if every requested formula fails.
-    /// Formula and row errors are returned with the result; other formulas continue.
-    ///
-    /// allows: NotReady formulas in formula_ids.
-    ///
-    /// error: Any input validation failure prevents all formula evaluation; only one EvaluateInputError is returned.
-    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
-
     /// Analyzes the candidate formula against Engine; edits do not modify Engine.
     ///
     /// allows:

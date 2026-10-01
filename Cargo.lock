@@ -203,6 +203,7 @@ dependencies = [
  "analyzer",
  "arrow-buffer",
  "derive_more",
+ "evaluator",
 ]
 
 [[package]]

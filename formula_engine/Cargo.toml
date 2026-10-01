@@ -7,3 +7,4 @@ edition = "2024"
 analyzer = { path = "../analyzer" }
 arrow-buffer = "60.0.0"
 derive_more = { version = "2.1.1", features = ["from"] }
+evaluator = { path = "../evaluator" }
