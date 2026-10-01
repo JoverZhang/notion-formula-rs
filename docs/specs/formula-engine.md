@@ -16,7 +16,7 @@ last_verified: 2026-09-24
 
 [简体中文](formula-engine.zh-CN.md)
 
-> Current: definition management, dependency analysis, state queries, and evaluation data types. Planned: evaluation and FormulaDraft.
+> Current: definition management, dependency analysis, state queries, evaluation data types, and request validation. Planned: evaluation and FormulaDraft.
 
 **Contents**
 

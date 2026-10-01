@@ -14,7 +14,7 @@ last_verified: 2026-09-24
 
 [English](formula-engine.md)
 
-> Current：定义管理、依赖分析、状态查询与求值数据类型。Planned：求值与 FormulaDraft。
+> Current：定义管理、依赖分析、状态查询、求值数据类型与请求校验。Planned：求值与 FormulaDraft。
 
 **目录**
 
