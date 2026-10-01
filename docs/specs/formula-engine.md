@@ -16,7 +16,7 @@ last_verified: 2026-09-24
 
 [简体中文](formula-engine.zh-CN.md)
 
-> Current: definition management, dependency analysis, and state queries. Planned: evaluation and FormulaDraft.
+> Current: definition management, dependency analysis, state queries, and evaluation data types. Planned: evaluation and FormulaDraft.
 
 **Contents**
 
@@ -67,10 +67,11 @@ pub enum ValueType {
 
 ```
 
-**Planned runtime value types**
+**Current runtime value types**
 
-```rust
+```rust out=formula_engine/src/evaluation.h.rs
 /// Columnar data uses a bitmap to mark null positions.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
@@ -80,6 +81,7 @@ pub enum Column {
     /// Carries Union or Unknown; each non-null value retains its concrete type.
     Union(ColumnData<Value>),
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ColumnData<T> {
     /// Length equals the evaluation row count; null positions hold placeholders that must not be read.
     pub values: Vec<T>,
@@ -91,7 +93,8 @@ pub struct ColumnData<T> {
 
 ```
 
-```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
+```rust out=formula_engine/src/evaluation.h.rs
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix timestamp in milliseconds.
@@ -101,8 +104,11 @@ pub enum Value {
 }
 
 /// The column kind for an Input's declared type; examines only the outermost type syntax.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColumnKind { Number, String, Boolean, Date, List, Union }
+```
+
+```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
 
 /// Empty columns, all-null columns, and single-member Unions do not change the column kind for the declared type.
 fn column_kind(ty: &ValueType) -> ColumnKind {
@@ -195,10 +201,11 @@ pub enum EngineChangeError {
 }
 ```
 
-**Planned evaluation request and result types**
+**Current evaluation request and result types**
 
-```rust
+```rust out=formula_engine/src/evaluation.h.rs
 /// Arguments to FormulaEngine::evaluate().
+#[derive(Clone, Debug, PartialEq)]
 pub struct EvaluateInput {
     /// Values in input and result columns follow this order.
     /// IDs are nonempty and unique within the batch; zero rows are allowed.
@@ -211,12 +218,13 @@ pub struct EvaluateInput {
     /// Nonempty, without duplicates; every ID must identify a Formula in Engine.
     pub formula_ids: Vec<PropertyId>,
 }
-#[derive(derive_more::From)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
 #[from(String, &str)]
 pub struct RowId(pub String);
 
 /// Input validation failures prevent all formula evaluation; only one error is returned.
 /// The same definition and input return the same error.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EvaluateInputError {
     /// UTC time or local time after applying time_zone is outside Gregorian years 0001–9999.
     InvalidNow { now: i64 },
@@ -246,6 +254,7 @@ pub enum EvaluateInputError {
 }
 
 /// All rows and formulas in one evaluation share this time and time-zone snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeContext {
     /// UTC Unix timestamp in milliseconds used by now(), supplied by the caller; Engine does not read the clock.
     /// For live evaluation, capture the time at request start; tests and replays may use a fixed value.
@@ -256,11 +265,13 @@ pub struct RuntimeContext {
     pub time_zone: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct EvaluateResult {
     /// One entry per input.formula_ids ID, including formulas whose evaluation failed.
     pub formulas: HashMap<PropertyId, Result<FormulaOutput, FormulaEvaluationError>>,
 }
 /// Even if every row fails, returns Ok(FormulaOutput), with failures recorded in errors.
+#[derive(Clone, Debug, PartialEq)]
 pub struct FormulaOutput {
     /// Output type at the time of this evaluation.
     pub output_type: ValueType,
@@ -273,6 +284,7 @@ pub struct FormulaOutput {
 }
 /// A row evaluation failure marks the corresponding result position null; other rows continue.
 /// Dependency errors propagate only through executed branches and do not change FormulaStatus.
+#[derive(Clone, Debug, PartialEq)]
 pub struct RowError {
     /// Index into input.row_ids.
     pub row_index: usize,
@@ -281,6 +293,7 @@ pub struct RowError {
     pub error: RuntimeError,
 }
 /// constraint and detail are for display only.
+#[derive(Clone, Debug, PartialEq)]
 pub enum RuntimeError {
     /// The runtime value's type is not accepted by the current operation.
     InvalidValueType {
@@ -307,6 +320,7 @@ pub enum RuntimeError {
     DateOutOfRange,
 }
 /// Returned when a formula cannot begin evaluation; see RowError for row evaluation failures.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FormulaEvaluationError {
     /// The Formula's FormulaStatus is NotReady.
     NotReady,

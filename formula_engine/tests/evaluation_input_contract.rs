@@ -2,7 +2,7 @@
 
 use std::fmt::Write;
 
-use formula_engine::ValueType;
+use formula_engine::{ColumnKind, Value, ValueType};
 
 include!("support/evaluation_input_contract.h.rs");
 

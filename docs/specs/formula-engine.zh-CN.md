@@ -14,7 +14,7 @@ last_verified: 2026-09-24
 
 [English](formula-engine.md)
 
-> Current：定义管理、依赖分析与状态查询。Planned：求值与 FormulaDraft。
+> Current：定义管理、依赖分析、状态查询与求值数据类型。Planned：求值与 FormulaDraft。
 
 **目录**
 
@@ -65,10 +65,11 @@ pub enum ValueType {
 
 ```
 
-**计划中的运行时值类型**
+**当前运行时值类型**
 
-```rust
+```rust out=formula_engine/src/evaluation.h.rs
 /// 列式结构以 bitmap 标记 null 位置。
+#[derive(Clone, Debug, PartialEq)]
 pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
@@ -78,6 +79,7 @@ pub enum Column {
     /// 承载 Union 或 Unknown；每个非 null 值保留实际类型。
     Union(ColumnData<Value>),
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ColumnData<T> {
     /// 长度等于本次求值的行数；null 位置仅保留占位值，不得读取。
     pub values: Vec<T>,
@@ -88,7 +90,8 @@ pub struct ColumnData<T> {
 }
 ```
 
-```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
+```rust out=formula_engine/src/evaluation.h.rs
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix 毫秒时间戳。
@@ -98,8 +101,11 @@ pub enum Value {
 }
 
 /// Input 声明类型对应的列种类；只看最外层类型语法。
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColumnKind { Number, String, Boolean, Date, List, Union }
+```
+
+```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
 
 /// 空列、全 null 列及单成员 Union 均不改变声明类型对应的列种类。
 fn column_kind(ty: &ValueType) -> ColumnKind {
@@ -192,10 +198,11 @@ pub enum EngineChangeError {
 }
 ```
 
-**计划中的求值请求与结果类型**
+**当前求值请求与结果类型**
 
-```rust
+```rust out=formula_engine/src/evaluation.h.rs
 /// FormulaEngine::evaluate() 的参数
+#[derive(Clone, Debug, PartialEq)]
 pub struct EvaluateInput {
     /// 输入列和结果列中的值均按此顺序排列。
     /// ID 非空且在本批次内唯一；允许零行。
@@ -208,12 +215,13 @@ pub struct EvaluateInput {
     /// 非空且不重复；每个 ID 均须指向 Engine 中的 Formula。
     pub formula_ids: Vec<PropertyId>,
 }
-#[derive(derive_more::From)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
 #[from(String, &str)]
 pub struct RowId(pub String);
 
 /// 入参校验失败时，不执行任何公式；一次只返回一个错误。
 /// 同一定义和输入返回同一个错误。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EvaluateInputError {
     /// UTC 时间或应用 time_zone 后的本地时间超出公历 0001–9999 年。
     InvalidNow { now: i64 },
@@ -243,6 +251,7 @@ pub enum EvaluateInputError {
 }
 
 /// 一次求值中，所有行和公式共用这份时间与时区快照。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeContext {
     /// now() 使用的 UTC Unix 毫秒时间戳，由调用方提供；Engine 不读取时钟。
     /// 实时求值取请求开始时的时间；测试或重放可传固定值。
@@ -253,11 +262,13 @@ pub struct RuntimeContext {
     pub time_zone: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct EvaluateResult {
     /// 与 input.formula_ids 一一对应，包括求值失败的公式。
     pub formulas: HashMap<PropertyId, Result<FormulaOutput, FormulaEvaluationError>>,
 }
 /// 所有行都失败时，仍以 Ok(FormulaOutput) 返回，错误记录在 errors 中。
+#[derive(Clone, Debug, PartialEq)]
 pub struct FormulaOutput {
     /// 本次求值时的输出类型。
     pub output_type: ValueType,
@@ -270,6 +281,7 @@ pub struct FormulaOutput {
 }
 /// 单行求值失败，对应结果位置标为 null；其他行继续求值。
 /// 依赖错误只沿实际执行的分支传播，不改变 FormulaStatus。
+#[derive(Clone, Debug, PartialEq)]
 pub struct RowError {
     /// input.row_ids 的下标。
     pub row_index: usize,
@@ -278,6 +290,7 @@ pub struct RowError {
     pub error: RuntimeError,
 }
 /// constraint 和 detail 仅用于展示。
+#[derive(Clone, Debug, PartialEq)]
 pub enum RuntimeError {
     /// 运行时值的类型不适用于当前操作。
     InvalidValueType {
@@ -304,6 +317,7 @@ pub enum RuntimeError {
     DateOutOfRange,
 }
 /// 公式无法开始求值时返回；单行求值错误见 RowError。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FormulaEvaluationError {
     /// 对应 Formula 的 FormulaStatus 为 NotReady。
     NotReady,
