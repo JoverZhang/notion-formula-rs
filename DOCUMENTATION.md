@@ -2,7 +2,7 @@
 doc_id: documentation.policy
 title: "Documentation policy"
 language: en
-source_language: en
+source_language: zh-CN
 counterpart: ./DOCUMENTATION.zh-CN.md
 implementation_status: current
 document_status: stable
@@ -66,6 +66,11 @@ Run `just docs-check` to validate classification, metadata, counterparts, and lo
 ## Write for a reader
 
 - Start from the question the reader needs answered and use direct, concrete sentences.
+- Express precise spec definitions through declarations and code, with nearby comments for semantics. Keep prose for conventions and evidence shared across declarations.
+- Put function usage, return values, constraints, and necessary examples in brief comments on the relevant declaration; describe type, field, and variant contracts in the same place. Do not repeat these facts in separate prose sections.
+- Write transformations that Rust can express precisely as functions, with comments only for necessary semantics. For example, define `flat` type conversion in the inference function rather than repeating its algorithm in prose, pseudocode, or input/output type tables.
+- When a language or industry convention covers shared semantics, briefly state the convention and its scope, then link to the specification or research report. Expand only this project's differences and necessary exceptions, without repeating the convention for each function.
+- Specs used as generation sources follow [spec-codegen](docs/contributing/spec-codegen.md). Validate declarations after edits; when an implementation exists, generate Rust and check its interfaces and contract comments.
 - Base technical claims on code, tests, schemas, runtime evidence, or an explicit human decision. Do not infer design intent from implementation structure.
 - Put a small number of useful implementation or test anchors beside the claim they support. Keep the verification procedure and command log in the PR.
 - Preserve scope, certainty, guarantees, limitations, failure behavior, examples, and lifecycle status across languages while writing naturally in each language.

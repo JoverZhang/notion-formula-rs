@@ -7,8 +7,6 @@ counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-translation_model: gpt-6-luna
-translation_review_model: gpt-6-astra
 last_verified: 2026-09-23
 ---
 
@@ -180,7 +178,7 @@ List literal: evaluate every element; if any evaluation errors, the current row 
 [1, empty(), 2] → length 3, with no value at the middle position.
 ```
 
-See [Builtin function signatures](builtin-functions.md#planned-empty-values-and-lists) for the null rules of `empty()`, `map`, and `join`.
+See [Builtin declarations](builtin-functions.md#supported-functions) for the null rules of `empty()`, `map`, and `join`.
 
 ### Planned Number
 
@@ -201,7 +199,7 @@ NaN in !=                    → true
 +0 == -0                     → true
 ```
 
-Function-specific argument constraints and null handling are defined in the [Planned Builtin rules](builtin-functions.md#planned-aggregates-sort-flat-and-repeat).
+Function-specific argument constraints and null handling are defined in the [Builtin declarations](builtin-functions.md#supported-functions).
 
 ## Analysis and Failure Boundaries
 

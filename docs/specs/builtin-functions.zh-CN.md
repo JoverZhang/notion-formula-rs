@@ -6,8 +6,8 @@ source_language: zh-CN
 counterpart: ./builtin-functions.md
 implementation_status: current
 document_status: stable
-translation_status: needs-update
-last_verified: 2026-09-29
+translation_status: synced
+last_verified: 2026-10-01
 ---
 
 # Builtin 函数签名
@@ -55,7 +55,8 @@ repeat(min = n) {...}  // 整组参数重复至少 n 次；不是一个 list 参
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
 
-/// Planned：无参返回 null；有参时沿用空值判断。返回类型由 resolve_empty 按实参个数确定。
+/// Planned：无参返回 null；有参时沿用空值判断。
+/// Current：返回类型由 resolve_empty 按实参个数确定。
 #[resolver(resolve_empty)]
 empty(value?: any) -> any;
 length(value: string | any[]) -> number;
@@ -65,7 +66,7 @@ unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 ```
 
-#### Planned empty 类型推断
+#### Current empty 类型推断
 
 ```rust
 fn resolve_empty(input: &builtin_fn::ResolverInput<'_>) -> builtin_fn::Ty {
@@ -206,14 +207,15 @@ some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
 every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
 count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
 
-/// Current：递归展开列表，返回类型收集、归一化所有叶子类型；缺少列表类型信息时使用默认返回类型。
+/// Current：递归展开列表。
 /// Planned：按输入顺序只展开一层，保留 null；列表参数为 null 时返回 null，空列表返回 []。
 /// flat([[1, empty()], [2]]) → [1, null, 2]；flat([[[]]]) → [[]]。
-/// Planned 返回类型由下方 resolve_flat 定义。
+/// Current 返回类型由下方 resolve_flat 定义。
+#[resolver(resolve_flat)]
 flat<T>(list: T[]) -> T[];
 ```
 
-#### Planned flat 类型推断
+#### Current flat 类型推断
 
 ```rust
 use builtin_fn::{ArgumentObservation, ResolverInput, Ty, normalize_union};

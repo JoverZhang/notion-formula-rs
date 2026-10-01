@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./README.md
 implementation_status: historical
 document_status: stable
-translation_status: needs-update
+translation_status: synced
 last_verified: 2026-09-29
 ---
 
