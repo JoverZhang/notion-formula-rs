@@ -53,7 +53,7 @@ The `sort` cases use `empty()` elements. The `flat` cases use `empty()` and the 
 | `flat([[empty()], []])` | Length 1; the element is empty |
 | `flat([[], empty(), [2]])` | Length 2; an empty element precedes 2 |
 
-The depth probe distinguishes one-level from recursive flattening: `length(flat([[[]]]))` returned 1, and `join(map(flat([[[]]]), length(current)), "|")` returned `"0"`. The retained element was an empty list. This differs from the repository's current recursive `flat` contract in [Builtin function signatures](../../specs/builtin-functions.md).
+The depth probe distinguishes one-level from recursive flattening: `length(flat([[[]]]))` returned 1, and `join(map(flat([[[]]]), length(current)), "|")` returned `"0"`. The retained element was an empty list. This differed from the repository's recursive `flat` behavior at the experiment date, 2026-09-29. See the [flat declaration](../../specs/builtin-functions.md#list) for the current contract.
 
 ## Repeat clamps and rounds tested finite counts
 

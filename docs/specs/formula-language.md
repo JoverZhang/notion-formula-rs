@@ -7,7 +7,7 @@ counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-23
+last_verified: 2026-10-01
 ---
 
 # Formula Grammar and Evaluation Rules
@@ -129,21 +129,21 @@ prop(1), prop("A", "B")     // Same
 x.prop("Name")             // Not recognized as a property reference
 
 lookup
-  Current uses the exact, case-sensitive property name from context.
-  Names must be unique; selection behavior for duplicate names is undefined. Missing name → semantic diagnostic, prepare fails.
+  EvalContext uses the exact, case-sensitive property name from the host context.
+  EvalContext names must be unique; selection behavior for duplicate names is undefined. Missing name → semantic diagnostic, prepare fails.
+  Current FormulaEngine resolves the decoded text as a PropertyId for an Input or Formula in the same FormulaSchema.
   prepare collects references from all branches, including branches skipped at runtime; deduplicates them and orders them by first source occurrence.
   Every required input must exist and satisfy its type/column layout; a missing input is not null.
 
 rename
-  Does not rewrite source automatically or retarget an already prepared formula to a new name.
+  There is no standalone rename API or automatic source rewriting; an already prepared formula is not retargeted to a new name.
   The host is responsible for updating source and preparing again; an existing prepared formula still requires inputs from the original context.
 
 boundary
-  Current product has no persistent FormulaId/FormulaName, formula reference, or rename API.
-  The demo's FormulaId is only a UI identity; the Planned Engine ID/dependency model must not be treated as Current behavior.
+  The demo's FormulaId is only a UI identity.
 ```
 
-See [FormulaEngine](formula-engine.md) for the Planned definition.
+See [FormulaEngine](formula-engine.md) for the Engine's PropertyId and dependency contracts.
 
 ## Operators and Nulls
 
@@ -152,9 +152,9 @@ op             non-null operands and successful result
 -x             number → number
 !x / not x     boolean → boolean
 a + b          two numbers → addition; if either is a string → convert both sides to text, then concatenate
-a - * / % ^ b  two numbers → number; divisor/modulus of 0 → row error
+a - * / % ^ b  two numbers → number
 a == b / !=    any non-null values; different value kinds are unequal
-a < <= >= > b  same kind among number/string/boolean/date → boolean; NaN cannot be ordered → row type error
+a < <= >= > b  same kind among number/string/boolean/date → boolean
 
 Unary/non-logical binary non-null operand combinations not listed above → row type error; ==/!= accept different kinds and are not in this category.
 Comparison order: numbers by numeric value, strings lexicographically, booleans false < true, dates chronologically.
@@ -163,7 +163,6 @@ Text conversion: integers have no .0, booleans are lowercase, dates are epoch-mi
 
 Non-logical operators: evaluate both sides; if either errors, report an error; otherwise, if either is null, return null.
 Unary operators: null → null.
-List literal: evaluate every element; if any errors, report an error; otherwise, if any is null, the entire list expression is null.
 
 a && b: a=true → evaluate b; a=false/null → false, skip b; if evaluation reaches b=null → null.
 a || b: a=true → true, skip b; a=false/null → evaluate b, result is boolean/null.
@@ -171,7 +170,7 @@ a ? b : c: a=true → b; a=false/null → c; condition accepts only boolean/null
 A skipped expression produces no row error; this does not change the rule that all properties are discovered during prepare.
 ```
 
-### Planned List
+### Current List
 
 ```text
 List literal: evaluate every element; if any evaluation errors, the current row fails; otherwise, retain every element, including empty values.
@@ -180,7 +179,7 @@ List literal: evaluate every element; if any evaluation errors, the current row 
 
 See [Builtin declarations](builtin-functions.md#supported-functions) for the null rules of `empty()`, `map`, and `join`.
 
-### Planned Number
+### Current Number
 
 FormulaEngine Number values, numeric operations, and comparisons follow
 [ECMAScript Number](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-ecmascript-language-types-number-type);

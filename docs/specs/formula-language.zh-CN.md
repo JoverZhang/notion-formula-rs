@@ -7,7 +7,7 @@ counterpart: ./formula-language.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-23
+last_verified: 2026-10-01
 ---
 
 # 公式文法与求值规则
@@ -129,21 +129,21 @@ prop(1), prop("A", "B")     // 同上
 x.prop("Name")             // 不作为 property reference 识别
 
 lookup
-  Current 使用 context 中的精确、区分大小写的 property name。
-  名称必须唯一；重复名称的选择结果未定义。缺失名称 → semantic diagnostic，prepare 失败。
+  EvalContext 使用宿主 context 中的精确、区分大小写的 property name。
+  EvalContext 名称必须唯一；重复名称的选择结果未定义。缺失名称 → semantic diagnostic，prepare 失败。
+  Current FormulaEngine 将解码后的文本作为 PropertyId，引用同一 FormulaSchema 中的 Input 或 Formula。
   prepare 收集所有分支中的引用，包括运行时将跳过的分支；去重后按源码首次出现顺序排列。
   每个必需输入都要存在且满足类型/列布局；缺失输入不等于 null。
 
 rename
-  不自动改写 source，也不将已 prepare 的公式重新指向新名称。
+  没有独立 rename API，也不自动改写 source；已 prepare 的公式不会重新指向新名称。
   宿主负责更新 source 并重新 prepare；已有 prepared formula 仍要求原 context 的输入。
 
 boundary
-  Current 产品没有持久化 FormulaId/FormulaName、formula reference 或 rename API。
-  demo 的 FormulaId 只是界面身份；Planned Engine 的 ID/依赖模型不能当作 Current 行为。
+  demo 的 FormulaId 只是界面身份。
 ```
 
-Planned 定义见 [FormulaEngine](formula-engine.zh-CN.md)。
+Engine 的 PropertyId 与依赖契约见 [FormulaEngine](formula-engine.zh-CN.md)。
 
 ## 运算与空值
 
@@ -152,9 +152,9 @@ op             非 null 操作数与成功结果
 -x             number → number
 !x / not x     boolean → boolean
 a + b          两个 number → 相加；任一为 string → 两侧转文本后拼接
-a - * / % ^ b  两个 number → number；除数/模数为 0 → 行错误
+a - * / % ^ b  两个 number → number
 a == b / !=    任意非 null 值；不同 value kind 不相等
-a < <= >= > b  同 kind 的 number/string/boolean/date → boolean；NaN 无法排序 → 行类型错误
+a < <= >= > b  同 kind 的 number/string/boolean/date → boolean
 
 表外的一元/非逻辑二元非 null 操作数组合 → 行类型错误；==/!= 接受不同 kind，不属于此类。
 比较顺序：number 按数值，string 按字典序，boolean 为 false < true，date 按时间先后。
@@ -163,7 +163,6 @@ a < <= >= > b  同 kind 的 number/string/boolean/date → boolean；NaN 无法�
 
 非逻辑运算：两侧都求值；只要有错误就报错，否则有 null 就返回 null。
 一元运算：null → null。
-list literal：求值所有元素；有错误则报错，否则任一 null → 整个 list expression 为 null。
 
 a && b：a=true → 求值 b；a=false/null → false，跳过 b；求值到 b=null → null。
 a || b：a=true → true，跳过 b；a=false/null → 求值 b，结果为 boolean/null。
@@ -171,7 +170,7 @@ a ? b : c：a=true → b；a=false/null → c；condition 只接受 boolean/null
 被跳过的 expression 不产生行错误；这不改变 prepare 时发现全部 property 的规则。
 ```
 
-### Planned List
+### Current List
 
 ```text
 list literal：求值所有元素；有错误则报当前行错误，否则保留所有元素，包括空值。
@@ -180,7 +179,7 @@ list literal：求值所有元素；有错误则报当前行错误，否则保�
 
 `empty()`、`map` 和 `join` 的空值规则见 [Builtin 声明](builtin-functions.zh-CN.md#支持的函数)。
 
-### Planned Number
+### Current Number
 
 FormulaEngine 的 Number 取值、数值运算和比较遵循
 [ECMAScript Number](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-ecmascript-language-types-number-type)；
