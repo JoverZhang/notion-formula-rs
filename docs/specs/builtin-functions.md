@@ -14,7 +14,7 @@ last_verified: 2026-10-01
 
 [简体中文](builtin-functions.zh-CN.md) · [Specification index](README.md)
 
-Current declarations execute through [builtins.rs](../../builtin_fn/src/builtins.rs).
+Declarations execute through [builtins.rs](../../builtin_fn/src/builtins.rs).
 The `builtin` blocks are a signature catalog and are not yet connected to Markdown → Rust generation.
 
 ## Signature notation
@@ -55,8 +55,8 @@ repeat(min = n) {...}  // Repeat the whole argument group at least n times; not 
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
 
-/// Current: no arguments returns null; with an argument, retain the current empty-value check.
-/// Current: resolve_empty determines the return type by argument count.
+/// Returns null with no arguments; otherwise checks whether the value is empty.
+/// Return type is inferred by resolve_empty from argument count.
 #[resolver(resolve_empty)]
 empty(value?: any) -> any;
 length(value: string | any[]) -> number;
@@ -66,7 +66,7 @@ unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 ```
 
-#### Current empty type inference
+#### empty type inference
 
 ```rust
 fn resolve_empty(input: &builtin_fn::ResolverInput<'_>) -> builtin_fn::Ty {
@@ -93,7 +93,7 @@ lower(text: string) -> string;
 upper(text: string) -> string;
 trim(text: string) -> string;
 
-/// Current: after argument evaluation and non-null value type checks, return null if either argument is null.
+/// After argument evaluation and non-null value type checks, return null if either argument is null.
 /// Otherwise times must be finite, even for empty text; a nonfinite count produces InvalidValue with the original Value::Number(times) as actual.
 /// Repeat min(10000, max(0, ceil(times))) times; 10,000 caps the repetition count, not output length.
 /// repeat("ab", -1.9) → ""; repeat("ab", 1.1) → "abab".
@@ -102,7 +102,7 @@ padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
-/// Current: convert null elements to empty strings and retain separators; a null list argument returns null.
+/// Convert null elements to empty strings and retain separators; a null list argument returns null.
 /// join([1, empty(), 2], ",") → "1,,2".
 join<T>(list: T[], separator: string) -> string;
 split(text: string, separator: string) -> string[];
@@ -110,7 +110,7 @@ split(text: string, separator: string) -> string[];
 
 ### Number
 
-Current numeric operations follow the [Number rules](formula-language.md#current-number).
+Numeric operations follow the [Number rules](formula-language.md#current-number).
 
 ```builtin
 formatNumber(value: number, format: string, precision: number) -> string;
@@ -121,25 +121,25 @@ mod(a: number, b: number) -> number;
 pow(base: number, exp: number) -> number;
 divide(a: number, b: number) -> number;
 
-// Current: the following five aggregates skip null arguments and null elements, expanding argument lists only one level.
+// The following five aggregates skip null arguments and null elements, expanding argument lists only one level.
 // Check all non-null values before computing: for an argument type mismatch, InvalidValueType.expected is Union(Number, List(Number));
 // for an element mismatch, expected is Number; actual is the offending value's actual type.
 // NaN and Infinity participate in the calculation; any NaN Number makes the result NaN, without a row error.
 
-/// Current: take the minimum according to Math.min; without any Numbers, return ordinary null.
+/// Take the minimum according to Math.min; without any Numbers, return ordinary null.
 min(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current: take the maximum according to Math.max; without any Numbers, return ordinary null.
+/// Take the maximum according to Math.max; without any Numbers, return ordinary null.
 max(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current: add in argument and element order, starting at +0; without any Numbers, return +0.
+/// Add in argument and element order, starting at +0; without any Numbers, return +0.
 /// sum([2, empty(), 4]) and sum(2, empty(), 4) both return 6; sum([]) is +0.
 sum(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current: take the middle value in numeric ascending order; for an even count, add the two middle values and divide by 2. -0 precedes +0; without any Numbers, return ordinary null.
+/// Take the middle value in numeric ascending order; for an even count, add the two middle values and divide by 2. -0 precedes +0; without any Numbers, return ordinary null.
 median(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current: divide the sum result by the number of Numbers; without any Numbers, return ordinary null.
+/// Divide the sum result by the number of Numbers; without any Numbers, return ordinary null.
 /// mean([2, empty(), 4]) is 3; mean([]) is null.
 mean(repeat(min = 1) { values: number | number[] }) -> number;
 
@@ -191,14 +191,14 @@ last<T>(list: T[]) -> T;
 slice<T>(list: T[], start: number, end?: number) -> T[];
 splice<T>(list: T[], startIndex: number, deleteCount: number, repeat(min = 0) { items: T }) -> T[];
 
-/// Current: remove outer null elements, then apply the current ordering of non-null values; do not modify nested lists.
+/// Remove outer null elements, then apply the current ordering of non-null values; do not modify nested lists.
 /// A null list argument returns null; an empty or all-null list returns []. Do not narrow the inferred type by row values.
 sort<T>(list: T[]) -> T[];
 reverse<T>(list: T[]) -> T[];
 unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
-/// Current: evaluate each element in input order, preserving list length; a null list argument returns null.
+/// Evaluate each element in input order, preserving list length; a null list argument returns null.
 map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
 filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
 find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
@@ -207,14 +207,14 @@ some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
 every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
 count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
 
-/// Current: flatten only one level in input order, retaining nulls; a null list argument returns null and an empty list returns [].
+/// Flatten only one level in input order, retaining nulls; a null list argument returns null and an empty list returns [].
 /// flat([[1, empty()], [2]]) → [1, null, 2]; flat([[[]]]) → [[]].
-/// Current return type is defined by resolve_flat below.
+/// Return type is defined by resolve_flat below.
 #[resolver(resolve_flat)]
 flat<T>(list: T[]) -> T[];
 ```
 
-#### Current flat type inference
+#### flat type inference
 
 ```rust
 use builtin_fn::{ArgumentObservation, ResolverInput, Ty, normalize_union};
@@ -255,7 +255,7 @@ fn resolve_flat(input: &ResolverInput<'_>) -> Ty {
 ### Special
 
 ```builtin
-/// Current row ID, not Formula ID.
+/// ID of the current row, not Formula ID.
 id() -> string;
 ```
 
@@ -292,7 +292,7 @@ evaluation
   Invalid regexes, dates, or value domains cause row errors; unexecuted branches/elements contribute no errors.
 ```
 
-Current: ordinary nulls retain their positions in lists, as in [JavaScript arrays](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.flat). See declaration comments for function differences, and the [empty-value experiment](../experiments/notion-empty-semantics/README.md) and [list and repeat experiment](../experiments/notion-list-repeat-semantics/README.md) for observations.
+Ordinary nulls retain their positions in lists, as in [JavaScript arrays](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.flat). See declaration comments for function differences, and the [empty-value experiment](../experiments/notion-empty-semantics/README.md) and [list and repeat experiment](../experiments/notion-list-repeat-semantics/README.md) for observations.
 Execution failures propagate under the [FormulaEngine](formula-engine.md) row-error rules and are not ignored as ordinary nulls.
 
 See [grammar](formula-language.md) for formula-call syntax.

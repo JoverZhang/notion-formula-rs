@@ -14,7 +14,7 @@ last_verified: 2026-10-01
 
 [English](builtin-functions.md) · [规格索引](README.zh-CN.md)
 
-Current 声明的执行入口由 [builtins.rs](../../builtin_fn/src/builtins.rs) 驱动。
+声明的执行入口由 [builtins.rs](../../builtin_fn/src/builtins.rs) 驱动。
 `builtin` 代码块是签名目录，尚未接入 Markdown → Rust 生成。
 
 ## 签名记法
@@ -55,8 +55,8 @@ repeat(min = n) {...}  // 整组参数重复至少 n 次；不是一个 list 参
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
 
-/// Current：无参返回 null；有参时沿用空值判断。
-/// Current：返回类型由 resolve_empty 按实参个数确定。
+/// 无参返回 null；有参时判断值是否为空。
+/// 返回类型由 resolve_empty 按实参个数确定。
 #[resolver(resolve_empty)]
 empty(value?: any) -> any;
 length(value: string | any[]) -> number;
@@ -66,7 +66,7 @@ unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 ```
 
-#### Current empty 类型推断
+#### empty 类型推断
 
 ```rust
 fn resolve_empty(input: &builtin_fn::ResolverInput<'_>) -> builtin_fn::Ty {
@@ -93,7 +93,7 @@ lower(text: string) -> string;
 upper(text: string) -> string;
 trim(text: string) -> string;
 
-/// Current：参数求值、非 null 值的类型检查通过后，任一参数为 null 则返回 null。
+/// 参数求值、非 null 值的类型检查通过后，任一参数为 null 则返回 null。
 /// 否则 times 须有限，包括 text 为空字符串的情况；非有限次数报 InvalidValue，actual 为原始 Value::Number(times)。
 /// 重复 min(10000, max(0, ceil(times))) 次；10,000 是次数上限，不是输出长度上限。
 /// repeat("ab", -1.9) → ""；repeat("ab", 1.1) → "abab"。
@@ -102,7 +102,7 @@ padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
-/// Current：null 元素转为空字符串并保留分隔符；列表参数为 null 时返回 null。
+/// null 元素转为空字符串并保留分隔符；列表参数为 null 时返回 null。
 /// join([1, empty(), 2], ",") → "1,,2"。
 join<T>(list: T[], separator: string) -> string;
 split(text: string, separator: string) -> string[];
@@ -110,7 +110,7 @@ split(text: string, separator: string) -> string[];
 
 ### Number
 
-Current 数值运算遵循 [Number 规则](formula-language.zh-CN.md#current-number)。
+数值运算遵循 [Number 规则](formula-language.zh-CN.md#current-number)。
 
 ```builtin
 formatNumber(value: number, format: string, precision: number) -> string;
@@ -121,25 +121,25 @@ mod(a: number, b: number) -> number;
 pow(base: number, exp: number) -> number;
 divide(a: number, b: number) -> number;
 
-// Current：以下五个聚合函数忽略 null 参数和 null 元素，只展开参数列表一层。
+// 以下五个聚合函数忽略 null 参数和 null 元素，只展开参数列表一层。
 // 先检查所有非 null 值，再计算：参数类型不符时 InvalidValueType.expected 为 Union(Number, List(Number))，
 // 元素类型不符时 expected 为 Number；actual 为出错值的实际类型。
 // NaN 与 Infinity 参与统计；任一 Number 为 NaN 时结果为 NaN，无行错误。
 
-/// Current：按 Math.min 规则取最小值；没有 Number 时返回普通 null。
+/// 按 Math.min 规则取最小值；没有 Number 时返回普通 null。
 min(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current：按 Math.max 规则取最大值；没有 Number 时返回普通 null。
+/// 按 Math.max 规则取最大值；没有 Number 时返回普通 null。
 max(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current：从 +0 开始，按参数和元素顺序相加；没有 Number 时返回 +0。
+/// 从 +0 开始，按参数和元素顺序相加；没有 Number 时返回 +0。
 /// sum([2, empty(), 4]) 与 sum(2, empty(), 4) 均为 6；sum([]) 为 +0。
 sum(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current：数值升序的中间值；偶数个值取中间两数之和再除以 2。-0 排在 +0 前；没有 Number 时返回普通 null。
+/// 数值升序的中间值；偶数个值取中间两数之和再除以 2。-0 排在 +0 前；没有 Number 时返回普通 null。
 median(repeat(min = 1) { values: number | number[] }) -> number;
 
-/// Current：sum 的结果除以 Number 个数；没有 Number 时返回普通 null。
+/// sum 的结果除以 Number 个数；没有 Number 时返回普通 null。
 /// mean([2, empty(), 4]) 为 3；mean([]) 为 null。
 mean(repeat(min = 1) { values: number | number[] }) -> number;
 
@@ -191,14 +191,14 @@ last<T>(list: T[]) -> T;
 slice<T>(list: T[], start: number, end?: number) -> T[];
 splice<T>(list: T[], startIndex: number, deleteCount: number, repeat(min = 0) { items: T }) -> T[];
 
-/// Current：移除外层 null 元素，再按当前非 null 值的排序规则排序；不修改嵌套列表。
+/// 移除外层 null 元素，再按当前非 null 值的排序规则排序；不修改嵌套列表。
 /// 列表参数为 null 时返回 null；空列表或全 null 列表返回 []。不按行值缩窄推断类型。
 sort<T>(list: T[]) -> T[];
 reverse<T>(list: T[]) -> T[];
 unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
-/// Current：按输入顺序逐元素求值，保持列表长度；列表参数为 null 时返回 null。
+/// 按输入顺序逐元素求值，保持列表长度；列表参数为 null 时返回 null。
 map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
 filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
 find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
@@ -207,14 +207,14 @@ some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
 every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
 count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
 
-/// Current：按输入顺序只展开一层，保留 null；列表参数为 null 时返回 null，空列表返回 []。
+/// 按输入顺序只展开一层，保留 null；列表参数为 null 时返回 null，空列表返回 []。
 /// flat([[1, empty()], [2]]) → [1, null, 2]；flat([[[]]]) → [[]]。
-/// Current 返回类型由下方 resolve_flat 定义。
+/// 返回类型由下方 resolve_flat 定义。
 #[resolver(resolve_flat)]
 flat<T>(list: T[]) -> T[];
 ```
 
-#### Current flat 类型推断
+#### flat 类型推断
 
 ```rust
 use builtin_fn::{ArgumentObservation, ResolverInput, Ty, normalize_union};
@@ -292,7 +292,7 @@ evaluation
   无效 regex、日期或值域等运行时问题是行错误；未执行的分支/元素不产生错误。
 ```
 
-Current：列表中的普通 null 像 [JavaScript 数组](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.flat)一样保留位置；各函数的差异见声明注释，观察依据见[空值实验](../experiments/notion-empty-semantics/README.zh-CN.md)和[列表与 repeat 实验](../experiments/notion-list-repeat-semantics/README.zh-CN.md)。
+列表中的普通 null 像 [JavaScript 数组](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.flat)一样保留位置；各函数的差异见声明注释，观察依据见[空值实验](../experiments/notion-empty-semantics/README.zh-CN.md)和[列表与 repeat 实验](../experiments/notion-list-repeat-semantics/README.zh-CN.md)。
 执行失败按 [FormulaEngine](formula-engine.zh-CN.md) 的行错误规则传播，不作为普通 null 忽略。
 
 公式调用语法见[文法](formula-language.zh-CN.md)。
