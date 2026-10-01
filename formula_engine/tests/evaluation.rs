@@ -676,6 +676,99 @@ fn list_traversal_propagates_dependency_errors_only_when_read() {
     );
 }
 
+#[test]
+fn dynamic_generic_values_are_checked_without_panicking() {
+    let engine = engine(vec![
+        input("x", ValueType::Unknown),
+        input("values", ValueType::Unknown),
+        formula("concat", "concat([1], [prop(\"x\")])"),
+        formula("reverse_concat", "concat([prop(\"x\")], [1])"),
+        formula("splice", "splice([1], 0, 0, prop(\"x\"))"),
+        formula("reverse_splice", "splice([prop(\"x\")], 0, 0, 1)"),
+        formula("format", "formatNumber(1, \"NO_SUCH_FORMAT\", 0)"),
+        formula("actual_type", "abs(prop(\"values\"))"),
+        formula("includes", "includes([1], prop(\"x\"))"),
+    ]);
+    let column = Column::Union(ColumnData {
+        values: vec![
+            Value::Number(2.0),
+            Value::Boolean(true),
+            Value::String("ignored".into()),
+        ],
+        validity: NullBuffer::from(vec![true, true, false]),
+    });
+    let values = dynamic(&[
+        Value::List(vec![None, Some(Value::Number(1.0))]),
+        Value::List(vec![None]),
+        Value::List(vec![Some(Value::List(vec![None]))]),
+    ]);
+    let ids = [
+        "concat",
+        "reverse_concat",
+        "splice",
+        "reverse_splice",
+        "format",
+        "actual_type",
+        "includes",
+    ];
+    let result = engine
+        .evaluate(&request(3, &ids, &[("x", column), ("values", values)]))
+        .unwrap();
+    for id in &ids[..4] {
+        let output = output(&result, id);
+        assert_eq!(
+            output.output_type,
+            ValueType::List(Box::new(ValueType::Number)),
+            "{id}"
+        );
+        assert_eq!(output.errors.len(), 1, "{id}");
+        assert_eq!(output.errors[0].row_index, 1, "{id}");
+        assert!(
+            matches!(
+                output.errors[0].error,
+                RuntimeError::InvalidValueType { .. }
+            ),
+            "{id}"
+        );
+        assert!(row_value(&output.column, 0).is_some(), "{id}");
+        assert!(row_value(&output.column, 1).is_none(), "{id}");
+        assert!(row_value(&output.column, 2).is_some(), "{id}");
+    }
+    assert_eq!(output(&result, "format").errors.len(), 3);
+    assert!(output(&result, "format").errors.iter().all(|error| matches!(
+        &error.error,
+        RuntimeError::InvalidValue { actual: Value::String(actual), .. } if actual == "NO_SUCH_FORMAT"
+    )));
+    let errors = &output(&result, "actual_type").errors;
+    assert_eq!(errors.len(), 3);
+    for (error, actual) in errors.iter().zip([
+        ValueType::List(Box::new(ValueType::Number)),
+        ValueType::List(Box::new(ValueType::Unknown)),
+        ValueType::List(Box::new(ValueType::List(Box::new(ValueType::Unknown)))),
+    ]) {
+        assert_eq!(
+            error.error,
+            RuntimeError::InvalidValueType {
+                expected: ValueType::Number,
+                actual
+            }
+        );
+    }
+    let includes = output(&result, "includes");
+    assert_eq!(includes.errors.len(), 1);
+    assert_eq!(includes.errors[0].row_index, 1);
+    assert_eq!(
+        includes.errors[0].error,
+        RuntimeError::InvalidValueType {
+            expected: ValueType::Number,
+            actual: ValueType::Boolean,
+        }
+    );
+    assert_eq!(row_value(&includes.column, 0), Some(Value::Boolean(false)));
+    assert_eq!(row_value(&includes.column, 1), None);
+    assert_eq!(row_value(&includes.column, 2), Some(Value::Boolean(false)));
+}
+
 fn render_value(value: &Value) -> String {
     match value {
         Value::Number(value) if value.is_nan() => "NaN".into(),
