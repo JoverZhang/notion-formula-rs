@@ -7,14 +7,14 @@ counterpart: ./formula-engine.md
 implementation_status: current
 document_status: draft
 translation_status: synced
-last_verified: 2026-09-24
+last_verified: 2026-10-01
 ---
 
 # FormulaEngine：编译与求值
 
 [English](formula-engine.md)
 
-> Current：定义管理、依赖分析与状态查询。Planned：求值与 FormulaDraft。
+> Current：定义管理、依赖分析、状态查询与批量求值。Planned：FormulaDraft。
 
 **目录**
 
@@ -53,7 +53,7 @@ pub struct PropertyId(pub String);
 /// Input 的声明类型与 Formula 的推断类型。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueType {
-    /// 数值规则见 [Planned Number](formula-language.zh-CN.md#planned-number)。
+    /// 数值规则见 [Current Number](formula-language.zh-CN.md#current-number)。
     Number,
     String, Boolean, Date,
     /// 静态类型未确定；可用于 Input 声明和推断结果，包括嵌套类型。
@@ -65,10 +65,11 @@ pub enum ValueType {
 
 ```
 
-**计划中的运行时值类型**
+**当前运行时值类型**
 
-```rust
+```rust out=formula_engine/src/evaluation.h.rs
 /// 列式结构以 bitmap 标记 null 位置。
+#[derive(Clone, Debug, PartialEq)]
 pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
@@ -78,6 +79,7 @@ pub enum Column {
     /// 承载 Union 或 Unknown；每个非 null 值保留实际类型。
     Union(ColumnData<Value>),
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ColumnData<T> {
     /// 长度等于本次求值的行数；null 位置仅保留占位值，不得读取。
     pub values: Vec<T>,
@@ -88,7 +90,8 @@ pub struct ColumnData<T> {
 }
 ```
 
-```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
+```rust out=formula_engine/src/evaluation.h.rs
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix 毫秒时间戳。
@@ -98,8 +101,11 @@ pub enum Value {
 }
 
 /// Input 声明类型对应的列种类；只看最外层类型语法。
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColumnKind { Number, String, Boolean, Date, List, Union }
+```
+
+```rust out=formula_engine/tests/support/evaluation_input_contract.h.rs
 
 /// 空列、全 null 列及单成员 Union 均不改变声明类型对应的列种类。
 fn column_kind(ty: &ValueType) -> ColumnKind {
@@ -192,10 +198,11 @@ pub enum EngineChangeError {
 }
 ```
 
-**计划中的求值请求与结果类型**
+**当前求值请求与结果类型**
 
-```rust
+```rust out=formula_engine/src/evaluation.h.rs
 /// FormulaEngine::evaluate() 的参数
+#[derive(Clone, Debug, PartialEq)]
 pub struct EvaluateInput {
     /// 输入列和结果列中的值均按此顺序排列。
     /// ID 非空且在本批次内唯一；允许零行。
@@ -208,12 +215,13 @@ pub struct EvaluateInput {
     /// 非空且不重复；每个 ID 均须指向 Engine 中的 Formula。
     pub formula_ids: Vec<PropertyId>,
 }
-#[derive(derive_more::From)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
 #[from(String, &str)]
 pub struct RowId(pub String);
 
 /// 入参校验失败时，不执行任何公式；一次只返回一个错误。
 /// 同一定义和输入返回同一个错误。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EvaluateInputError {
     /// UTC 时间或应用 time_zone 后的本地时间超出公历 0001–9999 年。
     InvalidNow { now: i64 },
@@ -243,6 +251,7 @@ pub enum EvaluateInputError {
 }
 
 /// 一次求值中，所有行和公式共用这份时间与时区快照。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuntimeContext {
     /// now() 使用的 UTC Unix 毫秒时间戳，由调用方提供；Engine 不读取时钟。
     /// 实时求值取请求开始时的时间；测试或重放可传固定值。
@@ -253,11 +262,13 @@ pub struct RuntimeContext {
     pub time_zone: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct EvaluateResult {
     /// 与 input.formula_ids 一一对应，包括求值失败的公式。
     pub formulas: HashMap<PropertyId, Result<FormulaOutput, FormulaEvaluationError>>,
 }
 /// 所有行都失败时，仍以 Ok(FormulaOutput) 返回，错误记录在 errors 中。
+#[derive(Clone, Debug, PartialEq)]
 pub struct FormulaOutput {
     /// 本次求值时的输出类型。
     pub output_type: ValueType,
@@ -270,6 +281,7 @@ pub struct FormulaOutput {
 }
 /// 单行求值失败，对应结果位置标为 null；其他行继续求值。
 /// 依赖错误只沿实际执行的分支传播，不改变 FormulaStatus。
+#[derive(Clone, Debug, PartialEq)]
 pub struct RowError {
     /// input.row_ids 的下标。
     pub row_index: usize,
@@ -278,6 +290,7 @@ pub struct RowError {
     pub error: RuntimeError,
 }
 /// constraint 和 detail 仅用于展示。
+#[derive(Clone, Debug, PartialEq)]
 pub enum RuntimeError {
     /// 运行时值的类型不适用于当前操作。
     InvalidValueType {
@@ -304,6 +317,7 @@ pub enum RuntimeError {
     DateOutOfRange,
 }
 /// 公式无法开始求值时返回；单行求值错误见 RowError。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FormulaEvaluationError {
     /// 对应 Formula 的 FormulaStatus 为 NotReady。
     NotReady,
@@ -311,81 +325,6 @@ pub enum FormulaEvaluationError {
 ```
 
 ## FormulaEngine API
-
-### 计划中的求值示例
-
-```rust
-/// # Examples
-///
-/// ```
-/// use std::collections::HashMap;
-/// use std::time::{SystemTime, UNIX_EPOCH};
-///
-/// // 1. Define schema
-/// let schema = FormulaSchema {
-///     properties: vec![
-///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
-///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
-///         PropertyDefinition::Formula(FormulaDefinition {
-///             id: "formula".into(),
-///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
-///         }),
-///     ],
-/// };
-///
-/// // 2. Create the engine
-/// let engine = FormulaEngine::new(schema).expect("valid definitions");
-/// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
-///
-/// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
-/// let since_epoch = SystemTime::now()
-///     .duration_since(UNIX_EPOCH)
-///     .expect("system clock is before Unix epoch");
-/// let runtime = RuntimeContext {
-///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
-///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
-/// };
-///
-/// // 4. Build input columns in row_ids order
-/// // row_id    text    number
-/// // row-1     "ha"    2
-/// // row-2     "go"    3
-/// let input = EvaluateInput {
-///     row_ids: vec!["row-1".into(), "row-2".into()],
-///     columns: HashMap::from([
-///         (
-///             "text".into(),
-///             Column::String(ColumnData {
-///                 values: vec!["ha".into(), "go".into()],
-///                 validity: NullBuffer::new_valid(2),
-///             }),
-///         ),
-///         (
-///             "number".into(),
-///             Column::Number(ColumnData {
-///                 values: vec![2.0, 3.0],
-///                 validity: NullBuffer::new_valid(2),
-///             }),
-///         ),
-///     ]),
-///     runtime,
-///     formula_ids: vec!["formula".into()],
-/// };
-///
-/// // 5. Evaluate the requested formula
-/// let result = engine.evaluate(&input).expect("valid request");
-///
-/// // 6. Read the result column in row_ids order
-/// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
-///     panic!("expected a computed formula");
-/// };
-/// let Column::String(column) = &output.column else {
-///     panic!("expected a string column");
-/// };
-/// assert_eq!(column.values, ["haha", "gogogo"]);
-/// assert!(output.errors.is_empty());
-/// ```
-```
 
 ### 当前的定义管理方法
 
@@ -408,6 +347,87 @@ impl FormulaEngine {
     pub fn properties(&self) -> Vec<PropertyState>;
     pub fn state(&self) -> FormulaEngineState<'_>;
 
+    /// 输入校验通过即返回 Ok(EvaluateResult)，包括所有请求的公式都失败的情况。
+    /// 公式与行错误随结果返回；其他公式继续求值。
+    ///
+    /// allows: formula_ids 中存在 NotReady 的公式。
+    ///
+    /// error: 任一入参校验失败，不执行任何公式；只返回一个 EvaluateInputError。
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use formula_engine::{Column, ColumnData, EvaluateInput, FormulaDefinition, FormulaEngine,
+    ///     FormulaEngineState, FormulaSchema, NullBuffer, PropertyDefinition, PropertyId, RuntimeContext, ValueType};
+    /// use std::collections::HashMap;
+    /// use std::time::{SystemTime, UNIX_EPOCH};
+    ///
+    /// // 1. Define schema
+    /// let schema = FormulaSchema {
+    ///     properties: vec![
+    ///         PropertyDefinition::Input { id: "text".into(), ty: ValueType::String },
+    ///         PropertyDefinition::Input { id: "number".into(), ty: ValueType::Number },
+    ///         PropertyDefinition::Formula(FormulaDefinition {
+    ///             id: "formula".into(),
+    ///             expression: r#"repeat(prop("text"), prop("number"))"#.into(),
+    ///         }),
+    ///     ],
+    /// };
+    ///
+    /// // 2. Create the engine
+    /// let engine = FormulaEngine::new(schema).expect("valid definitions");
+    /// assert!(matches!(engine.state(), FormulaEngineState::AllReady));
+    ///
+    /// // 3. Capture one runtime snapshot (this example uses UTC+08:00)
+    /// let since_epoch = SystemTime::now()
+    ///     .duration_since(UNIX_EPOCH)
+    ///     .expect("system clock is before Unix epoch");
+    /// let runtime = RuntimeContext {
+    ///     now: since_epoch.as_millis().try_into().expect("timestamp exceeds i64"),
+    ///     time_zone: "+08:00".into(), // Use the business/user time zone's offset.
+    /// };
+    ///
+    /// // 4. Build input columns in row_ids order
+    /// // row_id    text    number
+    /// // row-1     "ha"    2
+    /// // row-2     "go"    3
+    /// let input = EvaluateInput {
+    ///     row_ids: vec!["row-1".into(), "row-2".into()],
+    ///     columns: HashMap::from([
+    ///         (
+    ///             "text".into(),
+    ///             Column::String(ColumnData {
+    ///                 values: vec!["ha".into(), "go".into()],
+    ///                 validity: NullBuffer::new_valid(2),
+    ///             }),
+    ///         ),
+    ///         (
+    ///             "number".into(),
+    ///             Column::Number(ColumnData {
+    ///                 values: vec![2.0, 3.0],
+    ///                 validity: NullBuffer::new_valid(2),
+    ///             }),
+    ///         ),
+    ///     ]),
+    ///     runtime,
+    ///     formula_ids: vec!["formula".into()],
+    /// };
+    ///
+    /// // 5. Evaluate the requested formula
+    /// let result = engine.evaluate(&input).expect("valid request");
+    ///
+    /// // 6. Read the result column in row_ids order
+    /// let Some(Ok(output)) = result.formulas.get(&PropertyId::from("formula")) else {
+    ///     panic!("expected a computed formula");
+    /// };
+    /// let Column::String(column) = &output.column else {
+    ///     panic!("expected a string column");
+    /// };
+    /// assert_eq!(column.values, ["haha", "gogogo"]);
+    /// assert!(output.errors.is_empty());
+    /// ```
+    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
+
     /// 原子更新 PropertyDefinition。
     /// 返回前重新分析该 ID 的直接、间接公式依赖者及新的 Formula 定义。
     ///
@@ -426,19 +446,10 @@ impl FormulaEngine {
 }
 ```
 
-### 计划中的求值与 Draft 方法
+### 计划中的 Draft 方法
 
 ```rust
 impl FormulaEngine {
-
-    /// 输入校验通过即返回 Ok(EvaluateResult)，包括所有请求的公式都失败的情况。
-    /// 公式与行错误随结果返回；其他公式继续求值。
-    ///
-    /// allows: formula_ids 中存在 NotReady 的公式。
-    ///
-    /// error: 任一入参校验失败，不执行任何公式；只返回一个 EvaluateInputError。
-    pub fn evaluate(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError>;
-
     /// 基于 Engine 分析候选公式；编辑结果不写入 Engine。
     ///
     /// allows:

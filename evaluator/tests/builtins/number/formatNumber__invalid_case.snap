@@ -1,0 +1,4 @@
+=== INPUT ===
+formatNumber(1, "NO_SUCH_FORMAT", 0)
+=== OUTPUT ===
+row-0: error(InvalidValue { actual: Text("NO_SUCH_FORMAT"), constraint: "unsupported number format" })

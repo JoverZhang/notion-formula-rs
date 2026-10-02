@@ -117,7 +117,7 @@ fn typed_dispatch_returns_an_error_on_a_wrong_physical_abi_in_release() {
 
 #[cfg(debug_assertions)]
 #[test]
-fn lambda_binding_contract_rejects_an_incompatible_runtime_type() {
+fn lambda_binding_contract_allows_dynamic_values_for_runtime_validation() {
     let contract = DebugArgumentContract {
         parameter: ParamRef::Head(0),
         repeat_group: None,
@@ -138,7 +138,7 @@ fn lambda_binding_contract_rejects_an_incompatible_runtime_type() {
         std::panic::catch_unwind(|| {
             assert_lambda_bindings(Some(&contract), &bindings, &Mask::all(1));
         })
-        .is_err()
+        .is_ok()
     );
 }
 

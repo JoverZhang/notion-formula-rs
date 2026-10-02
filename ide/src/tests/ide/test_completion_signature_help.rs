@@ -131,7 +131,7 @@ fn signature_help_flat_uses_the_shared_dynamic_return_resolver() {
 
     t("flat([[[1]]]$0)")
         .ctx(c)
-        .expect_sig_label("flat(list: number[][][]) -> number[]");
+        .expect_sig_label("flat(list: number[][][]) -> number[][]");
 }
 
 #[test]

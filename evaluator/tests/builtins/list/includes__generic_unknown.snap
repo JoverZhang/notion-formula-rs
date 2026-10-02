@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Value": any = [true, 2, null]
+
+includes([1], prop("Value"))
+=== OUTPUT ===
+row-0: error(InvalidValueType { expected: Number, actual: Boolean })
+row-1: false
+row-2: false

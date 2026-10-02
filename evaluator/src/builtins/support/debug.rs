@@ -1,11 +1,9 @@
 #[cfg(debug_assertions)]
 use analyzer::analysis::Ty;
-#[cfg(debug_assertions)]
-use builtin_fn::{normalize_union, type_accepts};
 
 use crate::builtins::BuiltinKey;
 #[cfg(debug_assertions)]
-use crate::core::types::Value;
+use crate::core::types::value_type_accepts;
 use crate::core::types::{EvalBlock, Mask};
 use crate::ir::{DebugArgumentContract, DebugCallContract};
 
@@ -20,15 +18,10 @@ pub(crate) fn assert_materialized_argument(
     let Some(contract) = contract else {
         return;
     };
-    assert_runtime_type_rows(
-        &format!(
-            "builtin argument {:?} group {:?}",
-            contract.parameter, contract.repeat_group
-        ),
-        block,
-        mask,
-        &contract.expected_ty,
-    );
+    // Dynamic argument mismatches are row errors produced by the operation, not
+    // invalid evaluator invariants. Materialization must preserve the layout.
+    let _ = contract;
+    assert_eq!(block.len(), mask.len());
 }
 
 #[cfg(not(debug_assertions))]
@@ -62,16 +55,8 @@ pub(crate) fn assert_lambda_bindings(
         contract.repeat_group
     );
     for ((_, expected_ty), (name, column)) in params.iter().zip(bindings.as_slice()) {
-        let block = EvalBlock::new(column.clone(), Mask::all(mask.len()), Vec::new());
-        assert_runtime_type_rows(
-            &format!(
-                "builtin lambda binding {name} for argument {:?} group {:?}",
-                contract.parameter, contract.repeat_group
-            ),
-            &block,
-            mask,
-            expected_ty,
-        );
+        let _ = (expected_ty, name);
+        assert_eq!(column.len(), mask.len());
     }
 }
 
@@ -106,17 +91,8 @@ pub(super) fn assert_debug_inputs(
                 argument.repeat_group
             );
         };
-        assert_runtime_type_rows(
-            &format!(
-                "builtin {} argument {:?} group {:?}",
-                key.name(),
-                argument.parameter,
-                argument.repeat_group
-            ),
-            &argument.block,
-            execution_mask,
-            &expected.expected_ty,
-        );
+        let _ = expected;
+        assert_eq!(argument.block.len(), execution_mask.len());
     }
 }
 
@@ -233,24 +209,10 @@ pub(crate) fn assert_runtime_type_rows(
             continue;
         }
         let value = block.column.row_value(row).expect("valid row");
-        let actual = runtime_ty(&value);
+        let actual = value.value_type();
         assert!(
-            type_accepts(expected, &actual),
+            value_type_accepts(expected, &actual),
             "{context} row {row} expected {expected}, observed {actual}"
         );
-    }
-}
-
-#[cfg(debug_assertions)]
-pub(crate) fn runtime_ty(value: &Value) -> Ty {
-    match value {
-        Value::Number(_) => Ty::Number,
-        Value::Text(_) => Ty::String,
-        Value::Bool(_) => Ty::Boolean,
-        Value::Date(_) => Ty::Date,
-        Value::List(values) if values.is_empty() => Ty::List(Box::new(Ty::Unknown)),
-        Value::List(values) => Ty::List(Box::new(normalize_union(
-            values.iter().map(runtime_ty).collect::<Vec<_>>(),
-        ))),
     }
 }

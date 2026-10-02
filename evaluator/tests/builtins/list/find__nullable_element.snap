@@ -1,0 +1,4 @@
+=== INPUT ===
+find([empty(), 1], empty(current))
+=== OUTPUT ===
+row-0: null

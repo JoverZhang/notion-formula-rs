@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Pattern": string = ["[", "x", null]
+
+test("text", prop("Pattern"))
+=== OUTPUT ===
+row-0: error(InvalidRegex { pattern: "[", detail: "regex parse error:\n    [\n    ^\nerror: unclosed character class" })
+row-1: true
+row-2: null

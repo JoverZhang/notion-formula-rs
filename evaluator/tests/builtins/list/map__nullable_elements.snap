@@ -1,0 +1,4 @@
+=== INPUT ===
+map([1, empty(), 2], current)
+=== OUTPUT ===
+row-0: [1, null, 2]

@@ -1,0 +1,3 @@
+// @prop "Text": string = ["bad-date", "2024-01-01", null]
+
+parseDate(prop("Text"))

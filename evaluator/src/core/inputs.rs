@@ -5,6 +5,7 @@ use analyzer::analysis::Ty;
 use super::columns::{AbiKind, Column};
 use super::context::BuiltinRuntimeContext;
 use super::errors::InputContractError;
+use super::types::{EvalBlock, Mask};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct InputSlot {
@@ -45,7 +46,7 @@ impl InputLayoutId {
 #[derive(Debug)]
 pub struct EvalInputsBuilder {
     runtime: BuiltinRuntimeContext,
-    columns: Vec<(InputSlot, Column)>,
+    columns: Vec<(InputSlot, EvalBlock)>,
 }
 
 impl EvalInputsBuilder {
@@ -57,7 +58,17 @@ impl EvalInputsBuilder {
     }
 
     pub fn insert(&mut self, slot: InputSlot, column: Column) -> &mut Self {
-        self.columns.push((slot, column));
+        let len = column.len();
+        self.insert_block(slot, EvalBlock::new(column, Mask::all(len), Vec::new()))
+    }
+
+    pub fn insert_block(&mut self, slot: InputSlot, block: EvalBlock) -> &mut Self {
+        self.columns.push((slot, block));
+        self
+    }
+
+    pub fn with_block(mut self, slot: InputSlot, block: EvalBlock) -> Self {
+        self.insert_block(slot, block);
         self
     }
 
@@ -74,9 +85,10 @@ impl EvalInputsBuilder {
         let required = prepared.required_columns();
         let mut columns = std::iter::repeat_with(|| None)
             .take(required.len())
-            .collect::<Vec<Option<Column>>>();
+            .collect::<Vec<Option<EvalBlock>>>();
 
-        for (slot, column) in self.columns {
+        for (slot, block) in self.columns {
+            let column = &block.column;
             if slot.layout != prepared.input_layout_id() {
                 return Err(InputContractError::WrongInputLayout);
             }
@@ -115,7 +127,24 @@ impl EvalInputsBuilder {
                     actual,
                 });
             }
-            columns[slot.index()] = Some(column);
+            if block.ok.len() != batch_len {
+                return Err(InputContractError::WrongLength {
+                    slot,
+                    expected: batch_len,
+                    actual: block.ok.len(),
+                });
+            }
+            let mut error_rows = Mask::none(batch_len);
+            for (row, _) in &block.errors {
+                if *row >= batch_len || block.ok[*row] {
+                    return Err(InputContractError::WrongInputLayout);
+                }
+                error_rows.set(*row, true);
+            }
+            if (0..batch_len).any(|row| !block.ok[row] && !error_rows[row]) {
+                return Err(InputContractError::WrongInputLayout);
+            }
+            columns[slot.index()] = Some(block);
         }
 
         let columns = columns
@@ -142,7 +171,7 @@ impl EvalInputsBuilder {
 pub struct EvalInputs {
     layout: InputLayoutId,
     batch_len: usize,
-    columns: Box<[Column]>,
+    columns: Box<[EvalBlock]>,
     runtime: BuiltinRuntimeContext,
 }
 
@@ -156,7 +185,13 @@ impl EvalInputs {
     }
 
     pub fn column(&self, slot: InputSlot) -> Option<&Column> {
-        self.columns.get(slot.index())
+        self.block(slot).map(|block| &block.column)
+    }
+
+    pub fn block(&self, slot: InputSlot) -> Option<&EvalBlock> {
+        (slot.layout == self.layout)
+            .then(|| self.columns.get(slot.index()))
+            .flatten()
     }
 
     pub fn runtime(&self) -> &BuiltinRuntimeContext {

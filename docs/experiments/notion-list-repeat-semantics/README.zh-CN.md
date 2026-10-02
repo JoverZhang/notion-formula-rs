@@ -6,7 +6,7 @@ source_language: zh-CN
 counterpart: ./README.md
 implementation_status: historical
 document_status: stable
-translation_status: needs-update
+translation_status: synced
 last_verified: 2026-09-29
 ---
 
@@ -53,7 +53,7 @@ last_verified: 2026-09-29
 | `flat([[empty()], []])` | 长度为 1，元素为空值 |
 | `flat([[], empty(), [2]])` | 长度为 2，空值位于 2 之前 |
 
-深度对照区分了单层展开与递归展开：`length(flat([[[]]]))` 返回 1，`join(map(flat([[[]]]), length(current)), "|")` 返回 `"0"`。保留下来的元素是空列表。这与仓库 [Builtin function signatures](../../specs/builtin-functions.zh-CN.md) 当前规定的递归 `flat` 不同。
+深度对照区分了单层展开与递归展开：`length(flat([[[]]]))` 返回 1，`join(map(flat([[[]]]), length(current)), "|")` 返回 `"0"`。保留下来的元素是空列表。这与实验日期 2026-09-29 时仓库的递归 `flat` 行为不同。当前契约见 [flat 声明](../../specs/builtin-functions.zh-CN.md#list)。
 
 ## repeat 对测试中的有限次数取整并限制上限
 

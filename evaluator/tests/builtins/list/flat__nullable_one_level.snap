@@ -1,0 +1,4 @@
+=== INPUT ===
+flat([[1, empty()], [2], [[3]], empty()])
+=== OUTPUT ===
+row-0: [1, null, 2, [3], null]

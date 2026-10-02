@@ -1,0 +1,12 @@
+=== INPUT ===
+// @prop "Times": number = [-1.9, 1.1, 10000.1, "Infinity", "-Infinity", "NaN", null]
+
+length(repeat("ab", prop("Times")))
+=== OUTPUT ===
+row-0: 0
+row-1: 4
+row-2: 20000
+row-3: error(InvalidValue { actual: Number(inf), constraint: "repeat count must be finite" })
+row-4: error(InvalidValue { actual: Number(-inf), constraint: "repeat count must be finite" })
+row-5: error(InvalidValue { actual: Number(NaN), constraint: "repeat count must be finite" })
+row-6: null

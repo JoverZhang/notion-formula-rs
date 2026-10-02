@@ -14,7 +14,8 @@ use crate::core::types::{EvalBlock, Mask, RowBatch};
 use crate::ir::{ExecNode, ExecPlan, PlanId, PlannedArgumentKind};
 
 use super::operators::{
-    eval_binary, eval_cast, eval_list, eval_logical_and, eval_logical_or, eval_unary, literal_block,
+    eval_binary, eval_cast, eval_list, eval_logical_and, eval_logical_or, eval_type_check,
+    eval_unary, literal_block,
 };
 
 pub(crate) struct Runtime<'a> {
@@ -50,14 +51,10 @@ impl<'a> Runtime<'a> {
                 eval_list(blocks, mask)
             }
             ExecNode::Input(slot) => {
-                let Some(column) = self.inputs.column(slot).cloned() else {
+                let Some(block) = self.inputs.block(slot).cloned() else {
                     return EvalBlock::fail_mask(mask, EvalError::PropertyDisabled);
                 };
-                EvalBlock::new(
-                    column.normalize_inactive(mask),
-                    Mask::all(mask.len()),
-                    Vec::new(),
-                )
+                block.select(mask)
             }
             ExecNode::Variable(name) => {
                 let column = self
@@ -116,6 +113,10 @@ impl<'a> Runtime<'a> {
             ExecNode::Cast { input, target } => {
                 let input = self.eval_node(input, mask);
                 eval_cast(input, target, mask)
+            }
+            ExecNode::TypeCheck { input, expected } => {
+                let input = self.eval_node(input, mask);
+                eval_type_check(input, &expected, mask)
             }
             ExecNode::Builtin(call) => match call.key.evaluation_mode() {
                 BuiltinEvaluationMode::Value => {

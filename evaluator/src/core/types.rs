@@ -75,7 +75,47 @@ pub enum Value {
     Text(String),
     Bool(bool),
     Date(i64),
-    List(Vec<Value>),
+    List(Vec<Option<Value>>),
+}
+
+impl Value {
+    /// Observed runtime structure; empty lists have an unknown element type.
+    pub fn value_type(&self) -> analyzer::analysis::Ty {
+        use analyzer::analysis::Ty;
+        match self {
+            Self::Number(_) => Ty::Number,
+            Self::Text(_) => Ty::String,
+            Self::Bool(_) => Ty::Boolean,
+            Self::Date(_) => Ty::Date,
+            Self::List(values) => Ty::List(Box::new(builtin_fn::normalize_union(
+                values
+                    .iter()
+                    .filter_map(Option::as_ref)
+                    .map(Self::value_type),
+            ))),
+        }
+    }
+}
+
+pub(crate) fn value_type_accepts(
+    expected: &analyzer::analysis::Ty,
+    actual: &analyzer::analysis::Ty,
+) -> bool {
+    use analyzer::analysis::Ty;
+    match actual {
+        Ty::Null => true,
+        Ty::Union(members) => members
+            .iter()
+            .all(|member| value_type_accepts(expected, member)),
+        Ty::List(inner) => match expected {
+            Ty::List(expected) => value_type_accepts(expected, inner),
+            Ty::Union(members) => members
+                .iter()
+                .any(|member| value_type_accepts(member, actual)),
+            _ => builtin_fn::type_accepts(expected, actual),
+        },
+        _ => builtin_fn::type_accepts(expected, actual),
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -173,6 +213,18 @@ impl EvalBlock {
 
     pub fn validity(&self) -> &Validity {
         self.column.validity()
+    }
+
+    pub(crate) fn select(self, mask: &Mask) -> Self {
+        let ok = (0..mask.len())
+            .map(|row| !mask[row] || self.ok[row])
+            .collect();
+        let errors = self
+            .errors
+            .into_iter()
+            .filter(|(row, _)| mask[*row])
+            .collect();
+        Self::new(self.column.normalize_inactive(mask), ok, errors)
     }
 
     pub(crate) fn fail_mask(mask: &Mask, error: EvalError) -> Self {

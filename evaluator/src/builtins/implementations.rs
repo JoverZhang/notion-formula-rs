@@ -44,7 +44,7 @@ macro_rules! impl_typed_value_kernel {
 }
 
 impl_typed_value_kernel!(
-    Empty, EmptyKernel, EmptyArgs, BooleanKind;
+    Empty, EmptyKernel, EmptyArgs, AnyKind;
     args, _context, mask => eval_empty(args.value, mask)
 );
 impl_typed_value_kernel!(
@@ -355,11 +355,11 @@ impl_typed_value_kernel!(
 );
 impl_typed_value_kernel!(
     Timestamp, TimestampKernel, TimestampArgs, NumberKind;
-    args, _context, mask => eval_timestamp(args.date, mask)
+    args, context, mask => eval_timestamp(args.date, context, mask)
 );
 impl_typed_value_kernel!(
     FromTimestamp, FromTimestampKernel, FromTimestampArgs, DateKind;
-    args, _context, mask => eval_from_timestamp(args.timestamp, mask)
+    args, context, mask => eval_from_timestamp(args.timestamp, context, mask)
 );
 impl_typed_value_kernel!(
     FormatDate, FormatDateKernel, FormatDateArgs, TextKind;

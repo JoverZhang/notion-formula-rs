@@ -1,0 +1,7 @@
+=== INPUT ===
+// @prop "Values": any[] = [["x", null, 1], [null, 2]]
+
+map(prop("Values"), current - 1)
+=== OUTPUT ===
+row-0: error(InvalidValueType { expected: Number, actual: String })
+row-1: [null, 1]

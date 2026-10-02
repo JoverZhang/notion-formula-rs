@@ -1,0 +1,11 @@
+=== INPUT ===
+// @prop "Values": any = [true, 1, "x", [null, 2], [null, "x"], [[1]]]
+
+sum(prop("Values"))
+=== OUTPUT ===
+row-0: error(InvalidValueType { expected: Union([Number, List(Number)]), actual: Boolean })
+row-1: 1
+row-2: error(InvalidValueType { expected: Union([Number, List(Number)]), actual: String })
+row-3: 2
+row-4: error(InvalidValueType { expected: Number, actual: String })
+row-5: error(InvalidValueType { expected: Number, actual: List(Number) })

@@ -53,7 +53,7 @@ The `sort` cases use `empty()` elements. The `flat` cases use `empty()` and the 
 | `flat([[empty()], []])` | Length 1; the element is empty |
 | `flat([[], empty(), [2]])` | Length 2; an empty element precedes 2 |
 
-The depth probe distinguishes one-level from recursive flattening: `length(flat([[[]]]))` returned 1, and `join(map(flat([[[]]]), length(current)), "|")` returned `"0"`. The retained element was an empty list. This differs from the repository's current recursive `flat` contract in [Builtin function signatures](../../specs/builtin-functions.md#signature-notation).
+The depth probe distinguishes one-level from recursive flattening: `length(flat([[[]]]))` returned 1, and `join(map(flat([[[]]]), length(current)), "|")` returned `"0"`. The retained element was an empty list. This differed from the repository's recursive `flat` behavior at the experiment date, 2026-09-29. See the [flat declaration](../../specs/builtin-functions.md#list) for the current contract.
 
 ## Repeat clamps and rounds tested finite counts
 
@@ -80,7 +80,7 @@ repetitions = min(10000, max(0, ceil(count)))
 A blank Count property produced API null for the repeat length, `empty` check, and preview. Counts expressed as `0 / 0`, `1 / 0`, and `-1 / 0` did too; those cases do not isolate `repeat` from evaluation of the count expression. A bare `empty()` count was rejected at creation. Empty text produced an empty string for counts 3, -1, and 1,000,001.
 
 The finite-count observations differ from the nonnegative constraint planned at the time of the experiment and the evaluator's truncation and 1,000,000-count limit at that time.
-The subsequently adopted contract is [Planned repeat](../../specs/builtin-functions.md#planned-repeat); this experiment preserves the original observations and does not define the current contract.
+The subsequently adopted contract is the [repeat declaration](../../specs/builtin-functions.md#text); this experiment preserves the original observations and does not define the current contract.
 
 ## Reproduce and interpret
 

@@ -1,0 +1,8 @@
+=== INPUT ===
+// @prop "Text": string = ["bad-date", "2024-01-01", null]
+
+parseDate(prop("Text"))
+=== OUTPUT ===
+row-0: error(InvalidDateText { text: "bad-date" })
+row-1: date("2024-01-01T00:00:00+08:00")
+row-2: null

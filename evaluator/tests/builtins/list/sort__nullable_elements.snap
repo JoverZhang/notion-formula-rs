@@ -1,0 +1,9 @@
+=== INPUT ===
+// @prop "Values": number[] = [[2, null, 1], [null, null], [], null]
+
+sort(prop("Values"))
+=== OUTPUT ===
+row-0: [1, 2]
+row-1: []
+row-2: []
+row-3: null

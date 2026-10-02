@@ -1,4 +1,4 @@
-use analyzer::analysis::{Context as SemanticContext, analyze_expr_with_semantic_map};
+use analyzer::analysis::{Context as SemanticContext, Ty, analyze_expr_with_semantic_map};
 use analyzer::ast::Expr;
 
 use crate::core::context::EvalContext;
@@ -14,6 +14,7 @@ pub struct PreparedFormula {
     pub(crate) plan: ExecPlan,
     required_columns: Box<[RequiredColumn]>,
     input_layout: InputLayoutId,
+    output_type: Ty,
 }
 
 impl std::fmt::Debug for PreparedFormula {
@@ -33,7 +34,7 @@ pub fn prepare_formula(
         properties: context.properties.clone(),
         functions: builtin_fn::builtins_functions(),
     };
-    let (_, semantic_map, diagnostics) =
+    let (output_type, semantic_map, diagnostics) =
         analyze_expr_with_semantic_map(expression, &semantic_context);
     if !diagnostics.is_empty() {
         return Err(PrepareError::Semantic(
@@ -51,10 +52,15 @@ pub fn prepare_formula(
         plan,
         required_columns,
         input_layout,
+        output_type,
     })
 }
 
 impl PreparedFormula {
+    pub fn output_type(&self) -> &Ty {
+        &self.output_type
+    }
+
     pub fn required_columns(&self) -> &[RequiredColumn] {
         &self.required_columns
     }

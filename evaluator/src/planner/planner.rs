@@ -25,6 +25,7 @@ pub(crate) struct Planner<'a> {
     nodes: Vec<ExecNode>,
     required_columns: Vec<RequiredColumn>,
     property_slots: HashMap<String, InputSlot>,
+    bound_names: Vec<Box<[String]>>,
 }
 
 impl<'a> Planner<'a> {
@@ -44,6 +45,7 @@ impl<'a> Planner<'a> {
             nodes: Vec::new(),
             required_columns: Vec::new(),
             property_slots: HashMap::new(),
+            bound_names: Vec::new(),
         }
     }
 
@@ -89,7 +91,18 @@ impl<'a> Planner<'a> {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(self.push(ExecNode::List(items.into_boxed_slice())))
             }
-            ExprKind::Ident(symbol) => Ok(self.push(ExecNode::Variable(symbol.text.clone()))),
+            ExprKind::Ident(symbol) => {
+                if self
+                    .bound_names
+                    .iter()
+                    .rev()
+                    .any(|names| names.contains(&symbol.text))
+                {
+                    Ok(self.push(ExecNode::Variable(symbol.text.clone())))
+                } else {
+                    Err(PrepareError::UnboundVariable(symbol.text.clone()))
+                }
+            }
             ExprKind::Unary { op, expr } => {
                 let input = self.lower(expr)?;
                 Ok(self.push(ExecNode::Unary { op: *op, input }))
@@ -121,7 +134,12 @@ impl<'a> Planner<'a> {
             ExprKind::Call { callee, args } => {
                 self.lower_builtin(expression.id, &callee.text, args)
             }
-            ExprKind::ImplicitLambda { body, .. } => self.lower(body),
+            ExprKind::ImplicitLambda { params, body } => {
+                self.bound_names.push(params.clone().into_boxed_slice());
+                let result = self.lower(body);
+                self.bound_names.pop();
+                result
+            }
             ExprKind::MemberCall { .. } | ExprKind::Error => {
                 Err(PrepareError::UnsupportedExpression)
             }
@@ -198,8 +216,21 @@ impl<'a> Planner<'a> {
                     else {
                         return Err(PrepareError::UnsupportedExpression);
                     };
-                    let body = self.lower(body)?;
+                    self.bound_names
+                        .push(inferred_params.clone().into_boxed_slice());
+                    let body = self.lower(body);
+                    self.bound_names.pop();
+                    let body = body?;
                     let body = self.ensure_abi(body, abi_kind_for_ty(ret));
+                    let body = if contains_generic(ret) {
+                        let Some(Ty::Fn { ret, .. }) = resolved_argument.expected_ty.as_ref()
+                        else {
+                            return Err(PrepareError::InvalidResolvedShape);
+                        };
+                        self.ensure_type(body, ret)
+                    } else {
+                        body
+                    };
                     if params.is_empty() {
                         PlannedArgumentKind::Thunk { body }
                     } else {
@@ -219,6 +250,15 @@ impl<'a> Planner<'a> {
                 }
                 _ => {
                     let value = self.lower(argument)?;
+                    let value = if contains_generic(&template.ty) {
+                        let expected = resolved_argument
+                            .expected_ty
+                            .as_ref()
+                            .ok_or(PrepareError::InvalidResolvedShape)?;
+                        self.ensure_type(value, expected)
+                    } else {
+                        value
+                    };
                     PlannedArgumentKind::Value(
                         self.ensure_abi(value, abi_kind_for_ty(&template.ty)),
                     )
@@ -269,6 +309,19 @@ impl<'a> Planner<'a> {
         }
     }
 
+    fn ensure_type(&mut self, input: PlanId, expected: &Ty) -> PlanId {
+        if matches!(expected, Ty::Unknown | Ty::Generic(_)) {
+            input
+        } else {
+            // Generic substitution can constrain an Unknown argument using another
+            // argument. Enforce that resolved constraint in every execution profile.
+            self.push(ExecNode::TypeCheck {
+                input,
+                expected: expected.clone(),
+            })
+        }
+    }
+
     fn node_abi(&self, id: PlanId) -> AbiKind {
         match &self.nodes[id.index()] {
             ExecNode::Literal(Value::Number(_)) => AbiKind::Number,
@@ -286,7 +339,20 @@ impl<'a> Planner<'a> {
             | ExecNode::Binary { .. }
             | ExecNode::Ternary { .. } => AbiKind::Any,
             ExecNode::Cast { target, .. } => *target,
+            ExecNode::TypeCheck { input, .. } => self.node_abi(*input),
             ExecNode::Builtin(call) => call.key.return_abi(),
         }
+    }
+}
+
+fn contains_generic(ty: &Ty) -> bool {
+    match ty {
+        Ty::Generic(_) => true,
+        Ty::List(inner) | Ty::Ident(inner) => contains_generic(inner),
+        Ty::Union(members) => members.iter().any(contains_generic),
+        Ty::Fn { params, ret } => {
+            params.iter().any(|(_, ty)| contains_generic(ty)) || contains_generic(ret)
+        }
+        _ => false,
     }
 }

@@ -1,0 +1,4 @@
+=== INPUT ===
+includes([1, empty(), 2], empty())
+=== OUTPUT ===
+row-0: true

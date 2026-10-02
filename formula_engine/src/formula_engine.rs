@@ -1,8 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use analyzer::analysis::{self, Context, FunctionSig, Property, Ty};
+use analyzer::analysis::{Property, Ty};
 use analyzer::ast::{Expr, ExprKind};
 use analyzer::{LitKind, analyze_syntax};
+use evaluator::{EvalContext, PreparedFormula, prepare_formula};
+
+use crate::{EvaluateInput, EvaluateInputError, EvaluateResult};
+
+mod batch_evaluation;
 
 include!("formula_engine.h.rs");
 
@@ -11,6 +16,7 @@ struct FormulaEngineInner {
     definitions: BTreeMap<PropertyId, PropertyDefinition>,
     dependencies: BTreeMap<PropertyId, BTreeSet<PropertyId>>,
     statuses: BTreeMap<PropertyId, FormulaStatus>,
+    prepared: BTreeMap<PropertyId, PreparedFormula>,
     cycle_path: Vec<PropertyId>,
 }
 
@@ -24,6 +30,10 @@ impl PropertyDefinition {
 }
 
 impl FormulaEngine {
+    fn evaluate_impl(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError> {
+        batch_evaluation::evaluate(&self.inner, input)
+    }
+
     fn new_impl(schema: FormulaSchema) -> Result<Self, FormulaEngineInitError> {
         let mut definitions = BTreeMap::new();
         for property in schema.properties {
@@ -142,8 +152,8 @@ impl FormulaEngineInner {
         let mut analysis = DependencyAnalysis {
             definitions: &self.definitions,
             parsed: &mut parsed,
-            functions: analysis::builtins_functions(),
             resolved: BTreeMap::new(),
+            prepared: BTreeMap::new(),
             cycle_path: Vec::new(),
         };
         for id in self.dependencies.keys() {
@@ -163,6 +173,7 @@ impl FormulaEngineInner {
             })
             .collect();
         self.cycle_path = analysis.cycle_path;
+        self.prepared = analysis.prepared;
     }
 
     fn affected_formulas(
@@ -256,8 +267,8 @@ fn collect_dependencies(expr: &Expr, dependencies: &mut BTreeSet<PropertyId>) {
 struct DependencyAnalysis<'a> {
     definitions: &'a BTreeMap<PropertyId, PropertyDefinition>,
     parsed: &'a mut BTreeMap<PropertyId, ParsedFormula>,
-    functions: Vec<FunctionSig>,
     resolved: BTreeMap<PropertyId, Option<Ty>>,
+    prepared: BTreeMap<PropertyId, PreparedFormula>,
     cycle_path: Vec<PropertyId>,
 }
 
@@ -313,12 +324,14 @@ impl DependencyAnalysis<'_> {
                     .get_mut(&frame.id)
                     .expect("every formula has a parsed expression");
                 let ty = if frame.dependencies_ready && parsed.syntax_valid {
-                    let context = Context {
-                        properties: frame.properties,
-                        functions: self.functions.clone(),
-                    };
-                    let (ty, diagnostics) = analysis::analyze_expr(&mut parsed.expr, &context);
-                    diagnostics.is_empty().then_some(ty)
+                    let context = EvalContext::new(frame.properties);
+                    prepare_formula(&mut parsed.expr, &context)
+                        .ok()
+                        .map(|prepared| {
+                            let ty = prepared.output_type().clone();
+                            self.prepared.insert(frame.id.clone(), prepared);
+                            ty
+                        })
                 } else {
                     None
                 };

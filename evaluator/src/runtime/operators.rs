@@ -1,3 +1,4 @@
+use analyzer::analysis::Ty;
 use analyzer::ast::{BinOpKind, UnOp};
 
 use crate::builtins::{RowOutcome, rows_to_kernel};
@@ -6,7 +7,7 @@ use crate::core::columns::{
     NumberKind, TextKind, Validity,
 };
 use crate::core::errors::EvalError;
-use crate::core::types::{EvalBlock, Mask, Value};
+use crate::core::types::{EvalBlock, Mask, Value, value_type_accepts};
 
 pub(crate) fn literal_block(value: Value, mask: &Mask) -> EvalBlock {
     let len = mask.len();
@@ -53,6 +54,29 @@ pub(crate) fn eval_cast(input: EvalBlock, target: AbiKind, mask: &Mask) -> EvalB
     }
 }
 
+pub(crate) fn eval_type_check(mut input: EvalBlock, expected: &Ty, mask: &Mask) -> EvalBlock {
+    for row in 0..mask.len() {
+        if !mask[row] || !input.ok[row] {
+            continue;
+        }
+        let Some(value) = input.column.row_value(row) else {
+            continue;
+        };
+        let actual = value.value_type();
+        if !value_type_accepts(expected, &actual) {
+            input.ok.set(row, false);
+            input.errors.push((
+                row,
+                EvalError::InvalidValueType {
+                    expected: expected.clone(),
+                    actual,
+                },
+            ));
+        }
+    }
+    input
+}
+
 fn cast_rows<K: ColumnKind>(input: EvalBlock, mask: &Mask) -> EvalBlock {
     let rows = (0..mask.len())
         .map(|row| {
@@ -89,10 +113,7 @@ pub(crate) fn eval_list(blocks: Vec<EvalBlock>, mask: &Mask) -> EvalBlock {
             }
             let mut values = Vec::with_capacity(blocks.len());
             for block in &blocks {
-                let Some(value) = block.column.row_value(row) else {
-                    return RowOutcome::Null;
-                };
-                values.push(value);
+                values.push(block.column.row_value(row));
             }
             RowOutcome::Value(Value::List(values))
         })
@@ -117,7 +138,12 @@ pub(crate) fn eval_unary(op: UnOp, input: EvalBlock, mask: &Mask) -> EvalBlock {
             match (op, value) {
                 (UnOp::Neg, Value::Number(value)) => RowOutcome::Value(Value::Number(-value)),
                 (UnOp::Not(_), Value::Bool(value)) => RowOutcome::Value(Value::Bool(!value)),
-                _ => RowOutcome::Error(EvalError::TypeMismatch),
+                (UnOp::Neg, value) => {
+                    RowOutcome::Error(EvalError::invalid_type(Ty::Number, &value))
+                }
+                (UnOp::Not(_), value) => {
+                    RowOutcome::Error(EvalError::invalid_type(Ty::Boolean, &value))
+                }
             }
         })
         .collect();
@@ -172,21 +198,27 @@ fn eval_binary_row(op: BinOpKind, left: Value, right: Value) -> RowOutcome {
         (Star, Value::Number(left), Value::Number(right)) => {
             RowOutcome::Value(Value::Number(left * right))
         }
-        (Slash, Value::Number(_), Value::Number(0.0)) => RowOutcome::Error(EvalError::DivideByZero),
         (Slash, Value::Number(left), Value::Number(right)) => {
             RowOutcome::Value(Value::Number(left / right))
-        }
-        (Percent, Value::Number(_), Value::Number(0.0)) => {
-            RowOutcome::Error(EvalError::DivideByZero)
         }
         (Percent, Value::Number(left), Value::Number(right)) => {
             RowOutcome::Value(Value::Number(left % right))
         }
         (Caret, Value::Number(left), Value::Number(right)) => {
-            RowOutcome::Value(Value::Number(left.powf(right)))
+            RowOutcome::Value(Value::Number(pow_number(left, right)))
         }
         (EqEq, left, right) => RowOutcome::Value(Value::Bool(left == right)),
         (Ne, left, right) => RowOutcome::Value(Value::Bool(left != right)),
+        (Lt | Le | Ge | Gt, Value::Number(left), Value::Number(right)) => {
+            let matches = match op {
+                Lt => left < right,
+                Le => left <= right,
+                Ge => left >= right,
+                Gt => left > right,
+                _ => unreachable!(),
+            };
+            RowOutcome::Value(Value::Bool(matches))
+        }
         (Lt | Le | Ge | Gt, left, right) => compare_values(&left, &right)
             .map(|ordering| {
                 let matches = match op {
@@ -198,8 +230,32 @@ fn eval_binary_row(op: BinOpKind, left: Value, right: Value) -> RowOutcome {
                 };
                 RowOutcome::Value(Value::Bool(matches))
             })
-            .unwrap_or(RowOutcome::Error(EvalError::TypeMismatch)),
-        _ => RowOutcome::Error(EvalError::TypeMismatch),
+            .unwrap_or_else(|| RowOutcome::Error(comparison_error(&left, &right))),
+        (_, left, right) => {
+            let actual = if matches!(left, Value::Number(_)) {
+                &right
+            } else {
+                &left
+            };
+            RowOutcome::Error(EvalError::invalid_type(Ty::Number, actual))
+        }
+    }
+}
+
+fn comparison_error(left: &Value, right: &Value) -> EvalError {
+    let comparable = Ty::Union(vec![Ty::Boolean, Ty::Number, Ty::String, Ty::Date]);
+    if matches!(left, Value::List(_)) {
+        EvalError::invalid_type(comparable, left)
+    } else {
+        EvalError::invalid_type(left.value_type(), right)
+    }
+}
+
+pub(crate) fn pow_number(base: f64, exponent: f64) -> f64 {
+    if base.abs() == 1.0 && !exponent.is_finite() {
+        f64::NAN
+    } else {
+        base.powf(exponent)
     }
 }
 
@@ -239,7 +295,7 @@ impl LogicalMode {
     fn evaluates_right(self, left: Option<Value>) -> bool {
         match self {
             Self::And => matches!(left, Some(Value::Bool(true))),
-            Self::Or => !matches!(left, Some(Value::Bool(true))),
+            Self::Or => matches!(left, None | Some(Value::Bool(false))),
         }
     }
 
@@ -279,7 +335,9 @@ fn merge_logical(mode: LogicalMode, left: EvalBlock, right: EvalBlock, mask: &Ma
             let left_value = match left.column.row_value(row) {
                 Some(Value::Bool(value)) => value,
                 None => false,
-                _ => return RowOutcome::Error(EvalError::TypeMismatch),
+                Some(value) => {
+                    return RowOutcome::Error(EvalError::invalid_type(Ty::Boolean, &value));
+                }
             };
             if mode.short_circuits(left_value) {
                 return RowOutcome::Value(Value::Bool(left_value));
@@ -290,7 +348,7 @@ fn merge_logical(mode: LogicalMode, left: EvalBlock, right: EvalBlock, mask: &Ma
             match right.column.row_value(row) {
                 Some(Value::Bool(value)) => RowOutcome::Value(Value::Bool(value)),
                 None => RowOutcome::Null,
-                _ => RowOutcome::Error(EvalError::TypeMismatch),
+                Some(value) => RowOutcome::Error(EvalError::invalid_type(Ty::Boolean, &value)),
             }
         })
         .collect();
@@ -331,6 +389,11 @@ pub(crate) fn merge_condition(
             if !condition.ok[row] {
                 return RowOutcome::Failed;
             }
+            if let Some(value) = condition.column.row_value(row)
+                && !matches!(value, Value::Bool(_))
+            {
+                return RowOutcome::Error(EvalError::invalid_type(Ty::Boolean, &value));
+            }
             let selected = if then_mask[row] {
                 &then_block
             } else {
@@ -356,7 +419,15 @@ pub(crate) fn merge_condition(
 pub(crate) fn stringify_value(value: &Value) -> String {
     match value {
         Value::Number(value) => {
-            if value.fract() == 0.0 {
+            if value.is_nan() {
+                "NaN".to_string()
+            } else if *value == f64::INFINITY {
+                "Infinity".to_string()
+            } else if *value == f64::NEG_INFINITY {
+                "-Infinity".to_string()
+            } else if *value == 0.0 {
+                "0".to_string()
+            } else if value.fract() == 0.0 {
                 format!("{value:.0}")
             } else {
                 value.to_string()
@@ -366,7 +437,10 @@ pub(crate) fn stringify_value(value: &Value) -> String {
         Value::Bool(value) => value.to_string(),
         Value::Date(value) => value.to_string(),
         Value::List(values) => {
-            let values = values.iter().map(stringify_value).collect::<Vec<_>>();
+            let values = values
+                .iter()
+                .map(|value| value.as_ref().map_or(String::new(), stringify_value))
+                .collect::<Vec<_>>();
             format!("[{}]", values.join(", "))
         }
     }

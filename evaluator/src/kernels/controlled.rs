@@ -221,13 +221,10 @@ fn eval_map_impl<C: BuiltinEvalContext>(
             if !mapped.ok[row] {
                 active.set(row, false);
                 outcomes[row] = RowOutcome::Failed;
-            } else if let Some(value) = mapped.column.row_value(row) {
-                if let RowOutcome::Value(Value::List(output)) = &mut outcomes[row] {
-                    output.push(value);
-                }
             } else {
-                active.set(row, false);
-                outcomes[row] = RowOutcome::Null;
+                if let RowOutcome::Value(Value::List(output)) = &mut outcomes[row] {
+                    output.push(mapped.column.row_value(row));
+                }
             }
         }
     }
@@ -305,7 +302,7 @@ fn eval_predicate_list<C: BuiltinEvalContext, K: ColumnKind>(
                     }
                 }
                 BuiltinKey::Find if passed => {
-                    outcomes[row] = RowOutcome::Value(element);
+                    outcomes[row] = element.map_or(RowOutcome::Null, RowOutcome::Value);
                     active.set(row, false);
                 }
                 BuiltinKey::FindIndex if passed => {
@@ -343,11 +340,13 @@ enum ListInitial {
     Bool(bool),
 }
 
+type RowList = Option<Vec<Option<Value>>>;
+
 fn initialize_lists(
     list: &EvalBlock,
     mask: &Mask,
     initial: ListInitial,
-) -> (Vec<Option<Vec<Value>>>, Vec<RowOutcome>, Mask) {
+) -> (Vec<RowList>, Vec<RowOutcome>, Mask) {
     let mut lists = Vec::with_capacity(mask.len());
     let mut outcomes = Vec::with_capacity(mask.len());
     let mut active = Mask::none(mask.len());
@@ -377,36 +376,46 @@ fn initialize_lists(
                 lists.push(None);
                 outcomes.push(RowOutcome::Null);
             }
-            Some(_) => {
+            Some(value) => {
                 lists.push(None);
-                outcomes.push(RowOutcome::Error(EvalError::TypeMismatch));
+                outcomes.push(RowOutcome::Error(EvalError::invalid_type(
+                    analyzer::analysis::Ty::List(Box::new(analyzer::analysis::Ty::Unknown)),
+                    &value,
+                )));
             }
         }
     }
     (lists, outcomes, active)
 }
 
-fn element_mask(lists: &[Option<Vec<Value>>], active: &Mask, index: usize, len: usize) -> Mask {
+fn element_mask(lists: &[RowList], active: &Mask, index: usize, len: usize) -> Mask {
     (0..len)
         .map(|row| active[row] && lists[row].as_ref().is_some_and(|list| index < list.len()))
         .collect()
 }
 
-fn element_binding(lists: &[Option<Vec<Value>>], index: usize, mask: &Mask) -> Column {
+fn element_binding(lists: &[RowList], index: usize, mask: &Mask) -> Column {
+    let mut valid = Vec::with_capacity(mask.len());
     let values = (0..mask.len())
         .map(|row| {
             if mask[row] {
-                lists[row]
+                let value = lists[row]
                     .as_ref()
                     .and_then(|list| list.get(index))
                     .cloned()
-                    .expect("element mask only selects existing elements")
+                    .expect("element mask only selects existing elements");
+                valid.push(value.is_some());
+                value.unwrap_or(Value::Number(0.0))
             } else {
+                valid.push(true);
                 Value::Number(0.0)
             }
         })
         .collect();
-    Column::Any(KernelColumn::from_values(values, Validity::AllValid))
+    Column::Any(KernelColumn::from_values(
+        values,
+        Validity::from_valid_bits(valid),
+    ))
 }
 
 fn merge_branches(

@@ -1,13 +1,13 @@
-//! Executable reference for the planned input contract; evaluation is not implemented here.
+//! Executable reference for the input type contract.
 
 use std::fmt::Write;
 
-use formula_engine::ValueType;
+use formula_engine::{ColumnKind, Value, ValueType};
 
 include!("support/evaluation_input_contract.h.rs");
 
 #[test]
-fn planned_input_reference_transcript() {
+fn input_reference_transcript() {
     use ValueType as T;
 
     let mut transcript = String::from("accepts\n");
