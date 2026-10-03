@@ -1,0 +1,10 @@
+error[E0502]: cannot borrow `engine` as mutable because it is also borrowed as immutable
+  --> tests/draft_borrow/remove.rs:11:5
+   |
+ 5 |     let draft = engine
+   |                 ------ immutable borrow occurs here
+...
+11 |     engine.remove(&"input".into());
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow occurs here
+12 |     assert_eq!(draft.state().definition.expression, "1");
+   |                ----- immutable borrow later used here

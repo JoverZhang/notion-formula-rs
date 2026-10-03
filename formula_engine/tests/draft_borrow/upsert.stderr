@@ -1,0 +1,15 @@
+error[E0502]: cannot borrow `engine` as mutable because it is also borrowed as immutable
+  --> tests/draft_borrow/upsert.rs:13:5
+   |
+ 7 |       let draft = engine
+   |                   ------ immutable borrow occurs here
+...
+13 | /     engine
+14 | |         .upsert(PropertyDefinition::Input {
+15 | |             id: "input".into(),
+16 | |             ty: ValueType::Number,
+17 | |         })
+   | |__________^ mutable borrow occurs here
+18 |           .unwrap();
+19 |       assert_eq!(draft.state().definition.expression, "1");
+   |                  ----- immutable borrow later used here

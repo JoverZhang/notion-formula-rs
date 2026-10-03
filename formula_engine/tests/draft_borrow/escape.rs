@@ -9,3 +9,7 @@ pub fn escape_local_engine<'engine>() -> FormulaDraft<'engine> {
         })
         .unwrap()
 }
+
+fn main() {
+    let _draft = escape_local_engine();
+}

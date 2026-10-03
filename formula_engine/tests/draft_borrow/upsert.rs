@@ -2,7 +2,7 @@ use formula_engine::{
     FormulaDefinition, FormulaEngine, FormulaSchema, PropertyDefinition, ValueType,
 };
 
-pub fn mutate_while_draft_is_live() {
+fn main() {
     let mut engine = FormulaEngine::new(FormulaSchema { properties: vec![] }).unwrap();
     let draft = engine
         .create_draft(FormulaDefinition {

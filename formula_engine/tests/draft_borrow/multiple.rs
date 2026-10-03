@@ -1,6 +1,6 @@
 use formula_engine::{FormulaDefinition, FormulaEngine, FormulaSchema, PropertyDefinition};
 
-pub fn edit_then_save() {
+fn main() {
     let mut engine = FormulaEngine::new(FormulaSchema { properties: vec![] }).unwrap();
     let first = engine
         .create_draft(FormulaDefinition {

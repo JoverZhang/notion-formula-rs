@@ -1,6 +1,6 @@
 use formula_engine::{FormulaDefinition, FormulaEngine, FormulaSchema};
 
-pub fn remove_while_draft_is_live() {
+fn main() {
     let mut engine = FormulaEngine::new(FormulaSchema { properties: vec![] }).unwrap();
     let draft = engine
         .create_draft(FormulaDefinition {
