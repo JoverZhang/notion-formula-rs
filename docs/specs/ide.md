@@ -2,25 +2,27 @@
 doc_id: specs.ide
 title: "FormulaDraft: Editor Capabilities"
 language: en
-source_language: zh-CN
+source_language: en
 counterpart: ./ide.zh-CN.md
-implementation_status: planned
+implementation_status: current
 document_status: draft
 translation_status: synced
 translation_model: gpt-6-sol
 translation_review_model: gpt-6-astra
-last_verified: 2026-09-23
+last_verified: 2026-10-03
 ---
 
 # FormulaDraft: Editor Capabilities
 
 [简体中文](ide.zh-CN.md) · [Specification index](README.md)
 
-> Planned: FormulaDraft has not been implemented. Completion, signature help, and text editing follow the Current IDE behavior in the final section.
+> Current: FormulaDraft and its editor capabilities. Completion, signature help, formatting, and text editing follow the shared IDE behavior in the final section.
 
 ## FormulaDraft
 
-```rust spec=formula_draft.h.rs
+```rust out=formula_engine/src/formula_draft.h.rs
+use crate::{FormulaDefinition, FormulaEngine, ValueType};
+
 pub use analyzer::{Span, TextEdit, Token};
 pub use ide::{
     CompletionConfig, CompletionItem, CompletionKind, CompletionResult,
@@ -32,6 +34,7 @@ pub use ide::{
 /// Multiple Drafts can be created from the same Engine at once; all Draft borrows
 /// must end before saving.
 #[spec::private_fields]
+#[derive(Debug)]
 pub struct FormulaDraft<'engine> {}
 
 #[spec::header]
@@ -66,16 +69,18 @@ impl FormulaDraft<'_> {
 Completion follows the [IDE return structures](../../ide/src/lib.rs) and [candidate types](../../ide/src/completion/mod.rs);
 SignatureHelp follows the [signature structures](../../ide/src/signature/mod.rs) and [display segments](../../ide/src/display.rs).
 
-```rust spec=formula_draft.h.rs
+```rust out=formula_engine/src/formula_draft.h.rs
 /// UTF-8 byte offset.
-#[derive(derive_more::From)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, derive_more::From)]
 pub struct TextOffset(pub usize);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DraftVersion(pub u64);
 
+/// Independent snapshot; later Draft updates do not change it.
+#[derive(Clone, Debug)]
 pub struct FormulaDraftState {
-    /// Incremented by 1 when Replace changes text or Edits succeeds.
+    /// Starts at 0; incremented by 1 when Replace changes text or Edits succeeds.
     pub version: DraftVersion,
     pub definition: FormulaDefinition,
     /// - Returns the root expression's inferred type, even with local syntax errors.
@@ -87,26 +92,32 @@ pub struct FormulaDraftState {
     /// Lexical tokens of the current definition.expression, retaining comments, newlines, and Eof.
     pub tokens: Vec<Token>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExpressionDiagnostic {
     pub id: DiagnosticId,
     /// Location in the current Draft's expression.
     pub span: Span,
     pub message: String,
 }
+/// Opaque ID belonging to one Draft revision; an ID from another Draft or revision is not current.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DiagnosticId(pub String);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CursorHelp {
     /// Use this version as FormulaEdit.base_version when applying this completion's edits.
     pub base_version: DraftVersion,
     pub completion: CompletionResult,
     pub signature_help: Option<SignatureHelp>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaEdit {
     /// Must equal the current state.version, preventing stale edits from being applied to a modified expression.
     pub base_version: DraftVersion,
     /// All ranges are based on the expression before modification and must not overlap.
     pub edits: Vec<TextEdit>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExpressionUpdate {
     /// Replaces the current expression; base_version is not required.
     Replace(String),
@@ -116,11 +127,13 @@ pub enum ExpressionUpdate {
         cursor: TextOffset,
     },
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuickFix {
     pub title: String,
     /// version is bound to the Draft that produced the diagnostic.
     pub edit: FormulaEdit,
 }
+#[derive(Clone, Debug)]
 pub struct UpdateExpressionResult {
     pub state: FormulaDraftState,
     /// Replace returns the new expression.len(); for an empty string this is 0. Edits returns the relocated coordinate.
@@ -128,8 +141,10 @@ pub struct UpdateExpressionResult {
 }
 
 /// The expression contains a lexer/parser diagnostic and cannot be formatted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FormatError;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UpdateExpressionError {
     VersionMismatch,
     /// Out of bounds or not on a UTF-8 character boundary.
@@ -146,7 +161,7 @@ then account for additional edits before the primary edit to obtain the post-edi
 
 ## Current: IDE Behavior
 
-The current service processes source per request and does not persist FormulaDraft. This section owns editing behavior;
+The IDE helpers process source per request; FormulaDraft retains its candidate state. This section owns shared editing behavior;
 JS serialization, coordinate validation, and exceptions are defined by the [WASM API](wasm-api.md).
 
 ```text
@@ -196,8 +211,8 @@ format
   Full and deterministic; formatting is idempotent for covered syntax. Indent by 2 spaces, use conventional spaces around binary/ternary operators and commas, and end with one newline.
   Preserve attached comments; inline only when inlining is permitted and indentation plus rendered UTF-8 byte length is <= 80; otherwise use multiple lines.
   Atomic expressions are exempt from this width check; there are no formatting options.
-  Current returns the complete source and relocates the cursor as a whole-document replacement edit: internal positions usually move to zero, while the end follows the new end.
-  Planned format_edits returns edits; the Current return structure cannot be treated as its structure.
+  The standalone IDE format helper returns complete source and relocates the cursor as a whole-document replacement edit: internal positions usually move to zero, while the end follows the new end.
+  FormulaDraft::format_edits returns a version-bound whole-document replacement edit without changing Draft state.
 
 apply edits
   All ranges are based on the original source; stable-sort by (start,end), then apply in reverse order.

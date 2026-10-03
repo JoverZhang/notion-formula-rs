@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use analyzer::analysis::{Property, Ty};
+use analyzer::analysis::{Context, Property, Ty, builtins_functions};
 use analyzer::ast::{Expr, ExprKind};
-use analyzer::{LitKind, analyze_syntax};
+use analyzer::{LitKind, Span, analyze_syntax};
 use evaluator::{EvalContext, PreparedFormula, prepare_formula};
 
-use crate::{EvaluateInput, EvaluateInputError, EvaluateResult};
+use crate::{EvaluateInput, EvaluateInputError, EvaluateResult, FormulaDraft};
 
 mod batch_evaluation;
 
@@ -30,6 +30,66 @@ impl PropertyDefinition {
 }
 
 impl FormulaEngine {
+    pub(crate) fn draft_context(&self, definition: &FormulaDefinition) -> Context {
+        // Use the same dependency analysis as saving, with only the candidate
+        // definition overlaid. Saved readiness cannot represent candidate types.
+        let mut overlay = FormulaEngineInner {
+            definitions: self.inner.definitions.clone(),
+            ..FormulaEngineInner::default()
+        };
+        overlay.definitions.insert(
+            definition.id.clone(),
+            PropertyDefinition::Formula(definition.clone()),
+        );
+        overlay.reanalyze();
+
+        let mut cycle_candidates = dependent_formulas(&overlay.dependencies, &definition.id);
+        cycle_candidates.insert(definition.id.clone());
+        let properties = overlay
+            .definitions
+            .iter()
+            .map(|(id, property)| {
+                let ty = match property {
+                    PropertyDefinition::Input { ty, .. } => to_analyzer_type(ty),
+                    PropertyDefinition::Formula(_) => overlay
+                        .prepared
+                        .get(id)
+                        .map(|prepared| prepared.output_type().clone())
+                        .unwrap_or(Ty::Unknown),
+                };
+                let disabled_reason = if cycle_candidates.contains(id) {
+                    Some(format!(
+                        "Referencing property `{}` creates a dependency cycle",
+                        id.0
+                    ))
+                } else if matches!(overlay.statuses.get(id), Some(FormulaStatus::NotReady)) {
+                    Some(format!("Formula property `{}` is not ready", id.0))
+                } else {
+                    None
+                };
+                Property {
+                    name: id.0.clone(),
+                    ty,
+                    disabled_reason,
+                }
+            })
+            .collect();
+        Context {
+            properties,
+            functions: builtins_functions(),
+        }
+    }
+
+    fn create_draft_impl(
+        &self,
+        formula: FormulaDefinition,
+    ) -> Result<FormulaDraft<'_>, CreateDraftError> {
+        if formula.id.0.is_empty() {
+            return Err(CreateDraftError::EmptyId);
+        }
+        Ok(FormulaDraft::new(self, formula))
+    }
+
     fn evaluate_impl(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError> {
         batch_evaluation::evaluate(&self.inner, input)
     }
@@ -219,6 +279,12 @@ impl ParsedFormula {
 }
 
 fn collect_dependencies(expr: &Expr, dependencies: &mut BTreeSet<PropertyId>) {
+    visit_property_references(expr, &mut |name, _| {
+        dependencies.insert(PropertyId(name.into()));
+    });
+}
+
+pub(crate) fn visit_property_references(expr: &Expr, visit: &mut dyn FnMut(&str, Span)) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
             if callee.text == "prop"
@@ -226,40 +292,40 @@ fn collect_dependencies(expr: &Expr, dependencies: &mut BTreeSet<PropertyId>) {
                 && let ExprKind::Lit(literal) = &argument.kind
                 && literal.kind == LitKind::String
             {
-                dependencies.insert(PropertyId(literal.symbol.text.clone()));
+                visit(&literal.symbol.text, argument.span);
             }
             for arg in args {
-                collect_dependencies(arg, dependencies);
+                visit_property_references(arg, visit);
             }
         }
         ExprKind::Group { inner } | ExprKind::Unary { expr: inner, .. } => {
-            collect_dependencies(inner, dependencies);
+            visit_property_references(inner, visit);
         }
         ExprKind::List { items } => {
             for item in items {
-                collect_dependencies(item, dependencies);
+                visit_property_references(item, visit);
             }
         }
         ExprKind::MemberCall { receiver, args, .. } => {
-            collect_dependencies(receiver, dependencies);
+            visit_property_references(receiver, visit);
             for arg in args {
-                collect_dependencies(arg, dependencies);
+                visit_property_references(arg, visit);
             }
         }
         ExprKind::Binary { left, right, .. } => {
-            collect_dependencies(left, dependencies);
-            collect_dependencies(right, dependencies);
+            visit_property_references(left, visit);
+            visit_property_references(right, visit);
         }
         ExprKind::Ternary {
             cond,
             then,
             otherwise,
         } => {
-            collect_dependencies(cond, dependencies);
-            collect_dependencies(then, dependencies);
-            collect_dependencies(otherwise, dependencies);
+            visit_property_references(cond, visit);
+            visit_property_references(then, visit);
+            visit_property_references(otherwise, visit);
         }
-        ExprKind::ImplicitLambda { body, .. } => collect_dependencies(body, dependencies),
+        ExprKind::ImplicitLambda { body, .. } => visit_property_references(body, visit),
         ExprKind::Ident(_) | ExprKind::Lit(_) | ExprKind::Error => {}
     }
 }
@@ -401,7 +467,7 @@ fn to_analyzer_type(ty: &ValueType) -> Ty {
     }
 }
 
-fn from_analyzer_type(ty: &Ty) -> ValueType {
+pub(crate) fn from_analyzer_type(ty: &Ty) -> ValueType {
     match ty {
         Ty::Number => ValueType::Number,
         Ty::String => ValueType::String,

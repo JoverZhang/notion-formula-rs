@@ -1,0 +1,18 @@
+partial: version=0 output=List(Number)
+diagnostic[0]: 15..16 trailing comma is not supported
+quickfix: Remove trailing comma version=0
+edit: 15..16 => ""
+token: Comment(Line) 0..10 "// 中🙂"
+token: Newline 10..11 "\n"
+token: [ 11..12 "["
+token: Literal(Number) 12..13 "1"
+token: , 13..14 ","
+token: Literal(Number) 14..15 "2"
+token: , 15..16 ","
+token: ] 16..17 "]"
+token: Newline 17..18 "\n"
+token: Eof 18..18 ""
+completion: version=0
+candidate: disabled=true reason=true primary=false cursor=false preferred=false
+dependent: disabled=true reason=true primary=false cursor=false preferred=false
+safe: disabled=false reason=false primary=true cursor=true preferred=false

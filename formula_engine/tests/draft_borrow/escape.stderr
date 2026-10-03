@@ -1,0 +1,14 @@
+error[E0515]: cannot return value referencing local variable `engine`
+  --> tests/draft_borrow/escape.rs:5:5
+   |
+ 5 |       engine
+   |       ^-----
+   |       |
+   |  _____`engine` is borrowed here
+   | |
+ 6 | |         .create_draft(FormulaDefinition {
+ 7 | |             id: "draft".into(),
+ 8 | |             expression: "1".into(),
+ 9 | |         })
+10 | |         .unwrap()
+   | |_________________^ returns a value referencing data owned by the current function

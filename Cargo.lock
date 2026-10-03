@@ -204,6 +204,8 @@ dependencies = [
  "arrow-buffer",
  "derive_more",
  "evaluator",
+ "ide",
+ "trybuild",
 ]
 
 [[package]]
