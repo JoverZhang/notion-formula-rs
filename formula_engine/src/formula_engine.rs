@@ -5,7 +5,7 @@ use analyzer::ast::{Expr, ExprKind};
 use analyzer::{LitKind, analyze_syntax};
 use evaluator::{EvalContext, PreparedFormula, prepare_formula};
 
-use crate::{EvaluateInput, EvaluateInputError, EvaluateResult};
+use crate::{EvaluateInput, EvaluateInputError, EvaluateResult, FormulaDraft};
 
 mod batch_evaluation;
 
@@ -30,6 +30,16 @@ impl PropertyDefinition {
 }
 
 impl FormulaEngine {
+    fn create_draft_impl(
+        &self,
+        formula: FormulaDefinition,
+    ) -> Result<FormulaDraft<'_>, CreateDraftError> {
+        if formula.id.0.is_empty() {
+            return Err(CreateDraftError::EmptyId);
+        }
+        Ok(FormulaDraft::new(self, formula))
+    }
+
     fn evaluate_impl(&self, input: &EvaluateInput) -> Result<EvaluateResult, EvaluateInputError> {
         batch_evaluation::evaluate(&self.inner, input)
     }

@@ -2,23 +2,25 @@
 doc_id: specs.ide
 title: "FormulaDraft：编辑器能力"
 language: zh-CN
-source_language: zh-CN
+source_language: en
 counterpart: ./ide.md
-implementation_status: planned
+implementation_status: current
 document_status: draft
 translation_status: synced
-last_verified: 2026-09-23
+last_verified: 2026-10-03
 ---
 
 # FormulaDraft：编辑器能力
 
 [English](ide.md) · [Specification index](README.zh-CN.md)
 
-> Planned：FormulaDraft 尚未实现。补全、参数提示和文本编辑沿用末节的 Current IDE 行为。
+> Current：FormulaDraft 及其编辑器能力。补全、参数提示、格式化和文本编辑沿用末节的共用 IDE 行为。
 
 ## FormulaDraft
 
-```rust spec=formula_draft.h.rs
+```rust out=formula_engine/src/formula_draft.h.rs
+use crate::{FormulaDefinition, FormulaEngine, ValueType};
+
 pub use analyzer::{Span, TextEdit, Token};
 pub use ide::{
     CompletionConfig, CompletionItem, CompletionKind, CompletionResult,
@@ -28,6 +30,7 @@ pub use ide::{
 /// 共享借用 Engine 进行分析；同 ID 的依赖关系按正在编辑的定义计算。
 /// 同一 Engine 可同时创建多个 Draft；保存前须结束所有 Draft 的借用。
 #[spec::private_fields]
+#[derive(Debug)]
 pub struct FormulaDraft<'engine> {}
 
 #[spec::header]
@@ -62,16 +65,18 @@ impl FormulaDraft<'_> {
 Completion 沿用 [IDE 返回结构](../../ide/src/lib.rs)与[候选类型](../../ide/src/completion/mod.rs)；
 SignatureHelp 沿用[签名结构](../../ide/src/signature/mod.rs)和[显示片段](../../ide/src/display.rs)。
 
-```rust spec=formula_draft.h.rs
+```rust out=formula_engine/src/formula_draft.h.rs
 /// UTF-8 字节偏移。
-#[derive(derive_more::From)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, derive_more::From)]
 pub struct TextOffset(pub usize);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DraftVersion(pub u64);
 
+/// 独立快照；后续 Draft 更新不会改变此快照。
+#[derive(Clone, Debug)]
 pub struct FormulaDraftState {
-    /// Replace 改变文本或 Edits 成功时加 1。
+    /// 初始为 0；Replace 改变文本或 Edits 成功时加 1。
     pub version: DraftVersion,
     pub definition: FormulaDefinition,
     /// - 返回最外层 expression 的推断类型，允许局部语法错误。
@@ -83,26 +88,32 @@ pub struct FormulaDraftState {
     /// 当前 definition.expression 的词法 tokens，保留注释、换行和 Eof。
     pub tokens: Vec<Token>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExpressionDiagnostic {
     pub id: DiagnosticId,
     /// 当前 Draft 的 expression 中的位置。
     pub span: Span,
     pub message: String,
 }
+/// 仅属于一个 Draft 版本的不透明 ID；其他 Draft 或版本的 ID 不属于当前版本。
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DiagnosticId(pub String);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CursorHelp {
     /// 应用本次补全的 edits 时，使用此版本作为 FormulaEdit.base_version。
     pub base_version: DraftVersion,
     pub completion: CompletionResult,
     pub signature_help: Option<SignatureHelp>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FormulaEdit {
     /// 必须等于当前 state.version，防止旧 edits 应用到已修改的 expression。
     pub base_version: DraftVersion,
     /// 所有区间均基于修改前的 expression，且不得重叠。
     pub edits: Vec<TextEdit>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExpressionUpdate {
     /// 覆盖当前 expression，不要求 base_version。
     Replace(String),
@@ -112,11 +123,13 @@ pub enum ExpressionUpdate {
         cursor: TextOffset,
     },
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuickFix {
     pub title: String,
     /// version 绑定到产生 diagnostic 时的 Draft。
     pub edit: FormulaEdit,
 }
+#[derive(Clone, Debug)]
 pub struct UpdateExpressionResult {
     pub state: FormulaDraftState,
     /// Replace 返回新 expression.len()，空串为 0；Edits 返回重定位后的坐标。
@@ -124,8 +137,10 @@ pub struct UpdateExpressionResult {
 }
 
 /// expression 存在 lexer/parser diagnostic，无法格式化。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FormatError;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UpdateExpressionError {
     VersionMismatch,
     /// 越界或不在 UTF-8 字符边界上。
@@ -142,7 +157,7 @@ pub enum UpdateExpressionError {
 
 ## Current：IDE 行为
 
-当前服务按请求处理 source，没有持久化 FormulaDraft。此节拥有编辑行为；
+IDE 辅助函数按请求处理 source；FormulaDraft 保留自己的候选状态。此节拥有共用编辑行为；
 JS 序列化、坐标校验和异常由 [WASM API](wasm-api.zh-CN.md) 定义。
 
 ```text
@@ -192,8 +207,8 @@ format
   全量、确定性；已覆盖语法保持幂等。缩进 2 空格，二元/三元/逗号采用常规空格，结尾一个换行。
   保留附着的注释；允许内联且缩进+渲染 UTF-8 字节数 <= 80 才内联，否则多行。
   原子表达式不受该宽度判断约束；不提供格式选项。
-  Current 返回完整 source，并按整文替换 edit 重定位 cursor：内部位置通常归零，文末随新文末移动。
-  Planned format_edits 返回 edits；不能将 Current 的返回结构直接当作它的结构。
+  独立的 IDE format 辅助函数返回完整 source，并按整文替换 edit 重定位 cursor：内部位置通常归零，文末随新文末移动。
+  FormulaDraft::format_edits 返回绑定版本的全文替换 edit，不改变 Draft 状态。
 
 apply edits
   所有 range 基于原 source；按 (start,end) 稳定排序，再逆序应用。

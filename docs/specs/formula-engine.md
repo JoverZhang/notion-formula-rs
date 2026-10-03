@@ -2,21 +2,21 @@
 doc_id: specs.formula-engine
 title: "FormulaEngine: compilation and evaluation"
 language: en
-source_language: zh-CN
+source_language: en
 counterpart: ./formula-engine.zh-CN.md
 implementation_status: current
 document_status: draft
 translation_status: synced
 translation_model: gpt-6-luna
 translation_review_model: gpt-6-astra
-last_verified: 2026-10-01
+last_verified: 2026-10-03
 ---
 
 # FormulaEngine: compilation and evaluation
 
 [简体中文](formula-engine.zh-CN.md)
 
-> Current: definition management, dependency analysis, state queries, and batch evaluation. Planned: FormulaDraft.
+> Current: definition management, dependency analysis, state queries, batch evaluation, and FormulaDraft.
 
 **Contents**
 
@@ -199,6 +199,14 @@ pub enum FormulaEngineInitError {
 pub enum EngineChangeError {
     EmptyId,
 }
+
+/// Invalid definition supplied to FormulaEngine::create_draft.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreateDraftError {
+    /// The candidate Formula ID is empty.
+    EmptyId,
+}
+
 ```
 
 **Current evaluation request and result types**
@@ -449,11 +457,13 @@ impl FormulaEngine {
 }
 ```
 
-### Planned Draft methods
+### Draft methods
 
-```rust
+```rust out=formula_engine/src/formula_engine.h.rs
+#[spec::header]
 impl FormulaEngine {
-    /// Analyzes the candidate formula against Engine; edits do not modify Engine.
+    /// Analyzes the candidate formula through a shared Engine borrow; edits do not modify Engine.
+    /// Multiple Drafts may coexist; end all Draft borrows before saving with upsert.
     ///
     /// allows:
     /// - A new ID; replacing the same-ID Input or Formula in the Draft's analysis.
@@ -464,7 +474,8 @@ impl FormulaEngine {
     /// # Examples
     ///
     /// ```
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use formula_engine::{ExpressionUpdate, FormulaDefinition, FormulaEngine,
+    ///     FormulaSchema, PropertyDefinition, PropertyState};
     ///
     /// // 1. Create an engine with a saved formula
     /// let mut engine = FormulaEngine::new(FormulaSchema {
@@ -472,17 +483,18 @@ impl FormulaEngine {
     ///         id: "formula".into(),
     ///         expression: "1 + 1".into(),
     ///     })],
-    /// })?;
+    /// }).expect("valid definitions");
     ///
     /// // 2. Create a draft from the saved definition
     /// let Some(PropertyState::Formula(saved)) = engine.property(&"formula".into()) else {
     ///     panic!("expected a saved formula");
     /// };
-    /// let mut draft = engine.create_draft(saved.definition)?;
+    /// let mut draft = engine.create_draft(saved.definition).expect("nonempty ID");
     /// assert_eq!(draft.state().definition.expression, "1 + 1");
     ///
     /// // 3. Edit the draft; the engine keeps the saved definition
-    /// draft.update_expression(ExpressionUpdate::Replace("1 + 2".into()))?;
+    /// draft.update_expression(ExpressionUpdate::Replace("1 + 2".into()))
+    ///     .expect("valid replacement");
     /// assert_eq!(draft.state().definition.expression, "1 + 2");
     /// assert!(draft.state().diagnostics.is_empty());
     /// assert!(matches!(
@@ -492,14 +504,11 @@ impl FormulaEngine {
     ///
     /// // 4. Finish editing and save the definition
     /// let definition = draft.into_definition();
-    /// engine.upsert(PropertyDefinition::Formula(definition))?;
+    /// engine.upsert(PropertyDefinition::Formula(definition)).expect("nonempty ID");
     /// let Some(PropertyState::Formula(saved)) = engine.property(&"formula".into()) else {
     ///     panic!("expected a saved formula");
     /// };
     /// assert_eq!(saved.definition.expression, "1 + 2");
-    ///
-    /// # Ok(())
-    /// # }
     /// ```
     pub fn create_draft(&self, formula: FormulaDefinition)
         -> Result<FormulaDraft<'_>, CreateDraftError>;
