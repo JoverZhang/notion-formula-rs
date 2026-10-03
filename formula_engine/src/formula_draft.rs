@@ -1,6 +1,7 @@
 //! Candidate formula state held through an immutable Engine borrow.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use analyzer::analysis::Context;
@@ -15,8 +16,25 @@ include!("formula_draft.h.rs");
 static NEXT_DIAGNOSTIC_ID: AtomicU64 = AtomicU64::new(0);
 
 struct FormulaDraftInner<'engine> {
-    engine: &'engine FormulaEngine,
+    engine: DraftEngine<'engine>,
     analysis: DraftAnalysis,
+}
+
+// Owned sessions need to keep a draft and its immutable engine alive together.
+// Both ownership forms run the same analysis; Arc::get_mut also keeps callers
+// from changing the saved engine while an owned draft exists.
+enum DraftEngine<'engine> {
+    Borrowed(&'engine FormulaEngine),
+    Shared(Arc<FormulaEngine>),
+}
+
+impl DraftEngine<'_> {
+    fn engine(&self) -> &FormulaEngine {
+        match self {
+            Self::Borrowed(engine) => engine,
+            Self::Shared(engine) => engine,
+        }
+    }
 }
 
 struct DraftAnalysis {
@@ -37,7 +55,7 @@ impl<'engine> FormulaDraft<'engine> {
     pub(crate) fn new(engine: &'engine FormulaEngine, definition: FormulaDefinition) -> Self {
         Self {
             inner: FormulaDraftInner {
-                engine,
+                engine: DraftEngine::Borrowed(engine),
                 analysis: DraftAnalysis::new(engine, definition, DraftVersion(0)),
             },
         }
@@ -118,7 +136,7 @@ impl<'engine> FormulaDraft<'engine> {
             expression,
         };
         let version = DraftVersion(current.version.0 + 1);
-        let analysis = DraftAnalysis::new(self.inner.engine, definition, version);
+        let analysis = DraftAnalysis::new(self.inner.engine.engine(), definition, version);
         self.inner.analysis = analysis;
         Ok(UpdateExpressionResult {
             state: self.state().clone(),
@@ -128,6 +146,26 @@ impl<'engine> FormulaDraft<'engine> {
 
     fn into_definition_impl(self) -> FormulaDefinition {
         self.inner.analysis.state.definition
+    }
+}
+
+impl FormulaDraft<'static> {
+    /// Internal ownership bridge for wrappers that store Engine and Draft handles.
+    #[doc(hidden)]
+    pub fn from_shared_engine(
+        engine: Arc<FormulaEngine>,
+        definition: FormulaDefinition,
+    ) -> Result<Self, crate::CreateDraftError> {
+        if definition.id.0.is_empty() {
+            return Err(crate::CreateDraftError::EmptyId);
+        }
+        let analysis = DraftAnalysis::new(&engine, definition, DraftVersion(0));
+        Ok(Self {
+            inner: FormulaDraftInner {
+                engine: DraftEngine::Shared(engine),
+                analysis,
+            },
+        })
     }
 }
 

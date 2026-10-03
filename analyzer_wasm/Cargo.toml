@@ -8,10 +8,12 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 analyzer = { path = "../analyzer" }
+formula_engine = { path = "../formula_engine" }
 ide = { path = "../ide" }
 serde = "1.0.228"
 serde-wasm-bindgen = "0.6.5"
-ts-rs = { version = "10", features = ["serde-compat"] }
+# Custom deserialization hooks validate JS transport types without changing TS shapes.
+ts-rs = { version = "10", features = ["serde-compat", "no-serde-warnings"] }
 wasm-bindgen = "0.2.106"
 js-sys = "0.3.83"
 
