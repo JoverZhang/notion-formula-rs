@@ -7,7 +7,7 @@ counterpart: ./README.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-18
+last_verified: 2026-10-03
 ---
 
 # Specification index
@@ -16,9 +16,9 @@ last_verified: 2026-09-18
 
 | Document | What it covers | Status |
 | --- | --- | --- |
-| [FormulaEngine](formula-engine.md) | Definitions, dependency compilation, state, columnar evaluation | Planned |
+| [FormulaEngine](formula-engine.md) | Definitions, dependency compilation, state, columnar evaluation | Current |
 | [WASM API](wasm-api.md) | Worker clients, data formats, coordinates, lifetime | Planned (Worker clients); Current (Analyzer) |
-| [IDE / FormulaDraft](ide.md) | Drafts, completion and signature help, quick fixes, formatting, edits, commit and discard | Planned (FormulaDraft); Current (IDE) |
+| [IDE / FormulaDraft](ide.md) | Drafts, completion and signature help, quick fixes, formatting, edits, commit and discard | Current |
 | [Formula grammar](formula-language.md) | EBNF, property references, operators, nulls, failure boundaries | Current |
 | [Builtins](builtin-functions.md) | Supported functions, signature notation, call rules | Current |
 
