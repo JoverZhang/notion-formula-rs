@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Column, ColumnKind, EvaluateInput, EvaluateInputError, PropertyDefinition, RuntimeContext,
-    Value, ValueType,
+    Column, ColumnKind, EvaluateInput, EvaluateInputError, PropertyDefinition, PropertyId,
+    RuntimeContext, Value, ValueType,
 };
 
 /// Runtime snapshot whose UTC and offset-adjusted local times are valid.
@@ -48,18 +48,7 @@ pub(crate) fn validate_evaluate_input<'a>(
         }
     }
 
-    if input.formula_ids.is_empty() {
-        return Err(EvaluateInputError::EmptyFormulaIds);
-    }
-    let mut requested = BTreeSet::new();
-    for id in &input.formula_ids {
-        if id.0.is_empty() || !formulas.contains(id) {
-            return Err(EvaluateInputError::InvalidFormulaId { id: id.clone() });
-        }
-        if !requested.insert(id) {
-            return Err(EvaluateInputError::DuplicateFormulaId { id: id.clone() });
-        }
-    }
+    validate_formula_ids(&input.formula_ids, |id| formulas.contains(id))?;
 
     let expected_ids: BTreeSet<_> = inputs.keys().copied().collect();
     let provided_ids: BTreeSet<_> = input.columns.keys().collect();
@@ -128,6 +117,25 @@ pub(crate) fn validate_evaluate_input<'a>(
     }
 
     Ok(runtime)
+}
+
+pub(crate) fn validate_formula_ids(
+    formula_ids: &[PropertyId],
+    is_formula: impl Fn(&PropertyId) -> bool,
+) -> Result<(), EvaluateInputError> {
+    if formula_ids.is_empty() {
+        return Err(EvaluateInputError::EmptyFormulaIds);
+    }
+    let mut requested = BTreeSet::new();
+    for id in formula_ids {
+        if id.0.is_empty() || !is_formula(id) {
+            return Err(EvaluateInputError::InvalidFormulaId { id: id.clone() });
+        }
+        if !requested.insert(id) {
+            return Err(EvaluateInputError::DuplicateFormulaId { id: id.clone() });
+        }
+    }
+    Ok(())
 }
 
 fn validate_runtime(

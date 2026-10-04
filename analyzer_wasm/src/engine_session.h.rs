@@ -25,6 +25,12 @@ impl FormulaEngineSession {
     pub fn get_state(&self) -> Result<JsValue, JsValue> {
         Self::get_state_impl(self)
     }
+    /// Accepts PropertyId[] and returns PropertyId[] with FormulaEngine::required_inputs semantics.
+    /// Malformed arrays reject with INVALID_DTO; formula-selection errors use EVALUATE_INPUT.
+    /// Available while Drafts are active; Engine close rejects with ENGINE_CLOSED.
+    pub fn required_inputs(&self, formula_ids: JsValue) -> Result<JsValue, JsValue> {
+        Self::required_inputs_impl(self, formula_ids)
+    }
     /// Rejects ACTIVE_DRAFTS while any Draft handle exists.
     pub fn upsert(&mut self, property: JsValue) -> Result<JsValue, JsValue> {
         Self::upsert_impl(self, property)
