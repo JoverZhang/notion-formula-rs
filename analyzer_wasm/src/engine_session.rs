@@ -117,7 +117,7 @@ impl FormulaEngineSessionInner {
 
 impl FormulaEngineSession {
     fn new_impl(schema: JsValue) -> Result<Self, JsValue> {
-        let schema: dto::FormulaSchema = from_value(schema, "new")?;
+        let schema: dto::FormulaSchema = from_dto(schema, "new", dto::validate_schema_fields)?;
         let inner = FormulaEngineSessionInner::new(schema.into()).map_err(|error| {
             error_value(dto::FormulaClientErrorData::EngineInit {
                 message: "Invalid engine schema".into(),
@@ -158,7 +158,8 @@ impl FormulaEngineSession {
 
     fn upsert_impl(&mut self, property: JsValue) -> Result<JsValue, JsValue> {
         let engine = self.inner.engine_mut().map_err(error_value)?;
-        let property: dto::PropertyDefinition = from_value(property, "upsert")?;
+        let property: dto::PropertyDefinition =
+            from_dto(property, "upsert", dto::validate_property_fields)?;
         let change: dto::FormulaEngineChangeResult = engine
             .upsert(property.into())
             .map_err(|error| {
@@ -184,7 +185,7 @@ impl FormulaEngineSession {
 
     fn evaluate_impl(&self, input: JsValue) -> Result<JsValue, JsValue> {
         let engine = self.inner.engine().map_err(error_value)?;
-        let input: dto::EvaluateInput = from_value(input, "evaluate")?;
+        let input: dto::EvaluateInput = from_dto(input, "evaluate", dto::validate_evaluate_fields)?;
         let result: dto::EvaluateResult = engine
             .evaluate(&input.into())
             .map_err(|error| {
@@ -201,7 +202,8 @@ impl FormulaEngineSession {
 
     fn create_draft_impl(&mut self, formula: JsValue) -> Result<u32, JsValue> {
         self.inner.engine().map_err(error_value)?;
-        let formula: dto::FormulaDefinition = from_value(formula, "create_draft")?;
+        let formula: dto::FormulaDefinition =
+            from_dto(formula, "create_draft", dto::validate_formula_fields)?;
         self.inner.create_draft(formula.into()).map_err(error_value)
     }
 
@@ -218,7 +220,8 @@ impl FormulaEngineSession {
     ) -> Result<JsValue, JsValue> {
         let draft = self.inner.draft(handle).map_err(error_value)?;
         let cursor: u32 = from_value(cursor, "draft_help")?;
-        let config: dto::CompletionConfig = from_value(config, "draft_help")?;
+        let config: dto::CompletionConfig =
+            from_dto(config, "draft_help", dto::validate_completion_fields)?;
         let source = &draft.state().definition.expression;
         let cursor = rust::TextOffset(Converter::utf16_to_8_offset(source, cursor as usize));
         let help = draft.help(
@@ -268,7 +271,11 @@ impl FormulaEngineSession {
         update: JsValue,
     ) -> Result<JsValue, JsValue> {
         let draft = self.inner.draft_mut(handle).map_err(error_value)?;
-        let update: dto::ExpressionUpdate = from_value(update, "draft_update_expression")?;
+        let update: dto::ExpressionUpdate = from_dto(
+            update,
+            "draft_update_expression",
+            dto::validate_update_fields,
+        )?;
         let update = Converter::expression_update(draft.state(), update).map_err(update_error)?;
         let result = draft.update_expression(update).map_err(update_error)?;
         to_value(&dto::UpdateExpressionResult {
@@ -326,13 +333,24 @@ fn error_value<T: Serialize>(error: T) -> JsValue {
 }
 
 fn from_value<T: DeserializeOwned>(value: JsValue, operation: &str) -> Result<T, JsValue> {
-    serde_wasm_bindgen::from_value(value).map_err(|_| {
-        error_value(dto::FormulaClientErrorData::InvalidDto {
-            message: "Invalid DTO".into(),
-            payload: dto::InvalidDtoPayload {
-                operation: operation.into(),
-            },
-        })
+    serde_wasm_bindgen::from_value(value).map_err(|_| invalid_dto(operation))
+}
+
+fn from_dto<T: DeserializeOwned>(
+    value: JsValue,
+    operation: &str,
+    validate_fields: fn(&JsValue) -> Result<(), JsValue>,
+) -> Result<T, JsValue> {
+    validate_fields(&value).map_err(|_| invalid_dto(operation))?;
+    from_value(value, operation)
+}
+
+fn invalid_dto(operation: &str) -> JsValue {
+    error_value(dto::FormulaClientErrorData::InvalidDto {
+        message: "Invalid DTO".into(),
+        payload: dto::InvalidDtoPayload {
+            operation: operation.into(),
+        },
     })
 }
 

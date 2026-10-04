@@ -1,12 +1,13 @@
 #![cfg(target_arch = "wasm32")]
 
 use std::collections::HashMap;
+use std::{cell::Cell, rc::Rc};
 
 use analyzer_wasm::{FormulaEngineSession, dto::engine as dto};
 use formula_engine as native;
 use js_sys::{Array, Map, Reflect};
 use serde::Serialize;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 fn value<T: Serialize>(input: &T) -> JsValue {
@@ -35,6 +36,14 @@ fn error_code(error: &JsValue, code: &str) {
     assert_eq!(field(error, "code").as_string().as_deref(), Some(code));
     assert!(!field(error, "message").as_string().unwrap().is_empty());
     assert!(!field(error, "payload").is_undefined());
+}
+
+fn invalid_dto(error: &JsValue, operation: &str) {
+    error_code(error, "INVALID_DTO");
+    assert_eq!(
+        field(&field(error, "payload"), "operation"),
+        JsValue::from_str(operation)
+    );
 }
 
 fn definition(id: &str, expression: &str) -> dto::FormulaDefinition {
@@ -71,6 +80,226 @@ fn empty_input(ids: &[&str]) -> dto::EvaluateInput {
 fn output(result: &JsValue, id: &str) -> JsValue {
     let formulas: Map = field(result, "formulas").dyn_into().unwrap();
     field(&formulas.get(&JsValue::from_str(id)), "Ok")
+}
+
+#[wasm_bindgen_test]
+fn strict_schema_and_formula_fields_reject_before_engine_mutations() {
+    let malformed = value(&dto::FormulaSchema { properties: vec![] });
+    set(&malformed, "extra", &JsValue::from_f64(1.0));
+    let error = match FormulaEngineSession::new(malformed) {
+        Err(error) => error,
+        Ok(_) => panic!("unknown schema fields must fail"),
+    };
+    invalid_dto(&error, "new");
+
+    let malformed = value(&dto::FormulaSchema {
+        properties: vec![formula("saved", "1")],
+    });
+    let nested = field(&array(&field(&malformed, "properties")).get(0), "Formula");
+    set(&nested, "extra", &JsValue::from_f64(1.0));
+    let error = match FormulaEngineSession::new(malformed) {
+        Err(error) => error,
+        Ok(_) => panic!("unknown nested formula fields must fail"),
+    };
+    invalid_dto(&error, "new");
+
+    let mut engine = session(vec![formula("saved", "1")]);
+    let malformed = value(&definition("candidate", "2"));
+    set(&malformed, "extra", &JsValue::NULL);
+    invalid_dto(&engine.create_draft(malformed).unwrap_err(), "create_draft");
+    let handle = engine
+        .create_draft(value(&definition("candidate", "2")))
+        .unwrap();
+    assert_eq!(handle, 1, "invalid DTO must not allocate a draft handle");
+    engine.draft_close(handle);
+
+    let malformed = value(&formula("saved", "2"));
+    set(&field(&malformed, "Formula"), "extra", &JsValue::UNDEFINED);
+    invalid_dto(&engine.upsert(malformed).unwrap_err(), "upsert");
+    let saved = engine.get_property("saved".into()).unwrap();
+    assert_eq!(
+        field(
+            &field(&field(&saved, "Formula"), "definition"),
+            "expression"
+        ),
+        JsValue::from_str("1")
+    );
+    engine.upsert(value(&formula("saved", "2"))).unwrap();
+}
+
+#[wasm_bindgen_test]
+fn strict_evaluate_and_runtime_fields_reject_nested_unknown_fields() {
+    let engine = session(vec![formula("ok", "1")]);
+    let request = empty_input(&["ok"]);
+    assert!(engine.evaluate(value(&request)).is_ok());
+    let malformed = value(&request);
+    set(&malformed, "extra", &JsValue::from_f64(1.0));
+    invalid_dto(&engine.evaluate(malformed).unwrap_err(), "evaluate");
+    let malformed = value(&request);
+    set(
+        &field(&malformed, "runtime"),
+        "extra",
+        &JsValue::from_f64(1.0),
+    );
+    invalid_dto(&engine.evaluate(malformed).unwrap_err(), "evaluate");
+}
+
+#[wasm_bindgen_test]
+fn strict_column_fields_reject_unknown_fields_in_every_map_column_variant() {
+    for (kind, ty, column) in [
+        (
+            "Number",
+            dto::ValueType::Number,
+            dto::Column::Number(dto::ColumnData {
+                values: vec![f64::NAN],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "String",
+            dto::ValueType::String,
+            dto::Column::String(dto::ColumnData {
+                values: vec!["text".into()],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "Boolean",
+            dto::ValueType::Boolean,
+            dto::Column::Boolean(dto::ColumnData {
+                values: vec![true],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "Date",
+            dto::ValueType::Date,
+            dto::Column::Date(dto::ColumnData {
+                values: vec![9_007_199_254_740_993],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "List",
+            dto::ValueType::List(Box::new(dto::ValueType::Unknown)),
+            dto::Column::List(dto::ColumnData {
+                values: vec![vec![None, Some(dto::Value::Date(i64::MAX))]],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "Union",
+            dto::ValueType::Unknown,
+            dto::Column::Union(dto::ColumnData {
+                values: vec![dto::Value::List(vec![None])],
+                validity: vec![true],
+            }),
+        ),
+    ] {
+        let engine = session(vec![
+            input("first", dto::ValueType::Number),
+            input("second", ty),
+            formula("first_out", "prop(\"first\")"),
+            formula("second_out", "prop(\"second\")"),
+        ]);
+        let mut request = empty_input(&["first_out", "second_out"]);
+        request.columns.insert(
+            "first".into(),
+            dto::Column::Number(dto::ColumnData {
+                values: vec![1.0],
+                validity: vec![true],
+            }),
+        );
+        request.columns.insert("second".into(), column);
+        assert!(engine.evaluate(value(&request)).is_ok(), "{kind}");
+        let malformed = value(&request);
+        let columns = Map::new();
+        let serialized: Map = field(&malformed, "columns").dyn_into().unwrap();
+        // Keep the malformed column after a valid entry so all Map values
+        // must be checked, including the Date custom deserialization path.
+        columns.set(
+            &JsValue::from_str("first"),
+            &serialized.get(&JsValue::from_str("first")),
+        );
+        let second = serialized.get(&JsValue::from_str("second"));
+        set(&field(&second, kind), "extra", &JsValue::NULL);
+        columns.set(&JsValue::from_str("second"), &second);
+        set(&malformed, "columns", &columns.into());
+        invalid_dto(&engine.evaluate(malformed).unwrap_err(), "evaluate");
+    }
+}
+
+#[wasm_bindgen_test]
+fn strict_completion_and_edit_fields_reject_without_reading_unknown_values_or_updating() {
+    let mut engine = session(vec![]);
+    let handle = engine
+        .create_draft(value(&definition("candidate", "1")))
+        .unwrap();
+    let malformed = value(&dto::CompletionConfig { preferred_limit: 5 });
+    set(&malformed, "extra", &JsValue::NULL);
+    invalid_dto(
+        &engine
+            .draft_help(handle, JsValue::from_f64(1.0), malformed)
+            .unwrap_err(),
+        "draft_help",
+    );
+    assert!(
+        engine
+            .draft_help(
+                handle,
+                JsValue::from_f64(1.0),
+                value(&dto::CompletionConfig { preferred_limit: 5 }),
+            )
+            .is_ok()
+    );
+
+    let update = dto::ExpressionUpdate::Edits {
+        edit: dto::FormulaEdit {
+            base_version: 0,
+            edits: vec![dto::TextEdit {
+                range: dto::Span { start: 0, end: 1 },
+                new_text: "2".into(),
+            }],
+        },
+        cursor: 1,
+    };
+    let malformed = value(&update);
+    let calls = Rc::new(Cell::new(0));
+    let callback_calls = Rc::clone(&calls);
+    let getter = Closure::<dyn FnMut() -> JsValue>::new(move || {
+        callback_calls.set(callback_calls.get() + 1);
+        JsValue::from_f64(1.0)
+    });
+    let descriptor = js_sys::Object::new();
+    set(&descriptor, "get", getter.as_ref());
+    set(&descriptor, "enumerable", &JsValue::TRUE);
+    js_sys::Object::define_property(
+        &field(&field(&malformed, "Edits"), "edit")
+            .dyn_into::<js_sys::Object>()
+            .unwrap(),
+        &JsValue::from_str("extra"),
+        &descriptor,
+    );
+    invalid_dto(
+        &engine
+            .draft_update_expression(handle, malformed)
+            .unwrap_err(),
+        "draft_update_expression",
+    );
+    assert_eq!(calls.get(), 0, "unknown field getter must not be called");
+    let state = engine.draft_state(handle).unwrap();
+    assert_eq!(u64::try_from(field(&state, "version")).unwrap(), 0);
+    assert_eq!(
+        field(&field(&state, "definition"), "expression"),
+        JsValue::from_str("1")
+    );
+    let updated = engine
+        .draft_update_expression(handle, value(&update))
+        .unwrap();
+    assert_eq!(
+        u64::try_from(field(&field(&updated, "state"), "version")).unwrap(),
+        1
+    );
 }
 
 #[wasm_bindgen_test]
