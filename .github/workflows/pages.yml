@@ -52,6 +52,14 @@ jobs:
             "$CI_IMAGE" \
             just verify
 
+      - name: Preserve browser verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: formula-browser-verification
+          path: examples/vite/test-results/
+          if-no-files-found: ignore
+
   deploy:
     name: Deploy Pages
     needs: ci
