@@ -342,6 +342,20 @@ export async function runFormulaWorkerContract() {
     equal(await engine.remove("absent"), direct.remove("absent"), "missing remove null");
     verified.push("consume discard and explicit commit");
 
+    const property = { Formula: { id: "snapshot", expression: "1" } };
+    const original = engine.upsert(property);
+    const between = engine.getProperty("snapshot");
+    property.Formula.expression = "2";
+    const changedProperty = engine.upsert(property);
+    equal(
+      await original,
+      direct.upsert({ Formula: { id: "snapshot", expression: "1" } }),
+      "first request snapshot",
+    );
+    equal(await between, direct.get_property("snapshot"), "snapshot between mutations");
+    equal(await changedProperty, direct.upsert(property), "second request snapshot");
+    verified.push("request snapshots");
+
     const queued = engine.getProperties();
     const closing = engine.close();
     assert(engine.close() === closing, "Close must return the same Promise");

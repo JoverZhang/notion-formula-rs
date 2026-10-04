@@ -71,6 +71,7 @@ test("real module Worker matches the synchronous WASM session contract", async (
       "multiple drafts and borrow errors",
       "UTF-16 edits and versions",
       "consume discard and explicit commit",
+      "request snapshots",
       "queued close and idempotence",
     ],
     rows: 4,

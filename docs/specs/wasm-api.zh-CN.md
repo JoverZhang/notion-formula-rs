@@ -41,6 +41,8 @@ import type {
 import type { FormulaWorker } from "./rpc";
 
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
+// 每个请求入队时保存参数快照；后续突变不改变已入队的请求。
+// 不可克隆的参数在对应 FIFO 位置以 INVALID_REQUEST 拒绝。
 export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;

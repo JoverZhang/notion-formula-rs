@@ -153,7 +153,17 @@ class EngineClient implements FormulaEngineClient {
     method: Method,
     args: FormulaOperations[Method]["args"],
   ): Promise<FormulaOperations[Method]["result"]> {
-    const result = this.tail.then(() => this.rpc.request(method, args));
+    let result: Promise<FormulaOperations[Method]["result"]>;
+    try {
+      // Capture caller-owned DTOs now, before any earlier queued operation finishes.
+      const snapshot = structuredClone(args);
+      result = this.tail.then(() => this.rpc.request(method, snapshot));
+    } catch (error) {
+      const rejection = new FormulaClientError(formulaErrorData(error, "INVALID_REQUEST"));
+      result = this.tail.then(() => {
+        throw rejection;
+      });
+    }
     // A rejected call settles its own Promise but never prevents the next operation.
     this.tail = result.then(
       () => undefined,

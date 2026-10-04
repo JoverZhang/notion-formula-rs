@@ -23,6 +23,8 @@ import type {
 import type { FormulaWorker } from "./rpc";
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
+// Each request snapshots its arguments at enqueue; later mutations cannot change it.
+// Non-cloneable arguments reject with INVALID_REQUEST at their FIFO position.
 export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;

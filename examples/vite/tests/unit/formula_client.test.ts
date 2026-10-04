@@ -92,6 +92,127 @@ const cursorHelp: CursorHelp = {
 };
 
 describe("FormulaEngineClient queue and lifecycle", () => {
+  it("preserves each upsert's definition when the caller reuses and mutates it", async () => {
+    let expression: string | null = null;
+    const { engine, worker } = await setup((request) => {
+      if (request.method === "engine.upsert" && "Formula" in request.args[0]) {
+        const next = request.args[0].Formula.expression;
+        const changed = next !== expression;
+        expression = next;
+        return success(request, { affected_formulas: changed ? ["f"] : [] });
+      }
+      if (request.method === "engine.getProperty")
+        return success(request, {
+          Formula: {
+            definition: { id: "f", expression },
+            status: { Ready: { output_type: "Number" } },
+          },
+        });
+      throw new Error("Unexpected request");
+    });
+    const property = { Formula: { id: "f", expression: "1" } };
+    const first = engine.upsert(property);
+    const between = engine.getProperty("f");
+    property.Formula.expression = "2";
+    const second = engine.upsert(property);
+    property.Formula.expression = "3";
+    await expect(Promise.all([first, between, second])).resolves.toEqual([
+      { affected_formulas: ["f"] },
+      {
+        Formula: {
+          definition: { id: "f", expression: "1" },
+          status: { Ready: { output_type: "Number" } },
+        },
+      },
+      { affected_formulas: ["f"] },
+    ]);
+    expect(expression).toBe("2");
+    expect(worker.requests.filter((request) => request.method === "engine.upsert")).toEqual([
+      { id: 1, method: "engine.upsert", args: [{ Formula: { id: "f", expression: "1" } }] },
+      { id: 3, method: "engine.upsert", args: [{ Formula: { id: "f", expression: "2" } }] },
+    ]);
+    await engine.close();
+  });
+
+  it("snapshots the schema before asynchronous initialization starts", async () => {
+    const worker = new ControlledWorker((request) => success(request));
+    const schema = { properties: [{ Formula: { id: "f", expression: "1" } }] };
+    const starting = createFormulaEngineClient(schema, {
+      workerFactory: () => worker as unknown as FormulaWorker,
+    });
+    schema.properties[0].Formula.expression = "2";
+    schema.properties.push({ Formula: { id: "g", expression: "3" } });
+    const engine = await starting;
+    expect(worker.requests[0]?.args).toEqual([
+      { properties: [{ Formula: { id: "f", expression: "1" } }] },
+    ]);
+    await engine.close();
+  });
+
+  it("snapshots draft definitions, completion config and nested versioned edits", async () => {
+    const { engine, worker } = await setup((request) => {
+      if (request.method === "engine.createDraft") return success(request, 7);
+      if (request.method === "draft.help") return success(request, cursorHelp);
+      if (request.method === "draft.updateExpression")
+        return success(request, { state: draftState, cursor: 1 });
+      throw new Error("Unexpected request");
+    });
+    const definition = { id: "f", expression: "1" };
+    const creating = engine.createDraft(definition);
+    definition.expression = "2";
+    const draft = await creating;
+    const config = { preferred_limit: 5 };
+    const help = draft.help(1, config);
+    config.preferred_limit = 0;
+    const update = {
+      Edits: {
+        edit: {
+          base_version: 0n,
+          edits: [{ range: { start: 0, end: 1 }, new_text: "2" }],
+        },
+        cursor: 1,
+      },
+    };
+    const first = draft.updateExpression(update);
+    update.Edits.edit.base_version = 1n;
+    update.Edits.edit.edits[0].range.start = 1;
+    update.Edits.edit.edits[0].range.end = 2;
+    update.Edits.edit.edits[0].new_text = "3";
+    update.Edits.cursor = 2;
+    const second = draft.updateExpression(update);
+    update.Edits.edit.edits.length = 0;
+    await Promise.all([help, first, second]);
+    expect(worker.requests.slice(1).map((request) => request.args)).toEqual([
+      [{ id: "f", expression: "1" }],
+      [7, 1, { preferred_limit: 5 }],
+      [
+        7,
+        {
+          Edits: {
+            edit: {
+              base_version: 0n,
+              edits: [{ range: { start: 0, end: 1 }, new_text: "2" }],
+            },
+            cursor: 1,
+          },
+        },
+      ],
+      [
+        7,
+        {
+          Edits: {
+            edit: {
+              base_version: 1n,
+              edits: [{ range: { start: 1, end: 2 }, new_text: "3" }],
+            },
+            cursor: 2,
+          },
+        },
+      ],
+    ]);
+    await engine.close();
+  });
+
   it("serializes engine and draft calls in one FIFO queue", async () => {
     const blocked = deferred<FormulaResponse>();
     const { engine, worker } = await setup((request) => {
@@ -263,6 +384,75 @@ describe("FormulaEngineClient queue and lifecycle", () => {
 });
 
 describe("FormulaEngineClient transport", () => {
+  it("isolates queued input Maps, columns, arrays and caller-provided runtime values", async () => {
+    const { engine, worker } = await setup((request) => success(request, { formulas: new Map() }));
+    const numbers = {
+      values: [NaN, Infinity, -Infinity, -0],
+      validity: [true, true, true, true],
+    };
+    const dates = {
+      values: [9_007_199_254_740_993n, 0n, -1n, 100n],
+      validity: [true, true, true, true],
+    };
+    const input: EvaluateInput = {
+      row_ids: ["a", "b", "c", "d"],
+      columns: new Map<string, Column>([
+        ["n", { Number: numbers }],
+        ["date", { Date: dates }],
+      ]),
+      runtime: { now: 1_700_000_000_000n, time_zone: "+00:00" },
+      formula_ids: ["f"],
+    };
+    const first = engine.evaluate(input);
+    numbers.values[0] = 5;
+    numbers.validity[0] = false;
+    dates.values[0] = 1n;
+    input.row_ids[0] = "changed";
+    input.formula_ids.push("g");
+    input.runtime.now = 1_700_000_000_001n;
+    input.runtime.time_zone = "+08:00";
+    input.columns.delete("date");
+    const second = engine.evaluate(input);
+    input.columns.clear();
+    await Promise.all([first, second]);
+    const firstSent = worker.requests[1];
+    const secondSent = worker.requests[2];
+    if (firstSent.method !== "engine.evaluate" || secondSent.method !== "engine.evaluate")
+      throw new Error("Unexpected request");
+    expect(firstSent.args[0]).toEqual({
+      row_ids: ["a", "b", "c", "d"],
+      columns: new Map<string, Column>([
+        [
+          "n",
+          {
+            Number: {
+              values: [NaN, Infinity, -Infinity, -0],
+              validity: [true, true, true, true],
+            },
+          },
+        ],
+        [
+          "date",
+          {
+            Date: {
+              values: [9_007_199_254_740_993n, 0n, -1n, 100n],
+              validity: [true, true, true, true],
+            },
+          },
+        ],
+      ]),
+      runtime: { now: 1_700_000_000_000n, time_zone: "+00:00" },
+      formula_ids: ["f"],
+    });
+    expect(secondSent.args[0]).toEqual({
+      row_ids: ["changed", "b", "c", "d"],
+      columns: new Map<string, Column>([["n", { Number: numbers }]]),
+      runtime: { now: 1_700_000_000_001n, time_zone: "+08:00" },
+      formula_ids: ["f", "g"],
+    });
+    await engine.close();
+  });
+
   it("scopes opaque diagnostic IDs per client, preserving stable state and native routing", async () => {
     function response(request: FormulaRequest): FormulaResponse {
       if (request.method === "engine.createDraft") return success(request, 1);
@@ -459,17 +649,46 @@ describe("FormulaEngineClient transport", () => {
     },
   );
 
-  it("continues FIFO processing after a request cannot be cloned", async () => {
-    const { engine, worker } = await setup((request) => success(request, "AllReady"));
-    const invalid = engine.upsert({
-      Formula: { ...draftState.definition, extra: () => undefined },
-    } as Parameters<typeof engine.upsert>[0]);
-    const next = engine.getState();
-    await expect(invalid).rejects.toMatchObject({ code: "INVALID_REQUEST", payload: null });
-    await expect(next).resolves.toBe("AllReady");
+  it("queues clone failures behind earlier calls and continues with later calls", async () => {
+    const blocked = deferred<FormulaResponse>();
+    const events: string[] = [];
+    const { engine, worker } = await setup((request) =>
+      request.method === "engine.getState" ? blocked.promise : success(request, null),
+    );
+    const earlier = engine.getState().then((state) => {
+      events.push("earlier");
+      return state;
+    });
+    let invalid!: ReturnType<typeof engine.upsert>;
+    expect(() => {
+      invalid = engine.upsert({
+        Formula: { ...draftState.definition, extra: () => undefined },
+      } as Parameters<typeof engine.upsert>[0]);
+    }).not.toThrow();
+    const rejected = invalid.catch((error: unknown) => {
+      events.push("invalid");
+      throw error;
+    });
+    const next = engine.getProperty("f").then((property) => {
+      events.push("next");
+      return property;
+    });
+    const settled = Promise.allSettled([earlier, rejected, next]);
+    await vi.waitFor(() => expect(worker.requests).toHaveLength(2));
+    expect(events).toEqual([]);
+    blocked.resolve(success(worker.requests[1], "AllReady"));
+    const results = await settled;
+    expect(results[0]).toEqual({ status: "fulfilled", value: "AllReady" });
+    expect(results[1]).toMatchObject({
+      status: "rejected",
+      reason: { code: "INVALID_REQUEST", payload: null },
+    });
+    expect(results[2]).toEqual({ status: "fulfilled", value: null });
+    expect(events).toEqual(["earlier", "invalid", "next"]);
     expect(worker.requests.map((request) => request.method)).toEqual([
       "initialize",
       "engine.getState",
+      "engine.getProperty",
     ]);
     await engine.close();
   });
