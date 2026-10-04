@@ -10,6 +10,7 @@ export default tseslint.config(
       "dist/**",
       "src/pkg/**",
       "src/analyzer/generated/**",
+      "src/engine/generated/**",
       "pkg/**",
       "**/*.min.js",
       "eslint.config.js",

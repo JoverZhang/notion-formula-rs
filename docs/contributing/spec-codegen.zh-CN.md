@@ -7,15 +7,28 @@ counterpart: ./spec-codegen.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-17
+last_verified: 2026-10-04
 ---
 
 # 从 Markdown 生成 Rust 头文件
 
 [English](spec-codegen.md)
 
-`spec-codegen` 将选定 Markdown 文档中的声明生成 Rust 头文件。接口声明由一份规范源文档维护，
-私有状态和方法实现留在手写 Rust 中。现有 Engine 和 builtin 声明尚未迁移。
+接口声明由一份规范源文档维护，私有状态和方法实现留在手写 Rust 中。
+Engine、Draft 和 WASM 的 Rust 声明使用 `md-first` 的 `out=...h.rs` 代码块；
+[WASM 客户端](../specs/wasm-api.zh-CN.md)的 TypeScript 代码块使用 `spec-file=...client.h.ts`。
+提交前从英文源文档重新生成并检查一致性：
+
+```sh
+cargo run --locked -p md-first -- .
+just gen-ts
+cargo run --locked -p md-first -- --check .
+cargo run --locked -p analyzer_wasm --bin export_ts -- --check
+node scripts/generate-wasm-client.mjs --check
+```
+
+Rust 编译检查生成的 Rust 接口；Vite 的 TypeScript 检查编译生成的客户端接口和 DTO。
+以下章节介绍独立 `spec-codegen` 生成器使用的 `header=...` 代码块。
 
 ## 标记需要生成的声明
 

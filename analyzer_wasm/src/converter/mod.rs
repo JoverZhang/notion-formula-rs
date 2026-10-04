@@ -6,6 +6,7 @@
 
 mod analyze;
 mod completion;
+mod engine;
 mod shared;
 
 pub struct Converter;

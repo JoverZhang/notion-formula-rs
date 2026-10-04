@@ -4,8 +4,11 @@
 //! Spans are half-open `[start, end)`.
 mod converter;
 pub mod dto;
+mod engine_session;
 mod offsets;
 mod span;
+
+pub use engine_session::FormulaEngineSession;
 
 use analyzer::analysis::{Context, Property as AnalyzerProperty, builtins_functions};
 use ide::CompletionConfig;

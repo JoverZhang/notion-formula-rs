@@ -2,68 +2,332 @@
 doc_id: specs.wasm-api
 title: "WASM API 与 Worker"
 language: zh-CN
-source_language: zh-CN
+source_language: en
 counterpart: ./wasm-api.md
-implementation_status: planned
-document_status: draft
+implementation_status: current
+document_status: stable
 translation_status: synced
-last_verified: 2026-09-23
+last_verified: 2026-10-04
 ---
 
 # WASM API 与 Worker
 
 [English](wasm-api.md) · [Specification index](README.zh-CN.md)
 
-> Planned Worker client 与 Current Analyzer 分节定义；当前 WASM 尚无 Engine 求值入口。
+Worker 客户端以无损 DTO 使用 [Engine](formula-engine.zh-CN.md) 和 [Draft](ide.zh-CN.md) 契约。分析、求值和编辑逻辑留在 Rust。
 
-## Planned：薄客户端
+## Engine 与 Draft 客户端
 
-```text
-主线程 → FormulaEngineClient / FormulaDraftClient → Worker RPC → WASM → Rust
-wrapper 只负责 RPC/session 路由、无损 DTO 转换、UTF-8 ↔ UTF-16、Result ↔ Promise、生命周期。
-依赖分析、环检测、编译、求值、文本编辑留在 Rust；Worker/线程池数量不属于接口。
-```
+```ts spec-file=examples/vite/src/formula/client.h.ts
+import type {
+  CompletionConfig,
+  CursorHelp,
+  DiagnosticId,
+  EvaluateInput,
+  EvaluateResult,
+  ExpressionUpdate,
+  FormulaDefinition,
+  FormulaDraftState,
+  FormulaEdit,
+  FormulaEngineChangeResult,
+  FormulaEngineState,
+  FormulaSchema,
+  PropertyDefinition,
+  PropertyId,
+  PropertyState,
+  QuickFix,
+  UpdateExpressionResult,
+} from "../engine/generated/wasm_dto";
+import type { FormulaWorker } from "./rpc";
 
-```ts
-interface FormulaEngineClient {
+// Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
+// 每个请求入队时保存参数快照；后续突变不改变已入队的请求。
+// 不可克隆的参数在对应 FIFO 位置以 INVALID_REQUEST 拒绝。
+export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
+  // 所有 Draft 消耗或关闭之前，拒绝并返回 ACTIVE_DRAFTS。
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
   remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
-  // EvaluateInputError 拒绝 Promise；公式与行错误随 EvaluateResult 返回。
+  // EVALUATE_INPUT 拒绝 Promise；公式与行错误保留在 EvaluateResult 中。
+  // 所有行使用调用方提供的 RuntimeContext；Engine 不读取系统时钟。
   evaluate(input: EvaluateInput): Promise<EvaluateResult>;
   createDraft(formula: FormulaDefinition): Promise<FormulaDraftClient>;
+  // 立即拒绝新调用，等待已入队调用完成，先释放 Draft 再释放 Engine，
+  // 最后终止 Worker。重复 close 返回同一 Promise。
   close(): Promise<void>;
 }
-interface FormulaDraftClient {
+
+export interface FormulaDraftClient {
+  // Diagnostic ID 不透明，在当前版本中稳定，并限定于此客户端。
   getState(): Promise<FormulaDraftState>;
+  // UTF-16 cursor：surrogate pair 内向下取整，超出文末则截到文末。
   help(cursor: number, config: CompletionConfig): Promise<CursorHelp>;
+  // 其他客户端或过期的 Diagnostic ID 返回 []；查询仍进入同一 FIFO。
   quickFixes(diagnosticId: DiagnosticId): Promise<QuickFix[]>;
   formatEdits(): Promise<FormulaEdit>;
+  // edits 和 cursor 基于原 source；返回的 cursor 基于新 source。
+  // 保留 bigint base_version；过期编辑拒绝并返回 UPDATE_EXPRESSION。
   updateExpression(update: ExpressionUpdate): Promise<UpdateExpressionResult>;
+  // 消耗 Draft 而不保存；通过 Engine.upsert({ Formula: ... }) 显式保存。
   intoDefinition(): Promise<FormulaDefinition>;
+  // 丢弃 Draft；幂等，包括 Engine.close() 之后。
   close(): Promise<void>;
+}
+
+export interface FormulaClientOptions {
+  // 可选的 Worker 注入；客户端拥有并负责终止所返回的 Worker。
+  workerFactory?: () => FormulaWorker;
+}
+
+// 由 client.ts 的 createFormulaEngineClient 实现，WASM 与 Engine 初始化完成后
+// resolve；初始化失败会释放 Worker。受控拒绝为 FormulaClientError，
+// error.data.code 区分对应的类型化 payload；Worker 故障会结束所有 pending 调用。
+export type CreateFormulaEngineClient = (
+  schema: FormulaSchema,
+  options?: FormulaClientOptions,
+) => Promise<FormulaEngineClient>;
+```
+
+### 无损 DTO
+
+Rust 声明生成 JavaScript 类型。DTO 使用 structured clone 而非 JSON；enum 采用 serde 输出的编码。可选结果与 unit payload 显式为 `null`；索引和长度保持普通 JavaScript `number`。字符串须为合法 Unicode，不含孤立 surrogate。
+
+```rust out=analyzer_wasm/src/dto/engine.h.rs
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+pub use super::v1::{CompletionItem, SignatureItem, Span, TextEdit, Token};
+
+pub type PropertyId = String;
+pub type RowId = String;
+/// JavaScript bigint；输入 number 会被拒绝。
+pub type DraftVersion = u64;
+/// 不透明的原生 ID；Worker 客户端为其添加自己的会话范围。
+pub type DiagnosticId = String;
+/// 有限整数 UTF-16 code units，范围 0..=4_294_967_295；range 为半开区间。
+/// surrogate pair 内的位置在重叠检查前向下取到 scalar 起点。
+pub type TextOffset = u32;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum ValueType { Number, String, Boolean, Date, Unknown, List(Box<ValueType>), Union(Vec<ValueType>) }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct FormulaSchema { pub properties: Vec<PropertyDefinition> }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum PropertyDefinition { Input { id: PropertyId, ty: ValueType }, Formula(FormulaDefinition) }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct FormulaDefinition { pub id: PropertyId, pub expression: String }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum FormulaEngineState { AllReady, NotAllReady { cycle_path: Vec<PropertyId> } }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum PropertyState { Input { id: PropertyId, ty: ValueType }, Formula(FormulaState) }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub struct FormulaState { pub definition: FormulaDefinition, pub status: FormulaStatus }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum FormulaStatus { Ready { output_type: ValueType }, NotReady }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub struct FormulaEngineChangeResult { pub affected_formulas: Vec<PropertyId> }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+/// Number 保留 NaN、Infinity 和 signed zero；Date 使用 bigint 毫秒。
+/// 普通嵌套 null 以 None 表示，序列化为 JavaScript null。
+pub enum Value {
+    Number(f64), String(String), Boolean(bool),
+    Date(#[serde(deserialize_with = "deserialize_i64_bigint")] i64),
+    List(Vec<Option<Value>>),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+/// validity[i] 区分普通 null 与 values[i]；行错误单独返回。
+pub struct ColumnData<T> { pub values: Vec<T>, pub validity: Vec<bool> }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+pub enum Column {
+    Number(ColumnData<f64>), String(ColumnData<String>), Boolean(ColumnData<bool>),
+    Date(#[serde(deserialize_with = "deserialize_date_column")] ColumnData<i64>),
+    List(ColumnData<Vec<Option<Value>>>), Union(ColumnData<Value>),
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum ColumnKind { Number, String, Boolean, Date, List, Union }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+/// 每个请求使用调用方提供的一份时间与时区快照；now 严格要求 bigint。
+pub struct RuntimeContext {
+    #[serde(deserialize_with = "deserialize_i64_bigint")]
+    pub now: i64,
+    pub time_zone: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+/// columns 必须是 JavaScript Map；record 和其他 iterable 会被拒绝。
+pub struct EvaluateInput {
+    pub row_ids: Vec<RowId>,
+    #[serde(deserialize_with = "deserialize_columns")]
+    #[ts(type = "Map<PropertyId, Column>")]
+    pub columns: HashMap<PropertyId, Column>,
+    pub runtime: RuntimeContext,
+    pub formula_ids: Vec<PropertyId>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+/// formulas 为 JavaScript Map，完整保留 "__proto__" 等 ID。
+pub struct EvaluateResult {
+    #[ts(type = "Map<PropertyId, { Ok: FormulaOutput } | { Err: FormulaEvaluationError }>")]
+    pub formulas: HashMap<PropertyId, Result<FormulaOutput, FormulaEvaluationError>>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+pub struct FormulaOutput { pub output_type: ValueType, pub column: Column, pub errors: Vec<RowError> }
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+pub struct RowError { pub row_index: u32, pub origin_formula_id: PropertyId, pub error: RuntimeError }
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+pub enum RuntimeError {
+    InvalidValueType { expected: ValueType, actual: ValueType },
+    InvalidValue { actual: Value, constraint: String },
+    InvalidRegex { pattern: String, detail: String },
+    InvalidDateText { text: String }, DateOutOfRange,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub enum FormulaEvaluationError { NotReady }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub enum FormulaEngineInitError { EmptyId, DuplicateId(PropertyId) }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub enum EngineChangeError { EmptyId }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub enum CreateDraftError { EmptyId }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub enum EvaluateInputError {
+    InvalidNow { now: i64 }, InvalidTimeZone { time_zone: String },
+    EmptyRowId { row_index: u32 }, DuplicateRowId { id: RowId }, EmptyFormulaIds,
+    InvalidFormulaId { id: PropertyId }, DuplicateFormulaId { id: PropertyId },
+    MissingInputs { ids: Vec<PropertyId> }, UnexpectedInputs { ids: Vec<PropertyId> },
+    InvalidColumnType { id: PropertyId, expected: ColumnKind, actual: ColumnKind },
+    InvalidColumnLength { id: PropertyId, expected: u32, values_len: u32, validity_len: u32 },
+    InvalidValueType { id: PropertyId, row_index: u32, element_path: Vec<u32>, expected: ValueType, actual: ValueType },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct CompletionConfig { pub preferred_limit: u32 }
+#[derive(Serialize, TS)]
+pub struct FormulaDraftState {
+    pub version: DraftVersion,
+    pub definition: FormulaDefinition,
+    pub output_type: ValueType,
+    pub diagnostics: Vec<ExpressionDiagnostic>,
+    pub tokens: Vec<Token>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct ExpressionDiagnostic { pub id: DiagnosticId, pub span: Span, pub message: String }
+#[derive(Serialize, TS)]
+pub struct CompletionResult { pub items: Vec<CompletionItem>, pub replace: Span, pub preferred_indices: Vec<u32> }
+#[derive(Serialize, TS)]
+pub struct SignatureHelp { pub signatures: Vec<SignatureItem>, pub active_signature: u32, pub active_parameter: u32 }
+#[derive(Serialize, TS)]
+pub struct CursorHelp { pub base_version: DraftVersion, pub completion: CompletionResult, pub signature_help: Option<SignatureHelp> }
+#[derive(Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+/// 编辑基于原 source；base_version 必须是 bigint。
+pub struct FormulaEdit {
+    #[serde(deserialize_with = "deserialize_u64_bigint")]
+    pub base_version: DraftVersion,
+    pub edits: Vec<TextEdit>,
+}
+#[derive(Serialize, Deserialize, TS)]
+pub enum ExpressionUpdate { Replace(String), Edits { edit: FormulaEdit, cursor: TextOffset } }
+#[derive(Serialize, TS)]
+pub struct QuickFix { pub title: String, pub edit: FormulaEdit }
+#[derive(Serialize, TS)]
+pub struct UpdateExpressionResult { pub state: FormulaDraftState, pub cursor: TextOffset }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+pub enum UpdateExpressionError { VersionMismatch, InvalidCursor, InvalidEditRange, OverlappingEdits }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct InvalidDtoPayload { pub operation: String }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct DraftClosedPayload { pub handle: u32 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct ActiveDraftsPayload { pub count: u32 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct EngineInitPayload { pub error: FormulaEngineInitError }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct EngineChangePayload { pub error: EngineChangeError }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct CreateDraftPayload { pub error: CreateDraftError }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct EvaluateInputPayload { pub error: EvaluateInputError }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct UpdateExpressionPayload { pub error: UpdateExpressionError }
+
+/// 受控 WASM 错误以普通数据克隆穿过 Worker 边界。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "code", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum FormulaClientErrorData {
+    InvalidDto { message: String, payload: InvalidDtoPayload },
+    EngineClosed { message: String, payload: () },
+    DraftClosed { message: String, payload: DraftClosedPayload },
+    ActiveDrafts { message: String, payload: ActiveDraftsPayload },
+    EngineInit { message: String, payload: EngineInitPayload },
+    EngineChange { message: String, payload: EngineChangePayload },
+    CreateDraft { message: String, payload: CreateDraftPayload },
+    EvaluateInput { message: String, payload: EvaluateInputPayload },
+    UpdateExpression { message: String, payload: UpdateExpressionPayload },
+    FormatError { message: String, payload: () },
+    SerializeError { message: String, payload: () },
+    /// Worker 崩溃或传输失败时由 JS host 返回。
+    WorkerFailure { message: String, payload: () },
+    /// Worker 返回不合法响应时由 JS host 返回。
+    InvalidResponse { message: String, payload: () },
+    /// RPC 请求不合法时由 JS host 返回。
+    InvalidRequest { message: String, payload: () },
+    /// 创建 Worker 或加载 WASM 失败时由 JS host 返回。
+    InitializationError { message: String, payload: () },
 }
 ```
 
-```text
-queue
-  一个 Engine 及其全部 Draft client 共用一条 FIFO 队列，所有调用按入队顺序串行执行。
-engine.close()
-  幂等；拒绝新调用 → 等待已入队调用完成 → 释放 Engine 和关联 Draft → 终止 Worker。
-draft.close()
-  释放该草稿，即 discard。
-draft.intoDefinition()
-  消耗该草稿；仍需包装为 PropertyDefinition 的 Formula 分支并显式 upsert 才修改 Engine。
-coordinates
-  JS cursor/span 使用 UTF-16 code units；Rust 使用 UTF-8 bytes。
-DTO
-  上述名称对应 Rust 契约，不是在声明 Rust 内存布局可直接传输。
-  新接口的具体 JS 编码、初始化入口和错误载荷待随实现细化；不能套用下节 Current DTO。
-```
+### 同步 WASM 会话
 
-业务语义仅由 [Engine](formula-engine.zh-CN.md) 与 [Draft](ide.zh-CN.md) 定义。
+初始化后的 WASM 包导出 `FormulaEngineSession`。Worker 拥有该分配，并将 Engine 与 Draft 调用路由至它。
+
+```rust out=analyzer_wasm/src/engine_session.h.rs
+use wasm_bindgen::prelude::*;
+
+/// 拥有一个 Engine 及其 Draft handle；全部业务逻辑在 Rust 中执行。
+/// 显式 close 幂等。host 在 close 后须用 free() 释放生成的分配，
+/// free() 后不得再使用该分配。
+#[wasm_bindgen]
+#[spec::private_fields]
+pub struct FormulaEngineSession {}
+
+#[wasm_bindgen]
+#[spec::header]
+impl FormulaEngineSession {
+    /// 从无损 FormulaSchema DTO 构建 Engine。
+    #[wasm_bindgen(constructor)]
+    pub fn new(schema: JsValue) -> Result<FormulaEngineSession, JsValue>;
+    pub fn get_property(&self, id: String) -> Result<JsValue, JsValue>;
+    pub fn get_properties(&self) -> Result<JsValue, JsValue>;
+    pub fn get_state(&self) -> Result<JsValue, JsValue>;
+    /// 任何 Draft handle 存在时，拒绝并返回 ACTIVE_DRAFTS。
+    pub fn upsert(&mut self, property: JsValue) -> Result<JsValue, JsValue>;
+    /// 任何 Draft handle 存在时，拒绝并返回 ACTIVE_DRAFTS。
+    pub fn remove(&mut self, id: String) -> Result<JsValue, JsValue>;
+    pub fn evaluate(&self, input: JsValue) -> Result<JsValue, JsValue>;
+    pub fn create_draft(&mut self, formula: JsValue) -> Result<u32, JsValue>;
+    pub fn draft_state(&self, handle: u32) -> Result<JsValue, JsValue>;
+    /// UTF-16 转换前，检查 cursor 为有限的无符号 32 位整数。
+    pub fn draft_help(&self, handle: u32, cursor: JsValue, config: JsValue) -> Result<JsValue, JsValue>;
+    pub fn draft_quick_fixes(&self, handle: u32, diagnostic_id: String) -> Result<JsValue, JsValue>;
+    pub fn draft_format_edits(&self, handle: u32) -> Result<JsValue, JsValue>;
+    pub fn draft_update_expression(&mut self, handle: u32, update: JsValue) -> Result<JsValue, JsValue>;
+    /// 消耗 Draft；不修改已保存的定义。
+    pub fn draft_into_definition(&mut self, handle: u32) -> Result<JsValue, JsValue>;
+    /// 丢弃 Draft；重复 close 及 Engine close 后的 close 均成功。
+    pub fn draft_close(&mut self, handle: u32);
+    /// 先释放所有 Draft，再释放 Engine；重复 close 成功。
+    pub fn close(&mut self);
+}
+```
 
 ## Current：同步 Analyzer
 
@@ -192,7 +456,7 @@ validation order
   endpoint flooring 先于重叠检查；多个错误并存时由上述顺序决定先报告哪一个。
 ```
 
-当前边界不暴露 evaluator、plan 或业务行，也不定义 demo UI 策略。
+同步 Analyzer 边界不暴露 evaluator、plan 或业务行，也不定义 demo UI 策略。
 实现锚点：[导出](../../analyzer_wasm/src/lib.rs)、[DTO](../../analyzer_wasm/src/dto/v1.rs)、
 [坐标](../../analyzer_wasm/src/offsets.rs)、
 [生成的 TS](../../examples/vite/src/analyzer/generated/wasm_dto.ts)。
