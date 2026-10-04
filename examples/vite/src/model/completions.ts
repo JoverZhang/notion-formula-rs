@@ -15,6 +15,7 @@ export function getCompletionCursor(item: CompletionItem, nativeCursor: number):
 export const COMPLETION_ROW_LABEL_GROUP = 1 << 0;
 export const COMPLETION_ROW_LABEL_RECOMMENDED = 1 << 1;
 export const COMPLETION_ROW_ITEM_RECOMMENDED = 1 << 2;
+export const COMPLETION_ROW_ITEM_DISABLED = 1 << 3;
 
 export type CompletionRenderRow = {
   kind: "label" | "item";
@@ -75,7 +76,7 @@ export function buildCompletionRows(
   let lastKind: CompletionItem["kind"] | null = null;
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
-    if (item.is_disabled || recommended.has(i)) continue;
+    if (recommended.has(i)) continue;
     if (item.kind !== lastKind) {
       rows.push({
         kind: "label",
@@ -85,10 +86,19 @@ export function buildCompletionRows(
       });
       lastKind = item.kind;
     }
-    rows.push({ kind: "item", label: item.label, itemIndex: i, flags: 0 });
+    rows.push({
+      kind: "item",
+      label: item.label,
+      itemIndex: i,
+      flags: item.is_disabled ? COMPLETION_ROW_ITEM_DISABLED : 0,
+    });
   }
 
   return rows;
+}
+
+function isSelectableRow(row: CompletionRenderRow): boolean {
+  return row.kind === "item" && (row.flags & COMPLETION_ROW_ITEM_DISABLED) === 0;
 }
 
 export function getSelectedItemIndex(
@@ -97,7 +107,7 @@ export function getSelectedItemIndex(
 ): number | null {
   if (selectedRowIndex < 0 || selectedRowIndex >= rows.length) return null;
   const row = rows[selectedRowIndex];
-  return row?.kind === "item" ? row.itemIndex : null;
+  return isSelectableRow(row) ? row.itemIndex : null;
 }
 
 export function normalizeSelectedRowIndex(
@@ -106,17 +116,17 @@ export function normalizeSelectedRowIndex(
 ): number {
   if (rows.length === 0) return -1;
   if (selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
-    if (rows[selectedRowIndex].kind === "item") return selectedRowIndex;
+    if (isSelectableRow(rows[selectedRowIndex])) return selectedRowIndex;
     for (let i = selectedRowIndex + 1; i < rows.length; i += 1) {
-      if (rows[i].kind === "item") return i;
+      if (isSelectableRow(rows[i])) return i;
     }
     for (let i = selectedRowIndex - 1; i >= 0; i -= 1) {
-      if (rows[i].kind === "item") return i;
+      if (isSelectableRow(rows[i])) return i;
     }
     return -1;
   }
   for (let i = 0; i < rows.length; i += 1) {
-    if (rows[i].kind === "item") return i;
+    if (isSelectableRow(rows[i])) return i;
   }
   return -1;
 }
@@ -128,7 +138,7 @@ export function nextSelectedRowIndex(
 ): number {
   let hasItem = false;
   for (const row of rows) {
-    if (row.kind === "item") {
+    if (isSelectableRow(row)) {
       hasItem = true;
       break;
     }
@@ -143,7 +153,7 @@ export function nextSelectedRowIndex(
       : selectedRowIndex;
   for (let i = 0; i < rows.length; i += 1) {
     next = (next + direction + rows.length) % rows.length;
-    if (rows[next].kind === "item") return next;
+    if (isSelectableRow(rows[next])) return next;
   }
   return -1;
 }

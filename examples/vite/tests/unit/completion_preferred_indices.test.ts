@@ -95,7 +95,7 @@ describe("asynchronous editor actions", () => {
       view.editor.contentDOM.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
       await Promise.resolve();
       expect(view.actions.applyEdit).toHaveBeenCalledWith(
-        "f1",
+        "Formula 1",
         {
           base_version: 7n,
           edits: [item.primary_edit],
@@ -213,7 +213,7 @@ describe("asynchronous editor actions", () => {
     finish({
       state: {
         version: 1n,
-        definition: { id: "f1", expression: "if()" },
+        definition: { id: "Formula 1", expression: "if()" },
         output_type: "Unknown",
         diagnostics: [],
         tokens: [],
@@ -239,7 +239,7 @@ describe("asynchronous editor actions", () => {
     view.actions.format.mockImplementation(() => Promise.resolve(view.publishNative("1 + 2", 3)));
     view.panel.root.querySelector<HTMLButtonElement>('[data-testid="format-button"]')!.click();
     await Promise.resolve();
-    expect(view.actions.format).toHaveBeenCalledWith("f1", 2);
+    expect(view.actions.format).toHaveBeenCalledWith("Formula 1", 2);
     expect(view.editor.state.doc.toString()).toBe("1 + 2");
     expect(view.editor.state.selection.main.head).toBe(3);
     expect(view.actions.setSource).not.toHaveBeenCalled();
@@ -298,7 +298,7 @@ describe("asynchronous editor actions", () => {
     view.editor.dispatch({ changes: { from: 1, insert: "x" }, selection: { anchor: 2 } });
     await Promise.resolve();
     expect(view.editor.state.doc.toString()).toBe("ix");
-    expect(view.actions.setSource).toHaveBeenCalledExactlyOnceWith("f1", "ix");
+    expect(view.actions.setSource).toHaveBeenCalledExactlyOnceWith("Formula 1", "ix");
   });
 
   it("disables Save and Discard during saving while typing still works", () => {
@@ -311,13 +311,13 @@ describe("asynchronous editor actions", () => {
     expect(discard.disabled).toBe(false);
     save.click();
     discard.click();
-    expect(view.actions.save).toHaveBeenCalledWith("f1");
-    expect(view.actions.discard).toHaveBeenCalledWith("f1");
+    expect(view.actions.save).toHaveBeenCalledWith("Formula 1");
+    expect(view.actions.discard).toHaveBeenCalledWith("Formula 1");
     view.update({}, true);
     expect(save.disabled).toBe(true);
     expect(discard.disabled).toBe(true);
     view.editor.dispatch({ changes: { from: 1, insert: "x" } });
-    expect(view.actions.setSource).toHaveBeenCalledWith("f1", "ix");
+    expect(view.actions.setSource).toHaveBeenCalledWith("Formula 1", "ix");
   });
 
   it("shows draft status and action errors", () => {
@@ -341,11 +341,11 @@ describe("asynchronous editor actions", () => {
     );
     view.editor.focus();
     await vi.advanceTimersByTimeAsync(200);
-    expect(window.__nf_debug?.listPanels()).toContain("f1");
+    expect(window.__nf_debug?.listPanels()).toContain("Formula 1");
     view.panel.dispose();
     finish(cursorHelp());
     await Promise.resolve();
-    expect(window.__nf_debug?.listPanels() ?? []).not.toContain("f1");
+    expect(window.__nf_debug?.listPanels() ?? []).not.toContain("Formula 1");
     expect(itemLabels(view)).toEqual([]);
   });
 });

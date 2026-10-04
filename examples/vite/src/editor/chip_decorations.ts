@@ -19,7 +19,7 @@ export type ChipDecorationRange = {
 };
 
 export const formulaIdFacet = Facet.define<FormulaId, FormulaId>({
-  combine: (values) => values[0] ?? "f1",
+  combine: (values) => values[0] ?? "Formula 1",
 });
 
 export const setChipDecoListEffect = StateEffect.define<ChipDecorationRange[]>();

@@ -103,6 +103,7 @@ body {
 .page {
   max-width: 1080px;
   margin: 0 auto;
+  min-width: 0;
   display: grid;
   gap: 16px;
 }
@@ -220,6 +221,7 @@ body {
 }
 
 .table-section {
+  min-width: 0;
   padding: 12px;
 }
 
@@ -426,13 +428,11 @@ body {
 }
 
 .formula-output-type {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  margin-left: auto;
   min-height: 28px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   color: var(--muted);
   opacity: 0.85;
   font-size: 11px;
@@ -443,13 +443,13 @@ body {
   display: block;
   max-width: 100%;
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .completion-panel {
   --completion-body-height: 230px;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-muted);
@@ -487,6 +487,8 @@ body {
 }
 
 .completion-signature {
+  min-width: 0;
+  width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
   background: linear-gradient(168deg, var(--surface) 0%, var(--surface-muted) 100%);
@@ -509,7 +511,6 @@ body {
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-gutter: stable;
 }
 
 .completion-signature-main::-webkit-scrollbar {
@@ -550,6 +551,7 @@ body {
 }
 
 .completion-signature-diag-list li {
+  overflow-wrap: anywhere;
   color: var(--danger);
   border: 1px solid rgba(194, 58, 43, 0.18);
   border-radius: 7px;
@@ -564,29 +566,17 @@ body {
   border-color: rgba(255, 123, 111, 0.25);
 }
 
-.formula-editor-wrap > .completion-signature {
-  position: absolute;
-  top: 0;
-  right: calc(100% + 12px);
-  width: clamp(240px, 28vw, 360px);
-  z-index: 10;
-}
-
-.formula-editor-wrap > .completion-signature[data-side="right"] {
-  right: auto;
-  left: calc(100% + 12px);
-}
-
 .completion-signature[data-wrap="unwrapped"] .completion-signature-main {
   white-space: nowrap;
 }
 
 .completion-signature[data-wrap="wrapped"] .completion-signature-main {
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .completion-signature-seg {
-  display: inline-block;
+  display: inline;
   padding: 1px 3px;
   border-radius: 4px;
 }
@@ -644,6 +634,7 @@ body {
 }
 
 .completion-item {
+  min-width: 0;
   display: grid;
   gap: 2px;
   padding: 6px 8px;
@@ -655,6 +646,7 @@ body {
 }
 
 .completion-item-main {
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -662,6 +654,8 @@ body {
 }
 
 .completion-item-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -675,6 +669,12 @@ body {
   color: var(--muted);
   font-size: 11px;
   text-align: right;
+}
+
+.completion-item-reason {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 .completion-item:hover {
@@ -817,20 +817,9 @@ body {
     padding: 10px;
   }
 
-  .formula-editor-wrap > .completion-signature {
-    position: static;
-    width: 100%;
-    margin-bottom: 8px;
-  }
-
   .formula-actions {
     flex-wrap: wrap;
     row-gap: 6px;
-  }
-
-  .formula-output-type {
-    flex: 1 1 auto;
-    margin-left: 0;
   }
 }
 

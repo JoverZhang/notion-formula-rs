@@ -1,8 +1,6 @@
 import type { SignatureHelp } from "../formula/client";
 import {
-  computePopoverWidthPx,
   planSignatureTokens,
-  pickPopoverSide,
   shouldUseWrappedSignature,
   type SignatureWrapMode,
 } from "../model/signature";
@@ -84,7 +82,7 @@ function paintPopover(
   return { hasContent: true, signatureMain };
 }
 
-export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTMLElement) {
+export function createSignaturePopover(signatureEl: HTMLElement) {
   let wrapRaf: number | null = null;
   let generation = 0;
   let disposed = false;
@@ -93,18 +91,6 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
     generation += 1;
     if (wrapRaf !== null) cancelAnimationFrame(wrapRaf);
     wrapRaf = null;
-  };
-
-  const updateSide = () => {
-    if (disposed) return;
-    const viewportWidth = document.documentElement.clientWidth || window.innerWidth || 0;
-    const wrapRect = editorWrap.getBoundingClientRect();
-    signatureEl.dataset.side = pickPopoverSide({
-      viewportWidth,
-      wrapLeft: wrapRect.left,
-      wrapRight: wrapRect.right,
-      popoverWidthPx: computePopoverWidthPx(viewportWidth),
-    });
   };
 
   const hide = () => {
@@ -122,7 +108,6 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
       return;
     }
 
-    updateSide();
     const unwrapped = paintPopover(signatureEl, signature, diagnostics, "unwrapped");
     if (!unwrapped.hasContent) {
       hide();
@@ -163,5 +148,5 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
     disposed = true;
   };
 
-  return { render, hide, updateSide, dispose };
+  return { render, hide, dispose };
 }

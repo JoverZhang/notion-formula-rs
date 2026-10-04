@@ -11,7 +11,7 @@ import {
   waitForCompletionDebounce,
 } from "./helpers";
 
-const FORMULA_ID: FormulaId = "f1";
+const FORMULA_ID: FormulaId = "Formula 1";
 
 async function expectSourceText(
   page: Parameters<typeof gotoDebug>[0],

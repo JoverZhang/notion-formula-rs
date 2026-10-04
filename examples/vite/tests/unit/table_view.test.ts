@@ -11,12 +11,12 @@ const numbers = (values = [24, 14, 8, 36]): FormulaOutput => ({
 function output(f1: FormulaOutput, f2: FormulaOutput = numbers([25, 15, 9, 37])): EvaluateResult {
   return {
     formulas: new Map([
-      ["f1", { Ok: f1 }],
-      ["f2", { Ok: f2 }],
+      ["Formula 1", { Ok: f1 }],
+      ["Formula 2", { Ok: f2 }],
     ]),
   };
 }
-function cells(id = "f1") {
+function cells(id = "Formula 1") {
   return [
     ...document.querySelectorAll<HTMLTableCellElement>(
       `[data-testid="formula-cell"][data-formula-id="${id}"]`,
@@ -55,19 +55,19 @@ describe("formula result table", () => {
     ).toBe("[North Star, Blueprint]");
     view.update(output(numbers()));
     expect(cells().map((cell) => cell.textContent)).toEqual(["24", "14", "8", "36"]);
-    expect(cells("f2").map((cell) => cell.textContent)).toEqual(["25", "15", "9", "37"]);
+    expect(cells("Formula 2").map((cell) => cell.textContent)).toEqual(["25", "15", "9", "37"]);
     expect(
-      document.querySelector('th[data-formula-id="f1"]')?.getAttribute("data-output-type"),
+      document.querySelector('th[data-formula-id="Formula 1"]')?.getAttribute("data-output-type"),
     ).toBe("number");
-    expect(document.querySelector('th[data-formula-id="f1"] .table-output-type')?.textContent).toBe(
-      " (number)",
-    );
+    expect(
+      document.querySelector('th[data-formula-id="Formula 1"] .table-output-type')?.textContent,
+    ).toBe(" (number)");
   });
 
   it("distinguishes a failed initial evaluation from pending initialization", () => {
     const view = mount();
     view.update(null, "Evaluation failed");
-    for (const id of ["f1", "f2"]) {
+    for (const id of ["Formula 1", "Formula 2"]) {
       expect(cells(id).map((cell) => cell.textContent)).toEqual(Array(4).fill("Unavailable"));
       expect(cells(id).map((cell) => cell.title)).toEqual(Array(4).fill("Evaluation failed"));
     }
@@ -102,7 +102,7 @@ describe("formula result table", () => {
       "source-a: Date is out of range\nsource-b: Invalid date text: bad date",
     );
     expect(cells()[1].dataset.errorOrigins).toBe("source-a, source-b");
-    expect(cells("f2").map((cell) => cell.textContent)).toEqual(["25", "15", "9", "37"]);
+    expect(cells("Formula 2").map((cell) => cell.textContent)).toEqual(["25", "15", "9", "37"]);
     view.update(output(numbers()));
     expect(cells()[1].title).toBe("");
     expect(cells()[1].dataset.errorOrigins).toBeUndefined();
@@ -114,7 +114,7 @@ describe("formula result table", () => {
     view.update({
       formulas: new Map([
         [
-          "f1",
+          "Formula 1",
           {
             Ok: {
               output_type: { Union: ["Number", "String"] },
@@ -128,16 +128,16 @@ describe("formula result table", () => {
             },
           },
         ],
-        ["f2", { Err: "NotReady" }],
+        ["Formula 2", { Err: "NotReady" }],
       ]),
     });
     expect(cells().map((cell) => cell.textContent)).toEqual(Array(4).fill("null"));
     expect(
-      document.querySelector('th[data-formula-id="f1"]')?.getAttribute("data-output-type"),
+      document.querySelector('th[data-formula-id="Formula 1"]')?.getAttribute("data-output-type"),
     ).toBe("number | string");
-    expect(cells("f2").map((cell) => cell.textContent)).toEqual(Array(4).fill("Not ready"));
+    expect(cells("Formula 2").map((cell) => cell.textContent)).toEqual(Array(4).fill("Not ready"));
     expect(
-      document.querySelector('th[data-formula-id="f2"]')?.getAttribute("data-output-type"),
+      document.querySelector('th[data-formula-id="Formula 2"]')?.getAttribute("data-output-type"),
     ).toBeNull();
   });
 
@@ -186,7 +186,7 @@ describe("formula result table", () => {
       }),
     );
     expect(cells().map((cell) => cell.textContent)).toEqual(["NaN", "Infinity", "-Infinity", "-0"]);
-    expect(cells("f2").map((cell) => cell.textContent)).toEqual([
+    expect(cells("Formula 2").map((cell) => cell.textContent)).toEqual([
       "[9007199254740993, null]",
       "[false, [-0, null]]",
       "[1970-01-01, <b>hello</b>]",

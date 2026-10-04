@@ -13,8 +13,8 @@ export const PROPERTY_SCHEMA = [
 export type InputPropertyId = (typeof PROPERTY_SCHEMA)[number]["id"];
 
 export const FORMULA_DEMOS: Record<FormulaId, { label: string; sample: string }> = {
-  f1: { label: "Formula 1", sample: 'prop("Number") * 2' },
-  f2: { label: "Formula 2", sample: 'prop("f1") + 1' },
+  "Formula 1": { label: "Formula 1", sample: 'prop("Number") * 2' },
+  "Formula 2": { label: "Formula 2", sample: 'prop("Formula 1") + 1' },
 };
 
 export const DEMO_SCHEMA: FormulaSchema = {

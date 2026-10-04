@@ -11,7 +11,7 @@ import type {
   ValueType,
 } from "../formula/client";
 
-export const FORMULA_IDS = ["f1", "f2"] as const;
+export const FORMULA_IDS = ["Formula 1", "Formula 2"] as const;
 export type FormulaId = (typeof FORMULA_IDS)[number];
 export type FormulaDiagnostic = ExpressionDiagnostic;
 
