@@ -246,6 +246,7 @@ class FakeEngine implements FormulaEngineClient {
   );
   readonly getProperties = vi.fn((): Promise<PropertyState[]> => Promise.resolve([]));
   readonly getState = vi.fn((): Promise<"AllReady"> => Promise.resolve("AllReady"));
+  readonly requiredInputs = vi.fn((): Promise<string[]> => Promise.resolve([]));
   readonly remove = vi.fn((_id: string) => Promise.resolve(null));
 }
 

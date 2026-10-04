@@ -47,6 +47,9 @@ export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
+  // 返回排序、去重后的传递 Input ID。Ready 目标的依赖集合完整；
+  // NotReady 目标只返回已知引用。无效目标列表以 EVALUATE_INPUT 拒绝。
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]>;
   // 所有 Draft 消耗或关闭之前，拒绝并返回 ACTIVE_DRAFTS。
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
   remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
