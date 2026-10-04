@@ -1,7 +1,10 @@
+import type { FormulaClientErrorData } from "@notion-formula/sdk";
 import { describe, expect, it, vi } from "vitest";
-import type { FormulaClientErrorData } from "../../src/formula/client";
-import type { FormulaRequest } from "../../src/formula/protocol";
-import { FormulaWorkerRuntime, type FormulaSession } from "../../src/formula/worker_runtime";
+import type { FormulaRequest } from "../../../../packages/notion-formula/dist/protocol.js";
+import {
+  FormulaWorkerRuntime,
+  type FormulaSession,
+} from "../../../../packages/notion-formula/dist/worker_runtime.js";
 
 const definition = { id: "f", expression: "1" };
 const state = {

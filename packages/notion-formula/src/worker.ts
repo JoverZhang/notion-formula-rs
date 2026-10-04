@@ -1,7 +1,7 @@
-import init, { FormulaEngineSession } from "../pkg/analyzer_wasm.js";
-import { formulaErrorData } from "./errors";
-import type { FormulaRequest, FormulaResponse } from "./protocol";
-import { FormulaWorkerRuntime, type FormulaSession } from "./worker_runtime";
+import init, { FormulaEngineSession } from "./wasm/analyzer_wasm.js";
+import { formulaErrorData } from "./errors.js";
+import type { FormulaRequest, FormulaResponse } from "./protocol.js";
+import { FormulaWorkerRuntime, type FormulaSession } from "./worker_runtime.js";
 
 const runtime = new FormulaWorkerRuntime(async (schema) => {
   await init();

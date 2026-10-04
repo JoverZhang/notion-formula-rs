@@ -11,7 +11,13 @@ deps-rust:
   cargo fetch --locked --target wasm32-unknown-unknown
 
 deps-node:
+  pnpm -C packages/notion-formula install --frozen-lockfile
   pnpm -C examples/vite install --frozen-lockfile
+
+deps-appflowy: deps-node wasm
+  git submodule update --init examples/appflowy-web
+  node scripts/stage-appflowy-sdk.mjs
+  pnpm -C examples/appflowy-web install --frozen-lockfile
 
 # CI
 
@@ -62,7 +68,7 @@ gen-ts:
   cargo run -p analyzer_wasm --bin export_ts
 
 wasm:
-  pnpm -C examples/vite -s run wasm:build
+  pnpm -C packages/notion-formula -s run build
 
 build: deps-node wasm
   pnpm -C examples/vite -s run build
@@ -70,9 +76,17 @@ build: deps-node wasm
 run-example-vite: deps-node wasm
   pnpm -C examples/vite -s run dev
 
+# Configure AppFlowy Cloud in the example's .env before starting the app.
+run-example-appflowy: deps-appflowy
+  pnpm -C examples/appflowy-web -s run dev
+
+build-example-appflowy: deps-appflowy
+  pnpm -C examples/appflowy-web -s run build
+
 clean:
   cargo clean
   cd examples/vite && rm -rf node_modules dist src/pkg test-results
+  cd packages/notion-formula && rm -rf node_modules dist src/wasm
 
 # Tests
 

@@ -1,4 +1,4 @@
-import type { FormulaClientErrorData } from "../engine/generated/wasm_dto";
+import type { FormulaClientErrorData } from "./generated/wasm_dto.js";
 
 export type FormulaTransportErrorCode =
   | "WORKER_FAILURE"

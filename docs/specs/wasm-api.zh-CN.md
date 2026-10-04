@@ -18,7 +18,7 @@ Worker 客户端以无损 DTO 使用 [Engine](formula-engine.zh-CN.md) 和 [Draf
 
 ## Engine 与 Draft 客户端
 
-```ts spec-file=examples/vite/src/formula/client.h.ts
+```ts spec-file=packages/notion-formula/src/client.h.ts
 import type {
   CompletionConfig,
   CursorHelp,
@@ -37,8 +37,8 @@ import type {
   PropertyState,
   QuickFix,
   UpdateExpressionResult,
-} from "../engine/generated/wasm_dto";
-import type { FormulaWorker } from "./rpc";
+} from "./generated/wasm_dto.js";
+import type { FormulaWorker } from "./rpc.js";
 
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
 // 每个请求入队时保存参数快照；后续突变不改变已入队的请求。

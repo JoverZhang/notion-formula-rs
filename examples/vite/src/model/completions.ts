@@ -1,4 +1,4 @@
-import type { CompletionItem, DraftVersion, FormulaEdit } from "../formula/client";
+import type { CompletionItem, DraftVersion, FormulaEdit } from "@notion-formula/sdk";
 
 export function createCompletionEdit(
   item: CompletionItem | undefined,

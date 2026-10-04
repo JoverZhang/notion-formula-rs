@@ -1,5 +1,5 @@
+import type { CompletionItem } from "@notion-formula/sdk";
 import { describe, expect, it } from "vitest";
-import type { CompletionItem } from "../../src/formula/client";
 import {
   buildCompletionRows,
   COMPLETION_ROW_ITEM_RECOMMENDED,

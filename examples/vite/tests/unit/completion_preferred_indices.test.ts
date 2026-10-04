@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
+import type { CursorHelp, UpdateExpressionResult } from "@notion-formula/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CursorHelp, UpdateExpressionResult } from "../../src/formula/client";
 import { completionItem, cursorHelp, mountFormulaPanel } from "../helpers/formula_panel";
 
 type MountedPanel = ReturnType<typeof mountFormulaPanel>;

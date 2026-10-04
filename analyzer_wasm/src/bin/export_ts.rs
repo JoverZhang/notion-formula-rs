@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             analyzer_dto(),
         ),
         (
-            root.join("../examples/vite/src/engine/generated/wasm_dto.ts"),
+            root.join("../packages/notion-formula/src/generated/wasm_dto.ts"),
             engine_dto(),
         ),
     ];

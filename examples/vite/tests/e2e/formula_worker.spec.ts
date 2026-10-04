@@ -1,26 +1,56 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
-import { build } from "vite";
+import { expect, test, type TestInfo } from "@playwright/test";
+import { build, createServer as createViteServer, type ViteDevServer } from "vite";
 import type {} from "../../src/formula/browser_contract";
 
 let directory: string;
 let server: Server;
 let url: string;
+let devServer: ViteDevServer;
+let devUrl: string;
+
+async function recordContract(testInfo: TestInfo, name: string, data: unknown): Promise<void> {
+  await mkdir(testInfo.outputDir, { recursive: true });
+  const path = testInfo.outputPath(name);
+  await writeFile(path, JSON.stringify(data, null, 2));
+  await testInfo.attach(name, { path, contentType: "application/json" });
+}
 
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "formula-worker-contract-"));
-  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const root = join(directory, "consumer");
+  await mkdir(root);
+  const demo = fileURLToPath(new URL("../..", import.meta.url));
+  const sdk = fileURLToPath(new URL("../../../../packages/notion-formula", import.meta.url));
+  const installed = join(root, "node_modules/@notion-formula/sdk");
+  await mkdir(installed, { recursive: true });
+  // Install the same files included in the package, without access to its source tree.
+  await cp(join(sdk, "package.json"), join(installed, "package.json"));
+  await cp(join(sdk, "dist"), join(installed, "dist"), { recursive: true });
+  await cp(join(demo, "src/formula"), join(root, "src/formula"), { recursive: true });
+  devServer = await createViteServer({
+    configFile: false,
+    root,
+    base: "/sdk-consumer/",
+    logLevel: "warn",
+    optimizeDeps: { exclude: ["@notion-formula/sdk"] },
+    server: { host: "127.0.0.1", port: 0 },
+  });
+  await devServer.listen();
+  const devAddress = devServer.httpServer?.address();
+  if (!devAddress || typeof devAddress === "string") throw new Error("Dev server must have a port");
+  devUrl = `http://127.0.0.1:${devAddress.port}/sdk-consumer/src/formula/contract.html`;
   await build({
     configFile: false,
     root,
-    base: "/",
+    base: "/sdk-consumer/",
     logLevel: "warn",
     build: {
-      outDir: directory,
+      outDir: join(directory, "production"),
       emptyOutDir: true,
       rollupOptions: { input: join(root, "src/formula/contract.html") },
     },
@@ -32,7 +62,7 @@ test.beforeAll(async () => {
   };
   server = createServer((request, response) => {
     const path = new URL(request.url ?? "/", "http://localhost").pathname;
-    const file = join(directory, path);
+    const file = join(directory, "production", path.replace(/^\/sdk-consumer\//, ""));
     void readFile(file)
       .then((body) => {
         response.writeHead(200, {
@@ -48,10 +78,11 @@ test.beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Contract server must have a port");
-  url = `http://127.0.0.1:${address.port}/src/formula/contract.html`;
+  url = `http://127.0.0.1:${address.port}/sdk-consumer/src/formula/contract.html`;
 });
 
 test.afterAll(async () => {
+  if (devServer) await devServer.close();
   if (server)
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
@@ -59,10 +90,13 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-test("real module Worker matches the synchronous WASM session contract", async ({ page }) => {
+test("real module Worker matches the synchronous WASM session contract", async ({
+  page,
+}, testInfo) => {
   await page.goto(url);
   await page.waitForFunction(() => Boolean(window.__formula_worker_contract));
   const result = await page.evaluate(() => window.__formula_worker_contract());
+  await recordContract(testInfo, "sdk-worker-contract.json", { base: "/sdk-consumer/", ...result });
   expect(result).toEqual({
     verified: [
       "engine snapshots",
@@ -104,4 +138,26 @@ test("diagnostic IDs remain scoped to their Worker client and current draft revi
     staleEmpty: true,
     updateStateScoped: true,
   });
+});
+
+test("installed package default Worker loads in Vite dev with a deployment base", async ({
+  page,
+}, testInfo) => {
+  const assets: { url: string; status: number }[] = [];
+  page.on("response", (response) => {
+    if (response.url().includes("/dist/worker.js") || response.url().endsWith(".wasm")) {
+      assets.push({ url: response.url(), status: response.status() });
+    }
+  });
+  await page.goto(devUrl);
+  await page.waitForFunction(() => Boolean(window.__formula_worker_contract));
+  const result = await page.evaluate(() => window.__formula_worker_contract());
+  expect(result.maps).toBe(true);
+  expect(result.exactDate).toBe(true);
+  expect(result.verified).toContain("queued close and idempotence");
+  expect(assets.some((asset) => asset.url.endsWith(".wasm"))).toBe(true);
+  expect(
+    assets.every((asset) => asset.status === 200 && asset.url.includes("/sdk-consumer/")),
+  ).toBe(true);
+  await recordContract(testInfo, "sdk-dev-consumer.json", { ...result, assets });
 });

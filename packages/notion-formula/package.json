@@ -1,0 +1,41 @@
+{
+  "name": "@notion-formula/sdk",
+  "version": "0.1.0",
+  "description": "Browser FormulaEngine and FormulaDraft clients backed by a module Worker and WebAssembly.",
+  "type": "module",
+  "main": "./dist/client.js",
+  "module": "./dist/client.js",
+  "types": "./dist/client.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./wasm": {
+      "types": "./dist/wasm/analyzer_wasm.d.ts",
+      "import": "./dist/wasm/analyzer_wasm.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "wasm:build": "cd ../../analyzer_wasm && wasm-pack build --target web --out-dir ../packages/notion-formula/src/wasm",
+    "build:ts": "tsc -p tsconfig.json && node scripts/copy-wasm.mjs",
+    "build": "pnpm run wasm:build && pnpm run build:ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10 <11"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

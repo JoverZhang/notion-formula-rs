@@ -1,6 +1,6 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import type { Token as FormulaToken } from "./formula/client";
+import type { Token as FormulaToken } from "@notion-formula/sdk";
 
 export type Token = FormulaToken;
 

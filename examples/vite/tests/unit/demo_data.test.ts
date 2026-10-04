@@ -1,7 +1,7 @@
+import type { ColumnData } from "@notion-formula/sdk";
 import { describe, expect, it } from "vitest";
 import { DEMO_SCHEMA, FORMULA_DEMOS, PROPERTY_SCHEMA } from "../../src/app/context";
 import { buildEvaluateInput, SAMPLE_ROWS } from "../../src/app/data";
-import type { ColumnData } from "../../src/formula/client";
 import { columnValue, formatValue } from "../../src/model/values";
 
 const runtime = { now: 1791043200000n, time_zone: "+08:00" };

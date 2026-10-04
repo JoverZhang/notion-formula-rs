@@ -1,6 +1,3 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEMO_SCHEMA, FORMULA_DEMOS } from "../../src/app/context";
-import type { AppState } from "../../src/app/types";
 import {
   FormulaClientError,
   type CompletionConfig,
@@ -20,7 +17,10 @@ import {
   type QuickFix,
   type RuntimeContext,
   type ValueType,
-} from "../../src/formula/client";
+} from "@notion-formula/sdk";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEMO_SCHEMA, FORMULA_DEMOS } from "../../src/app/context";
+import type { AppState } from "../../src/app/types";
 import { AppVM } from "../../src/vm/app_vm";
 
 function deferred<T = void>() {

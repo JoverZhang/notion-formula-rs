@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
+import type { EvaluateResult, FormulaOutput } from "@notion-formula/sdk";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EvaluateResult, FormulaOutput } from "../../src/formula/client";
 import { createFormulaTableView } from "../../src/ui/table_view";
 
 const numbers = (values = [24, 14, 8, 36]): FormulaOutput => ({

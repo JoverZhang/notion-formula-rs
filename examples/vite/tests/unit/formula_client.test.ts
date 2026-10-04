@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
 import {
   createFormulaEngineClient,
   FormulaClientError,
@@ -8,8 +7,12 @@ import {
   type FormulaClientErrorData,
   type FormulaDraftState,
   type FormulaWorker,
-} from "../../src/formula/client";
-import type { FormulaRequest, FormulaResponse } from "../../src/formula/protocol";
+} from "@notion-formula/sdk";
+import { describe, expect, it, vi } from "vitest";
+import type {
+  FormulaRequest,
+  FormulaResponse,
+} from "../../../../packages/notion-formula/dist/protocol.js";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

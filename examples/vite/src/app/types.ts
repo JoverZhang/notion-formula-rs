@@ -9,7 +9,7 @@ import type {
   Token,
   UpdateExpressionResult,
   ValueType,
-} from "../formula/client";
+} from "@notion-formula/sdk";
 
 export const FORMULA_IDS = ["Formula 1", "Formula 2"] as const;
 export type FormulaId = (typeof FORMULA_IDS)[number];

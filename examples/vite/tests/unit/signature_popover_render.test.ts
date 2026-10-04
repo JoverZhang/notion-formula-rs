@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
+import type { SignatureHelp } from "@notion-formula/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SignatureHelp } from "../../src/formula/client";
 import { createSignaturePopover } from "../../src/ui/signature_popover";
 
 function makeLongSignatureHelp(): SignatureHelp {

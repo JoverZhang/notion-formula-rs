@@ -17,7 +17,7 @@ import type {
   PropertyState,
   QuickFix,
   UpdateExpressionResult,
-} from "../engine/generated/wasm_dto";
+} from "./generated/wasm_dto.js";
 
 type Operation<Args extends unknown[], Result> = { args: Args; result: Result };
 
