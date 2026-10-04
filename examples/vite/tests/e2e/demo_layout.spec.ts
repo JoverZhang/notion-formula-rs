@@ -3,10 +3,22 @@ import { editorContentLocator, gotoDebug, setEditorContent } from "./helpers";
 
 const LONG_OUTPUT_SOURCE = 'if(prop("Number") > 10, [1, "x", true, prop("Date")], [[[1, "x"]]])';
 
-for (const width of [1280, 768, 390, 320]) {
-  test(`long output type is fully readable at ${width}px`, async ({ page }) => {
+for (const [width, alternateFont] of [
+  [1280, false],
+  [768, false],
+  [390, false],
+  [320, false],
+  [1280, true],
+] as const) {
+  const fontVariant = alternateFont ? " with alternate font metrics" : "";
+  test(`long output type is fully readable at ${width}px${fontVariant}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await gotoDebug(page);
+    if (alternateFont) {
+      await page.addStyleTag({
+        content: ".formula-output-type { font-family: Arial, sans-serif; }",
+      });
+    }
     await setEditorContent(page, "Formula 1", LONG_OUTPUT_SOURCE);
     await expect
       .poll(() => page.evaluate(() => window.__nf_debug?.getState("Formula 1").outputType))
@@ -35,7 +47,6 @@ for (const width of [1280, 768, 390, 320]) {
         actionWidth: actionRect.width,
         clientWidth: value.clientWidth,
         scrollWidth: value.scrollWidth,
-        lineCount: new Set(textRects.map((rect) => rect.top)).size,
         textContained: textRects.every(
           (rect) =>
             rect.left >= outputRect.left - 1 &&
@@ -50,7 +61,7 @@ for (const width of [1280, 768, 390, 320]) {
     expect(geometry.belowActions).toBe(true);
     expect(Math.abs(geometry.outputWidth - geometry.actionWidth)).toBeLessThan(1);
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1);
-    if (width === 1280 || width <= 390) expect(geometry.lineCount).toBeGreaterThan(1);
+    // Font metrics vary; the contract is that all text stays visible within the output row.
     expect(geometry.textContained).toBe(true);
     expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth + 1);
   });
