@@ -34,12 +34,12 @@ export function mountFormulaPanel(initialSource = "i") {
     save: vi.fn<FormulaEditorActions["save"]>().mockResolvedValue(),
     discard: vi.fn<FormulaEditorActions["discard"]>().mockResolvedValue(),
   };
-  const panel = createFormulaPanelView({ id: "f1", label: "Test", initialSource, actions });
+  const panel = createFormulaPanelView({ id: "Formula 1", label: "Test", initialSource, actions });
   panel.mount(document.body);
   const editorNode = panel.root.querySelector<HTMLElement>(".cm-editor")!;
   const editor = EditorView.findFromDOM(editorNode)!;
   let state: FormulaState = {
-    id: "f1",
+    id: "Formula 1",
     source: initialSource,
     savedSource: "",
     version: 0n,
@@ -59,7 +59,7 @@ export function mountFormulaPanel(initialSource = "i") {
     const result: UpdateExpressionResult = {
       state: {
         version: (state.version ?? 0n) + 1n,
-        definition: { id: "f1", expression: source },
+        definition: { id: "Formula 1", expression: source },
         output_type: "Unknown",
         diagnostics: [],
         tokens: [],

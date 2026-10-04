@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { editorContentLocator, expectEditorText, gotoDebug, setEditorContent } from "./helpers";
-type EditorId = "f1" | "f2";
+type EditorId = "Formula 1" | "Formula 2";
 type Page = Parameters<typeof editorContentLocator>[0];
 
 async function clearEditor(page: Page, id: EditorId) {
@@ -115,33 +115,33 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("undo reverts recent editor input", async ({ page }) => {
-  await clearEditor(page, "f1");
+  await clearEditor(page, "Formula 1");
 
-  await expectEditorText(page, "f1", "");
+  await expectEditorText(page, "Formula 1", "");
   // CodeMirror history groups adjacent edits that happen within `newGroupDelay` (default 500ms).
   // Without a pause here, the "clear" and subsequent "type" can become a single undo group,
   // causing undo to restore the pre-clear content instead of the expected empty state.
   await page.waitForTimeout(600);
 
-  await typeInEditor(page, "f1", "1+2");
-  await expectEditorText(page, "f1", "1+2");
+  await typeInEditor(page, "Formula 1", "1+2");
+  await expectEditorText(page, "Formula 1", "1+2");
 
-  await pressUndo(page, "f1");
-  await expectEditorText(page, "f1", "");
+  await pressUndo(page, "Formula 1");
+  await expectEditorText(page, "Formula 1", "");
 
-  await pressRedo(page, "f1");
-  await expectEditorText(page, "f1", "1+2");
+  await pressRedo(page, "Formula 1");
+  await expectEditorText(page, "Formula 1", "1+2");
 });
 
 test("editor height grows with content", async ({ page }) => {
   const HEIGHT_EPSILON_PX = 1;
   const multiline = "a\nb\nc\nd\ne\nf\ng\nh";
-  await setEditorContent(page, "f1", multiline);
-  await expectEditorText(page, "f1", multiline);
+  await setEditorContent(page, "Formula 1", multiline);
+  await expectEditorText(page, "Formula 1", multiline);
 
   await page.waitForFunction(() => {
     const scroller = document.querySelector<HTMLElement>(
-      `[data-testid="formula-editor"][data-formula-id="f1"] .cm-scroller`,
+      `[data-testid="formula-editor"][data-formula-id="Formula 1"] .cm-scroller`,
     );
     if (!scroller) return false;
     // With auto-growth, the scroller should not need internal vertical scrolling.
@@ -150,7 +150,7 @@ test("editor height grows with content", async ({ page }) => {
 
   const metrics = await page.evaluate(() => {
     const scroller = document.querySelector<HTMLElement>(
-      `[data-testid="formula-editor"][data-formula-id="f1"] .cm-scroller`,
+      `[data-testid="formula-editor"][data-formula-id="Formula 1"] .cm-scroller`,
     );
     if (!scroller) return null;
     const cs = getComputedStyle(scroller);

@@ -127,7 +127,6 @@ export function createFormulaPanelView(opts: {
     <div class="formula-left">
       <div class="formula-label"></div>
       <div class="formula-editor-wrap">
-        <div class="completion-signature hidden" data-testid="suggestion-signature" data-formula-id="${opts.id}"></div>
         <div class="editor" data-testid="formula-editor" data-formula-id="${opts.id}"></div>
         <div class="formula-actions">
           <button class="format-button" type="button" data-testid="format-button" data-formula-id="${opts.id}">Format</button>
@@ -135,11 +134,12 @@ export function createFormulaPanelView(opts: {
           <button class="save-button" type="button" data-testid="save-button" data-formula-id="${opts.id}" disabled>Save</button>
           <button class="discard-button" type="button" data-testid="discard-button" data-formula-id="${opts.id}" disabled>Discard</button>
           <span class="formula-dirty hidden" data-testid="formula-dirty" data-formula-id="${opts.id}">Unsaved changes</span>
-          <div class="formula-output-type" data-testid="formula-output-type" data-formula-id="${opts.id}">
-            <span class="formula-output-type-value"></span>
-          </div>
+        </div>
+        <div class="formula-output-type" data-testid="formula-output-type" data-formula-id="${opts.id}">
+          <span class="formula-output-type-value"></span>
         </div>
         <div class="formula-error hidden" role="alert" data-testid="formula-error" data-formula-id="${opts.id}"></div>
+        <div class="completion-signature hidden" data-testid="suggestion-signature" data-formula-id="${opts.id}"></div>
         <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
           <div class="completion-header">Completions</div>
           <div class="completion-body">
@@ -152,7 +152,6 @@ export function createFormulaPanelView(opts: {
   `;
 
   const labelEl = must<HTMLElement>(panel, ".formula-label");
-  const editorWrap = must<HTMLElement>(panel, ".formula-editor-wrap");
   const signatureEl = must<HTMLElement>(
     panel,
     '.completion-signature[data-testid="suggestion-signature"]',
@@ -210,7 +209,7 @@ export function createFormulaPanelView(opts: {
   let commandRevision: number | null = null;
   let quickFixKey = "";
 
-  const signaturePopover = createSignaturePopover(signatureEl, editorWrap);
+  const signaturePopover = createSignaturePopover(signatureEl);
 
   function scrollSelectedIntoView() {
     const selected = itemsEl.querySelector(".completion-item.is-selected");
@@ -265,7 +264,10 @@ export function createFormulaPanelView(opts: {
       if (!item) return;
       li.className = "completion-item";
       if (rowIndex === selectedRowIndex) li.classList.add("is-selected");
-      if (item.is_disabled) li.classList.add("is-disabled");
+      if (item.is_disabled) {
+        li.classList.add("is-disabled");
+        li.setAttribute("aria-disabled", "true");
+      }
       if ((row.flags & COMPLETION_ROW_ITEM_RECOMMENDED) !== 0) {
         li.classList.add("is-recommended");
         li.setAttribute("data-completion-recommended", "true");
@@ -279,17 +281,25 @@ export function createFormulaPanelView(opts: {
       label.textContent = item.label;
       const meta = document.createElement("div");
       meta.className = "completion-item-meta";
-      meta.textContent = item.detail ?? (item.is_disabled ? (item.disabled_reason ?? "") : "");
+      meta.textContent = item.detail ?? "";
       main.append(label, meta);
       li.appendChild(main);
+      if (item.is_disabled && item.disabled_reason) {
+        const reason = document.createElement("div");
+        reason.className = "completion-item-reason";
+        reason.textContent = item.disabled_reason;
+        li.appendChild(reason);
+      }
 
       li.addEventListener("mouseenter", () => {
+        if (item.is_disabled) return;
         selectedRowIndex = rowIndex;
         renderCompletionRows();
         scrollSelectedIntoView();
       });
       li.addEventListener("mousedown", (event) => event.preventDefault());
       li.addEventListener("click", () => {
+        if (item.is_disabled) return;
         applySelectedCompletion(row.itemIndex);
       });
       itemsEl.appendChild(li);
@@ -598,7 +608,7 @@ export function createFormulaPanelView(opts: {
 
   const onResize = () => {
     if (!isUiActive) return;
-    signaturePopover.updateSide();
+    signaturePopover.render(signatureHelp, diagnosticRows, isUiActive);
   };
   editorView.dom.addEventListener("focusin", onFocusIn);
   editorView.dom.addEventListener("focusout", onFocusOut);

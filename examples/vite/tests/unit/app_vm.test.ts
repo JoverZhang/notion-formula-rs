@@ -207,7 +207,7 @@ class FakeEngine implements FormulaEngineClient {
       throw error;
     }
     if ("Formula" in property) this.saved.set(property.Formula.id, property.Formula.expression);
-    return { affected_formulas: ["f1", "f2"] };
+    return { affected_formulas: ["Formula 1", "Formula 2"] };
   });
 
   readonly evaluate = vi.fn(async (_input: EvaluateInput): Promise<EvaluateResult> => {
@@ -281,7 +281,7 @@ function setup(
 function schemaWithFirstSource(source: string): FormulaSchema {
   const schema = structuredClone(DEMO_SCHEMA);
   const property = schema.properties.find(
-    (property) => "Formula" in property && property.Formula.id === "f1",
+    (property) => "Formula" in property && property.Formula.id === "Formula 1",
   );
   if (property && "Formula" in property) property.Formula.expression = source;
   return schema;
@@ -310,15 +310,15 @@ describe("AppVM source buffers and native commands", () => {
       "Date",
       "Relation",
     ]);
-    expect(input.formula_ids).toEqual(["f1", "f2"]);
-    expect(latest().formulas.f1).toMatchObject({
-      source: FORMULA_DEMOS.f1.sample,
-      savedSource: FORMULA_DEMOS.f1.sample,
+    expect(input.formula_ids).toEqual(["Formula 1", "Formula 2"]);
+    expect(latest().formulas["Formula 1"]).toMatchObject({
+      source: FORMULA_DEMOS["Formula 1"].sample,
+      savedSource: FORMULA_DEMOS["Formula 1"].sample,
       dirty: false,
       version: 0n,
       outputType: engine.outputType,
     });
-    expect(latest().formulas.f2.source).toBe(FORMULA_DEMOS.f2.sample);
+    expect(latest().formulas["Formula 2"].source).toBe(FORMULA_DEMOS["Formula 2"].sample);
     expect(states[0].wasmReady).toBe(false);
     expect(latest().wasmReady).toBe(true);
   });
@@ -328,10 +328,10 @@ describe("AppVM source buffers and native commands", () => {
     const { vm, engine, latest } = setup();
     await vm.start();
     const evaluation = latest().evaluation;
-    vm.setSource("f1", "first buffer");
-    vm.setSource("f1", "latest buffer");
-    vm.setSource("f2", "other buffer");
-    expect(latest().formulas.f1).toMatchObject({
+    vm.setSource("Formula 1", "first buffer");
+    vm.setSource("Formula 1", "latest buffer");
+    vm.setSource("Formula 2", "other buffer");
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "latest buffer",
       dirty: true,
       version: null,
@@ -341,11 +341,11 @@ describe("AppVM source buffers and native commands", () => {
     await vi.advanceTimersByTimeAsync(79);
     expect(engine.drafts[0].updateExpression).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
-    await vm.help("f2", 0);
+    await vm.help("Formula 2", 0);
     expect(engine.drafts[0].updateExpression).toHaveBeenCalledExactlyOnceWith({
       Replace: "latest buffer",
     });
-    expect(latest().formulas.f1.tokens[0].text).toBe("latest buffer");
+    expect(latest().formulas["Formula 1"].tokens[0].text).toBe("latest buffer");
     expect(latest().evaluation).toEqual(evaluation);
     expect(engine.upsert).not.toHaveBeenCalled();
     expect(engine.evaluate).toHaveBeenCalledTimes(1);
@@ -354,10 +354,10 @@ describe("AppVM source buffers and native commands", () => {
   it("flushes the buffer before formatting and uses native text, version and mapped cursor", async () => {
     const { vm, engine, latest } = setup();
     await vm.start();
-    vm.setSource("f1", "unformatted buffer");
-    const result = await vm.format("f1", 2);
+    vm.setSource("Formula 1", "unformatted buffer");
+    const result = await vm.format("Formula 1", 2);
     expect(result?.state.definition.expression).toBe("native format");
-    expect(latest().formulas.f1).toMatchObject({
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "native format",
       cursor: 5,
       version: 2n,
@@ -383,23 +383,26 @@ describe("AppVM source buffers and native commands", () => {
     const { vm, engine, latest } = setup();
     engine.invalidSources.add("invalid buffer");
     await vm.start();
-    vm.setSource("f1", "invalid buffer");
-    await vm.help("f1", 0);
-    expect(latest().formulas.f1.diagnostics).toEqual([
+    vm.setSource("Formula 1", "invalid buffer");
+    await vm.help("Formula 1", 0);
+    expect(latest().formulas["Formula 1"].diagnostics).toEqual([
       { id: "diagnostic:0:1", span: { start: 0, end: 1 }, message: "native diagnostic" },
     ]);
-    expect(await vm.quickFixes("f1", "foreign ID")).toEqual([]);
-    const fixes = await vm.quickFixes("f1", latest().formulas.f1.diagnostics[0].id);
-    expect(await vm.applyEdit("f1", fixes[0].edit, 1)).not.toBeNull();
-    expect(latest().formulas.f1.source).toBe("native fix");
-    const help = await vm.help("f1", 0);
+    expect(await vm.quickFixes("Formula 1", "foreign ID")).toEqual([]);
+    const fixes = await vm.quickFixes(
+      "Formula 1",
+      latest().formulas["Formula 1"].diagnostics[0].id,
+    );
+    expect(await vm.applyEdit("Formula 1", fixes[0].edit, 1)).not.toBeNull();
+    expect(latest().formulas["Formula 1"].source).toBe("native fix");
+    const help = await vm.help("Formula 1", 0);
     const item = help!.completion.items[0];
     const completion = {
       base_version: help!.base_version,
       edits: [item.primary_edit!, ...item.additional_edits],
     };
-    expect(await vm.applyEdit("f1", completion, 0)).not.toBeNull();
-    expect(latest().formulas.f1.source).toBe("native completion");
+    expect(await vm.applyEdit("Formula 1", completion, 0)).not.toBeNull();
+    expect(latest().formulas["Formula 1"].source).toBe("native completion");
     expect(engine.drafts[0].quickFixes).toHaveBeenCalledWith("foreign ID");
     expect(engine.upsert).not.toHaveBeenCalled();
   });
@@ -408,17 +411,20 @@ describe("AppVM source buffers and native commands", () => {
     const { vm, engine, latest } = setup({ schema: schemaWithFirstSource("invalid buffer") });
     engine.invalidSources.add("invalid buffer");
     await vm.start();
-    const oldDiagnostic = latest().formulas.f1.diagnostics[0].id;
-    const fixes = await vm.quickFixes("f1", oldDiagnostic);
+    const oldDiagnostic = latest().formulas["Formula 1"].diagnostics[0].id;
+    const fixes = await vm.quickFixes("Formula 1", oldDiagnostic);
     expect(fixes[0].edit.base_version).toBe(0n);
-    await vm.save("f2");
-    expect(latest().formulas.f1.version).toBe(0n);
-    expect(await vm.applyEdit("f1", fixes[0].edit, 0)).toBeNull();
-    expect(await vm.quickFixes("f1", oldDiagnostic)).toEqual([]);
-    const current = await vm.quickFixes("f1", latest().formulas.f1.diagnostics[0].id);
-    vm.setSource("f1", "new typing");
-    expect(await vm.applyEdit("f1", current[0].edit, 0)).toBeNull();
-    expect(latest().formulas.f1.source).toBe("new typing");
+    await vm.save("Formula 2");
+    expect(latest().formulas["Formula 1"].version).toBe(0n);
+    expect(await vm.applyEdit("Formula 1", fixes[0].edit, 0)).toBeNull();
+    expect(await vm.quickFixes("Formula 1", oldDiagnostic)).toEqual([]);
+    const current = await vm.quickFixes(
+      "Formula 1",
+      latest().formulas["Formula 1"].diagnostics[0].id,
+    );
+    vm.setSource("Formula 1", "new typing");
+    expect(await vm.applyEdit("Formula 1", current[0].edit, 0)).toBeNull();
+    expect(latest().formulas["Formula 1"].source).toBe("new typing");
     expect(
       engine.drafts.every((draft) =>
         draft.updateExpression.mock.calls.every(([update]) => "Replace" in update),
@@ -431,15 +437,15 @@ describe("AppVM source buffers and native commands", () => {
     await vm.start();
     const gate = deferred();
     engine.beforeCall = (event) => (event.endsWith(":help") ? gate.promise : Promise.resolve());
-    const pending = vm.help("f1", 0);
+    const pending = vm.help("Formula 1", 0);
     await vi.waitFor(() => expect(engine.drafts[0].help).toHaveBeenCalledTimes(1));
-    vm.setSource("f1", "later typing");
+    vm.setSource("Formula 1", "later typing");
     gate.resolve();
     expect(await pending).toBeNull();
-    expect(latest().formulas.f1.source).toBe("later typing");
+    expect(latest().formulas["Formula 1"].source).toBe("later typing");
     engine.beforeCall = () => Promise.resolve();
-    expect(await vm.help("f1", 0)).not.toBeNull();
-    expect(latest().formulas.f1.tokens[0].text).toBe("later typing");
+    expect(await vm.help("Formula 1", 0)).not.toBeNull();
+    expect(latest().formulas["Formula 1"].tokens[0].text).toBe("later typing");
   });
 
   it("does not apply analysis from a replacement while the buffer keeps changing", async () => {
@@ -447,21 +453,21 @@ describe("AppVM source buffers and native commands", () => {
     await vm.start();
     const gate = deferred();
     engine.beforeCall = (event) => (event.endsWith(":replace") ? gate.promise : Promise.resolve());
-    vm.setSource("f1", "first typing");
-    const pending = vm.help("f1", 0);
+    vm.setSource("Formula 1", "first typing");
+    const pending = vm.help("Formula 1", 0);
     await vi.waitFor(() => expect(engine.drafts[0].updateExpression).toHaveBeenCalled());
-    vm.setSource("f1", "later typing");
+    vm.setSource("Formula 1", "later typing");
     gate.resolve();
     expect(await pending).toBeNull();
-    expect(latest().formulas.f1).toMatchObject({
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "later typing",
       version: null,
       tokens: [],
       outputType: "Unknown",
     });
     engine.beforeCall = () => Promise.resolve();
-    await vm.help("f1", 0);
-    expect(latest().formulas.f1.tokens[0].text).toBe("later typing");
+    await vm.help("Formula 1", 0);
+    expect(latest().formulas["Formula 1"].tokens[0].text).toBe("later typing");
   });
 
   it("preserves typing and cursor when a pending native edit finishes", async () => {
@@ -469,18 +475,18 @@ describe("AppVM source buffers and native commands", () => {
     await vm.start();
     const gate = deferred();
     engine.beforeCall = (event) => (event.endsWith(":edit") ? gate.promise : Promise.resolve());
-    const pending = vm.format("f1", 0);
+    const pending = vm.format("Formula 1", 0);
     await vi.waitFor(() => expect(engine.drafts[0].updateExpression).toHaveBeenCalled());
-    vm.setSource("f1", "typing during edit");
+    vm.setSource("Formula 1", "typing during edit");
     gate.resolve();
     expect(await pending).toBeNull();
-    expect(latest().formulas.f1).toMatchObject({
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "typing during edit",
       cursor: null,
       version: null,
     });
     engine.beforeCall = () => Promise.resolve();
-    await vm.help("f1", 0);
+    await vm.help("Formula 1", 0);
     expect(engine.drafts[0].definition.expression).toBe("typing during edit");
     expect(engine.evaluate).toHaveBeenCalledTimes(1);
   });
@@ -489,10 +495,10 @@ describe("AppVM source buffers and native commands", () => {
     const { vm, engine, latest } = setup();
     await vm.start();
     engine.drafts[0].help.mockRejectedValueOnce(new Error("native help failed"));
-    expect(await vm.help("f1", 0)).toBeNull();
-    expect(latest().formulas.f1.error).toContain("native help failed");
-    expect(await vm.help("f1", 0)).not.toBeNull();
-    expect(latest().formulas.f1.error).toBeNull();
+    expect(await vm.help("Formula 1", 0)).toBeNull();
+    expect(latest().formulas["Formula 1"].error).toContain("native help failed");
+    expect(await vm.help("Formula 1", 0)).not.toBeNull();
+    expect(latest().formulas["Formula 1"].error).toBeNull();
   });
 });
 
@@ -500,30 +506,32 @@ describe("AppVM save and discard coordination", () => {
   it("consumes one Draft, closes the other, evaluates saved definitions once and restores both buffers", async () => {
     const { vm, engine, latest } = setup();
     await vm.start();
-    vm.setSource("f1", "save this source");
-    vm.setSource("f2", "keep this unsaved source");
-    await vm.save("f1");
+    vm.setSource("Formula 1", "save this source");
+    vm.setSource("Formula 2", "keep this unsaved source");
+    await vm.save("Formula 1");
     expect(engine.upsert).toHaveBeenCalledExactlyOnceWith({
-      Formula: { id: "f1", expression: "save this source" },
+      Formula: { id: "Formula 1", expression: "save this source" },
     });
     expect(engine.drafts[0].intoDefinition).toHaveBeenCalledTimes(1);
     expect(engine.drafts[1].close).toHaveBeenCalledTimes(1);
-    expect(engine.events.indexOf("upsert")).toBeGreaterThan(engine.events.indexOf("f2:1:close"));
+    expect(engine.events.indexOf("upsert")).toBeGreaterThan(
+      engine.events.indexOf("Formula 2:1:close"),
+    );
     expect(engine.evaluate).toHaveBeenCalledTimes(2);
-    expect(latest().formulas.f1).toMatchObject({
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "save this source",
       savedSource: "save this source",
       dirty: false,
       version: 0n,
     });
-    expect(latest().formulas.f2).toMatchObject({
+    expect(latest().formulas["Formula 2"]).toMatchObject({
       source: "keep this unsaved source",
-      savedSource: FORMULA_DEMOS.f2.sample,
+      savedSource: FORMULA_DEMOS["Formula 2"].sample,
       dirty: true,
       version: 0n,
     });
-    expect(latest().evaluation?.formulas.get("f2")).toMatchObject({
-      Ok: { column: { String: { values: [FORMULA_DEMOS.f2.sample] } } },
+    expect(latest().evaluation?.formulas.get("Formula 2")).toMatchObject({
+      Ok: { column: { String: { values: [FORMULA_DEMOS["Formula 2"].sample] } } },
     });
     expect(engine.active.size).toBe(2);
     expect(latest()).toMatchObject({ saving: false, error: null });
@@ -534,24 +542,24 @@ describe("AppVM save and discard coordination", () => {
     await vm.start();
     const helpGate = deferred();
     engine.beforeCall = (event) => (event.endsWith(":help") ? helpGate.promise : Promise.resolve());
-    const earlier = vm.help("f2", 0);
+    const earlier = vm.help("Formula 2", 0);
     await vi.waitFor(() => expect(engine.drafts[1].help).toHaveBeenCalled());
-    vm.setSource("f1", "source at save click");
-    const saving = vm.save("f1");
-    vm.setSource("f1", "typing after save click");
-    vm.setSource("f2", "other later typing");
+    vm.setSource("Formula 1", "source at save click");
+    const saving = vm.save("Formula 1");
+    vm.setSource("Formula 1", "typing after save click");
+    vm.setSource("Formula 2", "other later typing");
     helpGate.resolve();
     await earlier;
     await saving;
-    expect(engine.saved.get("f1")).toBe("source at save click");
-    expect(latest().formulas.f1).toMatchObject({
+    expect(engine.saved.get("Formula 1")).toBe("source at save click");
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "typing after save click",
       savedSource: "source at save click",
       dirty: true,
     });
-    expect(latest().formulas.f2).toMatchObject({
+    expect(latest().formulas["Formula 2"]).toMatchObject({
       source: "other later typing",
-      savedSource: FORMULA_DEMOS.f2.sample,
+      savedSource: FORMULA_DEMOS["Formula 2"].sample,
       dirty: true,
     });
     expect([...engine.active].map((draft) => draft.definition.expression)).toEqual([
@@ -571,24 +579,27 @@ describe("AppVM save and discard coordination", () => {
       entered.resolve();
       return gate.promise;
     };
-    vm.setSource("f1", "saved click source");
-    vm.setSource("f2", "other unsaved source");
-    const saving = vm.save("f1");
+    vm.setSource("Formula 1", "saved click source");
+    vm.setSource("Formula 2", "other unsaved source");
+    const saving = vm.save("Formula 1");
     await entered.promise;
     expect(engine.active.size).toBe(0);
-    vm.setSource("f1", "later selected typing");
-    const help = vm.help("f2", 0);
-    const discard = vm.discard("f2");
+    vm.setSource("Formula 1", "later selected typing");
+    const help = vm.help("Formula 2", 0);
+    const discard = vm.discard("Formula 2");
     await vi.advanceTimersByTimeAsync(80);
     gate.resolve();
     await Promise.all([saving, help, discard]);
     expect(await help).not.toBeNull();
-    expect(latest().formulas.f1).toMatchObject({
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "later selected typing",
       savedSource: "saved click source",
       dirty: true,
     });
-    expect(latest().formulas.f2).toMatchObject({ source: FORMULA_DEMOS.f2.sample, dirty: false });
+    expect(latest().formulas["Formula 2"]).toMatchObject({
+      source: FORMULA_DEMOS["Formula 2"].sample,
+      dirty: false,
+    });
     expect(engine.drafts[3].help).toHaveBeenCalledTimes(1);
     expect(engine.drafts[3].close).toHaveBeenCalledTimes(1);
     expect(engine.evaluate).toHaveBeenCalledTimes(2);
@@ -600,14 +611,14 @@ describe("AppVM save and discard coordination", () => {
     const { vm, engine, latest } = setup();
     engine.invalidSources.add("invalid saved source");
     await vm.start();
-    vm.setSource("f1", "invalid saved source");
-    await vm.save("f1");
-    expect(latest().formulas.f1).toMatchObject({
+    vm.setSource("Formula 1", "invalid saved source");
+    await vm.save("Formula 1");
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       savedSource: "invalid saved source",
       dirty: false,
       diagnostics: [{ message: "native diagnostic" }],
     });
-    expect(latest().evaluation?.formulas.get("f1")).toEqual({ Err: "NotReady" });
+    expect(latest().evaluation?.formulas.get("Formula 1")).toEqual({ Err: "NotReady" });
     expect(latest().error).toBeNull();
   });
 
@@ -615,19 +626,19 @@ describe("AppVM save and discard coordination", () => {
     const { vm, engine, latest } = setup();
     await vm.start();
     const evaluation = latest().evaluation;
-    vm.setSource("f1", "discard this");
-    vm.setSource("f2", "keep this");
-    await vm.help("f1", 0);
-    await vm.help("f2", 0);
-    await vm.discard("f1");
+    vm.setSource("Formula 1", "discard this");
+    vm.setSource("Formula 2", "keep this");
+    await vm.help("Formula 1", 0);
+    await vm.help("Formula 2", 0);
+    await vm.discard("Formula 1");
     expect(engine.drafts[0].closed).toBe(true);
     expect(engine.drafts[1].closed).toBe(false);
-    expect(latest().formulas.f1).toMatchObject({
-      source: FORMULA_DEMOS.f1.sample,
+    expect(latest().formulas["Formula 1"]).toMatchObject({
+      source: FORMULA_DEMOS["Formula 1"].sample,
       dirty: false,
       version: 0n,
     });
-    expect(latest().formulas.f2).toMatchObject({ source: "keep this", dirty: true });
+    expect(latest().formulas["Formula 2"]).toMatchObject({ source: "keep this", dirty: true });
     expect(latest().evaluation).toEqual(evaluation);
     expect(engine.upsert).not.toHaveBeenCalled();
     expect(engine.evaluate).toHaveBeenCalledTimes(1);
@@ -636,17 +647,20 @@ describe("AppVM save and discard coordination", () => {
   it("does not overwrite typing while discard closes and recreates its Draft", async () => {
     const { vm, engine, latest } = setup();
     await vm.start();
-    vm.setSource("f1", "discard this");
+    vm.setSource("Formula 1", "discard this");
     const gate = deferred();
     engine.beforeCall = (event) => (event.endsWith(":close") ? gate.promise : Promise.resolve());
-    const discarding = vm.discard("f1");
+    const discarding = vm.discard("Formula 1");
     await vi.waitFor(() => expect(engine.drafts[0].close).toHaveBeenCalled());
-    vm.setSource("f1", "typing during discard");
+    vm.setSource("Formula 1", "typing during discard");
     gate.resolve();
     await discarding;
     engine.beforeCall = () => Promise.resolve();
-    await vm.help("f1", 0);
-    expect(latest().formulas.f1).toMatchObject({ source: "typing during discard", dirty: true });
+    await vm.help("Formula 1", 0);
+    expect(latest().formulas["Formula 1"]).toMatchObject({
+      source: "typing during discard",
+      dirty: true,
+    });
     expect(engine.drafts[2].definition.expression).toBe("typing during discard");
   });
 
@@ -654,24 +668,27 @@ describe("AppVM save and discard coordination", () => {
     const { vm, engine, latest } = setup();
     await vm.start();
     const evaluation = latest().evaluation;
-    vm.setSource("f1", "retry this save");
-    vm.setSource("f2", "other dirty buffer");
+    vm.setSource("Formula 1", "retry this save");
+    vm.setSource("Formula 2", "other dirty buffer");
     engine.nextUpsertError = new Error("native upsert failed");
-    await vm.save("f1");
-    expect(latest().formulas.f1).toMatchObject({
+    await vm.save("Formula 1");
+    expect(latest().formulas["Formula 1"]).toMatchObject({
       source: "retry this save",
-      savedSource: FORMULA_DEMOS.f1.sample,
+      savedSource: FORMULA_DEMOS["Formula 1"].sample,
       dirty: true,
     });
-    expect(latest().formulas.f2.source).toBe("other dirty buffer");
+    expect(latest().formulas["Formula 2"].source).toBe("other dirty buffer");
     expect(latest().error).toContain("native upsert failed");
     expect(latest().saving).toBe(false);
     expect(latest().evaluation).toEqual(evaluation);
     expect(engine.evaluate).toHaveBeenCalledTimes(1);
     expect(engine.active.size).toBe(2);
-    expect(await vm.help("f1", 0)).not.toBeNull();
-    await vm.save("f1");
-    expect(latest().formulas.f1).toMatchObject({ savedSource: "retry this save", dirty: false });
+    expect(await vm.help("Formula 1", 0)).not.toBeNull();
+    await vm.save("Formula 1");
+    expect(latest().formulas["Formula 1"]).toMatchObject({
+      savedSource: "retry this save",
+      dirty: false,
+    });
     expect(latest().error).toBeNull();
     expect(engine.evaluate).toHaveBeenCalledTimes(2);
   });
@@ -680,15 +697,18 @@ describe("AppVM save and discard coordination", () => {
     const { vm, engine, latest } = setup();
     await vm.start();
     expect(latest().evaluation).not.toBeNull();
-    vm.setSource("f1", "committed source");
+    vm.setSource("Formula 1", "committed source");
     engine.nextEvaluateError = new Error("native evaluation failed");
-    await vm.save("f1");
-    expect(latest().formulas.f1).toMatchObject({ savedSource: "committed source", dirty: false });
+    await vm.save("Formula 1");
+    expect(latest().formulas["Formula 1"]).toMatchObject({
+      savedSource: "committed source",
+      dirty: false,
+    });
     expect(latest().evaluation).toBeNull();
     expect(latest().error).toContain("evaluate the saved formulas: native evaluation failed");
     expect(engine.active.size).toBe(2);
-    expect(await vm.help("f2", 0)).not.toBeNull();
-    await vm.save("f2");
+    expect(await vm.help("Formula 2", 0)).not.toBeNull();
+    await vm.save("Formula 2");
     expect(latest().evaluation).not.toBeNull();
     expect(latest().error).toBeNull();
   });
@@ -700,18 +720,18 @@ describe("AppVM save and discard coordination", () => {
       event.endsWith(":consume")
         ? Promise.reject(new Error("native serialization failed"))
         : Promise.resolve();
-    vm.setSource("f1", "still unsaved");
-    await vm.save("f1");
+    vm.setSource("Formula 1", "still unsaved");
+    await vm.save("Formula 1");
     expect(engine.drafts[1].close).toHaveBeenCalledTimes(1);
     expect(engine.active.size).toBe(2);
-    expect(latest().formulas.f1).toMatchObject({
-      savedSource: FORMULA_DEMOS.f1.sample,
+    expect(latest().formulas["Formula 1"]).toMatchObject({
+      savedSource: FORMULA_DEMOS["Formula 1"].sample,
       source: "still unsaved",
       dirty: true,
     });
     expect(latest().error).toContain("native serialization failed");
     engine.beforeCall = () => Promise.resolve();
-    await vm.save("f1");
+    await vm.save("Formula 1");
     expect(latest().error).toBeNull();
   });
 });
@@ -730,7 +750,7 @@ describe("AppVM lifecycle", () => {
     const count = states.length;
     const disposing = vm.dispose();
     expect(vm.dispose()).toBe(disposing);
-    vm.setSource("f1", "ignored after dispose");
+    vm.setSource("Formula 1", "ignored after dispose");
     gate.resolve(engine);
     await Promise.all([starting, disposing]);
     expect(engine.close).toHaveBeenCalledTimes(1);
@@ -738,14 +758,15 @@ describe("AppVM lifecycle", () => {
     expect(engine.createDraft).not.toHaveBeenCalled();
     expect(engine.evaluate).not.toHaveBeenCalled();
     expect(states).toHaveLength(count);
-    expect(await vm.help("f1", 0)).toBeNull();
-    await vm.save("f1");
+    expect(await vm.help("Formula 1", 0)).toBeNull();
+    await vm.save("Formula 1");
   });
 
   it("releases partially initialized Drafts when disposal races draft creation", async () => {
     const { vm, engine, states } = setup();
     const gate = deferred();
-    engine.beforeCall = (event) => (event === "create:f2" ? gate.promise : Promise.resolve());
+    engine.beforeCall = (event) =>
+      event === "create:Formula 2" ? gate.promise : Promise.resolve();
     const starting = vm.start();
     await vi.waitFor(() => expect(engine.createDraft).toHaveBeenCalledTimes(2));
     const disposing = vm.dispose();
@@ -783,7 +804,7 @@ describe("AppVM lifecycle", () => {
   it("closes the acquired Engine and every Draft after a later startup failure", async () => {
     const { vm, engine, latest } = setup();
     engine.beforeCall = (event) =>
-      event === "f2:1:state"
+      event === "Formula 2:1:state"
         ? Promise.reject(new Error("native draft initialization failed"))
         : Promise.resolve();
     await expect(vm.start()).rejects.toThrow("native draft initialization failed");
@@ -807,10 +828,10 @@ describe("AppVM lifecycle", () => {
       entered.resolve();
       return gate.promise;
     };
-    const help = vm.help("f1", 0);
+    const help = vm.help("Formula 1", 0);
     await entered.promise;
-    vm.setSource("f2", "cancel this debounce");
-    const queued = vm.format("f2", 0);
+    vm.setSource("Formula 2", "cancel this debounce");
+    const queued = vm.format("Formula 2", 0);
     const disposing = vm.dispose();
     const count = states.length;
     gate.resolve();

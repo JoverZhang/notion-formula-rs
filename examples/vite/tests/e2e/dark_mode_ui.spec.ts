@@ -8,7 +8,7 @@ import {
   waitForAnyCompletionItems,
 } from "./helpers";
 
-const FORMULA_ID: FormulaId = "f1";
+const FORMULA_ID: FormulaId = "Formula 1";
 const THEME_STORAGE_KEY = "nf-theme";
 
 function parseRgb(value: string): [number, number, number] | null {

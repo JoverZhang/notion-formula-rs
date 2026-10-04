@@ -103,4 +103,45 @@ describe("completion row planning", () => {
     expect(getSelectedItemIndex(rows, 0)).toBeNull();
     expect(getSelectedItemIndex(rows, firstItemRow)).toBeTypeOf("number");
   });
+
+  it("keeps disabled properties visible while excluding them from every selection path", () => {
+    const items = [
+      makeItem({ label: "Formula 1", kind: "Property", is_disabled: true }),
+      makeItem({ label: "Number", kind: "Property" }),
+      makeItem({ label: "Formula 2", kind: "Property", is_disabled: true }),
+    ];
+    const rows = buildCompletionRows(items, [0, 2]);
+    expect(rows.filter((row) => row.kind === "label").map((row) => row.label)).toEqual([
+      "Properties",
+    ]);
+    expect(rows.filter((row) => row.kind === "item").map((row) => row.label)).toEqual([
+      "Formula 1",
+      "Number",
+      "Formula 2",
+    ]);
+    const disabledRows = rows
+      .map((row, index) => (row.kind === "item" && row.itemIndex !== 1 ? index : -1))
+      .filter((index) => index >= 0);
+    const enabledRow = rows.findIndex((row) => row.kind === "item" && row.itemIndex === 1);
+    for (const index of disabledRows) {
+      expect(getSelectedItemIndex(rows, index)).toBeNull();
+      expect(normalizeSelectedRowIndex(rows, index)).toBe(enabledRow);
+      expect(nextSelectedRowIndex(rows, index, 1)).toBe(enabledRow);
+      expect(nextSelectedRowIndex(rows, index, -1)).toBe(enabledRow);
+    }
+    expect(nextSelectedRowIndex(rows, enabledRow, 1)).toBe(enabledRow);
+    expect(nextSelectedRowIndex(rows, enabledRow, -1)).toBe(enabledRow);
+  });
+
+  it("has no selected row when every visible property is disabled", () => {
+    const rows = buildCompletionRows(
+      [makeItem({ label: "Formula 1", kind: "Property", is_disabled: true })],
+      [0],
+    );
+    expect(rows.map((row) => row.label)).toEqual(["Properties", "Formula 1"]);
+    expect(getSelectedItemIndex(rows, 1)).toBeNull();
+    expect(normalizeSelectedRowIndex(rows, 1)).toBe(-1);
+    expect(nextSelectedRowIndex(rows, -1, 1)).toBe(-1);
+    expect(nextSelectedRowIndex(rows, 1, -1)).toBe(-1);
+  });
 });

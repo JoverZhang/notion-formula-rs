@@ -101,7 +101,7 @@ test("debug bridge is available and panels are registered", async ({ page }) => 
     const dbg = window.__nf_debug;
     return (dbg?.listPanels() ?? []).slice();
   });
-  expect(panels.sort()).toEqual(["f1", "f2"]);
+  expect(panels.sort()).toEqual(["Formula 1", "Formula 2"]);
 });
 
 test("page layout shows table above two formula editors", async ({ page }) => {
@@ -122,28 +122,28 @@ test("page layout shows table above two formula editors", async ({ page }) => {
 });
 
 test("table evaluates saved definitions while parse errors stay in the draft", async ({ page }) => {
-  const cells = page.locator('[data-testid="formula-cell"][data-formula-id="f1"]');
+  const cells = page.locator('[data-testid="formula-cell"][data-formula-id="Formula 1"]');
   await expect(cells).toHaveText(["24", "14", "8", "36"]);
-  await setEditorContent(page, "f1", "if(");
-  await waitForDiagnostics(page, "f1");
+  await setEditorContent(page, "Formula 1", "if(");
+  await waitForDiagnostics(page, "Formula 1");
   await expect(cells).toHaveText(["24", "14", "8", "36"]);
-  await page.locator('[data-testid="save-button"][data-formula-id="f1"]').click();
-  await waitForFormulaColumnText(page, "f1", "Not ready");
+  await page.locator('[data-testid="save-button"][data-formula-id="Formula 1"]').click();
+  await waitForFormulaColumnText(page, "Formula 1", "Not ready");
 
-  await setEditorContent(page, "f1", 'if(prop("Number") > 1, "ok", "no")');
-  await page.locator('[data-testid="save-button"][data-formula-id="f1"]').click();
-  await waitForFormulaColumnText(page, "f1", "ok");
+  await setEditorContent(page, "Formula 1", 'if(prop("Number") > 1, "ok", "no")');
+  await page.locator('[data-testid="save-button"][data-formula-id="Formula 1"]').click();
+  await waitForFormulaColumnText(page, "Formula 1", "ok");
 });
 
 test("token highlighting regression check", async ({ page }) => {
   const sample =
     'if(prop("Number") + sum(1, 2) > 3, prop("Text"), formatDate(prop("Date"), "YYYY"))';
-  await setEditorContent(page, "f1", sample);
-  await waitForTokenCount(page, "f1", 5);
+  await setEditorContent(page, "Formula 1", sample);
+  await waitForTokenCount(page, "Formula 1", 5);
 
   const tokenDecoCount = await page.evaluate<number>(() => {
     const dbg = window.__nf_debug;
-    return dbg ? dbg.getTokenDecorations("f1").length : 0;
+    return dbg ? dbg.getTokenDecorations("Formula 1").length : 0;
   });
 
   expect(tokenDecoCount).toBeGreaterThan(5);
@@ -151,16 +151,18 @@ test("token highlighting regression check", async ({ page }) => {
 });
 
 test("diagnostics propagate to UI and CodeMirror lint", async ({ page }) => {
-  await setEditorContent(page, "f1", "if(");
-  await waitForDiagnostics(page, "f1");
+  await setEditorContent(page, "Formula 1", "if(");
+  await waitForDiagnostics(page, "Formula 1");
 
   const cmDiagCount = await page.evaluate<number>(() => {
     const dbg = window.__nf_debug;
-    return dbg ? dbg.getCmDiagnostics("f1").length : 0;
+    return dbg ? dbg.getCmDiagnostics("Formula 1").length : 0;
   });
   expect(cmDiagCount).toBeGreaterThan(0);
 
-  const domDiagItems = page.locator('[data-testid="formula-diagnostics"][data-formula-id="f1"] li');
+  const domDiagItems = page.locator(
+    '[data-testid="formula-diagnostics"][data-formula-id="Formula 1"] li',
+  );
   await expect(domDiagItems.first()).toBeVisible();
   await expect(domDiagItems.first()).not.toHaveText(/No diagnostics/i);
 });
@@ -169,36 +171,36 @@ test("chips remain rendered when later unterminated string causes syntax error",
   page,
 }) => {
   const broken = 'if(prop("Number") > 10, prop("Text"), "Needs review)';
-  await setEditorContent(page, "f1", broken);
-  await waitForDiagnostics(page, "f1");
-  await waitForTokenCount(page, "f1", 0);
+  await setEditorContent(page, "Formula 1", broken);
+  await waitForDiagnostics(page, "Formula 1");
+  await waitForTokenCount(page, "Formula 1", 0);
 
   const tokenCount = await page.evaluate<number>(() => {
     const dbg = window.__nf_debug;
-    return dbg ? dbg.getState("f1").tokenCount : 0;
+    return dbg ? dbg.getState("Formula 1").tokenCount : 0;
   });
   expect(tokenCount).toBeGreaterThan(0);
 
   await page.waitForFunction(() => {
     const dbg = window.__nf_debug;
-    return dbg ? dbg.getChipUiCount("f1") >= 2 : false;
+    return dbg ? dbg.getChipUiCount("Formula 1") >= 2 : false;
   });
 
   const decoCount = await page.evaluate<number>(() => {
     const dbg = window.__nf_debug;
-    return dbg ? dbg.getTokenDecorations("f1").length : 0;
+    return dbg ? dbg.getTokenDecorations("Formula 1").length : 0;
   });
   expect(decoCount).toBeGreaterThan(1);
 });
 
 test("diagnostics list uses chip positions and omits raw offsets", async ({ page }) => {
   const broken = 'if(prop("Title") == "x", "ok", "Needs review)';
-  await setEditorContent(page, "f1", broken);
-  await waitForDiagnostics(page, "f1");
-  await waitForChipUiCount(page, "f1", 1);
+  await setEditorContent(page, "Formula 1", broken);
+  await waitForDiagnostics(page, "Formula 1");
+  await waitForChipUiCount(page, "Formula 1", 1);
 
   const diagText = await page
-    .locator('[data-testid="formula-diagnostics"][data-formula-id="f1"]')
+    .locator('[data-testid="formula-diagnostics"][data-formula-id="Formula 1"]')
     .innerText();
 
   expect(diagText).toContain("chipPos=");
@@ -207,20 +209,20 @@ test("diagnostics list uses chip positions and omits raw offsets", async ({ page
 });
 
 test("chip spans and mapping are exposed (UI not required)", async ({ page }) => {
-  await setEditorContent(page, "f1", 'prop("Title")');
-  await waitForTokenCount(page, "f1", 0);
-  await waitForChipSpans(page, "f1");
+  await setEditorContent(page, "Formula 1", 'prop("Title")');
+  await waitForTokenCount(page, "Formula 1", 0);
+  await waitForChipSpans(page, "Formula 1");
 
   const chipInfo = await page.evaluate<ChipInfo | null>(() => {
     const dbg = window.__nf_debug;
-    const spans = dbg?.getChipSpans("f1") ?? [];
+    const spans = dbg?.getChipSpans("Formula 1") ?? [];
     if (spans.length === 0 || !dbg) return null;
     const span = spans[0];
     const inside = span.start + 1;
-    const chipPos = dbg.toChipPos("f1", inside);
-    const chipStart = dbg.toChipPos("f1", span.start);
-    const roundTrip = dbg.toRawPos("f1", chipPos);
-    const docLen = dbg.getState("f1").source.length;
+    const chipPos = dbg.toChipPos("Formula 1", inside);
+    const chipStart = dbg.toChipPos("Formula 1", span.start);
+    const roundTrip = dbg.toRawPos("Formula 1", chipPos);
+    const docLen = dbg.getState("Formula 1").source.length;
     return { chipPos, chipStart, roundTrip, docLen, spanCount: spans.length };
   });
 
@@ -235,21 +237,21 @@ test("chip UI is rendered for valid prop(...) (enable when chip UI is implemente
   page,
 }) => {
   const sample = 'if(prop("Number") > 10, prop("Text"), "Needs review")';
-  await setEditorContent(page, "f1", sample);
-  await waitForTokenCount(page, "f1", 5);
-  await waitForChipSpans(page, "f1");
-  await waitForChipUiCount(page, "f1", 2);
+  await setEditorContent(page, "Formula 1", sample);
+  await waitForTokenCount(page, "Formula 1", 5);
+  await waitForChipSpans(page, "Formula 1");
+  await waitForChipUiCount(page, "Formula 1", 2);
 
   await expect(
-    page.locator('[data-testid="prop-chip"][data-formula-id="f1"][data-prop-name="Number"]'),
+    page.locator('[data-testid="prop-chip"][data-formula-id="Formula 1"][data-prop-name="Number"]'),
   ).toHaveCount(1);
   await expect(
-    page.locator('[data-testid="prop-chip"][data-formula-id="f1"][data-prop-name="Text"]'),
+    page.locator('[data-testid="prop-chip"][data-formula-id="Formula 1"][data-prop-name="Text"]'),
   ).toHaveCount(1);
 
   const tokenDecoCount = await page.evaluate<number>(() => {
     const dbg = window.__nf_debug;
-    return dbg ? dbg.getTokenDecorations("f1").length : 0;
+    return dbg ? dbg.getTokenDecorations("Formula 1").length : 0;
   });
 
   expect(tokenDecoCount).toBeGreaterThan(5);
@@ -257,14 +259,14 @@ test("chip UI is rendered for valid prop(...) (enable when chip UI is implemente
 });
 
 test("arrow navigation jumps over chip ranges", async ({ page }) => {
-  await setEditorContent(page, "f1", 'prop("Title")');
-  await waitForTokenCount(page, "f1", 0);
-  await waitForChipUiCount(page, "f1", 1);
+  await setEditorContent(page, "Formula 1", 'prop("Title")');
+  await waitForTokenCount(page, "Formula 1", 0);
+  await waitForChipUiCount(page, "Formula 1", 1);
 
   const chipRange = await page.evaluate(() => {
     const dbg = window.__nf_debug;
     if (!dbg) return null;
-    const ranges = dbg.getChipUiRanges("f1");
+    const ranges = dbg.getChipUiRanges("Formula 1");
     return ranges.length ? { from: ranges[0].from, to: ranges[0].to } : null;
   });
 
@@ -273,39 +275,39 @@ test("arrow navigation jumps over chip ranges", async ({ page }) => {
 
   await page.evaluate((pos) => {
     const dbg = window.__nf_debug;
-    dbg?.setSelectionHead("f1", pos);
+    dbg?.setSelectionHead("Formula 1", pos);
   }, chipRange.to);
   await page.keyboard.press("ArrowLeft");
 
   const leftHead = await page.evaluate(() => {
     const dbg = window.__nf_debug;
-    return dbg?.getSelectionHead("f1") ?? -1;
+    return dbg?.getSelectionHead("Formula 1") ?? -1;
   });
   expect(leftHead).toBe(chipRange.from);
 
   await page.evaluate((pos) => {
     const dbg = window.__nf_debug;
-    dbg?.setSelectionHead("f1", pos);
+    dbg?.setSelectionHead("Formula 1", pos);
   }, chipRange.from);
   await page.keyboard.press("ArrowRight");
 
   const rightHead = await page.evaluate(() => {
     const dbg = window.__nf_debug;
-    return dbg?.getSelectionHead("f1") ?? -1;
+    return dbg?.getSelectionHead("Formula 1") ?? -1;
   });
   expect(rightHead).toBe(chipRange.to);
 });
 
 test("chips reflect diagnostics when ranges intersect", async ({ page }) => {
-  await setEditorContent(page, "f1", 'if(prop("Title"))');
-  await waitForTokenCount(page, "f1", 0);
-  await waitForDiagnostics(page, "f1");
-  await waitForChipUiCount(page, "f1", 1);
+  await setEditorContent(page, "Formula 1", 'if(prop("Title"))');
+  await waitForTokenCount(page, "Formula 1", 0);
+  await waitForDiagnostics(page, "Formula 1");
+  await waitForChipUiCount(page, "Formula 1", 1);
 
   const chipStatus = await page.evaluate(() => {
     const dbg = window.__nf_debug;
     if (!dbg) return { count: 0, flagged: 0 };
-    const ranges = dbg.getChipUiRanges("f1") ?? [];
+    const ranges = dbg.getChipUiRanges("Formula 1") ?? [];
     const flagged = ranges.filter((range) => range.hasError || range.hasWarning).length;
     return { count: ranges.length, flagged };
   });

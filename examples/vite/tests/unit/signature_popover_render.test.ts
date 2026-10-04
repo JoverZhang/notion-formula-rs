@@ -48,30 +48,15 @@ describe("signature popover render", () => {
     });
     vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
 
-    const editorWrap = document.createElement("div");
     const signatureEl = document.createElement("div");
     signatureEl.className = "completion-signature hidden";
-    signatureEl.setAttribute("data-formula-id", "f1");
-    document.body.append(editorWrap, signatureEl);
-
-    vi.spyOn(editorWrap, "getBoundingClientRect").mockReturnValue({
-      x: 520,
-      y: 0,
-      width: 240,
-      height: 120,
-      top: 0,
-      right: 760,
-      bottom: 120,
-      left: 520,
-      toJSON() {
-        return {};
-      },
-    } as DOMRect);
+    signatureEl.setAttribute("data-formula-id", "Formula 1");
+    document.body.append(signatureEl);
 
     Object.defineProperty(signatureEl, "clientWidth", { configurable: true, get: () => 280 });
     Object.defineProperty(signatureEl, "scrollWidth", { configurable: true, get: () => 520 });
 
-    const popover = createSignaturePopover(signatureEl, editorWrap);
+    const popover = createSignaturePopover(signatureEl);
     popover.render(makeLongSignatureHelp(), [], true);
 
     const main = signatureEl.querySelector(".completion-signature-main");
@@ -91,11 +76,10 @@ describe("signature popover render", () => {
       return 1;
     });
     vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
-    const editorWrap = document.createElement("div");
     const signatureEl = document.createElement("div");
     Object.defineProperty(signatureEl, "clientWidth", { configurable: true, value: 280 });
     Object.defineProperty(signatureEl, "scrollWidth", { configurable: true, value: 520 });
-    const popover = createSignaturePopover(signatureEl, editorWrap);
+    const popover = createSignaturePopover(signatureEl);
     popover.render(makeLongSignatureHelp(), [], true);
     const pending = wrap;
     popover.hide();

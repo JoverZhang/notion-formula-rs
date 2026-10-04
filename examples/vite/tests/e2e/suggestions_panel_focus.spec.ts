@@ -22,17 +22,21 @@ async function setCursorAfter(page: Page, formulaId: FormulaId, needle: string) 
 }
 
 test("Suggestion signature follows focus and hides on editor blur", async ({ page }) => {
-  await setEditorContent(page, "f1", 'if(true, 1, "x")');
-  await setCursorAfter(page, "f1", '"x"');
-  const editor = page.locator('[data-testid="formula-editor"][data-formula-id="f1"]');
+  await setEditorContent(page, "Formula 1", 'if(true, 1, "x")');
+  await setCursorAfter(page, "Formula 1", '"x"');
+  const editor = page.locator('[data-testid="formula-editor"][data-formula-id="Formula 1"]');
   const editorBoxBefore = await editor.boundingBox();
   expect(editorBoxBefore).not.toBeNull();
   if (!editorBoxBefore) return;
 
   await waitForCompletionDebounce(page);
 
-  const signature = page.locator('[data-testid="suggestion-signature"][data-formula-id="f1"]');
-  const completionPanel = page.locator('[data-testid="completion-panel"][data-formula-id="f1"]');
+  const signature = page.locator(
+    '[data-testid="suggestion-signature"][data-formula-id="Formula 1"]',
+  );
+  const completionPanel = page.locator(
+    '[data-testid="completion-panel"][data-formula-id="Formula 1"]',
+  );
   await expect(signature).toBeVisible({ timeout: 5_000 });
   await expect(completionPanel).toBeVisible({ timeout: 5_000 });
 
@@ -42,14 +46,11 @@ test("Suggestion signature follows focus and hides on editor blur", async ({ pag
   expect(editorBoxAfter).not.toBeNull();
   if (!signatureBox || !editorBoxBefore || !editorBoxAfter) return;
 
-  const side = await signature.getAttribute("data-side");
-  expect(side).toMatch(/^(left|right)$/);
-
-  if (side === "left") {
-    expect(signatureBox.x + signatureBox.width).toBeLessThanOrEqual(editorBoxAfter.x);
-  } else {
-    expect(signatureBox.x).toBeGreaterThanOrEqual(editorBoxAfter.x + editorBoxAfter.width);
-  }
+  expect(signatureBox.y).toBeGreaterThanOrEqual(editorBoxAfter.y + editorBoxAfter.height);
+  expect(signatureBox.x).toBeGreaterThanOrEqual(editorBoxAfter.x - 1);
+  expect(signatureBox.x + signatureBox.width).toBeLessThanOrEqual(
+    editorBoxAfter.x + editorBoxAfter.width + 1,
+  );
 
   const viewport = page.viewportSize();
   expect(viewport).not.toBeNull();
@@ -57,11 +58,12 @@ test("Suggestion signature follows focus and hides on editor blur", async ({ pag
   expect(signatureBox.x).toBeGreaterThanOrEqual(0);
   expect(signatureBox.x + signatureBox.width).toBeLessThanOrEqual(viewport.width + 1);
 
-  // Popover doesn't change the editor width.
+  // In-flow help keeps the editor's geometry stable.
   expect(Math.abs(editorBoxBefore.width - editorBoxAfter.width)).toBeLessThan(1);
+  expect(Math.abs(editorBoxBefore.y - editorBoxAfter.y)).toBeLessThan(1);
 
   const editorWrap = page.locator(
-    '[data-testid="formula-panel"][data-formula-id="f1"] .formula-editor-wrap',
+    '[data-testid="formula-panel"][data-formula-id="Formula 1"] .formula-editor-wrap',
   );
   const editorWrapBox = await editorWrap.boundingBox();
   const completionBox = await completionPanel.boundingBox();
@@ -75,17 +77,18 @@ test("Suggestion signature follows focus and hides on editor blur", async ({ pag
   await expect(signature).toBeHidden({ timeout: 5_000 });
   await expect(completionPanel).toBeHidden({ timeout: 5_000 });
 
-  await setEditorContent(page, "f2", 'if(true, 1, "x")');
-  await setCursorAfter(page, "f2", '"x"');
+  await setEditorContent(page, "Formula 2", 'if(true, 1, "x")');
+  await setCursorAfter(page, "Formula 2", '"x"');
   await waitForCompletionDebounce(page);
 
-  const signature2 = page.locator('[data-testid="suggestion-signature"][data-formula-id="f2"]');
-  const completionPanel2 = page.locator('[data-testid="completion-panel"][data-formula-id="f2"]');
+  const signature2 = page.locator(
+    '[data-testid="suggestion-signature"][data-formula-id="Formula 2"]',
+  );
+  const completionPanel2 = page.locator(
+    '[data-testid="completion-panel"][data-formula-id="Formula 2"]',
+  );
   await expect(signature2).toBeVisible({ timeout: 5_000 });
   await expect(completionPanel2).toBeVisible({ timeout: 5_000 });
-
-  await expect.poll(() => signature.getAttribute("data-side")).toBe("right");
-  await expect.poll(() => signature2.getAttribute("data-side")).toBe("left");
 
   await expect(signature).toBeHidden({ timeout: 5_000 });
   await expect(completionPanel).toBeHidden({ timeout: 5_000 });

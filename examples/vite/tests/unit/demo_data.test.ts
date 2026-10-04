@@ -39,10 +39,10 @@ describe("demo evaluate input", () => {
         validity: [true, true, true, true],
       },
     });
-    expect(input.formula_ids).toEqual(["f1", "f2"]);
+    expect(input.formula_ids).toEqual(["Formula 1", "Formula 2"]);
     expect(DEMO_SCHEMA.properties.filter((property) => "Formula" in property)).toEqual([
-      { Formula: { id: "f1", expression: FORMULA_DEMOS.f1.sample } },
-      { Formula: { id: "f2", expression: FORMULA_DEMOS.f2.sample } },
+      { Formula: { id: "Formula 1", expression: FORMULA_DEMOS["Formula 1"].sample } },
+      { Formula: { id: "Formula 2", expression: FORMULA_DEMOS["Formula 2"].sample } },
     ]);
     expect(input.runtime).toEqual(runtime);
     expect(input.runtime).not.toBe(runtime);

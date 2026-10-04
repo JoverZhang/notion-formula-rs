@@ -1,6 +1,5 @@
 import type { SignatureHelp } from "../formula/client";
 
-export type SignatureSide = "left" | "right";
 export type SignatureWrapMode = "unwrapped" | "wrapped";
 export type SignatureToken = { text: string; active: boolean };
 
@@ -96,25 +95,6 @@ function buildWrapped(sig: SignatureHelp): SignatureToken[] {
 
 export function planSignatureTokens(sig: SignatureHelp, mode: SignatureWrapMode) {
   return { mode, tokens: mode === "wrapped" ? buildWrapped(sig) : buildUnwrapped(sig) };
-}
-
-export function computePopoverWidthPx(viewportWidth: number): number {
-  return Math.max(240, Math.min(360, viewportWidth * 0.28));
-}
-
-export function pickPopoverSide(args: {
-  viewportWidth: number;
-  wrapLeft: number;
-  wrapRight: number;
-  gapPx?: number;
-  popoverWidthPx: number;
-}): SignatureSide {
-  const gap = args.gapPx ?? 12;
-  const leftSpace = args.wrapLeft - gap;
-  const rightSpace = args.viewportWidth - args.wrapRight - gap;
-  if (leftSpace >= args.popoverWidthPx) return "left";
-  if (rightSpace >= args.popoverWidthPx) return "right";
-  return leftSpace >= rightSpace ? "left" : "right";
 }
 
 export function shouldUseWrappedSignature(args: {

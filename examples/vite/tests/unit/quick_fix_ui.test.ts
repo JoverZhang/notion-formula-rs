@@ -32,8 +32,8 @@ describe("native quick fixes", () => {
     view.update({ diagnostics: [diagnostic("opaque:first"), diagnostic("opaque:second")] });
     await vi.advanceTimersByTimeAsync(1);
     expect(view.actions.quickFixes.mock.calls).toEqual([
-      ["f1", "opaque:first"],
-      ["f1", "opaque:second"],
+      ["Formula 1", "opaque:first"],
+      ["Formula 1", "opaque:second"],
     ]);
     const button = view.panel.root.querySelector<HTMLButtonElement>(
       '[data-testid="quick-fix-button"]',
@@ -42,7 +42,7 @@ describe("native quick fixes", () => {
     expect(button.title).toBe(fix.title);
     button.click();
     await Promise.resolve();
-    expect(view.actions.applyEdit).toHaveBeenCalledWith("f1", fix.edit, 0);
+    expect(view.actions.applyEdit).toHaveBeenCalledWith("Formula 1", fix.edit, 0);
     expect(view.actions.applyEdit.mock.calls[0][1]).toBe(fix.edit);
     expect(view.editor.state.doc.toString()).toBe("if()");
     expect(view.actions.setSource).not.toHaveBeenCalled();

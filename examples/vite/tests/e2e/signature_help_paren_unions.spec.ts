@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test("signature help renders parenthesized unions inside label", async ({ page }) => {
   const src = 'if(true, 42, [42, "42"])';
-  await setEditorContent(page, "f1", src);
+  await setEditorContent(page, "Formula 1", src);
 
   const cursor = await page.evaluate((source) => {
     const pos = source.lastIndexOf('"42"');
@@ -17,11 +17,13 @@ test("signature help renders parenthesized unions inside label", async ({ page }
   expect(cursor).not.toBeNull();
 
   await page.evaluate((pos) => {
-    window.__nf_debug?.setSelectionHead("f1", pos ?? 0);
+    window.__nf_debug?.setSelectionHead("Formula 1", pos ?? 0);
   }, cursor);
   await waitForCompletionDebounce(page);
 
-  const signature = page.locator('[data-testid="suggestion-signature"][data-formula-id="f1"]');
+  const signature = page.locator(
+    '[data-testid="suggestion-signature"][data-formula-id="Formula 1"]',
+  );
   await expect(signature).toBeVisible({ timeout: 5_000 });
   await expect(signature).toContainText("(number | string)[]");
   await expect(signature).not.toContainText("undefined");
