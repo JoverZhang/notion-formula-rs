@@ -7,8 +7,12 @@ use ts_rs::TS;
 pub use super::v1::{CompletionItem, SignatureItem, Span, TextEdit, Token};
 pub type PropertyId = String;
 pub type RowId = String;
+/// JavaScript bigint; numeric values are rejected on input.
 pub type DraftVersion = u64;
+/// Opaque native ID; the Worker client adds its own session scope.
 pub type DiagnosticId = String;
+/// Finite integer UTF-16 code units, 0..=4_294_967_295; ranges are half-open.
+/// Surrogate-pair interiors floor to the scalar start before overlap checks.
 pub type TextOffset = u32;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 pub enum ValueType {
@@ -61,6 +65,8 @@ pub struct FormulaEngineChangeResult {
     pub affected_formulas: Vec<PropertyId>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+/// Number retains NaN, infinities and signed zero. Date uses bigint milliseconds.
+/// Ordinary nested null is represented by None, serialized as JavaScript null.
 pub enum Value {
     Number(f64),
     String(String),
@@ -70,6 +76,7 @@ pub enum Value {
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
+/// validity[i] distinguishes an ordinary null from values[i]; row errors are separate.
 pub struct ColumnData<T> {
     pub values: Vec<T>,
     pub validity: Vec<bool>,
@@ -94,6 +101,7 @@ pub enum ColumnKind {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
+/// One caller-provided time and timezone snapshot per request. now is a strict bigint.
 pub struct RuntimeContext {
     #[serde(deserialize_with = "deserialize_i64_bigint")]
     pub now: i64,
@@ -101,6 +109,7 @@ pub struct RuntimeContext {
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
+/// columns must be a JavaScript Map; records and other iterables are rejected.
 pub struct EvaluateInput {
     pub row_ids: Vec<RowId>,
     #[serde(deserialize_with = "deserialize_columns")]
@@ -110,6 +119,7 @@ pub struct EvaluateInput {
     pub formula_ids: Vec<PropertyId>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
+/// formulas is a JavaScript Map, preserving IDs such as "__proto__".
 pub struct EvaluateResult {
     #[ts(
         type = "Map<PropertyId, { Ok: FormulaOutput } | { Err: FormulaEvaluationError }>"
@@ -218,6 +228,7 @@ pub struct CursorHelp {
 }
 #[derive(Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
+/// Edits use the original source; base_version must be a bigint.
 pub struct FormulaEdit {
     #[serde(deserialize_with = "deserialize_u64_bigint")]
     pub base_version: DraftVersion,

@@ -29,6 +29,8 @@ check: docs-check check-rust check-example-vite
 
 check-rust:
   cargo fmt --all -- --check
+  cargo run --locked -p md-first -- --check .
+  cargo run --locked -p analyzer_wasm --bin export_ts -- --check
   cargo check
   cargo clippy
 
@@ -38,6 +40,7 @@ check-example-vite: wasm
 docs-check:
   node --test scripts/check-docs.test.mjs
   node scripts/check-docs.mjs
+  node scripts/generate-wasm-client.mjs --check
 
 typecheck:
   cargo check
@@ -55,6 +58,7 @@ bootstrap-md-first:
   cargo run --locked -p md-first -- --check .
 
 gen-ts:
+  node scripts/generate-wasm-client.mjs
   cargo run -p analyzer_wasm --bin export_ts
 
 wasm:

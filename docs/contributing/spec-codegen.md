@@ -14,9 +14,21 @@ last_verified: 2026-09-17
 
 [简体中文](spec-codegen.zh-CN.md)
 
-`spec-codegen` turns selected Markdown declarations into Rust headers. Keep interface declarations
-in a canonical document and private state and method bodies in handwritten Rust. Existing Engine
-and builtin declarations have not been migrated.
+Keep interface declarations in a canonical document and private state and method bodies in handwritten Rust.
+Engine, Draft and WASM Rust declarations use `md-first` blocks marked `out=...h.rs`;
+the [WASM client](../specs/wasm-api.md) TypeScript block uses `spec-file=...client.h.ts`.
+Regenerate from the English sources and check parity before committing:
+
+```sh
+cargo run --locked -p md-first -- .
+just gen-ts
+cargo run --locked -p md-first -- --check .
+cargo run --locked -p analyzer_wasm --bin export_ts -- --check
+node scripts/generate-wasm-client.mjs --check
+```
+
+Rust compilation checks generated Rust interfaces; the Vite TypeScript checks compile the generated client
+interfaces and DTOs. The following sections describe the separate `spec-codegen` generator's `header=...` blocks.
 
 ## Mark declarations, not examples
 
