@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SignatureHelp } from "../../src/analyzer/generated/wasm_dto";
+import type { SignatureHelp } from "../../src/formula/client";
 import { createSignaturePopover } from "../../src/ui/signature_popover";
 
 function makeLongSignatureHelp(): SignatureHelp {
@@ -82,5 +82,31 @@ describe("signature popover render", () => {
     expect(signatureEl.dataset.wrap).toBe("wrapped");
     expect(signatureEl.classList.contains("hidden")).toBe(false);
     expect(signatureEl.querySelectorAll(".completion-signature-main br").length).toBeGreaterThan(0);
+  });
+
+  it("ignores a pending wrap frame after hide or dispose", () => {
+    let wrap!: FrameRequestCallback;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      wrap = callback;
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    const editorWrap = document.createElement("div");
+    const signatureEl = document.createElement("div");
+    Object.defineProperty(signatureEl, "clientWidth", { configurable: true, value: 280 });
+    Object.defineProperty(signatureEl, "scrollWidth", { configurable: true, value: 520 });
+    const popover = createSignaturePopover(signatureEl, editorWrap);
+    popover.render(makeLongSignatureHelp(), [], true);
+    const pending = wrap;
+    popover.hide();
+    popover.render(null, ["error 1:1: current diagnostic"], true);
+    pending(0);
+    expect(signatureEl.querySelector(".completion-signature-main")).toBeNull();
+    expect(signatureEl.textContent).toContain("current diagnostic");
+    popover.dispose();
+    pending(0);
+    popover.render(makeLongSignatureHelp(), [], true);
+    expect(signatureEl.textContent).toBe("");
+    expect(signatureEl.classList.contains("hidden")).toBe(true);
   });
 });

@@ -160,6 +160,8 @@ body {
 
 .theme-toggle,
 .format-button,
+.save-button,
+.discard-button,
 .quick-fix-button {
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -183,6 +185,8 @@ body {
 
 .theme-toggle:hover,
 .format-button:hover,
+.save-button:hover,
+.discard-button:hover,
 .quick-fix-button:hover {
   transform: translateY(-1px);
   border-color: var(--border-strong);
@@ -191,11 +195,15 @@ body {
 
 .theme-toggle:active,
 .format-button:active,
+.save-button:active,
+.discard-button:active,
 .quick-fix-button:active {
   transform: translateY(0);
 }
 
 .format-button:disabled,
+.save-button:disabled,
+.discard-button:disabled,
 .quick-fix-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -233,6 +241,17 @@ body {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.table-output-type {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .table-scroll {
@@ -287,6 +306,20 @@ body {
 
 .formula-cell.is-error {
   color: var(--danger);
+}
+
+.app-error,
+.formula-error,
+.table-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.formula-dirty {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .formula-section {
@@ -385,6 +418,7 @@ body {
 
 .formula-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
   gap: 10px;
@@ -809,6 +843,8 @@ body {
 
   .theme-toggle,
   .format-button,
+  .save-button,
+  .discard-button,
   .quick-fix-button,
   .completion-item,
   .editor .cm-editor {

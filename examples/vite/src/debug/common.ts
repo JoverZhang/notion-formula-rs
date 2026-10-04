@@ -1,5 +1,5 @@
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
-import type { AnalyzerDiagnostic, FormulaId } from "../app/types";
+import type { FormulaDiagnostic, FormulaId } from "../app/types";
 import type { ChipSpan } from "../chip_spans";
 import type { ChipDecorationRange } from "../editor/chip_decorations";
 import type { TokenDecorationRange } from "../editor_decorations";
@@ -15,7 +15,7 @@ export interface NfDebug {
   listPanels(): FormulaId[];
   getState(id: FormulaId): DebugState;
   getSelectionHead(id: FormulaId): number;
-  getAnalyzerDiagnostics(id: FormulaId): AnalyzerDiagnostic[];
+  getAnalyzerDiagnostics(id: FormulaId): FormulaDiagnostic[];
   getCmDiagnostics(id: FormulaId): CmDiagnostic[];
   getTokenDecorations(id: FormulaId): TokenDecorationRange[];
   getChipSpans(id: FormulaId): { start: number; end: number }[];
@@ -36,7 +36,7 @@ declare global {
 export type PanelDebugHandle = {
   getState(): DebugState;
   getSelectionHead(): number;
-  getAnalyzerDiagnostics(): AnalyzerDiagnostic[];
+  getAnalyzerDiagnostics(): FormulaDiagnostic[];
   getCmDiagnostics(): CmDiagnostic[];
   getTokenDecorations(): TokenDecorationRange[];
   getChipSpans(): ChipSpan[];

@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Diagnostic } from "../../src/analyzer/generated/wasm_dto";
+import type { ExpressionDiagnostic } from "../../src/formula/client";
 import { buildDiagnosticTextRows } from "../../src/model/diagnostics";
 
-function diag(overrides: Partial<Diagnostic>): Diagnostic {
+function diag(overrides: Partial<ExpressionDiagnostic>): ExpressionDiagnostic {
   return {
-    kind: "error",
+    id: "opaque-diagnostic-id",
     message: "msg",
     span: { start: 0, end: 1 },
-    line: 1,
-    col: 1,
-    actions: [],
     ...overrides,
   };
 }
@@ -18,7 +15,7 @@ describe("buildDiagnosticTextRows", () => {
   it("includes 1-based line/col", () => {
     const rows = buildDiagnosticTextRows(
       "1 +\n2 *",
-      [diag({ message: "expected expression", line: 2, col: 3 })],
+      [diag({ message: "expected expression", span: { start: 6, end: 7 } })],
       null,
       [],
     );
@@ -28,8 +25,8 @@ describe("buildDiagnosticTextRows", () => {
 
   it("keeps chip position suffix with line/col prefix", () => {
     const rows = buildDiagnosticTextRows(
-      "x",
-      [diag({ message: "expected expression", line: 4, col: 9, span: { start: 2, end: 3 } })],
+      "abx",
+      [diag({ message: "expected expression", span: { start: 2, end: 3 } })],
       {
         toChipPos: (rawPos: number) => rawPos,
         toRawPos: (chipPos: number) => chipPos,
@@ -37,6 +34,12 @@ describe("buildDiagnosticTextRows", () => {
       [],
     );
 
-    expect(rows).toEqual(["error 4:9: expected expression chipPos=[2,3)"]);
+    expect(rows).toEqual(["error 1:3: expected expression chipPos=[2,3)"]);
+  });
+
+  it("computes columns from UTF-16 source offsets", () => {
+    expect(
+      buildDiagnosticTextRows("😀\nx", [diag({ span: { start: 3, end: 4 } })], null, []),
+    ).toEqual(["error 2:1: msg"]);
   });
 });

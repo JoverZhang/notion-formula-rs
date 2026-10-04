@@ -1,4 +1,4 @@
-import type { SignatureHelp } from "../analyzer/wasm_client";
+import type { SignatureHelp } from "../formula/client";
 
 export type SignatureSide = "left" | "right";
 export type SignatureWrapMode = "unwrapped" | "wrapped";

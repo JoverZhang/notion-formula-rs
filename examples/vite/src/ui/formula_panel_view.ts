@@ -2,17 +2,14 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { linter, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, keymap } from "@codemirror/view";
-import type { TextEdit } from "../analyzer/generated/wasm_dto";
-import {
-  applyCompletionItem,
-  apply_edits,
-  format,
-  safeBuildCompletionState,
-  type CompletionItem,
-  type SignatureHelp,
-} from "../analyzer/wasm_client";
 import { PROPERTY_SCHEMA } from "../app/context";
-import type { AnalyzerDiagnostic, FormulaId, FormulaState } from "../app/types";
+import {
+  FORMULA_IDS,
+  type FormulaDiagnostic,
+  type FormulaEditorActions,
+  type FormulaId,
+  type FormulaState,
+} from "../app/types";
 import { buildChipOffsetMap, type ChipOffsetMap, type ChipSpan } from "../chip_spans";
 import { registerPanelDebug } from "../debug/debug_bridge";
 import {
@@ -32,8 +29,17 @@ import {
   type Chip,
   type TokenDecorationRange,
 } from "../editor_decorations";
+import type {
+  CompletionItem,
+  DraftVersion,
+  QuickFix,
+  SignatureHelp,
+  UpdateExpressionResult,
+} from "../formula/client";
 import {
   buildCompletionRows,
+  createCompletionEdit,
+  getCompletionCursor,
   getSelectedItemIndex,
   nextSelectedRowIndex,
   normalizeSelectedRowIndex,
@@ -46,17 +52,20 @@ import {
   mergeChipRangesWithDiagnostics,
   toCmDiagnostics,
 } from "../model/diagnostics";
+import { formatValueType } from "../model/values";
 import { createSignaturePopover } from "./signature_popover";
 
 type FormulaPanelView = {
   root: HTMLElement;
   mount(parent: HTMLElement): void;
-  update(state: FormulaState): void;
+  update(state: FormulaState, saving?: boolean): void;
+  dispose(): void;
 };
 
-type PropName = (typeof PROPERTY_SCHEMA)[number]["name"];
-
-const VALID_PROP_NAMES = new Set<PropName>(PROPERTY_SCHEMA.map((prop) => prop.name));
+const VALID_PROP_NAMES = new Set<string>([
+  ...PROPERTY_SCHEMA.map((prop) => prop.id),
+  ...FORMULA_IDS,
+]);
 const COMPLETION_DEBOUNCE_MS = 120;
 
 type ActiveFormulaPanelUi = {
@@ -99,33 +108,15 @@ function must<T extends Element>(root: ParentNode, selector: string): T {
   return node as T;
 }
 
-function isValidPropChip(chip: Chip): chip is Chip & { argValue: PropName } {
+function isValidPropChip(chip: Chip): boolean {
   return VALID_PROP_NAMES.has(chip.argValue);
-}
-
-export function firstDiagnosticAction(
-  diagnostics: AnalyzerDiagnostic[],
-): { title: string; edits: TextEdit[] } | null {
-  for (const diag of diagnostics) {
-    for (const action of diag.actions ?? []) {
-      if (!action) continue;
-      const edits = (action.edits ?? []).filter((edit) => {
-        const from = edit?.range?.start;
-        const to = edit?.range?.end;
-        return typeof from === "number" && typeof to === "number" && from >= 0 && to >= from;
-      });
-      if (edits.length === 0) continue;
-      return { title: action.title ?? "Apply quick fix", edits };
-    }
-  }
-  return null;
 }
 
 export function createFormulaPanelView(opts: {
   id: FormulaId;
   label: string;
   initialSource: string;
-  onSourceChange: (id: FormulaId, source: string) => void;
+  actions: FormulaEditorActions;
 }): FormulaPanelView {
   const panel = document.createElement("section");
   panel.className = "formula-panel";
@@ -141,10 +132,14 @@ export function createFormulaPanelView(opts: {
         <div class="formula-actions">
           <button class="format-button" type="button" data-testid="format-button" data-formula-id="${opts.id}">Format</button>
           <button class="quick-fix-button" type="button" data-testid="quick-fix-button" data-formula-id="${opts.id}" disabled>Quick Fix</button>
+          <button class="save-button" type="button" data-testid="save-button" data-formula-id="${opts.id}" disabled>Save</button>
+          <button class="discard-button" type="button" data-testid="discard-button" data-formula-id="${opts.id}" disabled>Discard</button>
+          <span class="formula-dirty hidden" data-testid="formula-dirty" data-formula-id="${opts.id}">Unsaved changes</span>
           <div class="formula-output-type" data-testid="formula-output-type" data-formula-id="${opts.id}">
             <span class="formula-output-type-value"></span>
           </div>
         </div>
+        <div class="formula-error hidden" role="alert" data-testid="formula-error" data-formula-id="${opts.id}"></div>
         <div class="completion-panel hidden" data-testid="completion-panel" data-formula-id="${opts.id}">
           <div class="completion-header">Completions</div>
           <div class="completion-body">
@@ -165,6 +160,10 @@ export function createFormulaPanelView(opts: {
   const editorEl = must<HTMLElement>(panel, '.editor[data-testid="formula-editor"]');
   const formatBtn = must<HTMLButtonElement>(panel, ".format-button");
   const quickFixBtn = must<HTMLButtonElement>(panel, ".quick-fix-button");
+  const saveBtn = must<HTMLButtonElement>(panel, ".save-button");
+  const discardBtn = must<HTMLButtonElement>(panel, ".discard-button");
+  const dirtyEl = must<HTMLElement>(panel, ".formula-dirty");
+  const errorEl = must<HTMLElement>(panel, ".formula-error");
   const outputTypeEl = must<HTMLElement>(panel, ".formula-output-type");
   const outputTypeValueEl = must<HTMLElement>(panel, ".formula-output-type-value");
   const completionPanel = must<HTMLElement>(
@@ -184,6 +183,32 @@ export function createFormulaPanelView(opts: {
   let completionRows: CompletionRenderRow[] = [];
   let selectedRowIndex = -1;
   let completionTimer: ReturnType<typeof setTimeout> | null = null;
+  let helpGeneration = 0;
+  let quickFixGeneration = 0;
+  let helpContext: { source: string; cursor: number; version: DraftVersion } | null = null;
+  let disposed = false;
+  let suppressSourceChange = false;
+  let inSourceChange = false;
+  let queuedUpdate: { state: FormulaState; saving: boolean } | null = null;
+  let updateQueued = false;
+  let userRevision = 0;
+  let blurRaf: number | null = null;
+  let lastDiagnostics: FormulaDiagnostic[] = [];
+  let lastCmDiagnostics: CmDiagnostic[] = [];
+  let lastTokenRanges: TokenDecorationRange[] = [];
+  let lastChipUiRanges: ChipDecorationRange[] = [];
+  let lastChipSpans: ChipSpan[] = [];
+  let lastChipMap: ChipOffsetMap | null = null;
+  let lastQuickFixAction: QuickFix | null = null;
+  let lastOutputType = "unknown";
+  let lastSource = opts.initialSource;
+  let lastVersion: DraftVersion | null = null;
+  let lastStateCursor: number | null = null;
+  let lastDirty = false;
+  let lastSaving = false;
+  let commandPending = false;
+  let commandRevision: number | null = null;
+  let quickFixKey = "";
 
   const signaturePopover = createSignaturePopover(signatureEl, editorWrap);
 
@@ -288,29 +313,163 @@ export function createFormulaPanelView(opts: {
 
   function requestCompletions(view: EditorView) {
     if (completionTimer) clearTimeout(completionTimer);
+    completionTimer = null;
+    const generation = ++helpGeneration;
+    const source = view.state.doc.toString();
+    const cursor = view.state.selection.main.head;
+    helpContext = null;
+    completionItems = [];
+    signatureHelp = null;
+    preferredCompletionIndices = [];
+    selectedRowIndex = -1;
+    rerenderCompletions();
+    if (disposed || !isUiActive || lastSaving) return;
+
+    const isCurrent = () =>
+      !disposed &&
+      isUiActive &&
+      !lastSaving &&
+      generation === helpGeneration &&
+      view.state.doc.toString() === source &&
+      view.state.selection.main.head === cursor;
     completionTimer = setTimeout(() => {
       completionTimer = null;
-      const source = view.state.doc.toString();
-      const cursor = view.state.selection.main.head;
-      const next = safeBuildCompletionState(source, cursor);
-      completionItems = next.items;
-      signatureHelp = next.signatureHelp;
-      preferredCompletionIndices = next.preferredIndices;
-      if (!completionItems.length) selectedRowIndex = -1;
-      rerenderCompletions();
+      if (!isCurrent()) return;
+      void opts.actions.help(opts.id, cursor).then(
+        (next) => {
+          if (!next || !isCurrent()) return;
+          helpContext = { source, cursor, version: next.base_version };
+          completionItems = next.completion.items;
+          signatureHelp = next.signature_help;
+          preferredCompletionIndices = next.completion.preferred_indices;
+          rerenderCompletions();
+        },
+        () => {},
+      );
     }, COMPLETION_DEBOUNCE_MS);
   }
 
-  function applySelectedCompletion(index: number): boolean {
-    const applyResult = applyCompletionItem(completionItems[index]);
-    if (!applyResult) return false;
-    editorView.dispatch({
-      changes: applyResult.changes,
-      selection: { anchor: applyResult.cursor },
-    });
-    requestAnimationFrame(() => editorView.focus());
-    selectedRowIndex = -1;
+  function applyNativeSelection(
+    result: UpdateExpressionResult | null,
+    revision: number,
+    cursor?: number,
+  ) {
+    if (
+      disposed ||
+      !result ||
+      revision !== userRevision ||
+      result.state.definition.expression !== editorView.state.doc.toString()
+    )
+      return;
+    const nextCursor = cursor ?? result.cursor;
+    suppressSourceChange = true;
+    try {
+      editorView.dispatch({
+        selection: { anchor: Math.max(0, Math.min(nextCursor, editorView.state.doc.length)) },
+      });
+    } finally {
+      suppressSourceChange = false;
+    }
+    if (activeFormulaPanelId === opts.id || panel.contains(document.activeElement)) {
+      editorView.focus();
+    }
     requestCompletions(editorView);
+  }
+
+  function refreshButtons() {
+    formatBtn.disabled = lastSaving || commandPending || lastVersion === null;
+    quickFixBtn.disabled = lastSaving || commandPending || !lastQuickFixAction;
+    saveBtn.disabled = lastSaving || !lastDirty || lastVersion === null;
+    discardBtn.disabled = lastSaving || !lastDirty || lastVersion === null;
+    saveBtn.textContent = lastSaving ? "Saving…" : "Save";
+    quickFixBtn.title = lastQuickFixAction?.title ?? "No quick fix available";
+  }
+
+  function runEditorCommand(
+    operation: () => Promise<UpdateExpressionResult | null>,
+    item?: CompletionItem,
+  ) {
+    const revision = userRevision;
+    commandPending = true;
+    commandRevision = revision;
+    refreshButtons();
+    void operation().then(
+      (result) => {
+        commandPending = false;
+        commandRevision = null;
+        if (disposed) return;
+        refreshButtons();
+        applyNativeSelection(
+          result,
+          revision,
+          item && result ? getCompletionCursor(item, result.cursor) : undefined,
+        );
+      },
+      (error: unknown) => {
+        commandPending = false;
+        commandRevision = null;
+        if (disposed) return;
+        refreshButtons();
+        showError(error);
+      },
+    );
+  }
+
+  function showError(error: unknown) {
+    if (disposed) return;
+    errorEl.textContent =
+      error instanceof Error ? error.message : "The operation could not finish.";
+    errorEl.classList.remove("hidden");
+  }
+
+  function requestQuickFixes(state: FormulaState) {
+    if (lastSaving) return;
+    const key = `${state.version ?? "none"}:${JSON.stringify(state.diagnostics.map((diag) => diag.id))}`;
+    if (key === quickFixKey) return;
+    quickFixKey = key;
+    const generation = ++quickFixGeneration;
+    lastQuickFixAction = null;
+    refreshButtons();
+    if (state.version === null || !state.diagnostics.length) return;
+    const source = state.source;
+    const version = state.version;
+    const isCurrent = () =>
+      !disposed &&
+      generation === quickFixGeneration &&
+      lastVersion === version &&
+      editorView.state.doc.toString() === source;
+    const findFirst = async () => {
+      for (const diagnostic of state.diagnostics) {
+        if (!isCurrent()) return;
+        const fixes = await opts.actions.quickFixes(opts.id, diagnostic.id);
+        if (!isCurrent()) return;
+        const first = fixes[0];
+        if (!first) continue;
+        lastQuickFixAction = first;
+        refreshButtons();
+        return;
+      }
+    };
+    void findFirst().catch(() => {});
+  }
+
+  function applySelectedCompletion(index: number): boolean {
+    const item = completionItems[index];
+    const context = helpContext;
+    if (
+      disposed ||
+      !item ||
+      !context ||
+      commandPending ||
+      lastSaving ||
+      context.source !== editorView.state.doc.toString() ||
+      context.cursor !== editorView.state.selection.main.head
+    )
+      return false;
+    const edit = createCompletionEdit(item, context.version);
+    if (!edit) return false;
+    selectedRowIndex = -1;
+    runEditorCommand(() => opts.actions.applyEdit(opts.id, edit, context.cursor), item);
     return true;
   }
 
@@ -379,7 +538,20 @@ export function createFormulaPanelView(opts: {
         chipAtomicRangesExt,
         lintDiagnosticsStateField,
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) opts.onSourceChange(opts.id, update.state.doc.toString());
+          if (disposed || suppressSourceChange) return;
+          if (update.docChanged || update.selectionSet) userRevision += 1;
+          if (update.docChanged) {
+            quickFixGeneration += 1;
+            quickFixKey = "";
+            lastQuickFixAction = null;
+            refreshButtons();
+            inSourceChange = true;
+            try {
+              opts.actions.setSource(opts.id, update.state.doc.toString());
+            } finally {
+              inSourceChange = false;
+            }
+          }
           if (update.docChanged || update.selectionSet) requestCompletions(update.view);
         }),
         linter((view) => view.state.field(lintDiagnosticsStateField)),
@@ -388,7 +560,7 @@ export function createFormulaPanelView(opts: {
     parent: editorEl,
   });
 
-  activeFormulaPanelUiById.set(opts.id, {
+  const activeUi: ActiveFormulaPanelUi = {
     show() {
       isUiActive = true;
       completionPanel.classList.remove("hidden");
@@ -397,75 +569,70 @@ export function createFormulaPanelView(opts: {
     },
     hide() {
       isUiActive = false;
+      helpGeneration += 1;
+      if (completionTimer) clearTimeout(completionTimer);
+      completionTimer = null;
       completionPanel.classList.add("hidden");
       signaturePopover.hide();
     },
-  });
+  };
+  activeFormulaPanelUiById.set(opts.id, activeUi);
 
-  editorView.dom.addEventListener("focusin", () => {
-    setActiveFormulaPanel(opts.id);
-  });
+  const onFocusIn = () => {
+    if (activeFormulaPanelId === opts.id) requestCompletions(editorView);
+    else setActiveFormulaPanel(opts.id);
+  };
 
-  editorView.dom.addEventListener("focusout", () => {
-    requestAnimationFrame(() => {
-      if (editorView.hasFocus) return;
+  const onFocusOut = () => {
+    helpGeneration += 1;
+    if (completionTimer) clearTimeout(completionTimer);
+    completionTimer = null;
+    signaturePopover.hide();
+    if (blurRaf !== null) cancelAnimationFrame(blurRaf);
+    blurRaf = requestAnimationFrame(() => {
+      blurRaf = null;
+      if (disposed || editorView.hasFocus) return;
       clearActiveFormulaPanel(opts.id);
     });
-  });
+  };
 
-  window.addEventListener("resize", () => {
+  const onResize = () => {
     if (!isUiActive) return;
     signaturePopover.updateSide();
-  });
-
-  let lastDiagnostics: AnalyzerDiagnostic[] = [];
-  let lastCmDiagnostics: CmDiagnostic[] = [];
-  let lastTokenRanges: TokenDecorationRange[] = [];
-  let lastChipUiRanges: ChipDecorationRange[] = [];
-  let lastChipSpans: ChipSpan[] = [];
-  let lastChipMap: ChipOffsetMap | null = null;
-  let lastQuickFixAction: { title: string; edits: TextEdit[] } | null = null;
-  let lastOutputType = "unknown";
-  let lastSource = opts.initialSource;
+  };
+  editorView.dom.addEventListener("focusin", onFocusIn);
+  editorView.dom.addEventListener("focusout", onFocusOut);
+  window.addEventListener("resize", onResize);
 
   rerenderCompletions();
 
-  formatBtn.addEventListener("click", () => {
-    const current = editorView.state.doc.toString();
+  const onFormat = () => {
+    if (formatBtn.disabled || disposed) return;
     const cursor = editorView.state.selection.main.head;
-    try {
-      const applied = format(current, cursor);
-      if (applied.source === current && applied.cursor === cursor) return;
-      editorView.dispatch({
-        changes: { from: 0, to: editorView.state.doc.length, insert: applied.source },
-        selection: { anchor: Math.max(0, Math.min(applied.cursor, applied.source.length)) },
-      });
-      editorView.focus();
-    } catch {
-      return;
-    }
-  });
+    runEditorCommand(() => opts.actions.format(opts.id, cursor));
+  };
 
-  quickFixBtn.addEventListener("click", () => {
+  const onQuickFix = () => {
+    if (quickFixBtn.disabled || disposed) return;
     const action = lastQuickFixAction;
-    if (!action || !action.edits.length) return;
-
-    const current = editorView.state.doc.toString();
+    if (!action) return;
     const cursor = editorView.state.selection.main.head;
-    try {
-      const applied = apply_edits(current, action.edits, cursor);
-      if (applied.source === current && applied.cursor === cursor) return;
-      editorView.dispatch({
-        changes: { from: 0, to: editorView.state.doc.length, insert: applied.source },
-        selection: { anchor: Math.max(0, Math.min(applied.cursor, applied.source.length)) },
-      });
-      editorView.focus();
-    } catch {
-      return;
-    }
-  });
+    runEditorCommand(() => opts.actions.applyEdit(opts.id, action.edit, cursor));
+  };
+  const onSave = () => {
+    if (saveBtn.disabled || disposed) return;
+    void opts.actions.save(opts.id).catch(showError);
+  };
+  const onDiscard = () => {
+    if (discardBtn.disabled || disposed) return;
+    void opts.actions.discard(opts.id).catch(showError);
+  };
+  formatBtn.addEventListener("click", onFormat);
+  quickFixBtn.addEventListener("click", onQuickFix);
+  saveBtn.addEventListener("click", onSave);
+  discardBtn.addEventListener("click", onDiscard);
 
-  registerPanelDebug(opts.id, {
+  const unregisterDebug = registerPanelDebug(opts.id, {
     getState: () => ({
       source: lastSource,
       outputType: lastOutputType,
@@ -488,21 +655,75 @@ export function createFormulaPanelView(opts: {
     getChipUiCount: () => lastChipUiRanges.length,
   });
 
-  return {
+  const result: FormulaPanelView = {
     root: panel,
     mount(parent: HTMLElement) {
       parent.appendChild(panel);
     },
-    update(state: FormulaState) {
+    update(state: FormulaState, saving = false) {
+      if (disposed) return;
+      // setSource may notify synchronously from inside CodeMirror's update listener.
+      if (inSourceChange) {
+        queuedUpdate = { state, saving };
+        if (!updateQueued) {
+          updateQueued = true;
+          queueMicrotask(() => {
+            updateQueued = false;
+            const pending = queuedUpdate;
+            queuedUpdate = null;
+            if (pending && !disposed) result.update(pending.state, pending.saving);
+          });
+        }
+        return;
+      }
+      queuedUpdate = null;
+      const sourceChanged = state.source !== editorView.state.doc.toString();
+      const versionChanged = state.version !== lastVersion;
+      const cursorChanged = state.cursor !== lastStateCursor;
+      // AppVM publishes native state before the command Promise resolves.
+      const stateCursorCurrent =
+        state.cursor !== null && (commandRevision === null || commandRevision === userRevision);
+      const updateCursor = cursorChanged && stateCursorCurrent;
+      const savingChanged = saving !== lastSaving;
       lastSource = state.source;
       lastDiagnostics = state.diagnostics;
-      lastQuickFixAction = firstDiagnosticAction(state.diagnostics);
-      lastOutputType = state.outputType;
-      quickFixBtn.disabled = !lastQuickFixAction;
-      quickFixBtn.title = lastQuickFixAction ? lastQuickFixAction.title : "No quick fix available";
-      const outputTypeLabel = `output: ${state.outputType}`;
+      lastVersion = state.version;
+      lastStateCursor = state.cursor;
+      lastDirty = state.dirty;
+      lastSaving = saving;
+      if (savingChanged) {
+        quickFixGeneration += 1;
+        quickFixKey = "";
+        lastQuickFixAction = null;
+      }
+      lastOutputType = formatValueType(state.outputType);
+      dirtyEl.classList.toggle("hidden", !state.dirty);
+      errorEl.textContent = state.error ?? "";
+      errorEl.classList.toggle("hidden", !state.error);
+      refreshButtons();
+      const outputTypeLabel = `output: ${lastOutputType}`;
       outputTypeValueEl.textContent = outputTypeLabel;
       outputTypeEl.title = outputTypeLabel;
+
+      if (sourceChanged || updateCursor) {
+        const selection = editorView.state.selection.main;
+        const anchor = stateCursorCurrent ? state.cursor! : selection.anchor;
+        const head = stateCursorCurrent ? state.cursor! : selection.head;
+        suppressSourceChange = true;
+        try {
+          editorView.dispatch({
+            changes: sourceChanged
+              ? { from: 0, to: editorView.state.doc.length, insert: state.source }
+              : undefined,
+            selection: {
+              anchor: Math.max(0, Math.min(anchor, state.source.length)),
+              head: Math.max(0, Math.min(head, state.source.length)),
+            },
+          });
+        } finally {
+          suppressSourceChange = false;
+        }
+      }
 
       const docLen = state.source.length;
       const sortedTokens = sortTokens(state.tokens || []);
@@ -549,6 +770,34 @@ export function createFormulaPanelView(opts: {
       const cmDiagnostics = toCmDiagnostics(state.diagnostics, docLen, lastChipSpans);
       lastCmDiagnostics = cmDiagnostics;
       editorView.dispatch({ effects: setLintDiagnosticsEffect.of(cmDiagnostics) });
+      requestQuickFixes(state);
+      if (sourceChanged || versionChanged || savingChanged || updateCursor) {
+        requestCompletions(editorView);
+      }
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      helpGeneration += 1;
+      quickFixGeneration += 1;
+      if (completionTimer) clearTimeout(completionTimer);
+      if (blurRaf !== null) cancelAnimationFrame(blurRaf);
+      if (activeFormulaPanelUiById.get(opts.id) === activeUi) {
+        clearActiveFormulaPanel(opts.id);
+        activeFormulaPanelUiById.delete(opts.id);
+      }
+      editorView.dom.removeEventListener("focusin", onFocusIn);
+      editorView.dom.removeEventListener("focusout", onFocusOut);
+      window.removeEventListener("resize", onResize);
+      formatBtn.removeEventListener("click", onFormat);
+      quickFixBtn.removeEventListener("click", onQuickFix);
+      saveBtn.removeEventListener("click", onSave);
+      discardBtn.removeEventListener("click", onDiscard);
+      unregisterDebug();
+      signaturePopover.dispose();
+      editorView.destroy();
+      panel.remove();
     },
   };
+  return result;
 }

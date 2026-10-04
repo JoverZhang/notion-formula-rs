@@ -1,4 +1,4 @@
-import type { SignatureHelp } from "../analyzer/wasm_client";
+import type { SignatureHelp } from "../formula/client";
 import {
   computePopoverWidthPx,
   planSignatureTokens,
@@ -86,8 +86,17 @@ function paintPopover(
 
 export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTMLElement) {
   let wrapRaf: number | null = null;
+  let generation = 0;
+  let disposed = false;
+
+  const cancelWrap = () => {
+    generation += 1;
+    if (wrapRaf !== null) cancelAnimationFrame(wrapRaf);
+    wrapRaf = null;
+  };
 
   const updateSide = () => {
+    if (disposed) return;
     const viewportWidth = document.documentElement.clientWidth || window.innerWidth || 0;
     const wrapRect = editorWrap.getBoundingClientRect();
     signatureEl.dataset.side = pickPopoverSide({
@@ -99,12 +108,15 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
   };
 
   const hide = () => {
+    cancelWrap();
     signatureEl.classList.add("hidden");
     signatureEl.textContent = "";
     delete signatureEl.dataset.wrap;
   };
 
   const render = (signature: SignatureHelp | null, diagnostics: string[], isActive: boolean) => {
+    if (disposed) return;
+    cancelWrap();
     if (!isActive) {
       hide();
       return;
@@ -122,10 +134,15 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
     }
     const signatureMain = unwrapped.signatureMain;
 
-    if (wrapRaf !== null) cancelAnimationFrame(wrapRaf);
+    const requestGeneration = generation;
     wrapRaf = requestAnimationFrame(() => {
       wrapRaf = null;
-      if (!isActive || signatureEl.classList.contains("hidden") || signatureEl.clientWidth === 0)
+      if (
+        disposed ||
+        requestGeneration !== generation ||
+        signatureEl.classList.contains("hidden") ||
+        signatureEl.clientWidth === 0
+      )
         return;
       const hasMainOverflow = shouldUseWrappedSignature({
         scrollWidth: signatureMain.scrollWidth,
@@ -141,5 +158,10 @@ export function createSignaturePopover(signatureEl: HTMLElement, editorWrap: HTM
     });
   };
 
-  return { render, hide, updateSide };
+  const dispose = () => {
+    hide();
+    disposed = true;
+  };
+
+  return { render, hide, updateSide, dispose };
 }
