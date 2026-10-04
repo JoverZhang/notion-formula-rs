@@ -1,5 +1,5 @@
 import "./style.css";
-import { ANALYZER_CONFIG } from "./app/context";
+import { FORMULA_DEMOS } from "./app/context";
 import { FORMULA_IDS, type FormulaId } from "./app/types";
 import { createFormulaPanelView } from "./ui/formula_panel_view";
 import { createRootLayoutView } from "./ui/layout";
@@ -7,55 +7,33 @@ import { createFormulaTableView } from "./ui/table_view";
 import { initThemeToggle } from "./ui/theme";
 import { AppVM } from "./vm/app_vm";
 
-const FORMULA_DEMOS: Record<FormulaId, { label: string; sample: string }> = {
-  f1: {
-    label: "Formula 1",
-    sample: `if(
-  sum(prop("Number"), [1, 2, 3]) > 20,
-  prop("Text"),
-  [
-    prop("Date"),
-    12,
-    ["34", 56]
-  ]
-)`,
-  },
-  f2: {
-    label: "Formula 2",
-    sample: `(prop("Number") < 1).ifs(
-  prop("Title"),
-  prop("Number") < 2,
-  [prop("Number")],
-  prop("Number") < 3,
-  prop("Date"),
-  4
-)`,
-  },
-};
-
-const isError = (diagnostics: { kind?: string; severity?: string }[]) =>
-  diagnostics.some((diag) => (diag.kind ?? diag.severity ?? "").toLowerCase() === "error");
-
 async function start() {
   const appEl = document.querySelector<HTMLElement>("#app");
   if (!appEl) throw new Error("Missing element: #app");
 
   const layout = createRootLayoutView();
   layout.mount(appEl);
-  initThemeToggle(layout.themeToggle);
+  const disposeTheme = initThemeToggle(layout.themeToggle);
+
+  const errorBanner = document.createElement("p");
+  errorBanner.className = "app-error";
+  errorBanner.setAttribute("role", "alert");
+  errorBanner.setAttribute("data-testid", "app-error");
+  errorBanner.hidden = true;
+  layout.slots.tables.before(errorBanner);
 
   const tableView = createFormulaTableView();
   tableView.mount(layout.slots.tables);
 
   const panelViews: Partial<Record<FormulaId, ReturnType<typeof createFormulaPanelView>>> = {};
+  let disposed = false;
   const vm = new AppVM({
-    analyzerConfig: ANALYZER_CONFIG,
     onStateChange: (state) => {
-      for (const id of FORMULA_IDS) panelViews[id]?.update(state.formulas[id]);
-      tableView.updateFormulaStatus({
-        f1: isError(state.formulas.f1.diagnostics),
-        f2: isError(state.formulas.f2.diagnostics),
-      });
+      if (disposed) return;
+      for (const id of FORMULA_IDS) panelViews[id]?.update(state.formulas[id], state.saving);
+      tableView.update(state.evaluation, state.error);
+      errorBanner.textContent = state.error ?? "";
+      errorBanner.hidden = !state.error;
     },
   });
 
@@ -65,14 +43,45 @@ async function start() {
       id,
       label: meta.label,
       initialSource: meta.sample,
-      onSourceChange: (formulaId, source) => vm.setSource(formulaId, source),
+      actions: vm,
     });
     panelViews[id] = view;
     view.mount(layout.slots.panels);
   }
 
-  await vm.start();
-  for (const id of FORMULA_IDS) vm.setSource(id, FORMULA_DEMOS[id].sample);
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    window.removeEventListener("pagehide", onPageHide);
+    disposeTheme();
+    for (const id of FORMULA_IDS) panelViews[id]?.dispose();
+    layout.root.remove();
+    void vm.dispose().catch((error) => console.error("Unable to close formula session", error));
+  };
+  // A persisted page remains alive in the back-forward cache; its Worker and
+  // unsaved buffers resume when the browser restores it.
+  const onPageHide = (event: PageTransitionEvent) => {
+    if (!event.persisted) dispose();
+  };
+  window.addEventListener("pagehide", onPageHide);
+  import.meta.hot?.dispose(dispose);
+
+  try {
+    await vm.start();
+  } catch (error) {
+    if (disposed) return;
+    if (!errorBanner.textContent) {
+      errorBanner.textContent = error instanceof Error ? error.message : String(error);
+    }
+    errorBanner.hidden = false;
+  }
 }
 
-start().catch((e) => console.error(e));
+void start().catch((error) => {
+  console.error("Unable to start formula demo", error);
+  const app = document.querySelector<HTMLElement>("#app");
+  if (app) {
+    app.textContent = error instanceof Error ? error.message : String(error);
+    app.setAttribute("role", "alert");
+  }
+});

@@ -1,4 +1,16 @@
-import type { CompletionItem } from "../analyzer/wasm_client";
+import type { CompletionItem, DraftVersion, FormulaEdit } from "../formula/client";
+
+export function createCompletionEdit(
+  item: CompletionItem | undefined,
+  baseVersion: DraftVersion,
+): FormulaEdit | null {
+  if (!item || item.is_disabled || !item.primary_edit) return null;
+  return { base_version: baseVersion, edits: [item.primary_edit, ...item.additional_edits] };
+}
+
+export function getCompletionCursor(item: CompletionItem, nativeCursor: number): number {
+  return item.cursor ?? nativeCursor;
+}
 
 export const COMPLETION_ROW_LABEL_GROUP = 1 << 0;
 export const COMPLETION_ROW_LABEL_RECOMMENDED = 1 << 1;

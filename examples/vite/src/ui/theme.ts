@@ -32,9 +32,11 @@ export function initThemeToggle(button: HTMLButtonElement) {
   applyTheme(current);
   syncToggleLabel(button, current);
 
-  button.addEventListener("click", () => {
+  const toggle = () => {
     current = current === "dark" ? "light" : "dark";
     applyTheme(current);
     syncToggleLabel(button, current);
-  });
+  };
+  button.addEventListener("click", toggle);
+  return () => button.removeEventListener("click", toggle);
 }

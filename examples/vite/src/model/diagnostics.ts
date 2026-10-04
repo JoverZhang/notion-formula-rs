@@ -1,5 +1,5 @@
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
-import type { AnalyzerDiagnostic } from "../app/types";
+import type { FormulaDiagnostic } from "../app/types";
 import type { ChipOffsetMap, ChipSpan } from "../chip_spans";
 
 type Range = { from: number; to: number };
@@ -30,13 +30,7 @@ function remapRangeToChip(range: Range, chipSpans: ChipSpan[]): Range {
   return range;
 }
 
-function toCmSeverity(kind?: string): "error" | "warning" | "info" {
-  if (kind === "warning") return "warning";
-  if (kind === "info") return "info";
-  return "error";
-}
-
-export function normalizeDiagRange(diag: AnalyzerDiagnostic, docLen: number): Range | null {
+export function normalizeDiagRange(diag: FormulaDiagnostic, docLen: number): Range | null {
   const start = diag.span?.start;
   if (typeof start !== "number") return null;
   const end = diag.span?.end;
@@ -47,7 +41,7 @@ export function normalizeDiagRange(diag: AnalyzerDiagnostic, docLen: number): Ra
 
 export function mergeChipRangesWithDiagnostics(
   chipRanges: Array<{ from: number; to: number; propName: string }>,
-  diagnostics: AnalyzerDiagnostic[],
+  diagnostics: FormulaDiagnostic[],
   docLen: number,
 ): ChipUiRange[] {
   if (chipRanges.length === 0) return [];
@@ -73,7 +67,7 @@ export function mergeChipRangesWithDiagnostics(
 }
 
 export function toCmDiagnostics(
-  diagnostics: AnalyzerDiagnostic[],
+  diagnostics: FormulaDiagnostic[],
   docLen: number,
   chipSpans: ChipSpan[] = [],
 ): CmDiagnostic[] {
@@ -87,7 +81,7 @@ export function toCmDiagnostics(
     out.push({
       from,
       to,
-      severity: toCmSeverity(diag.kind),
+      severity: "error",
       message: diag.message || "(no message)",
     });
   }
@@ -95,7 +89,7 @@ export function toCmDiagnostics(
 }
 
 function chipPosLabel(
-  diag: AnalyzerDiagnostic,
+  diag: FormulaDiagnostic,
   chipMap: ChipOffsetMap | null,
   chipSpans: ChipSpan[],
 ): string | null {
@@ -113,18 +107,21 @@ function chipPosLabel(
 }
 
 export function buildDiagnosticTextRows(
-  _source: string,
-  diagnostics: AnalyzerDiagnostic[],
+  source: string,
+  diagnostics: FormulaDiagnostic[],
   chipMap: ChipOffsetMap | null,
   chipSpans: ChipSpan[],
 ): string[] {
   if (!diagnostics.length) return ["No diagnostics"];
   return diagnostics.map((diag) => {
-    const kind = diag.kind || "error";
-    const lineColLabel = ` ${diag.line}:${diag.col}`;
+    const start = clamp(diag.span.start, 0, source.length);
+    const prefix = source.slice(0, start);
+    const line = prefix.split("\n").length;
+    const col = start - prefix.lastIndexOf("\n");
+    const lineColLabel = ` ${line}:${col}`;
     const chipLabel = chipPosLabel(diag, chipMap, chipSpans);
     return chipLabel
-      ? `${kind}${lineColLabel}: ${diag.message} ${chipLabel}`
-      : `${kind}${lineColLabel}: ${diag.message}`;
+      ? `error${lineColLabel}: ${diag.message} ${chipLabel}`
+      : `error${lineColLabel}: ${diag.message}`;
   });
 }

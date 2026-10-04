@@ -6,7 +6,7 @@ export function createRootLayoutView() {
     <header class="page-header">
       <div class="page-header-text">
         <h1 class="page-title">Notion Formula Demo</h1>
-        <p class="page-subtitle">A lightweight playground for tokens, diagnostics, and formatting.</p>
+        <p class="page-subtitle">Edit formulas, then save to calculate every row. Formula 2 uses Formula 1.</p>
       </div>
       <div class="page-header-actions">
         <button class="theme-toggle" type="button" data-testid="theme-toggle"></button>

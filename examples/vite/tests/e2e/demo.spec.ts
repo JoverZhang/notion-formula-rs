@@ -121,13 +121,18 @@ test("page layout shows table above two formula editors", async ({ page }) => {
   await expect(page.locator(".formula-label", { hasText: "Formula 2" })).toBeVisible();
 });
 
-test("formula table column shows error placeholder when parse error exists", async ({ page }) => {
+test("table evaluates saved definitions while parse errors stay in the draft", async ({ page }) => {
+  const cells = page.locator('[data-testid="formula-cell"][data-formula-id="f1"]');
+  await expect(cells).toHaveText(["24", "14", "8", "36"]);
   await setEditorContent(page, "f1", "if(");
   await waitForDiagnostics(page, "f1");
-  await waitForFormulaColumnText(page, "f1", "<error>");
+  await expect(cells).toHaveText(["24", "14", "8", "36"]);
+  await page.locator('[data-testid="save-button"][data-formula-id="f1"]').click();
+  await waitForFormulaColumnText(page, "f1", "Not ready");
 
   await setEditorContent(page, "f1", 'if(prop("Number") > 1, "ok", "no")');
-  await waitForFormulaColumnText(page, "f1", "<pending>");
+  await page.locator('[data-testid="save-button"][data-formula-id="f1"]').click();
+  await waitForFormulaColumnText(page, "f1", "ok");
 });
 
 test("token highlighting regression check", async ({ page }) => {

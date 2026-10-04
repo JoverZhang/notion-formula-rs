@@ -1,18 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { applyCompletionItem, type CompletionItem } from "../../src/analyzer/wasm_client";
+import type { CompletionItem } from "../../src/formula/client";
+import { createCompletionEdit, getCompletionCursor } from "../../src/model/completions";
 
-function applyChanges(
-  source: string,
-  changes: Array<{ from: number; to: number; insert: string }>,
-): string {
-  let text = source;
-  for (const change of [...changes].sort((a, b) => b.from - a.from || b.to - a.to)) {
-    text = text.slice(0, change.from) + change.insert + text.slice(change.to);
-  }
-  return text;
-}
-
-describe("applyCompletionItem", () => {
+describe("completion edits", () => {
   const baseItem: CompletionItem = {
     label: "x",
     kind: "FunctionGeneral",
@@ -26,30 +16,34 @@ describe("applyCompletionItem", () => {
   };
 
   it("uses explicit cursor when provided", () => {
-    const result = applyCompletionItem({
+    const item = {
       ...baseItem,
       primary_edit: { range: { start: 0, end: 5 }, new_text: "hi" },
       cursor: 1,
-    });
-    expect(result).not.toBeNull();
-    expect(result?.cursor).toBe(1);
-    expect(applyChanges("hello", result?.changes ?? [])).toBe("hi");
+    };
+    expect(getCompletionCursor(item, 5)).toBe(1);
   });
 
-  it("falls back to primary + pre-primary edit offset when cursor is missing", () => {
-    const result = applyCompletionItem({
+  it("preserves help version and original edit objects for Rust", () => {
+    const item = {
       ...baseItem,
       primary_edit: { range: { start: 2, end: 4 }, new_text: "sum()" },
       cursor: null,
       additional_edits: [{ range: { start: 0, end: 0 }, new_text: "qq" }],
+    };
+    const result = createCompletionEdit(item, 7n);
+    expect(result).toEqual({
+      base_version: 7n,
+      edits: [item.primary_edit, ...item.additional_edits],
     });
-    expect(result).not.toBeNull();
-    expect(result?.cursor).toBe(9);
-    expect(applyChanges("abxxcd", result?.changes ?? [])).toBe("qqabsum()cd");
+    expect(result?.edits[0]).toBe(item.primary_edit);
+    expect(result?.edits[1]).toBe(item.additional_edits[0]);
+    expect(getCompletionCursor(item, 9)).toBe(9);
   });
 
   it("returns null for disabled or edit-less items", () => {
-    expect(applyCompletionItem({ ...baseItem, is_disabled: true })).toBeNull();
-    expect(applyCompletionItem({ ...baseItem, primary_edit: null })).toBeNull();
+    expect(createCompletionEdit({ ...baseItem, is_disabled: true }, 3n)).toBeNull();
+    expect(createCompletionEdit({ ...baseItem, primary_edit: null }, 3n)).toBeNull();
+    expect(createCompletionEdit(undefined, 3n)).toBeNull();
   });
 });

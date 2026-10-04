@@ -36,8 +36,12 @@ const debugApi: NfDebug = {
   getChipUiCount: (id) => handleFor(id).getChipUiCount(),
 };
 
-export function registerPanelDebug(id: FormulaId, handle: PanelDebugHandle): void {
-  if (!DEBUG_ENABLED) return;
+export function registerPanelDebug(id: FormulaId, handle: PanelDebugHandle): () => void {
+  if (!DEBUG_ENABLED) return () => {};
   panelHandles.set(id, handle);
   if (!window.__nf_debug) window.__nf_debug = debugApi;
+  return () => {
+    if (panelHandles.get(id) === handle) panelHandles.delete(id);
+    if (panelHandles.size === 0 && window.__nf_debug === debugApi) delete window.__nf_debug;
+  };
 }

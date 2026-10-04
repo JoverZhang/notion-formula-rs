@@ -1,8 +1,8 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import type { Token as AnalyzerToken } from "./analyzer/generated/wasm_dto";
+import type { Token as FormulaToken } from "./formula/client";
 
-export type Token = AnalyzerToken;
+export type Token = FormulaToken;
 
 export type Chip = {
   spanStart: number;

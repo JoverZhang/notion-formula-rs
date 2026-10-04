@@ -1,6 +1,20 @@
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
-import { help, initWasm } from "../../src/analyzer/wasm_client";
-import { ANALYZER_CONFIG } from "../../src/app/context";
+import type { CursorHelp } from "../../src/formula/client";
+import init, { FormulaEngineSession } from "../../src/pkg/analyzer_wasm.js";
+
+function help(source: string, cursor: number): CursorHelp {
+  const session = new FormulaEngineSession({ properties: [] });
+  const handle = session.create_draft({ id: "signature-test", expression: source });
+  try {
+    return session.draft_help(handle, cursor, { preferred_limit: 30 }) as CursorHelp;
+  } finally {
+    session.draft_close(handle);
+    session.close();
+    session.free();
+  }
+}
 
 function sigLabelAtCloseParen(source: string): string {
   const cursor = source.lastIndexOf(")");
@@ -35,7 +49,10 @@ function sigAtCloseParen(source: string) {
 }
 
 beforeAll(async () => {
-  await initWasm(ANALYZER_CONFIG);
+  const wasmBytes = await readFile(
+    fileURLToPath(new URL("../../src/pkg/analyzer_wasm_bg.wasm", import.meta.url)),
+  );
+  await init({ module_or_path: wasmBytes });
 });
 
 describe("WASM signature help (instantiated types)", () => {
