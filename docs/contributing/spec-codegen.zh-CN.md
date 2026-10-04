@@ -7,7 +7,7 @@ counterpart: ./spec-codegen.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-17
+last_verified: 2026-10-04
 ---
 
 # 从 Markdown 生成 Rust 头文件

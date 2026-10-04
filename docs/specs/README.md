@@ -17,7 +17,7 @@ last_verified: 2026-10-03
 | Document | What it covers | Status |
 | --- | --- | --- |
 | [FormulaEngine](formula-engine.md) | Definitions, dependency compilation, state, columnar evaluation | Current |
-| [WASM API](wasm-api.md) | Worker clients, data formats, coordinates, lifetime | Planned (Worker clients); Current (Analyzer) |
+| [WASM API](wasm-api.md) | Worker clients, data formats, coordinates, lifetime | Current |
 | [IDE / FormulaDraft](ide.md) | Drafts, completion and signature help, quick fixes, formatting, edits, commit and discard | Current |
 | [Formula grammar](formula-language.md) | EBNF, property references, operators, nulls, failure boundaries | Current |
 | [Builtins](builtin-functions.md) | Supported functions, signature notation, call rules | Current |

@@ -4,10 +4,10 @@ title: "WASM API 与 Worker"
 language: zh-CN
 source_language: en
 counterpart: ./wasm-api.md
-implementation_status: planned
-document_status: draft
+implementation_status: current
+document_status: stable
 translation_status: synced
-last_verified: 2026-09-23
+last_verified: 2026-10-04
 ---
 
 # WASM API 与 Worker
@@ -16,7 +16,7 @@ last_verified: 2026-09-23
 
 Worker 客户端以无损 DTO 使用 [Engine](formula-engine.zh-CN.md) 和 [Draft](ide.zh-CN.md) 契约。分析、求值和编辑逻辑留在 Rust。
 
-## Planned：Engine 与 Draft 客户端
+## Engine 与 Draft 客户端
 
 ```ts spec-file=examples/vite/src/formula/client.h.ts
 import type {

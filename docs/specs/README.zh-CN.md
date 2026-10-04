@@ -17,7 +17,7 @@ last_verified: 2026-10-03
 | 文档 | 查阅内容 | 状态 |
 | --- | --- | --- |
 | [FormulaEngine](formula-engine.zh-CN.md) | 定义、依赖编译、状态、列式求值 | Current |
-| [WASM API](wasm-api.zh-CN.md) | Worker 客户端、数据格式、坐标、生命周期 | Planned（Worker 客户端）；Current（Analyzer） |
+| [WASM API](wasm-api.zh-CN.md) | Worker 客户端、数据格式、坐标、生命周期 | Current |
 | [IDE / FormulaDraft](ide.zh-CN.md) | 草稿、补全与签名提示、快速修复、格式化、编辑、提交与丢弃 | Current |
 | [公式文法](formula-language.zh-CN.md) | EBNF、property reference、运算符、null、失败边界 | Current |
 | [Builtin](builtin-functions.zh-CN.md) | 支持的函数、签名记法、调用规则 | Current |

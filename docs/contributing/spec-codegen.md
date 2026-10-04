@@ -7,7 +7,7 @@ counterpart: ./spec-codegen.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-09-17
+last_verified: 2026-10-04
 ---
 
 # Generate Rust headers from Markdown

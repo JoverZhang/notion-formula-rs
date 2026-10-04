@@ -3,5 +3,6 @@ dist/
 pkg/
 src/pkg/
 src/analyzer/generated/
+src/engine/generated/
 *.snap
 pnpm-lock.yaml
