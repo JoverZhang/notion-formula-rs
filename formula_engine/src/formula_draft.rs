@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use analyzer::analysis::Context;
-use analyzer::{Diagnostic, DiagnosticCode, DiagnosticKind};
+use analyzer::{Diagnostic, DiagnosticCode, DiagnosticKind, TokenKind};
 
 use crate::formula_engine::{from_analyzer_type, visit_property_references};
 
@@ -179,7 +179,21 @@ impl DraftAnalysis {
 
         // The analyzer uses disabled properties for inference and completion;
         // Engine readiness and dependency cycles need diagnostics of their own.
-        visit_property_references(&syntax.expr, &mut |name, span| {
+        let mut property_references = Vec::new();
+        visit_property_references(&syntax.expr, &mut |name, id_span, span| {
+            if complete_property_call(&syntax.tokens, span)
+                && !syntax.diagnostics.iter().any(|diagnostic| {
+                    diagnostic.code == DiagnosticCode::LexError
+                        && diagnostic.span.start < span.end
+                        && diagnostic.span.end > span.start
+                })
+            {
+                property_references.push(PropertyReference {
+                    property_id: PropertyId(name.into()),
+                    span,
+                    id_span,
+                });
+            }
             if let Some(reason) = context
                 .properties
                 .iter()
@@ -190,7 +204,7 @@ impl DraftAnalysis {
                     kind: DiagnosticKind::Error,
                     code: DiagnosticCode::SemanticError,
                     message: reason.clone(),
-                    span,
+                    span: id_span,
                     labels: Vec::new(),
                     notes: Vec::new(),
                     actions: Vec::new(),
@@ -233,11 +247,28 @@ impl DraftAnalysis {
                 output_type: from_analyzer_type(&output_type),
                 diagnostics,
                 tokens: syntax.tokens,
+                property_references,
             },
             context,
             quick_fixes,
         }
     }
+}
+
+// Parser recovery can retain a one-literal Call after malformed or missing
+// delimiters. Only expose complete calls as editable property chips.
+fn complete_property_call(tokens: &[Token], span: Span) -> bool {
+    let start = tokens.partition_point(|token| token.span.start < span.start);
+    let mut kinds = tokens[start..]
+        .iter()
+        .take_while(|token| token.span.start < span.end)
+        .map(|token| &token.kind)
+        .filter(|kind| !matches!(kind, TokenKind::DocComment(..) | TokenKind::Newline));
+    matches!(kinds.next(), Some(TokenKind::Ident(_)))
+        && matches!(kinds.next(), Some(TokenKind::OpenParen))
+        && matches!(kinds.next(), Some(TokenKind::Literal(_)))
+        && matches!(kinds.next(), Some(TokenKind::CloseParen))
+        && kinds.next().is_none()
 }
 
 fn map_edit_error(error: ide::IdeError) -> UpdateExpressionError {

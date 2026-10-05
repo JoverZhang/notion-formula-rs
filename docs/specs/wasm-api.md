@@ -221,7 +221,11 @@ pub struct FormulaDraftState {
     pub output_type: ValueType,
     pub diagnostics: Vec<ExpressionDiagnostic>,
     pub tokens: Vec<Token>,
+    pub property_references: Vec<PropertyReference>,
 }
+/// Same reference contract as FormulaDraft; both spans use UTF-16 offsets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct PropertyReference { pub property_id: PropertyId, pub span: Span, pub id_span: Span }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct ExpressionDiagnostic { pub id: DiagnosticId, pub span: Span, pub message: String }
 #[derive(Serialize, TS)]

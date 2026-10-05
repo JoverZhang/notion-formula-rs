@@ -83,6 +83,46 @@ fn output(result: &JsValue, id: &str) -> JsValue {
 }
 
 #[wasm_bindgen_test]
+fn draft_reference_spans_use_utf16_and_decoded_ids() {
+    let mut engine = session(vec![input("字段🙂", dto::ValueType::Number)]);
+    let source =
+        r#"["中🙂", prop( /* preserved */ "字段🙂" ), prop("missing"), "prop(\"ignored\")"]"#;
+    let handle = engine
+        .create_draft(value(&definition("candidate", source)))
+        .unwrap();
+    let state = engine.draft_state(handle).unwrap();
+    let references = array(&field(&state, "property_references"));
+    assert_eq!(references.length(), 2);
+    let first = references.get(0);
+    assert_eq!(
+        field(&first, "property_id").as_string().as_deref(),
+        Some("字段🙂")
+    );
+    let expected_call = r#"prop( /* preserved */ "字段🙂" )"#;
+    let expected_id = r#""字段🙂""#;
+    for (key, text) in [("span", expected_call), ("id_span", expected_id)] {
+        let start = source.find(text).unwrap();
+        let span = field(&first, key);
+        assert_eq!(
+            field(&span, "start").as_f64(),
+            Some(source[..start].encode_utf16().count() as f64)
+        );
+        assert_eq!(
+            field(&span, "end").as_f64(),
+            Some(source[..start + text.len()].encode_utf16().count() as f64)
+        );
+    }
+    assert_eq!(
+        field(&references.get(1), "property_id")
+            .as_string()
+            .as_deref(),
+        Some("missing")
+    );
+    engine.draft_close(handle);
+    assert_eq!(array(&field(&state, "property_references")).length(), 2);
+}
+
+#[wasm_bindgen_test]
 fn required_inputs_is_a_read_only_transitive_query_with_existing_selection_errors() {
     let mut engine = session(vec![
         input("Price", dto::ValueType::Number),
