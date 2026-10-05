@@ -280,7 +280,7 @@ shape → type → execution
   Unknown, including nested unknown, is indeterminate rather than an immediate mismatch; analysis success does not ensure row success.
 
 postfix
-  Requires a deterministic first parameter slot and another argument position after consuming the receiver.
+  Requires a deterministic first parameter slot; the receiver may supply the only argument, as in values.sum().
   receiver.f(args) is equivalent to f(receiver, args), subject to type compatibility.
   Parsing a member call does not make every builtin postfix-capable; unsupported member calls do not fall back to ordinary calls.
 
