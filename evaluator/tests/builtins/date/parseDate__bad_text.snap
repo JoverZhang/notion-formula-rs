@@ -4,5 +4,5 @@
 parseDate(prop("Text"))
 === OUTPUT ===
 row-0: error(InvalidDateText { text: "bad-date" })
-row-1: date("2024-01-01T00:00:00+08:00")
+row-1: date_value(start=1704038400000, end=None, include_time=false)
 row-2: null

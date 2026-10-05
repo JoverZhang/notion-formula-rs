@@ -11,12 +11,13 @@ use crate::kernels::helpers::{eval_fallible_selected, eval_infallible_all_slots}
 use crate::kernels::value::{
     Aggregate, DatePart, DateShift, ListPick, ListTransform, NumericBinary, NumericUnary,
     RegexOperation, TextTransform, ceil_number, eval_abs, eval_aggregate, eval_concat,
-    eval_constant_number, eval_contains, eval_date_between, eval_date_part, eval_date_shift,
-    eval_empty, eval_equality, eval_flat, eval_format, eval_format_date, eval_format_number,
-    eval_from_timestamp, eval_id, eval_includes, eval_join, eval_length, eval_list_pick,
-    eval_list_transform, eval_now, eval_numeric_binary, eval_numeric_unary, eval_pad,
-    eval_parse_date, eval_regex, eval_repeat, eval_round, eval_slice, eval_splice, eval_split,
-    eval_substring, eval_text_transform, eval_timestamp, eval_to_number, eval_today, sqrt_number,
+    eval_constant_number, eval_contains, eval_date_between, eval_date_endpoint, eval_date_part,
+    eval_date_range, eval_date_shift, eval_empty, eval_equality, eval_flat, eval_format,
+    eval_format_date, eval_format_number, eval_from_timestamp, eval_id, eval_includes, eval_join,
+    eval_length, eval_list_pick, eval_list_transform, eval_now, eval_numeric_binary,
+    eval_numeric_unary, eval_pad, eval_parse_date, eval_regex, eval_repeat, eval_round, eval_slice,
+    eval_splice, eval_split, eval_substring, eval_text_transform, eval_timestamp, eval_to_number,
+    eval_today, sqrt_number,
 };
 
 use super::contract::*;
@@ -352,6 +353,18 @@ impl_typed_value_kernel!(
 impl_typed_value_kernel!(
     DateBetween, DateBetweenKernel, DateBetweenArgs, NumberKind;
     args, context, mask => eval_date_between(args.a, args.b, args.unit, context, mask)
+);
+impl_typed_value_kernel!(
+    DateRange, DateRangeKernel, DateRangeArgs, DateKind;
+    args, context, mask => eval_date_range(args.start, args.end, context, mask)
+);
+impl_typed_value_kernel!(
+    DateStart, DateStartKernel, DateStartArgs, DateKind;
+    args, context, mask => eval_date_endpoint(args.date, false, context, mask)
+);
+impl_typed_value_kernel!(
+    DateEnd, DateEndKernel, DateEndArgs, DateKind;
+    args, context, mask => eval_date_endpoint(args.date, true, context, mask)
 );
 impl_typed_value_kernel!(
     Timestamp, TimestampKernel, TimestampArgs, NumberKind;

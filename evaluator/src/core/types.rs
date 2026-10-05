@@ -75,6 +75,7 @@ pub enum Value {
     Text(String),
     Bool(bool),
     Date(i64),
+    DateValue(DateValue),
     List(Vec<Option<Value>>),
 }
 
@@ -86,7 +87,7 @@ impl Value {
             Self::Number(_) => Ty::Number,
             Self::Text(_) => Ty::String,
             Self::Bool(_) => Ty::Boolean,
-            Self::Date(_) => Ty::Date,
+            Self::Date(_) | Self::DateValue(_) => Ty::Date,
             Self::List(values) => Ty::List(Box::new(builtin_fn::normalize_union(
                 values
                     .iter()
@@ -94,6 +95,57 @@ impl Value {
                     .map(Self::value_type),
             ))),
         }
+    }
+}
+
+include!("date_value.h.rs");
+
+impl From<i64> for DateValue {
+    fn from(start: i64) -> Self {
+        Self {
+            start,
+            end: None,
+            include_time: true,
+        }
+    }
+}
+
+impl DateValue {
+    pub(crate) fn into_value(self) -> Value {
+        if self.end.is_none() && self.include_time {
+            Value::Date(self.start)
+        } else {
+            Value::DateValue(self)
+        }
+    }
+}
+
+pub(crate) fn values_equal(left: &Value, right: &Value) -> bool {
+    let date = |value: &Value| match value {
+        Value::Date(start) => Some(DateValue::from(*start)),
+        Value::DateValue(value) => Some(*value),
+        _ => None,
+    };
+    if let (Some(left), Some(right)) = (date(left), date(right)) {
+        return left.start == right.start && left.end == right.end;
+    }
+    match (left, right) {
+        (Value::List(left), Value::List(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(left, right)| optional_values_equal(left.as_ref(), right.as_ref()))
+        }
+        _ => left == right,
+    }
+}
+
+pub(crate) fn optional_values_equal(left: Option<&Value>, right: Option<&Value>) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => values_equal(left, right),
+        (None, None) => true,
+        _ => false,
     }
 }
 

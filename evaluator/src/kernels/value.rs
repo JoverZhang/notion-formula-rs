@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use analyzer::analysis::Ty;
 
-use chrono::{Datelike, FixedOffset, Months, NaiveDate, TimeZone, Timelike, Utc};
+use chrono::{Datelike, FixedOffset, Months, NaiveDate, NaiveDateTime, TimeZone, Timelike, Utc};
 use regex::Regex;
 
 use crate::builtins::contract::{ConcatArgs, SpliceArgs};
@@ -12,7 +12,7 @@ use crate::core::columns::{
 };
 use crate::core::context::BuiltinValueContext;
 use crate::core::errors::EvalError;
-use crate::core::types::{Mask, Value};
+use crate::core::types::{DateValue, Mask, Value, optional_values_equal, values_equal};
 use crate::runtime::operators::{pow_number, stringify_value};
 
 #[derive(Clone, Debug)]
@@ -125,7 +125,7 @@ pub(crate) fn eval_empty(
             Some(Value::Text(value)) => value.is_empty(),
             Some(Value::List(value)) => value.is_empty(),
             Some(Value::Bool(value)) => !value,
-            Some(Value::Date(_)) => false,
+            Some(Value::Date(_) | Value::DateValue(_)) => false,
         };
         TypedRow::Value(Value::Bool(is_empty))
     })
@@ -149,6 +149,9 @@ pub(crate) fn eval_format<C: BuiltinValueContext>(
 ) -> KernelResult<TextKind> {
     eval_rows(mask, |row| match value.value(row) {
         None => TypedRow::Value(String::new()),
+        Some(Value::DateValue(value)) => format_date_value(value, context)
+            .map(TypedRow::Value)
+            .unwrap_or_else(TypedRow::Error),
         Some(Value::Date(value)) => local_datetime(*value, context)
             .map(|date| date.format("%B %-d, %Y %H:%M").to_string())
             .map(TypedRow::Value)
@@ -166,7 +169,7 @@ pub(crate) fn eval_equality(
     eval_rows(mask, |row| {
         let equal = match (a.value(row), b.value(row)) {
             (None, None) => true,
-            (Some(a), Some(b)) => a == b,
+            (Some(a), Some(b)) => values_equal(a, b),
             _ => false,
         };
         TypedRow::Value(if negate { !equal } else { equal })
@@ -667,6 +670,7 @@ pub(crate) fn eval_to_number(
                 }
             }
             Value::Date(value) => *value as f64,
+            Value::DateValue(value) => value.start as f64,
             Value::Text(value) => value.trim().parse::<f64>().map_err(|_| {
                 EvalError::invalid_value(Value::Text(value.clone()), "text must contain a number")
             })?,
@@ -752,7 +756,7 @@ pub(crate) fn eval_now<C: BuiltinValueContext>(context: &C, mask: &Mask) -> Kern
     let value = context.runtime().evaluated_at_epoch_ms();
     eval_rows(mask, |_| {
         local_datetime(value, context)
-            .map(|_| TypedRow::Value(value))
+            .map(|_| TypedRow::Value(value.into()))
             .unwrap_or_else(TypedRow::Error)
     })
 }
@@ -762,7 +766,13 @@ pub(crate) fn eval_today<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<DateKind> {
     match today_epoch_ms(context) {
-        Ok(value) => eval_rows(mask, |_| TypedRow::Value(value)),
+        Ok(start) => eval_rows(mask, |_| {
+            TypedRow::Value(DateValue {
+                start,
+                end: None,
+                include_time: false,
+            })
+        }),
         Err(error) => eval_rows(mask, |_| TypedRow::Error(error.clone())),
     }
 }
@@ -785,7 +795,8 @@ pub(crate) fn eval_date_part<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<NumberKind> {
     eval_unary(&date, mask, |date| {
-        let date = local_datetime(*date, context)?;
+        validate_date(date, context)?;
+        let date = local_datetime(date.start, context)?;
         Ok(match part {
             DatePart::Minute => date.minute() as f64,
             DatePart::Hour => date.hour() as f64,
@@ -804,6 +815,63 @@ pub(crate) enum DateShift {
     Subtract,
 }
 
+fn validate_date<C: BuiltinValueContext>(date: &DateValue, context: &C) -> Result<(), EvalError> {
+    local_datetime(date.start, context)?;
+    if let Some(end) = date.end {
+        local_datetime(end, context)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn eval_date_range<C: BuiltinValueContext>(
+    start: KernelColumn<DateKind>,
+    end: KernelColumn<DateKind>,
+    context: &C,
+    mask: &Mask,
+) -> KernelResult<DateKind> {
+    eval_rows(mask, |row| {
+        let Some(start) = start.value(row) else {
+            return TypedRow::Null;
+        };
+        let end = end.value(row);
+        let result = (|| {
+            validate_date(start, context)?;
+            if let Some(end) = end {
+                validate_date(end, context)?;
+            }
+            Ok(DateValue {
+                start: start.start,
+                end: end.map(|value| value.start),
+                include_time: start.include_time || end.is_some_and(|value| value.include_time),
+            })
+        })();
+        match result {
+            Ok(value) => TypedRow::Value(value),
+            Err(error) => TypedRow::Error(error),
+        }
+    })
+}
+
+pub(crate) fn eval_date_endpoint<C: BuiltinValueContext>(
+    date: KernelColumn<DateKind>,
+    end: bool,
+    context: &C,
+    mask: &Mask,
+) -> KernelResult<DateKind> {
+    eval_unary(&date, mask, |date| {
+        validate_date(date, context)?;
+        Ok(DateValue {
+            start: if end {
+                date.end.unwrap_or(date.start)
+            } else {
+                date.start
+            },
+            end: None,
+            include_time: date.include_time,
+        })
+    })
+}
+
 pub(crate) fn eval_date_shift<C: BuiltinValueContext>(
     date: KernelColumn<DateKind>,
     amount: KernelColumn<NumberKind>,
@@ -813,7 +881,7 @@ pub(crate) fn eval_date_shift<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<DateKind> {
     eval_ternary(&date, &amount, &unit, mask, |date, amount, unit| {
-        local_datetime(*date, context)?;
+        validate_date(date, context)?;
         if !amount.is_finite() {
             return Err(EvalError::invalid_value(
                 Value::Number(*amount),
@@ -825,21 +893,28 @@ pub(crate) fn eval_date_shift<C: BuiltinValueContext>(
             amount = amount.checked_neg().ok_or(EvalError::DateOutOfRange)?;
         }
         let unit = DateUnit::parse(unit)?;
-        let shifted = if let Some(milliseconds) = unit.fixed_milliseconds() {
-            date.checked_add(
-                amount
-                    .checked_mul(milliseconds)
-                    .ok_or(EvalError::DateOutOfRange)?,
-            )
-        } else {
-            let months = amount
-                .checked_mul(unit.month_multiplier().ok_or(EvalError::InvalidArgument)?)
-                .ok_or(EvalError::DateOutOfRange)?;
-            shift_months(*date, months, context)
-        }
-        .ok_or(EvalError::DateOutOfRange)?;
-        local_datetime(shifted, context)?;
-        Ok(shifted)
+        let shift = |timestamp: i64| {
+            let shifted = if let Some(milliseconds) = unit.fixed_milliseconds() {
+                timestamp.checked_add(
+                    amount
+                        .checked_mul(milliseconds)
+                        .ok_or(EvalError::DateOutOfRange)?,
+                )
+            } else {
+                let months = amount
+                    .checked_mul(unit.month_multiplier().ok_or(EvalError::InvalidArgument)?)
+                    .ok_or(EvalError::DateOutOfRange)?;
+                shift_months(timestamp, months, context)
+            }
+            .ok_or(EvalError::DateOutOfRange)?;
+            local_datetime(shifted, context)?;
+            Ok(shifted)
+        };
+        Ok(DateValue {
+            start: shift(date.start)?,
+            end: date.end.map(shift).transpose()?,
+            include_time: date.include_time,
+        })
     })
 }
 
@@ -851,20 +926,40 @@ pub(crate) fn eval_date_between<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<NumberKind> {
     eval_ternary(&a, &b, &unit, mask, |a, b, unit| {
-        local_datetime(*a, context)?;
-        local_datetime(*b, context)?;
+        validate_date(a, context)?;
+        validate_date(b, context)?;
+        let start = |date: &DateValue| -> Result<i64, EvalError> {
+            if date.include_time {
+                return Ok(date.start);
+            }
+            let local = local_datetime(date.start, context)?;
+            let midnight = timezone(context)?
+                .from_local_datetime(
+                    &local
+                        .date_naive()
+                        .and_hms_opt(0, 0, 0)
+                        .ok_or(EvalError::DateOutOfRange)?,
+                )
+                .single()
+                .ok_or(EvalError::DateOutOfRange)?
+                .timestamp_millis();
+            local_datetime(midnight, context)?;
+            Ok(midnight)
+        };
+        let a = start(a)?;
+        let b = start(b)?;
         let unit = DateUnit::parse(unit)?;
         let value = match unit {
             DateUnit::Minute | DateUnit::Hour | DateUnit::Day | DateUnit::Week => {
-                let difference = a.checked_sub(*b).ok_or(EvalError::DateOutOfRange)?;
+                let difference = a.checked_sub(b).ok_or(EvalError::DateOutOfRange)?;
                 let milliseconds = unit
                     .fixed_milliseconds()
                     .ok_or(EvalError::InvalidArgument)?;
                 (difference as f64 / milliseconds as f64).trunc()
             }
-            DateUnit::Month => complete_months_between(*a, *b, context)? as f64,
-            DateUnit::Quarter => complete_months_between(*a, *b, context)? as f64 / 3.0,
-            DateUnit::Year => complete_months_between(*a, *b, context)? as f64 / 12.0,
+            DateUnit::Month => complete_months_between(a, b, context)? as f64,
+            DateUnit::Quarter => complete_months_between(a, b, context)? as f64 / 3.0,
+            DateUnit::Year => complete_months_between(a, b, context)? as f64 / 12.0,
         };
         Ok(value.trunc())
     })
@@ -951,8 +1046,8 @@ pub(crate) fn eval_timestamp<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<NumberKind> {
     eval_unary(&date, mask, |date| {
-        local_datetime(*date, context)?;
-        Ok(*date as f64)
+        validate_date(date, context)?;
+        Ok(date.start as f64)
     })
 }
 
@@ -976,7 +1071,7 @@ pub(crate) fn eval_from_timestamp<C: BuiltinValueContext>(
             .checked_sub(timestamp.rem_euclid(60_000))
             .ok_or(EvalError::DateOutOfRange)?;
         local_datetime(timestamp, context)?;
-        Ok(timestamp)
+        Ok(timestamp.into())
     })
 }
 
@@ -987,7 +1082,8 @@ pub(crate) fn eval_format_date<C: BuiltinValueContext>(
     mask: &Mask,
 ) -> KernelResult<TextKind> {
     eval_binary(&date, &format, mask, |date, format| {
-        Ok(local_datetime(*date, context)?
+        validate_date(date, context)?;
+        Ok(local_datetime(date.start, context)?
             .format(&translate_date_format(format))
             .to_string())
     })
@@ -1002,18 +1098,53 @@ pub(crate) fn eval_parse_date<C: BuiltinValueContext>(
         if let Ok(date) = chrono::DateTime::parse_from_rfc3339(text) {
             let timestamp = date.timestamp_millis();
             local_datetime(timestamp, context)?;
-            return Ok(timestamp);
+            return Ok(timestamp.into());
         }
-        let date = NaiveDate::parse_from_str(text, "%Y-%m-%d")
-            .map_err(|_| EvalError::InvalidDateText { text: text.clone() })?;
-        let local = timezone(context)?
-            .from_local_datetime(&date.and_hms_opt(0, 0, 0).ok_or(EvalError::DateOutOfRange)?)
+        let (local, include_time) = if let Ok(date) = NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+            (
+                date.and_hms_opt(0, 0, 0).ok_or(EvalError::DateOutOfRange)?,
+                false,
+            )
+        } else {
+            let date = NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S%.f")
+                .or_else(|_| NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M"))
+                .map_err(|_| EvalError::InvalidDateText { text: text.clone() })?;
+            (date, true)
+        };
+        let timestamp = timezone(context)?
+            .from_local_datetime(&local)
             .single()
-            .ok_or(EvalError::DateOutOfRange)?;
-        let timestamp = local.timestamp_millis();
+            .ok_or(EvalError::DateOutOfRange)?
+            .timestamp_millis();
         local_datetime(timestamp, context)?;
-        Ok(timestamp)
+        Ok(DateValue {
+            start: timestamp,
+            end: None,
+            include_time,
+        })
     })
+}
+
+fn format_date_value<C: BuiltinValueContext>(
+    value: &DateValue,
+    context: &C,
+) -> Result<String, EvalError> {
+    validate_date(value, context)?;
+    let pattern = if value.include_time {
+        "%B %-d, %Y %H:%M"
+    } else {
+        "%B %-d, %Y"
+    };
+    let start = local_datetime(value.start, context)?
+        .format(pattern)
+        .to_string();
+    match value.end {
+        Some(end) => Ok(format!(
+            "{start} → {}",
+            local_datetime(end, context)?.format(pattern)
+        )),
+        None => Ok(start),
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1162,7 +1293,9 @@ pub(crate) fn eval_list_transform(
             ListTransform::Unique => {
                 let mut unique = Vec::with_capacity(values.len());
                 for value in values {
-                    if !unique.contains(&value) {
+                    if !unique.iter().any(|existing: &Option<Value>| {
+                        optional_values_equal(existing.as_ref(), value.as_ref())
+                    }) {
                         unique.push(value);
                     }
                 }
@@ -1179,7 +1312,10 @@ pub(crate) fn eval_includes(
     mask: &Mask,
 ) -> KernelResult<BooleanKind> {
     eval_rows(mask, |row| match list.value(row) {
-        Some(list) => TypedRow::Value(list.contains(&value.value(row).cloned())),
+        Some(list) => TypedRow::Value(
+            list.iter()
+                .any(|item| optional_values_equal(item.as_ref(), value.value(row))),
+        ),
         None => TypedRow::Null,
     })
 }
@@ -1335,6 +1471,9 @@ fn compare_value(left: &Value, right: &Value) -> Ordering {
         (Value::Text(left), Value::Text(right)) => left.cmp(right),
         (Value::Bool(left), Value::Bool(right)) => left.cmp(right),
         (Value::Date(left), Value::Date(right)) => left.cmp(right),
+        (Value::DateValue(left), Value::DateValue(right)) => left.start.cmp(&right.start),
+        (Value::Date(left), Value::DateValue(right)) => left.cmp(&right.start),
+        (Value::DateValue(left), Value::Date(right)) => left.start.cmp(right),
         (Value::List(left), Value::List(right)) => left.len().cmp(&right.len()),
         (left, right) => value_rank(left).cmp(&value_rank(right)),
     }
@@ -1345,7 +1484,7 @@ fn value_rank(value: &Value) -> u8 {
         Value::Number(_) => 0,
         Value::Text(_) => 1,
         Value::Bool(_) => 2,
-        Value::Date(_) => 3,
+        Value::Date(_) | Value::DateValue(_) => 3,
         Value::List(_) => 4,
     }
 }

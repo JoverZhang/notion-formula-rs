@@ -25,7 +25,7 @@ fn accepts(ty: &ValueType, value: Option<&Value>) -> bool {
         (T::Number, V::Number(_))
         | (T::String, V::String(_))
         | (T::Boolean, V::Boolean(_))
-        | (T::Date, V::Date(_)) => true,
+        | (T::Date, V::Date(_) | V::DateValue(_)) => true,
         (T::List(t), V::List(items)) => items.iter().all(|v| accepts(t, v.as_ref())),
         (T::Union(ts), v) => ts.iter().any(|t| accepts(t, Some(v))),
         _ => false,
