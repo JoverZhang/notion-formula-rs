@@ -16,8 +16,9 @@ last_verified: 2026-10-05
 
 [`examples/appflowy-web`](../../examples/appflowy-web) 以 submodule 固定
 [AppFlowy-Web fork](https://github.com/JoverZhang/AppFlowy-Web) 的提交。
-[Issue #67](https://github.com/JoverZhang/notion-formula-rs/issues/67) 跟踪公式迁移进度；
-加入示例不代表所有使用公式结果的功能都已完成迁移。
+固定版本的示例使用共享 SDK 完成公式求值、编辑及数据库中各项功能的公式计算。
+存储、兼容性和编辑器行为由其[接入指南](../../examples/appflowy-web/doc/NOTION_FORMULA.md)维护。
+[Issue #67](https://github.com/JoverZhang/notion-formula-rs/issues/67) 链接实现 PR 和验证结果。
 
 ## 准备与启动
 
@@ -64,6 +65,15 @@ Review 两个仓库的差异，将 gitlink 固定到经过验证的提交。父�
 
 运行 `just test-example-vite`，执行已有的 Engine/Draft 回归测试。浏览器契约测试只安装 SDK manifest
 和 `dist`，在非根路径下验证开发与生产环境的默认 Worker，并在示例的 `test-results` 中保存 JSON 结果。
-各迁移阶段完成后，用 AppFlowy 的集成测试验证实际使用公式结果的功能。
+执行 `just deps-appflowy` 后，可运行 AppFlowy 的真实 Worker/WASM 集成测试，无需登录 Cloud：
+
+```sh
+pnpm -C examples/appflowy-web exec playwright install chromium
+pnpm -C examples/appflowy-web exec playwright test native-formula --config=playwright.integrations.config.ts --project=chromium
+FORMULA_FIXTURE_PRODUCTION=1 pnpm -C examples/appflowy-web exec playwright test native-formula --config=playwright.integrations.config.ts --project=chromium
+```
+
+这些用例将 JSON 和截图保存在 submodule 的 `test-results` 目录中。
+需要认证的应用测试仍须先完成上面的 Cloud 配置。
 
 父仓库的文档检查跳过 submodule 和生成的 WASM 包。AppFlowy 的文档与检查仍由其仓库维护。

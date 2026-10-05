@@ -16,8 +16,10 @@ last_verified: 2026-10-05
 
 [`examples/appflowy-web`](../../examples/appflowy-web) pins the
 [AppFlowy-Web fork](https://github.com/JoverZhang/AppFlowy-Web) as a submodule.
-[Issue #67](https://github.com/JoverZhang/notion-formula-rs/issues/67) tracks the formula migration;
-adding the example does not mean every formula consumer has migrated.
+The pinned example uses the shared SDK for formula evaluation, editing, and database consumers.
+Its [integration guide](../../examples/appflowy-web/doc/NOTION_FORMULA.md) owns the storage,
+compatibility, and editor behavior. [Issue #67](https://github.com/JoverZhang/notion-formula-rs/issues/67)
+links the implementation PRs and verification.
 
 ## Prepare and run
 
@@ -69,7 +71,16 @@ automatically follow the fork's latest branch.
 Run `just test-example-vite` for the existing Engine/Draft regression suite. Its browser contract
 installs only the SDK manifest and `dist`, then exercises the default Worker in development and
 production under a non-root URL. Playwright records JSON artifacts in the example's `test-results`.
-Use AppFlowy's integration tests for its database consumers as each migration stage lands.
+After `just deps-appflowy`, run AppFlowy's real Worker/WASM integration fixtures without a Cloud login:
+
+```sh
+pnpm -C examples/appflowy-web exec playwright install chromium
+pnpm -C examples/appflowy-web exec playwright test native-formula --config=playwright.integrations.config.ts --project=chromium
+FORMULA_FIXTURE_PRODUCTION=1 pnpm -C examples/appflowy-web exec playwright test native-formula --config=playwright.integrations.config.ts --project=chromium
+```
+
+These cases retain JSON and screenshot artifacts in the submodule's `test-results` directory.
+Authenticated application tests still require the Cloud setup above.
 
 Parent documentation checks skip the submodule and generated WASM package. AppFlowy's documentation
 and checks remain owned by its repository.
