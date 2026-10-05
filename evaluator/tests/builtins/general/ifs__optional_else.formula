@@ -1,0 +1,2 @@
+// @prop "Flag": boolean = [true, false, null]
+ifs(prop("Flag"), 1)

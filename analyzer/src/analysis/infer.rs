@@ -181,6 +181,7 @@ fn infer_expr(expr: &mut Expr, ctx: &Context, ictx: &mut InferCtx) -> Ty {
             let right_ty = infer_expr(right, ctx, ictx);
             use crate::ast::BinOpKind::*;
             match op.node {
+                Plus if left_ty == Ty::String || right_ty == Ty::String => Ty::String,
                 Plus | Minus | Star | Slash | Percent | Caret => {
                     if left_ty == Ty::Number && right_ty == Ty::Number {
                         Ty::Number

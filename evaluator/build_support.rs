@@ -15,6 +15,7 @@ pub fn generate_contract(categories: &[BuiltinCategory]) -> String {
     let functions = categories
         .iter()
         .flat_map(|category| category.entries.iter())
+        .filter(|entry| !entry.requires_lowering)
         .filter_map(|entry| entry.implementation.as_ref())
         .collect::<Vec<_>>();
 
@@ -39,6 +40,12 @@ pub fn generate_contract_for_names(
         for entry in &category.entries {
             if !requested.contains(entry.name.as_str()) {
                 continue;
+            }
+            if entry.requires_lowering {
+                return Err(format!(
+                    "builtin `{}` requires semantic lowering",
+                    entry.name
+                ));
             }
             let Some(signature) = entry.implementation.as_ref() else {
                 return Err(format!(

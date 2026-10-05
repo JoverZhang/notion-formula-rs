@@ -42,7 +42,7 @@ x?: T                  // An omittable argument, not a claim that all T values a
 T[] / A | B            // List / union; T and U bind within one call
 Ident<T>               // Binding identifier, not an ordinary string argument
 () -> T                // Deferred expression
-(current: T) -> U      // Expression with an implicit binding; callers do not write lambda syntax
+(current: T, index: number) -> U      // Expression with an implicit binding; callers do not write lambda syntax
 repeat(min = n) {...}  // Repeat the whole argument group at least n times; not one list argument
                        // Trailing commas in declarations do not permit them in formula calls
 ```
@@ -53,7 +53,11 @@ repeat(min = n) {...}  // Repeat the whole argument group at least n times; not 
 
 ```builtin
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
-ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
+/// Evaluate conditions in order; skip unselected values. Without else, an unmatched row returns ordinary null.
+ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else?: () -> T) -> T;
+/// Require Boolean/null expressions and short-circuit left to right using the && / || null rules.
+and(repeat(min = 1) { condition: () -> boolean }) -> boolean;
+or(repeat(min = 1) { condition: () -> boolean }) -> boolean;
 
 /// Returns null with no arguments; otherwise checks whether the value is empty.
 /// Return type is inferred by resolve_empty from argument count.
@@ -67,6 +71,9 @@ format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
+/// Bind names sequentially with independent value types; later bindings see and may shadow earlier names.
+/// Infer the result type from the final expression in that lexical scope.
+lets(repeat(min = 1) { var: Ident<any>, value: any }, expr: () -> any) -> any;
 ```
 
 #### empty type inference
@@ -103,6 +110,10 @@ trim(text: string) -> string;
 repeat(text: string, times: number) -> string;
 padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
+/// Preserve text, including ordinary null, after evaluating and type-checking all style names; styling metadata is ignored.
+style(text: string, repeat(min = 0) { styles: string }) -> string;
+unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
+/// Accept at least two lists; scalar text concatenation uses +.
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
 /// Convert null elements to empty strings and retain separators; a null list argument returns null.
@@ -117,7 +128,12 @@ split(text: string, separator: string) -> string[];
 Numeric operations follow the [Number rules](formula-language.md#current-number).
 
 ```builtin
-formatNumber(value: number, format: string, precision: number) -> string;
+/// Formats: number/decimal, number_with_commas/commas, percent/%, scientific, humanize, usd/eur/gbp/jpy/cny/krw/inr/cad/aud/chf.
+/// Trim and lowercase format; unknown selectors produce InvalidValue. Explicit null precision returns null.
+/// Precision must be finite in 0..=1000000; truncate and cap at 100 digits.
+/// Without precision, decimal/commas/percent use up to 10 fractional digits, humanize uses up to one (K/M/B/T),
+/// scientific uses 10, currencies use two, and jpy/krw use zero. Explicit precision retains trailing zeros.
+formatNumber(value: number, format: string, precision?: number) -> string;
 add(a: number, b: number) -> number;
 subtract(a: number, b: number) -> number;
 multiply(a: number, b: number) -> number;
@@ -196,7 +212,9 @@ dateEnd(date: date) -> date;
 timestamp(date: date) -> number;
 /// Construct a single date with include_time=true.
 fromTimestamp(timestamp: number) -> date;
-/// Format start using the caller's pattern.
+/// Format start in the runtime fixed offset with Moment calendar, clock, ordinal, weekday and week tokens.
+/// [text] is literal; W/WW/Wo/GGGG use ISO weeks, w/ww/wo/gggg use English Sunday-start weeks.
+/// Percent signs are literal. [Week] W on 2024-03-05 renders "Week 10".
 formatDate(date: date, format: string) -> string;
 /// YYYY-MM-DD creates a date at runtime local midnight with include_time=false.
 /// RFC3339 and local YYYY-MM-DDTHH:MM[:SS[.fraction]] create a single date with include_time=true.
@@ -220,13 +238,14 @@ unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
 /// Evaluate each element in input order, preserving list length; a null list argument returns null.
-map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+/// Every callback binds current and zero-based index; nested callbacks shadow and then restore both names.
+map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
 /// Flatten only one level in input order, retaining nulls; a null list argument returns null and an empty list returns [].
 /// flat([[1, empty()], [2]]) → [1, null, 2]; flat([[[]]]) → [[]].
@@ -282,9 +301,8 @@ id() -> string;
 
 ```text
 People currently has no supported functions. These declarations are excluded from callable/completion sets:
-  and / or / not          // Expressed by && / || / not operators
-  lets                    // No heterogeneous sequential binder model
-  link / style / unstyle  // No Link / StyledText types yet
+  not                     // Expressed by the not prefix operator, including not(true)
+  link                    // No Link type yet
   name / email            // No person-name/email runtime inputs yet
 Unsupported declarations are treated like unknown functions, without a separate unsupported error class.
 Category order is General, Text, Number, Date, People, List, Special; declaration order is preserved within each.

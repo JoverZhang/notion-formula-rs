@@ -24,8 +24,8 @@ Current：描述本仓库接受的完整表达式，不承诺与上游 Notion �
 source      = expression, EOF ;
 expression  = conditional ;
 conditional = disjunction, [ "?", expression, ":", conditional ] ;
-disjunction = conjunction, { "||", conjunction } ;
-conjunction = equality, { "&&", equality } ;
+disjunction = conjunction, { ( "||" | "or" ), conjunction } ;
+conjunction = equality, { ( "&&" | "and" ), equality } ;
 equality    = comparison, { ( "==" | "!=" ), comparison } ;
 comparison  = addition, { ( "<" | "<=" | ">" | ">=" ), addition } ;
 addition    = product, { ( "+" | "-" ), product } ;
@@ -50,6 +50,7 @@ identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
 letter      = ? Rust char::is_alphabetic ? ;
 alphanumeric = ? Rust char::is_alphanumeric ? ;
 keyword     = "true" | "false" | "not" ;
+(* and/or 在中缀位置作为运算符；and(...)、or(...) 仍是普通函数调用。 *)
 
 (* token 之间允许 trivia；词法 token 内部不允许插入 trivia。 *)
 trivia        = " " | "\t" | "\r" | "\n" | line-comment | block-comment ;
@@ -169,6 +170,7 @@ a < <= >= > b  同 kind 的 number/string/boolean/date → boolean
 
 a && b：a=true → 求值 b；a=false/null → false，跳过 b；求值到 b=null → null。
 a || b：a=true → true，跳过 b；a=false/null → 求值 b，结果为 boolean/null。
+and/or 与 &&/|| 的优先级、Boolean/null 规则及短路行为相同；格式化保留原始拼写。
 a ? b : c：a=true → b；a=false/null → c；condition 只接受 boolean/null。
 被跳过的 expression 不产生行错误；这不改变 prepare 时发现全部 property 的规则。
 ```
@@ -212,7 +214,7 @@ evaluate          → 运行时问题是逐行错误；其他行可继续
 
 Current 推断允许 unknown、union，以及嵌套 unknown。
 未知标识符或不确定推断不必立即拒绝；语法诊断阻止求值。
-例如 "count: " + 3 可推断为 unknown，但运行时仍可拼接文本。
++ 任一操作数已知为 String 时，结果推断为 String，与运行时文本转换一致。
 诊断 message 不是机器接口。
 ```
 

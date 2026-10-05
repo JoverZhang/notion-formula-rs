@@ -183,8 +183,6 @@ fn run_fixture(path: &Path) {
             })
             .collect(),
     );
-    let prepared = prepare_formula(&mut syntax.expr, &context)
-        .unwrap_or_else(|error| panic!("{path:?}: failed to prepare fixture: {error:?}"));
     let primary = path
         .file_stem()
         .and_then(|name| name.to_str())
@@ -194,6 +192,9 @@ fn run_fixture(path: &Path) {
         contains_call(&syntax.expr, primary),
         "{path:?}: fixture does not call its primary builtin `{primary}`"
     );
+    // Validate coverage against source calls, before semantic lowering changes lets into let.
+    let prepared = prepare_formula(&mut syntax.expr, &context)
+        .unwrap_or_else(|error| panic!("{path:?}: failed to prepare fixture: {error:?}"));
     let required_names = prepared
         .required_columns()
         .iter()

@@ -24,8 +24,8 @@ Current: Describes the complete expressions accepted by this repository; compati
 source      = expression, EOF ;
 expression  = conditional ;
 conditional = disjunction, [ "?", expression, ":", conditional ] ;
-disjunction = conjunction, { "||", conjunction } ;
-conjunction = equality, { "&&", equality } ;
+disjunction = conjunction, { ( "||" | "or" ), conjunction } ;
+conjunction = equality, { ( "&&" | "and" ), equality } ;
 equality    = comparison, { ( "==" | "!=" ), comparison } ;
 comparison  = addition, { ( "<" | "<=" | ">" | ">=" ), addition } ;
 addition    = product, { ( "+" | "-" ), product } ;
@@ -50,6 +50,7 @@ identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
 letter      = ? Rust char::is_alphabetic ? ;
 alphanumeric = ? Rust char::is_alphanumeric ? ;
 keyword     = "true" | "false" | "not" ;
+(* and/or are contextual infix operators; and(...) and or(...) remain ordinary calls. *)
 
 (* Trivia is allowed between tokens; it cannot be inserted inside a lexical token. *)
 trivia        = " " | "\t" | "\r" | "\n" | line-comment | block-comment ;
@@ -169,6 +170,7 @@ Unary operators: null → null.
 
 a && b: a=true → evaluate b; a=false/null → false, skip b; if evaluation reaches b=null → null.
 a || b: a=true → true, skip b; a=false/null → evaluate b, result is boolean/null.
+and/or have the same precedence, Boolean/null rules and short circuit as &&/||; formatting retains their source spelling.
 a ? b : c: a=true → b; a=false/null → c; condition accepts only boolean/null.
 A skipped expression produces no row error; this does not change the rule that all properties are discovered during prepare.
 ```
@@ -212,7 +214,7 @@ evaluate          → runtime issues are per-row errors; other rows can continue
 
 Current inference allows unknown, unions, and nested unknown.
 Unknown identifiers or uncertain inference need not be rejected immediately; syntax diagnostics prevent evaluation.
-For example, "count: " + 3 may infer as unknown, but at runtime it can still concatenate text.
+When either + operand is known to be String, the result is inferred as String, matching runtime text conversion.
 Diagnostic messages are not a machine interface.
 ```
 

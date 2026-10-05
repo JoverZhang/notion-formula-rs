@@ -162,12 +162,12 @@ fn signature_help_postfix_ifs_uses_method_style_and_boolean_receiver() {
     t("(1 == 1).ifs(42, \"42\"$0)")
         .ctx(c.clone())
         .expect_sig_label(
-            "(condition1: boolean).ifs(value1: number, ..., else: string) -> number | string",
+            "(condition1: boolean).ifs(value1: number, ..., else: string?) -> number | string",
         );
 
     // Ill-typed receiver should not override the hard-constrained boolean receiver slot.
     t("(1).ifs(42, \"42\"$0)").ctx(c).expect_sig_label(
-        "(condition1: boolean).ifs(value1: number, ..., else: string) -> number | string",
+        "(condition1: boolean).ifs(value1: number, ..., else: string?) -> number | string",
     );
 }
 
@@ -215,7 +215,7 @@ fn signature_help_ifs_repeat_group_label_format() {
     t("ifs(true, 1, false, 2, 3$0)")
         .ctx(c)
         .expect_sig_label(
-            "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., else: number) -> number",
+            "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., else: number?) -> number",
         );
 }
 
@@ -253,7 +253,7 @@ fn signature_help_ifs_shows_instantiated_union_return_type() {
     t("ifs(true, 1, false, 2, \"a\"$0)")
         .ctx(c)
         .expect_sig_label(
-            "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., else: string) -> number | string",
+            "ifs(condition1: boolean, value1: number, condition2: boolean, value2: number, ..., else: string?) -> number | string",
         );
 }
 
@@ -263,7 +263,7 @@ fn signature_help_ifs_propagates_unknown() {
     t("ifs(true, x, false, 1, 2$0)")
         .ctx(c)
         .expect_sig_label(
-            "ifs(condition1: boolean, value1: unknown, condition2: boolean, value2: number, ..., else: number) -> unknown",
+            "ifs(condition1: boolean, value1: unknown, condition2: boolean, value2: number, ..., else: number?) -> unknown",
         );
 }
 
@@ -273,16 +273,16 @@ fn signature_help_ifs_single_group_highlights_default_and_omits_second_group() {
     t("ifs(true, \"42\", $0)")
         .ctx(c)
         .expect_sig_active(2)
-        .expect_sig_label("ifs(condition1: boolean, value1: string, ..., else: string) -> string");
+        .expect_sig_label("ifs(condition1: boolean, value1: string, ..., else: string?) -> string");
 }
 
 #[test]
-fn signature_help_ifs_invalid_total_4_guides_to_value2() {
+fn signature_help_ifs_total_4_guides_to_value2_without_default() {
     let c = ctx().build();
     t("ifs(true, \"42\", false, $0)")
         .ctx(c)
         .expect_sig_active(3)
-        .expect_sig_label("ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., else: string) -> string");
+        .expect_sig_label("ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ...) -> string");
 }
 
 #[test]
@@ -292,7 +292,7 @@ fn signature_help_ifs_does_not_override_hard_constrained_condition_types() {
         .ctx(c)
         .expect_sig_active(3)
         .expect_sig_label(
-            "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., else: string) -> string",
+            "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ...) -> string",
         );
 }
 
@@ -302,7 +302,7 @@ fn signature_help_ifs_total_5_highlights_default() {
     t("ifs(true, \"42\", false, 7, $0)")
         .ctx(c)
         .expect_sig_active(4)
-        .expect_sig_label("ifs(condition1: boolean, value1: string, condition2: boolean, value2: number, ..., else: number | string) -> number | string");
+        .expect_sig_label("ifs(condition1: boolean, value1: string, condition2: boolean, value2: number, ..., else: number | string?) -> number | string");
 }
 
 #[test]

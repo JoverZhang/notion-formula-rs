@@ -4,8 +4,8 @@ use crate::core::columns::{
 use crate::core::context::BuiltinValueContext;
 use crate::core::types::Mask;
 use crate::kernels::controlled::{
-    eval_count, eval_every, eval_filter, eval_find, eval_find_index, eval_if, eval_ifs, eval_let,
-    eval_map, eval_some,
+    eval_and, eval_count, eval_every, eval_filter, eval_find, eval_find_index, eval_if, eval_ifs,
+    eval_let, eval_map, eval_or, eval_some,
 };
 use crate::kernels::helpers::{eval_fallible_selected, eval_infallible_all_slots};
 use crate::kernels::value::{
@@ -15,9 +15,9 @@ use crate::kernels::value::{
     eval_date_range, eval_date_shift, eval_empty, eval_equality, eval_flat, eval_format,
     eval_format_date, eval_format_number, eval_from_timestamp, eval_id, eval_includes, eval_join,
     eval_length, eval_list_pick, eval_list_transform, eval_now, eval_numeric_binary,
-    eval_numeric_unary, eval_pad, eval_parse_date, eval_regex, eval_repeat, eval_round, eval_slice,
-    eval_splice, eval_split, eval_substring, eval_text_transform, eval_timestamp, eval_to_number,
-    eval_today, sqrt_number,
+    eval_numeric_unary, eval_pad, eval_parse_date, eval_plain_text, eval_regex, eval_repeat,
+    eval_round, eval_slice, eval_splice, eval_split, eval_substring, eval_text_transform,
+    eval_timestamp, eval_to_number, eval_today, sqrt_number,
 };
 
 use super::contract::*;
@@ -65,6 +65,14 @@ impl_typed_value_kernel!(
     args, _context, mask => eval_equality(args.a, args.b, true, mask)
 );
 
+impl_typed_value_kernel!(
+    Style, StyleKernel, StyleArgs, TextKind;
+    args, _context, mask => eval_plain_text(args.text, args.repeat_groups.into_vec().into_iter().map(|group| group.styles), mask)
+);
+impl_typed_value_kernel!(
+    Unstyle, UnstyleKernel, UnstyleArgs, TextKind;
+    args, _context, mask => eval_plain_text(args.text, args.repeat_groups.into_vec().into_iter().map(|group| group.styles), mask)
+);
 impl_typed_value_kernel!(
     Substring, SubstringKernel, SubstringArgs, TextKind;
     args, _context, mask => eval_substring(args.text, args.start, args.end, mask)
@@ -427,6 +435,26 @@ impl_typed_value_kernel!(
     Id, IdKernel, IdArgs, TextKind;
     _args, context, mask => eval_id(context, mask)
 );
+
+impl AndKernel for And {
+    fn eval<C: super::BuiltinEvalContext>(
+        context: &mut C,
+        args: AndPlans,
+        mask: &Mask,
+    ) -> KernelResult<BooleanKind> {
+        eval_and(context, args, mask)
+    }
+}
+
+impl OrKernel for Or {
+    fn eval<C: super::BuiltinEvalContext>(
+        context: &mut C,
+        args: OrPlans,
+        mask: &Mask,
+    ) -> KernelResult<BooleanKind> {
+        eval_or(context, args, mask)
+    }
+}
 
 impl IfKernel for If {
     fn eval<C: super::BuiltinEvalContext>(
