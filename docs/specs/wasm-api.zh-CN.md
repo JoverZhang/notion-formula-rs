@@ -7,7 +7,7 @@ counterpart: ./wasm-api.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-04
+last_verified: 2026-10-05
 ---
 
 # WASM API 与 Worker
@@ -47,6 +47,9 @@ export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
+  // 返回排序、去重后的传递 Input ID。Ready 目标的依赖集合完整；
+  // NotReady 目标只返回已知引用。无效目标列表以 EVALUATE_INPUT 拒绝。
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]>;
   // 所有 Draft 消耗或关闭之前，拒绝并返回 ACTIVE_DRAFTS。
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
   remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
@@ -308,6 +311,10 @@ impl FormulaEngineSession {
     pub fn get_property(&self, id: String) -> Result<JsValue, JsValue>;
     pub fn get_properties(&self) -> Result<JsValue, JsValue>;
     pub fn get_state(&self) -> Result<JsValue, JsValue>;
+    /// 接收 PropertyId[]，按 FormulaEngine::required_inputs 的语义返回 PropertyId[]。
+    /// 数组格式错误返回 INVALID_DTO；公式选择错误返回 EVALUATE_INPUT。
+    /// 存在活动 Draft 时仍可调用；Engine 关闭后返回 ENGINE_CLOSED。
+    pub fn required_inputs(&self, formula_ids: JsValue) -> Result<JsValue, JsValue>;
     /// 任何 Draft handle 存在时，拒绝并返回 ACTIVE_DRAFTS。
     pub fn upsert(&mut self, property: JsValue) -> Result<JsValue, JsValue>;
     /// 任何 Draft handle 存在时，拒绝并返回 ACTIVE_DRAFTS。
