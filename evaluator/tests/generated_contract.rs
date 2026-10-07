@@ -37,8 +37,8 @@ fn generated_contract_is_deterministic_ordered_and_unique() {
         .filter(|entry| entry.is_supported() && !entry.requires_lowering)
         .map(|entry| entry.name.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(names.len(), 88);
-    assert_eq!(names.iter().copied().collect::<HashSet<_>>().len(), 88);
+    assert_eq!(names.len(), 90);
+    assert_eq!(names.iter().copied().collect::<HashSet<_>>().len(), 90);
 
     let mut cursor = 0;
     for name in names {
