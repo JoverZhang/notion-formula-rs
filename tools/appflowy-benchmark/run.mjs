@@ -99,7 +99,7 @@ Failed or unmatched measurements fail the run; they do not count as speedups.`);
   return options;
 }
 
-async function runChain(variants, chromium, options, record, metadata) {
+async function runChain(variants, chromium, options, record, metadata, checkpoint) {
   const hosts = new Map();
   try {
     // Both versions finish compilation before any timed browser processes start.
@@ -109,6 +109,7 @@ async function runChain(variants, chromium, options, record, metadata) {
       hosts.set(variant.id, host);
       metadata.builds.push({ variant: variant.id, layer: 'chain', ...host.metadata });
     }
+    await checkpoint();
     let caseIndex = 0;
     for (const family of options.families) {
       for (const rows of options.rowCounts) {
@@ -144,6 +145,7 @@ async function runChain(variants, chromium, options, record, metadata) {
               if (pageErrors.length) throw new Error(`Browser errors: ${pageErrors.join('; ')}`);
               console.log(`Measured ${variant.id} ${family} ${rows} rows session ${session + 1}/${options.sessions}`);
             } finally { await browser.close(); }
+            await checkpoint();
           }
         }
         caseIndex++;
@@ -170,7 +172,7 @@ async function main() {
     'Memory and instrumented CPU profiles are outside this first latency experiment.',
   ] };
   const report = {
-    schemaVersion: 1, createdAt: new Date().toISOString(), status: 'running',
+    schemaVersion: 1, createdAt: new Date().toISOString(), status: 'running', phase: 'prepare', completedLayers: [],
     benchmark: {
       revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: directory, encoding: 'utf8' }).trim(),
       sourceHash: await directoryHash(directory),
@@ -183,23 +185,41 @@ async function main() {
       cpu: os.cpus()[0]?.model, logicalCpus: os.cpus().length, totalMemoryBytes: os.totalmem(), startLoadAverage: os.loadavg() },
     variants: [], metadata, samples,
   };
+  // Atomic metadata checkpoints complement the append-only samples. A killed
+  // process leaves a running/partial report, never a fabricated successful run.
+  const checkpoint = async () => {
+    const temporary = `${evidencePath}.tmp`;
+    await writeFile(temporary, JSON.stringify(report, null, 2) + '\n');
+    await rename(temporary, evidencePath);
+  };
   const record = async (sample) => {
     samples.push(sample);
     await appendFile(path.join(options.outputDir, 'samples.ndjson'), JSON.stringify(sample) + '\n');
+    if (sample.layer === 'full-app') await checkpoint();
   };
   const lockPath = path.join(options.cacheDir, 'benchmark.lock');
   let lock;
   try {
+    await checkpoint();
     await mkdir(options.cacheDir, { recursive: true });
     lock = await open(lockPath, 'wx').catch(() => { throw new Error(`Cache is already in use; inspect ${lockPath} before removing a stale lock`); });
     await lock.writeFile(JSON.stringify({ pid: process.pid, startedAt: report.createdAt }) + '\n');
     const variants = await prepareVariants({ cacheDir: options.cacheDir });
     report.variants = variants.map(({ root: _root, ...variant }) => variant);
+    await checkpoint();
     if (options.prepareOnly) { report.status = 'prepared'; return; }
     const require = createRequire(path.join(variants.find((variant) => variant.id === 'native').root, 'package.json'));
     const { chromium } = require('@playwright/test');
-    if (options.layer !== 'full-app') await runChain(variants, chromium, options, record, metadata);
+    if (options.layer !== 'full-app') {
+      report.phase = 'chain';
+      await runChain(variants, chromium, options, record, metadata, checkpoint);
+      report.completedLayers.push('chain');
+      report.summary = summarize(samples);
+      await checkpoint();
+    }
     if (options.layer !== 'chain') {
+      report.phase = 'full-app';
+      await checkpoint();
       const { runFullApp } = await import('./full-app.mjs');
       const fullApp = await runFullApp({ variants, chromium,
         options: { ...options, rowCounts: options.fullAppRows }, onSample: record });
@@ -207,11 +227,14 @@ async function main() {
       metadata.limits.push(...(fullApp.limits ?? []));
       metadata.artifacts = Object.fromEntries(Object.entries(fullApp.artifacts ?? {})
         .map(([key, artifact]) => [key, Array.isArray(artifact) ? artifact.map(file => path.basename(file)) : path.basename(artifact)]));
+      report.completedLayers.push('full-app');
     }
     report.summary = summarize(samples);
     report.status = 'passed';
+    report.phase = 'finished';
   } catch (error) {
     report.status = 'failed';
+    report.failurePhase = report.phase;
     report.failure = error instanceof Error ? error.message : String(error);
     process.exitCode = 1;
     console.error(report.failure);
@@ -219,9 +242,7 @@ async function main() {
     if (lock) { await lock.close(); await unlink(lockPath); }
     report.environment.endLoadAverage = os.loadavg();
     report.finishedAt = new Date().toISOString();
-    const temporary = `${evidencePath}.tmp`;
-    await writeFile(temporary, JSON.stringify(report, null, 2) + '\n');
-    await rename(temporary, evidencePath);
+    await checkpoint();
     await writeFile(path.join(options.outputDir, 'samples.csv'), samplesCsv(samples));
     await writeFile(path.join(options.outputDir, 'report.md'), renderReport(report));
     console.log(`Evidence: ${options.outputDir} (${report.status}, ${samples.length} samples)`);

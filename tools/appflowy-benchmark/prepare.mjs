@@ -141,7 +141,13 @@ async function serve(dist) {
       response.end(body);
     } catch { response.writeHead(404); response.end(); }
   });
-  server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
+  server.on('connection', socket => {
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+    // Closing a browser can reset an in-flight asset connection. The failed
+    // request stays failed; it must not crash unrelated measurements.
+    socket.on('error', () => socket.destroy());
+  });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   return { url: `http://127.0.0.1:${server.address().port}/`,
     close: async () => { for (const socket of sockets) socket.destroy(); await new Promise(resolve => server.close(resolve)); } };
