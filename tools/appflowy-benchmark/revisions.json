@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/JoverZhang/AppFlowy-Web.git",
+  "variants": [
+    { "id": "legacy", "revision": "4fdb4f45098a5b8f449ab4b0f7775a5aedb21c4a" },
+    { "id": "native", "revision": "c4485cdec14ed4e089e2472c882237d8a4ec0c3e", "sdkRevision": "43b393c86a26e54ea51b5c32443ec59bc02667c9" }
+  ]
+}

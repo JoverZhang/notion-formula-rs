@@ -76,7 +76,14 @@ clean:
 
 # Tests
 
-test: test-rust test-example-vite
+test: test-rust test-example-vite test-benchmark-report
+
+test-benchmark-report:
+  node --test tools/appflowy-benchmark/report.test.mjs
+
+# Production browser A/B measurements; use --help for Cloud and sampling options.
+benchmark-appflowy *args:
+  node tools/appflowy-benchmark/run.mjs {{args}}
 
 test-rust: test-builtin_fn test-analyzer test-evaluator test-formula_engine test-ide test-analyzer_wasm test-spec-codegen test-md-first
 
