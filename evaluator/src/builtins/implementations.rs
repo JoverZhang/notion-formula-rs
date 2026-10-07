@@ -4,8 +4,8 @@ use crate::core::columns::{
 use crate::core::context::BuiltinValueContext;
 use crate::core::types::Mask;
 use crate::kernels::controlled::{
-    eval_count, eval_every, eval_filter, eval_find, eval_find_index, eval_if, eval_ifs, eval_let,
-    eval_map, eval_some,
+    eval_and, eval_count, eval_every, eval_filter, eval_find, eval_find_index, eval_if, eval_ifs,
+    eval_let, eval_map, eval_or, eval_some,
 };
 use crate::kernels::helpers::{eval_fallible_selected, eval_infallible_all_slots};
 use crate::kernels::value::{
@@ -427,6 +427,26 @@ impl_typed_value_kernel!(
     Id, IdKernel, IdArgs, TextKind;
     _args, context, mask => eval_id(context, mask)
 );
+
+impl AndKernel for And {
+    fn eval<C: super::BuiltinEvalContext>(
+        context: &mut C,
+        args: AndPlans,
+        mask: &Mask,
+    ) -> KernelResult<BooleanKind> {
+        eval_and(context, args, mask)
+    }
+}
+
+impl OrKernel for Or {
+    fn eval<C: super::BuiltinEvalContext>(
+        context: &mut C,
+        args: OrPlans,
+        mask: &Mask,
+    ) -> KernelResult<BooleanKind> {
+        eval_or(context, args, mask)
+    }
+}
 
 impl IfKernel for If {
     fn eval<C: super::BuiltinEvalContext>(

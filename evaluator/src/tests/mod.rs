@@ -22,9 +22,14 @@ fn number_column(values: Vec<f64>, validity: Validity) -> Column {
 
 #[test]
 fn generated_catalog_has_one_obligation_per_supported_builtin() {
-    let supported = builtin_fn::builtins_functions();
+    let supported = builtin_fn::builtin_categories()
+        .into_iter()
+        .flat_map(|category| category.entries)
+        .filter(|entry| !entry.requires_lowering)
+        .filter_map(|entry| entry.implementation)
+        .collect::<Vec<_>>();
     assert_eq!(BuiltinKey::ALL.len(), supported.len());
-    assert_eq!(BuiltinKey::ALL.len(), 86);
+    assert_eq!(BuiltinKey::ALL.len(), 88);
     for (key, signature) in BuiltinKey::ALL.iter().zip(supported) {
         assert_eq!(key.name(), signature.name);
         let expected_mode = if signature

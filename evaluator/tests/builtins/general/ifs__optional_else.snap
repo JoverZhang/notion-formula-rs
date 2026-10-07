@@ -1,0 +1,7 @@
+=== INPUT ===
+// @prop "Flag": boolean = [true, false, null]
+ifs(prop("Flag"), 1)
+=== OUTPUT ===
+row-0: 1
+row-1: null
+row-2: null

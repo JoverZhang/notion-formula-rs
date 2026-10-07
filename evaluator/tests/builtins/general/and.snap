@@ -1,0 +1,7 @@
+=== INPUT ===
+// @prop "Flag": boolean = [false, true, null]
+and(prop("Flag"), true, false, test("x", "["))
+=== OUTPUT ===
+row-0: false
+row-1: false
+row-2: false

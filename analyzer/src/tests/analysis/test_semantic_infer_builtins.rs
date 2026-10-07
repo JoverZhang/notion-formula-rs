@@ -99,34 +99,24 @@ fn diagnostics_if_arity_error() {
 }
 
 #[test]
-fn diagnostics_ifs_missing_default_is_arity_error() {
+fn semantic_ifs_single_pair_accepts_missing_default() {
     let ctx = builtins_ctx();
-    assert_single_diag(
-        "ifs(true, 1)",
-        &ctx,
-        "ifs() expects at least 3 arguments",
-        Span { start: 0, end: 12 },
-    );
+    assert_eq!(infer_ok("ifs(true, 1)", &ctx), Ty::Number);
 }
 
 #[test]
-fn diagnostics_ifs_repeat_shape_error() {
+fn semantic_ifs_multiple_pairs_accept_missing_default() {
     let ctx = builtins_ctx();
-    assert_single_diag(
-        "ifs(true, 1, false, 2)",
-        &ctx,
-        "ifs() has an invalid argument shape",
-        Span { start: 0, end: 22 },
-    );
+    assert_eq!(infer_ok("ifs(true, 1, false, 2)", &ctx), Ty::Number);
 }
 
 #[test]
-fn diagnostics_ifs_shape_error_short_circuits_type_mismatches() {
+fn diagnostics_ifs_optional_default_does_not_relax_condition_type() {
     let ctx = builtins_ctx();
     assert_single_diag(
         "ifs(true, 1, \"x\", 2)",
         &ctx,
-        "ifs() has an invalid argument shape",
-        Span { start: 0, end: 20 },
+        "argument type mismatch: expected Boolean, got String",
+        Span { start: 13, end: 16 },
     );
 }

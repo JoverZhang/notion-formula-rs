@@ -33,6 +33,7 @@ fn expand_function(category: syn::Ident, function: &FunctionDecl) -> TokenStream
     let name = function.name.to_string();
     let signature = canonical_signature(function);
     let detail = canonical_detail(function);
+    let lowered = attrs.lowered;
     let docs = attrs.docs.iter().map(|doc| quote!(#doc.to_string()));
 
     if attrs.unsupported {
@@ -133,7 +134,7 @@ fn expand_function(category: syn::Ident, function: &FunctionDecl) -> TokenStream
                 #detail,
                 vec![#(#docs),*],
                 implementation,
-            )
+            ).with_lowering(#lowered)
         }
     }
 }
@@ -208,6 +209,7 @@ fn expand_type(ty: &TypeAst, generics: &HashMap<String, u32>, any_id: Option<u32
 
 #[derive(Default)]
 struct AttrInfo {
+    lowered: bool,
     unsupported: bool,
     unsupported_span: Option<Span>,
     resolver: Option<Path>,
@@ -231,6 +233,20 @@ fn parse_attrs(attrs: &[Attribute], errors: &mut Errors) -> AttrInfo {
                 continue;
             };
             out.docs.push(text.value().trim().to_string());
+            continue;
+        }
+
+        if attr.path().is_ident("lowered") {
+            if out.lowered {
+                errors.push(syn::Error::new(attr.span(), "duplicate `#[lowered]`"));
+            }
+            if !matches!(attr.meta, Meta::Path(_)) {
+                errors.push(syn::Error::new(
+                    attr.span(),
+                    "`#[lowered]` takes no arguments",
+                ));
+            }
+            out.lowered = true;
             continue;
         }
 
@@ -312,6 +328,12 @@ fn validate(category: &CategoryDecl) -> syn::Result<()> {
 
 fn validate_function(function: &FunctionDecl, errors: &mut Errors) {
     let attrs = parse_attrs(&function.attrs, errors);
+    if attrs.lowered && attrs.unsupported {
+        errors.push(syn::Error::new(
+            function.name.span(),
+            "`#[lowered]` cannot be combined with `#[unsupported]`",
+        ));
+    }
     if attrs.unsupported && attrs.docs.is_empty() {
         let span = attrs.unsupported_span.unwrap_or(function.name.span());
         errors.push(syn::Error::new(
@@ -360,14 +382,28 @@ fn validate_function(function: &FunctionDecl, errors: &mut Errors) {
         for repeat in &repeats {
             validate_repeat(repeat, errors);
         }
+        let mut saw_repeat = false;
+        let mut saw_optional_tail = false;
         for item in &function.params {
-            if let ParamItem::Param(param) = item
-                && param.optional
-            {
-                errors.push(syn::Error::new(
-                    param.name.span(),
-                    "fixed parameters cannot be optional when repeat is present",
-                ));
+            match item {
+                ParamItem::Repeat(_) => saw_repeat = true,
+                ParamItem::Param(param) if !saw_repeat && param.optional => {
+                    errors.push(syn::Error::new(
+                        param.name.span(),
+                        "fixed parameters cannot be optional when repeat is present",
+                    ));
+                }
+                ParamItem::Param(param) if saw_repeat => {
+                    if param.optional {
+                        saw_optional_tail = true;
+                    } else if saw_optional_tail {
+                        errors.push(syn::Error::new(
+                            param.name.span(),
+                            "required fixed parameter cannot follow an optional parameter",
+                        ));
+                    }
+                }
+                _ => {}
             }
         }
     } else {
