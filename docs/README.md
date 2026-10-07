@@ -29,7 +29,6 @@ clients, and WASM integrations to the current user-visible contract they need.
 ## Contribute safely
 
 - [Testing guide](contributing/testing.md)
-- [Build the AppFlowy example](contributing/appflowy-example.md)
 - [Markdown-generated Rust headers](contributing/spec-codegen.md)
 - [Changelog guide](contributing/changelogs.md)
 - [Documentation policy](../DOCUMENTATION.md)

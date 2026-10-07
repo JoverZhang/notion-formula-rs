@@ -31,7 +31,6 @@ const TOOL_IGNORED_DIRECTORY_NAMES = new Set([
 const TOOL_IGNORED_PATHS = new Set([
   "examples/vite/src/pkg",
   "packages/notion-formula/src/wasm",
-  "examples/appflowy-web",
 ]);
 const BILINGUAL_METADATA = [
   "doc_id",
