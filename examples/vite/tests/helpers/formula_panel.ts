@@ -63,6 +63,7 @@ export function mountFormulaPanel(initialSource = "i") {
         output_type: "Unknown",
         diagnostics: [],
         tokens: [],
+        property_references: [],
       },
       cursor,
     };

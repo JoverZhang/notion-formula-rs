@@ -86,6 +86,7 @@ const draftState: FormulaDraftState = {
   output_type: "Number",
   diagnostics: [],
   tokens: [],
+  property_references: [],
 };
 
 const cursorHelp: CursorHelp = {

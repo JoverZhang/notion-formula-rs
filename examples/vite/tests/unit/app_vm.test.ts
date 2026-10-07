@@ -47,6 +47,7 @@ class FakeDraft implements FormulaDraftClient {
       version: this.version,
       definition: { ...this.definition },
       output_type: this.engine.outputType,
+      property_references: [],
       diagnostics: this.engine.invalidSources.has(this.definition.expression)
         ? [
             {

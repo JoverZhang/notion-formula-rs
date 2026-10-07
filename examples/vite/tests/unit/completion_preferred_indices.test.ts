@@ -217,6 +217,7 @@ describe("asynchronous editor actions", () => {
         output_type: "Unknown",
         diagnostics: [],
         tokens: [],
+        property_references: [],
       },
       cursor: 3,
     });

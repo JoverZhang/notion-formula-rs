@@ -393,6 +393,15 @@ impl Converter {
                 })
                 .collect(),
             tokens: state.tokens.iter().map(|t| token_view(source, t)).collect(),
+            property_references: state
+                .property_references
+                .iter()
+                .map(|reference| js::PropertyReference {
+                    property_id: reference.property_id.0.clone(),
+                    span: span_dto(source, reference.span),
+                    id_span: span_dto(source, reference.id_span),
+                })
+                .collect(),
         }
     }
 

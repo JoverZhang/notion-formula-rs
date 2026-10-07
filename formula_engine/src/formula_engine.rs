@@ -279,12 +279,12 @@ impl ParsedFormula {
 }
 
 fn collect_dependencies(expr: &Expr, dependencies: &mut BTreeSet<PropertyId>) {
-    visit_property_references(expr, &mut |name, _| {
+    visit_property_references(expr, &mut |name, _, _| {
         dependencies.insert(PropertyId(name.into()));
     });
 }
 
-pub(crate) fn visit_property_references(expr: &Expr, visit: &mut dyn FnMut(&str, Span)) {
+pub(crate) fn visit_property_references(expr: &Expr, visit: &mut dyn FnMut(&str, Span, Span)) {
     match &expr.kind {
         ExprKind::Call { callee, args } => {
             if callee.text == "prop"
@@ -292,7 +292,7 @@ pub(crate) fn visit_property_references(expr: &Expr, visit: &mut dyn FnMut(&str,
                 && let ExprKind::Lit(literal) = &argument.kind
                 && literal.kind == LitKind::String
             {
-                visit(&literal.symbol.text, argument.span);
+                visit(&literal.symbol.text, argument.span, expr.span);
             }
             for arg in args {
                 visit_property_references(arg, visit);
