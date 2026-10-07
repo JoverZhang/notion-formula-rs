@@ -100,6 +100,10 @@ trim(text: string) -> string;
 repeat(text: string, times: number) -> string;
 padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
+/// 所有样式名称照常求值并检查类型，随后原样返回文本（含普通 null）；忽略样式元数据。
+style(text: string, repeat(min = 0) { styles: string }) -> string;
+unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
+/// 至少接受两个列表；标量文本拼接使用 +。
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
 /// null 元素转为空字符串并保留分隔符；列表参数为 null 时返回 null。
@@ -113,7 +117,12 @@ split(text: string, separator: string) -> string[];
 数值运算遵循 [Number 规则](formula-language.zh-CN.md#current-number)。
 
 ```builtin
-formatNumber(value: number, format: string, precision: number) -> string;
+/// 格式：number/decimal、number_with_commas/commas、percent/%、scientific、humanize、usd/eur/gbp/jpy/cny/krw/inr/cad/aud/chf。
+/// format 去除首尾空白并转为小写；未知格式产生 InvalidValue。显式 null precision 返回 null。
+/// precision 必须为 0..=1000000 内的有限值，截断后最多保留 100 位。
+/// 省略 precision 时，decimal/commas/percent 最多保留 10 位小数，humanize 最多一位（K/M/B/T），
+/// scientific 保留 10 位，货币保留两位，jpy/krw 保留零位；显式 precision 保留末尾零。
+formatNumber(value: number, format: string, precision?: number) -> string;
 add(a: number, b: number) -> number;
 subtract(a: number, b: number) -> number;
 multiply(a: number, b: number) -> number;
@@ -178,6 +187,9 @@ dateSubtract(date: date, amount: number, unit: string) -> date;
 dateBetween(a: date, b: date, unit: string) -> number;
 timestamp(date: date) -> number;
 fromTimestamp(timestamp: number) -> date;
+/// 在运行时固定偏移时区中，使用 Moment 日历、时钟、序数、星期与周编号标记格式化 start。
+/// [text] 为字面量；W/WW/Wo/GGGG 使用 ISO 周，w/ww/wo/gggg 使用英语区域的周日始周规则。
+/// 百分号为字面量；2024-03-05 的 [Week] W 输出 "Week 10"。
 formatDate(date: date, format: string) -> string;
 parseDate(text: string) -> date;
 ```
@@ -263,7 +275,7 @@ id() -> string;
 People 当前无受支持函数。以下声明不进入可调用/补全集合：
   and / or / not          // 用 && / || / not 运算符表达
   lets                    // 缺少异构、顺序绑定模型
-  link / style / unstyle  // 尚无 Link / StyledText 类型
+  link                    // 尚无 Link 类型
   dateRange / dateStart / dateEnd // 尚无 DateRange 类型
   name / email            // 尚无 person 名称/邮件输入
 调用 unsupported 声明按未知函数处理，不提供独立的 unsupported 错误类别。
