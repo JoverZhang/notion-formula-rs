@@ -100,6 +100,7 @@ test("real module Worker matches the synchronous WASM session contract", async (
   expect(result).toEqual({
     verified: [
       "engine snapshots",
+      "transitive input dependencies",
       "lossless evaluation DTOs",
       "typed native errors",
       "multiple drafts and borrow errors",

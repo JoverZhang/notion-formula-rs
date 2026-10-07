@@ -29,6 +29,9 @@ export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
+  // Sorted, distinct transitive Input IDs. Ready targets have complete closures;
+  // NotReady targets expose known references only. Invalid selections reject with EVALUATE_INPUT.
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]>;
   // Rejects ACTIVE_DRAFTS until every Draft has been consumed or closed.
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
   remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
