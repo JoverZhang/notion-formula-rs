@@ -7,7 +7,11 @@ pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
     Boolean(ColumnData<bool>),
+    /// Legacy storage; output uses this form when no present row needs metadata, including zero-row and all-null results.
     Date(ColumnData<i64>),
+    /// Same declared type and column kind as Date, with lossless date metadata.
+    /// Output uses this form if any present row has an end or include_time=false; legacy rows become end=None, include_time=true.
+    DateValue(ColumnData<DateValue>),
     List(ColumnData<Vec<Option<Value>>>),
     /// Carries Union or Unknown; each non-null value retains its concrete type.
     Union(ColumnData<Value>),
@@ -28,6 +32,8 @@ pub enum Value {
     Boolean(bool),
     /// UTC Unix timestamp in milliseconds.
     Date(i64),
+    /// Same semantic type as Date; legacy Date means end=None and include_time=true.
+    DateValue(DateValue),
     /// An element None means that position has no value; a null list, an empty list, and a list with null elements differ.
     List(Vec<Option<Value>>),
 }
@@ -151,7 +157,7 @@ pub enum RuntimeError {
     /// Date text cannot be parsed.
     InvalidDateText { text: String },
     /// UTC or offset-adjusted local time used or produced by a date operation is outside Gregorian years 0001–9999.
-    /// Out-of-range Date input values pass type validation; using them in a date operation produces this row error.
+    /// Out-of-range Date / DateValue input endpoints pass type validation and copying; date operations check both endpoints and produce this row error.
     DateOutOfRange,
 }
 /// Returned when a formula cannot begin evaluation; see RowError for row evaluation failures.

@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use formula_engine::{
-    Column, ColumnData, ColumnKind, EvaluateInput, EvaluateInputError, EvaluateResult,
+    Column, ColumnData, ColumnKind, DateValue, EvaluateInput, EvaluateInputError, EvaluateResult,
     FormulaDefinition, FormulaEngine, FormulaEvaluationError, FormulaOutput, FormulaSchema,
     FormulaStatus, NullBuffer, PropertyDefinition, PropertyId, PropertyState, RuntimeContext,
     RuntimeError, Value, ValueType,
@@ -86,6 +86,7 @@ fn row_value(column: &Column, row: usize) -> Option<Value> {
         Column::String(data) => value!(data, String),
         Column::Boolean(data) => value!(data, Boolean),
         Column::Date(data) => value!(data, Date),
+        Column::DateValue(data) => value!(data, DateValue),
         Column::List(data) => value!(data, List),
         Column::Union(data) => data
             .validity
@@ -470,7 +471,11 @@ fn runtime_snapshot_date_ranges_and_output_types_survive_updates() {
     );
     assert_eq!(
         row_value(&output(&result, "today").column, 0),
-        Some(Value::Date(-28_800_000))
+        Some(Value::DateValue(DateValue {
+            start: -28_800_000,
+            end: None,
+            include_time: false,
+        }))
     );
     assert_eq!(
         row_value(&output(&result, "year").column, 0),
@@ -779,6 +784,7 @@ fn render_value(value: &Value) -> String {
         Value::String(value) => format!("{value:?}"),
         Value::Boolean(value) => value.to_string(),
         Value::Date(value) => format!("date({value})"),
+        Value::DateValue(value) => format!("date_value({value:?})"),
         Value::List(values) => format!(
             "[{}]",
             values
@@ -807,6 +813,7 @@ fn snapshot(result: &EvaluateResult) -> String {
                     Column::String(data) => data.values.len(),
                     Column::Boolean(data) => data.values.len(),
                     Column::Date(data) => data.values.len(),
+                    Column::DateValue(data) => data.values.len(),
                     Column::List(data) => data.values.len(),
                     Column::Union(data) => data.values.len(),
                 };

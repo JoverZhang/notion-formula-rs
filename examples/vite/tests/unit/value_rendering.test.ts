@@ -9,6 +9,19 @@ import {
 } from "../../src/model/values";
 
 describe("engine value presentation", () => {
+  it("renders rich ranges without converting exact metadata to scalar dates", () => {
+    const date = { start: 1790244000000n, end: 1790384400000n, include_time: false };
+    expect(formatValue({ DateValue: date })).toBe("2026-09-24 → 2026-09-26");
+    expect(formatValue({ DateValue: { ...date, include_time: true } })).toBe(
+      "2026-09-24T10:00:00.000Z → 2026-09-26T01:00:00.000Z",
+    );
+    expect(
+      formatValue({ DateValue: { start: 9007199254740993n, end: null, include_time: false } }),
+    ).toBe("9007199254740993");
+    const column: Column = { DateValue: { values: [date, date], validity: [true, false] } };
+    expect(columnValue(column, 0)).toEqual({ DateValue: date });
+    expect(columnValue(column, 1)).toBeNull();
+  });
   it.each([
     [null, "null"],
     [{ Number: NaN }, "NaN"],

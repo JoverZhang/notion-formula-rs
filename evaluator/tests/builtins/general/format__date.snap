@@ -3,4 +3,4 @@
 
 format(parseDate("2024-05-06"))
 === OUTPUT ===
-row-0: "May 6, 2024 00:00"
+row-0: "May 6, 2024"

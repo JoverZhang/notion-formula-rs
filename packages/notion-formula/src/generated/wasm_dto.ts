@@ -80,11 +80,13 @@ export type FormulaStatus = { "Ready": { output_type: ValueType, } } | "NotReady
 
 export type FormulaEngineChangeResult = { affected_formulas: Array<string>, };
 
-export type Value = { "Number": number } | { "String": string } | { "Boolean": boolean } | { "Date": bigint } | { "List": Array<Value | null> };
+export type Value = { "Number": number } | { "String": string } | { "Boolean": boolean } | { "Date": bigint } | { "DateValue": DateValue } | { "List": Array<Value | null> };
+
+export type DateValue = { start: bigint, end: bigint | null, include_time: boolean, };
 
 export type ColumnData<T> = { values: Array<T>, validity: Array<boolean>, };
 
-export type Column = { "Number": ColumnData<number> } | { "String": ColumnData<string> } | { "Boolean": ColumnData<boolean> } | { "Date": ColumnData<bigint> } | { "List": ColumnData<Array<Value | null>> } | { "Union": ColumnData<Value> };
+export type Column = { "Number": ColumnData<number> } | { "String": ColumnData<string> } | { "Boolean": ColumnData<boolean> } | { "Date": ColumnData<bigint> } | { "DateValue": ColumnData<DateValue> } | { "List": ColumnData<Array<Value | null>> } | { "Union": ColumnData<Value> };
 
 export type ColumnKind = "Number" | "String" | "Boolean" | "Date" | "List" | "Union";
 
