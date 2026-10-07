@@ -1,0 +1,1093 @@
+{
+  "schemaVersion": 1,
+  "attempt": {
+    "status": "failed",
+    "phase": "full-app-setup",
+    "error": "Unhandled Socket error: read ECONNRESET",
+    "node": "v25.9.0",
+    "originalReportBytes": 0,
+    "lock": {
+      "pid": 799883,
+      "startedAt": "2026-10-07T10:37:45.726Z"
+    },
+    "samplesSha256": "4cb6e265cf378361b7360dc817cd87bc379d6df2a6992a8c4bb5fdfb88dc6784",
+    "samplesBytes": 612761,
+    "samplesCount": 2520,
+    "lastSampleAppendTime": "2026-10-07T10:53:02.327315+00:00",
+    "recordedAt": "2026-10-07T11:01:17.721141+00:00",
+    "originalRevision": "535a5e9fcaacc5f45642e17b6aff7bf9e49e8a97",
+    "originalSourceHash": "46e1b9bcf358f69f42abf43c9d5e89f0d1ba8d0bc3787ba3d9a8d464b75fca23"
+  },
+  "invocation": {
+    "entrypoint": "node tools/appflowy-benchmark/run.mjs",
+    "layer": "all",
+    "sessions": 5,
+    "samples": 5,
+    "warmups": 2,
+    "seed": 47183,
+    "rowCounts": [
+      100,
+      1000,
+      10000
+    ],
+    "families": [
+      "arithmetic",
+      "text-list",
+      "dependency",
+      "business-long"
+    ],
+    "fullAppRows": [
+      100
+    ],
+    "timeoutMs": 120000,
+    "captureScreenshots": true,
+    "backendUrl": "http://127.0.0.1:8000",
+    "gotrueUrl": "http://127.0.0.1:9999",
+    "browser": "Google Chrome for Testing 145.0.7632.6",
+    "privateArguments": "Credential, cache, output, and browser executable paths omitted."
+  },
+  "corroboration": {
+    "source": "Successful canonical CLI smoke immediately before the formal run, same unchanged source, checkouts, builds, browser and host; cache build markers re-read after the failure and compared below. These are reconstructed metadata, not a recovered original results.json.",
+    "smokeCreatedAt": "2026-10-07T10:33:46.069Z",
+    "smokeFinishedAt": "2026-10-07T10:34:27.646Z",
+    "benchmark": {
+      "revision": "535a5e9fcaacc5f45642e17b6aff7bf9e49e8a97",
+      "sourceHash": "46e1b9bcf358f69f42abf43c9d5e89f0d1ba8d0bc3787ba3d9a8d464b75fca23",
+      "modifiedSources": false
+    },
+    "variants": [
+      {
+        "id": "legacy",
+        "revision": "4fdb4f45098a5b8f449ab4b0f7775a5aedb21c4a",
+        "repository": "https://github.com/JoverZhang/AppFlowy-Web.git",
+        "lockHash": "3d3e036b18a62ac9c07274acdd7e3292181c5933a57207cdff4e95cfd02feb32",
+        "packageManager": "10.9.0"
+      },
+      {
+        "id": "native",
+        "revision": "c4485cdec14ed4e089e2472c882237d8a4ec0c3e",
+        "sdkRevision": "43b393c86a26e54ea51b5c32443ec59bc02667c9",
+        "repository": "https://github.com/JoverZhang/AppFlowy-Web.git",
+        "lockHash": "f171b407001ab2e3bff96b156864bbac3a5ef3de6b29368984ad412d75aeacf7",
+        "packageManager": "10.9.0",
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "wasmPack": "wasm-pack 0.12.1",
+        "sdkHash": "00f3343cae7108fbae8a29d1190837d4dcd37682521ab6b7dfdeb5bcefc560b0"
+      }
+    ],
+    "metadata": {
+      "builds": [
+        {
+          "variant": "legacy",
+          "layer": "chain",
+          "revision": "4fdb4f45098a5b8f449ab4b0f7775a5aedb21c4a",
+          "lockHash": "3d3e036b18a62ac9c07274acdd7e3292181c5933a57207cdff4e95cfd02feb32",
+          "sdkHash": null,
+          "harnessHash": "7ad912a4a18655c803e2258da0282ed2eab7cc60701408d6fcf05568c9a5ef24",
+          "buildScriptHash": "8010eee487bc615fdb42482a20fd2360f0cc5ccd1d14f6aff74723814503d897",
+          "node": "v25.9.0",
+          "artifactHash": "633dbf45358df6ad4e15b2efb5490e64c8167aaf9bf6f2927dc7bba88cda3f4d",
+          "nodeEnv": "production"
+        },
+        {
+          "variant": "native",
+          "layer": "chain",
+          "revision": "c4485cdec14ed4e089e2472c882237d8a4ec0c3e",
+          "lockHash": "f171b407001ab2e3bff96b156864bbac3a5ef3de6b29368984ad412d75aeacf7",
+          "sdkHash": "00f3343cae7108fbae8a29d1190837d4dcd37682521ab6b7dfdeb5bcefc560b0",
+          "harnessHash": "7ad912a4a18655c803e2258da0282ed2eab7cc60701408d6fcf05568c9a5ef24",
+          "buildScriptHash": "51073a0f30caaed81bcb9234cb43e5210ec7f00308f5f94ae1711502144c97eb",
+          "node": "v25.9.0",
+          "artifactHash": "fae2690dafe1941f0c3adee1e7305fd89ed7cc1955a778e70c404a03aade9cfe",
+          "nodeEnv": "production"
+        }
+      ],
+      "cases": [
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "arithmetic",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "sum",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "score",
+              "expression": "prop(\"a\") * prop(\"b\") + prop(\"c\") + 0",
+              "characters": 37
+            },
+            {
+              "id": "scaled",
+              "expression": "(prop(\"a\") - prop(\"b\")) / 2 + prop(\"c\")",
+              "characters": 39
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "arithmetic",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "sum",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "score",
+              "expression": "prop(\"a\") * prop(\"b\") + prop(\"c\") + 0",
+              "characters": 37
+            },
+            {
+              "id": "scaled",
+              "expression": "(prop(\"a\") - prop(\"b\")) / 2 + prop(\"c\")",
+              "characters": 39
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "arithmetic",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "sum",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "score",
+              "expression": "prop(\"a\") * prop(\"b\") + prop(\"c\") + 0",
+              "characters": 37
+            },
+            {
+              "id": "scaled",
+              "expression": "(prop(\"a\") - prop(\"b\")) / 2 + prop(\"c\")",
+              "characters": 39
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "arithmetic",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "sum",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "score",
+              "expression": "prop(\"a\") * prop(\"b\") + prop(\"c\") + 0",
+              "characters": 37
+            },
+            {
+              "id": "scaled",
+              "expression": "(prop(\"a\") - prop(\"b\")) / 2 + prop(\"c\")",
+              "characters": 39
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "arithmetic",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "sum",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "score",
+              "expression": "prop(\"a\") * prop(\"b\") + prop(\"c\") + 0",
+              "characters": 37
+            },
+            {
+              "id": "scaled",
+              "expression": "(prop(\"a\") - prop(\"b\")) / 2 + prop(\"c\")",
+              "characters": 39
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "arithmetic",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "sum",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "score",
+              "expression": "prop(\"a\") * prop(\"b\") + prop(\"c\") + 0",
+              "characters": 37
+            },
+            {
+              "id": "scaled",
+              "expression": "(prop(\"a\") - prop(\"b\")) / 2 + prop(\"c\")",
+              "characters": 39
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "text-list",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "label",
+            "tags"
+          ],
+          "formulas": [
+            {
+              "id": "normalized",
+              "expression": "lower(trim(prop(\"label\"))) + \":\" + join(sort(unique(prop(\"tags\"))), \"|\") + \" / v0\"",
+              "characters": 82
+            },
+            {
+              "id": "tokens",
+              "expression": "concat(split(upper(trim(prop(\"label\"))), \" \"), prop(\"tags\"))",
+              "characters": 60
+            },
+            {
+              "id": "weight",
+              "expression": "length(prop(\"label\")) + length(prop(\"tags\"))",
+              "characters": 44
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "text-list",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "label",
+            "tags"
+          ],
+          "formulas": [
+            {
+              "id": "normalized",
+              "expression": "lower(trim(prop(\"label\"))) + \":\" + join(sort(unique(prop(\"tags\"))), \"|\") + \" / v0\"",
+              "characters": 82
+            },
+            {
+              "id": "tokens",
+              "expression": "concat(split(upper(trim(prop(\"label\"))), \" \"), prop(\"tags\"))",
+              "characters": 60
+            },
+            {
+              "id": "weight",
+              "expression": "length(prop(\"label\")) + length(prop(\"tags\"))",
+              "characters": 44
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "text-list",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "label",
+            "tags"
+          ],
+          "formulas": [
+            {
+              "id": "normalized",
+              "expression": "lower(trim(prop(\"label\"))) + \":\" + join(sort(unique(prop(\"tags\"))), \"|\") + \" / v0\"",
+              "characters": 82
+            },
+            {
+              "id": "tokens",
+              "expression": "concat(split(upper(trim(prop(\"label\"))), \" \"), prop(\"tags\"))",
+              "characters": 60
+            },
+            {
+              "id": "weight",
+              "expression": "length(prop(\"label\")) + length(prop(\"tags\"))",
+              "characters": 44
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "text-list",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "label",
+            "tags"
+          ],
+          "formulas": [
+            {
+              "id": "normalized",
+              "expression": "lower(trim(prop(\"label\"))) + \":\" + join(sort(unique(prop(\"tags\"))), \"|\") + \" / v0\"",
+              "characters": 82
+            },
+            {
+              "id": "tokens",
+              "expression": "concat(split(upper(trim(prop(\"label\"))), \" \"), prop(\"tags\"))",
+              "characters": 60
+            },
+            {
+              "id": "weight",
+              "expression": "length(prop(\"label\")) + length(prop(\"tags\"))",
+              "characters": 44
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "text-list",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "label",
+            "tags"
+          ],
+          "formulas": [
+            {
+              "id": "normalized",
+              "expression": "lower(trim(prop(\"label\"))) + \":\" + join(sort(unique(prop(\"tags\"))), \"|\") + \" / v0\"",
+              "characters": 82
+            },
+            {
+              "id": "tokens",
+              "expression": "concat(split(upper(trim(prop(\"label\"))), \" \"), prop(\"tags\"))",
+              "characters": 60
+            },
+            {
+              "id": "weight",
+              "expression": "length(prop(\"label\")) + length(prop(\"tags\"))",
+              "characters": 44
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "text-list",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "label",
+            "tags"
+          ],
+          "formulas": [
+            {
+              "id": "normalized",
+              "expression": "lower(trim(prop(\"label\"))) + \":\" + join(sort(unique(prop(\"tags\"))), \"|\") + \" / v0\"",
+              "characters": 82
+            },
+            {
+              "id": "tokens",
+              "expression": "concat(split(upper(trim(prop(\"label\"))), \" \"), prop(\"tags\"))",
+              "characters": 60
+            },
+            {
+              "id": "weight",
+              "expression": "length(prop(\"label\")) + length(prop(\"tags\"))",
+              "characters": 44
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "dependency",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 7,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "base",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "left",
+              "expression": "prop(\"base\") * 2",
+              "characters": 16
+            },
+            {
+              "id": "right",
+              "expression": "prop(\"base\") + prop(\"c\")",
+              "characters": 24
+            },
+            {
+              "id": "merged",
+              "expression": "prop(\"left\") + prop(\"right\")",
+              "characters": 28
+            },
+            {
+              "id": "chain1",
+              "expression": "prop(\"merged\") + 1",
+              "characters": 18
+            },
+            {
+              "id": "chain2",
+              "expression": "prop(\"chain1\") * 2",
+              "characters": 18
+            },
+            {
+              "id": "total",
+              "expression": "prop(\"chain2\") + prop(\"base\") + 0",
+              "characters": 33
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "dependency",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 7,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "base",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "left",
+              "expression": "prop(\"base\") * 2",
+              "characters": 16
+            },
+            {
+              "id": "right",
+              "expression": "prop(\"base\") + prop(\"c\")",
+              "characters": 24
+            },
+            {
+              "id": "merged",
+              "expression": "prop(\"left\") + prop(\"right\")",
+              "characters": 28
+            },
+            {
+              "id": "chain1",
+              "expression": "prop(\"merged\") + 1",
+              "characters": 18
+            },
+            {
+              "id": "chain2",
+              "expression": "prop(\"chain1\") * 2",
+              "characters": 18
+            },
+            {
+              "id": "total",
+              "expression": "prop(\"chain2\") + prop(\"base\") + 0",
+              "characters": 33
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "dependency",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 7,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "base",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "left",
+              "expression": "prop(\"base\") * 2",
+              "characters": 16
+            },
+            {
+              "id": "right",
+              "expression": "prop(\"base\") + prop(\"c\")",
+              "characters": 24
+            },
+            {
+              "id": "merged",
+              "expression": "prop(\"left\") + prop(\"right\")",
+              "characters": 28
+            },
+            {
+              "id": "chain1",
+              "expression": "prop(\"merged\") + 1",
+              "characters": 18
+            },
+            {
+              "id": "chain2",
+              "expression": "prop(\"chain1\") * 2",
+              "characters": 18
+            },
+            {
+              "id": "total",
+              "expression": "prop(\"chain2\") + prop(\"base\") + 0",
+              "characters": 33
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "dependency",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 7,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "base",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "left",
+              "expression": "prop(\"base\") * 2",
+              "characters": 16
+            },
+            {
+              "id": "right",
+              "expression": "prop(\"base\") + prop(\"c\")",
+              "characters": 24
+            },
+            {
+              "id": "merged",
+              "expression": "prop(\"left\") + prop(\"right\")",
+              "characters": 28
+            },
+            {
+              "id": "chain1",
+              "expression": "prop(\"merged\") + 1",
+              "characters": 18
+            },
+            {
+              "id": "chain2",
+              "expression": "prop(\"chain1\") * 2",
+              "characters": 18
+            },
+            {
+              "id": "total",
+              "expression": "prop(\"chain2\") + prop(\"base\") + 0",
+              "characters": 33
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "dependency",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 7,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "base",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "left",
+              "expression": "prop(\"base\") * 2",
+              "characters": 16
+            },
+            {
+              "id": "right",
+              "expression": "prop(\"base\") + prop(\"c\")",
+              "characters": 24
+            },
+            {
+              "id": "merged",
+              "expression": "prop(\"left\") + prop(\"right\")",
+              "characters": 28
+            },
+            {
+              "id": "chain1",
+              "expression": "prop(\"merged\") + 1",
+              "characters": 18
+            },
+            {
+              "id": "chain2",
+              "expression": "prop(\"chain1\") * 2",
+              "characters": 18
+            },
+            {
+              "id": "total",
+              "expression": "prop(\"chain2\") + prop(\"base\") + 0",
+              "characters": 33
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "dependency",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 7,
+          "inputFieldIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "formulas": [
+            {
+              "id": "base",
+              "expression": "prop(\"a\") + prop(\"b\")",
+              "characters": 21
+            },
+            {
+              "id": "left",
+              "expression": "prop(\"base\") * 2",
+              "characters": 16
+            },
+            {
+              "id": "right",
+              "expression": "prop(\"base\") + prop(\"c\")",
+              "characters": 24
+            },
+            {
+              "id": "merged",
+              "expression": "prop(\"left\") + prop(\"right\")",
+              "characters": 28
+            },
+            {
+              "id": "chain1",
+              "expression": "prop(\"merged\") + 1",
+              "characters": 18
+            },
+            {
+              "id": "chain2",
+              "expression": "prop(\"chain1\") * 2",
+              "characters": 18
+            },
+            {
+              "id": "total",
+              "expression": "prop(\"chain2\") + prop(\"base\") + 0",
+              "characters": 33
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "business-long",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "price",
+            "quantity",
+            "discount",
+            "tax",
+            "cancelled",
+            "paid",
+            "customer"
+          ],
+          "formulas": [
+            {
+              "id": "total",
+              "expression": "if(prop(\"cancelled\") or empty(prop(\"price\")) or empty(prop(\"quantity\")), 0, round(prop(\"price\") * prop(\"quantity\") * (1 - prop(\"discount\")) * (1 + prop(\"tax\")) * 100) / 100)",
+              "characters": 173
+            },
+            {
+              "id": "outstanding",
+              "expression": "lets(\n  unitPrice, prop(\"price\"),\n  units, prop(\"quantity\"),\n  discountRate, prop(\"discount\"),\n  taxRate, prop(\"tax\"),\n  invoiceAdjustment, 0,\n  cancelled, prop(\"cancelled\"),\n  paid, prop(\"paid\"),\n  subtotal, unitPrice * units,\n  discountAmount, subtotal * discountRate,\n  taxableAmount, subtotal - discountAmount,\n  taxAmount, taxableAmount * taxRate,\n  invoiceAmount, round((taxableAmount + taxAmount + invoiceAdjustment) * 100) / 100,\n  if(cancelled or empty(unitPrice) or empty(units), 0, if(paid, 0, invoiceAmount))\n)",
+              "characters": 522
+            },
+            {
+              "id": "description",
+              "expression": "upper(trim(prop(\"customer\"))) + \" / \" + if(prop(\"cancelled\"), \"Cancelled\", if(prop(\"paid\"), \"Paid\", \"Outstanding\")) + \" / unit \" + format(prop(\"price\"))",
+              "characters": 152
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "business-long",
+          "seed": 47183,
+          "rowCount": 100,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "price",
+            "quantity",
+            "discount",
+            "tax",
+            "cancelled",
+            "paid",
+            "customer"
+          ],
+          "formulas": [
+            {
+              "id": "total",
+              "expression": "if(prop(\"cancelled\") or empty(prop(\"price\")) or empty(prop(\"quantity\")), 0, round(prop(\"price\") * prop(\"quantity\") * (1 - prop(\"discount\")) * (1 + prop(\"tax\")) * 100) / 100)",
+              "characters": 173
+            },
+            {
+              "id": "outstanding",
+              "expression": "lets(\n  unitPrice, prop(\"price\"),\n  units, prop(\"quantity\"),\n  discountRate, prop(\"discount\"),\n  taxRate, prop(\"tax\"),\n  invoiceAdjustment, 0,\n  cancelled, prop(\"cancelled\"),\n  paid, prop(\"paid\"),\n  subtotal, unitPrice * units,\n  discountAmount, subtotal * discountRate,\n  taxableAmount, subtotal - discountAmount,\n  taxAmount, taxableAmount * taxRate,\n  invoiceAmount, round((taxableAmount + taxAmount + invoiceAdjustment) * 100) / 100,\n  if(cancelled or empty(unitPrice) or empty(units), 0, if(paid, 0, invoiceAmount))\n)",
+              "characters": 522
+            },
+            {
+              "id": "description",
+              "expression": "upper(trim(prop(\"customer\"))) + \" / \" + if(prop(\"cancelled\"), \"Cancelled\", if(prop(\"paid\"), \"Paid\", \"Outstanding\")) + \" / unit \" + format(prop(\"price\"))",
+              "characters": 152
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "business-long",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "price",
+            "quantity",
+            "discount",
+            "tax",
+            "cancelled",
+            "paid",
+            "customer"
+          ],
+          "formulas": [
+            {
+              "id": "total",
+              "expression": "if(prop(\"cancelled\") or empty(prop(\"price\")) or empty(prop(\"quantity\")), 0, round(prop(\"price\") * prop(\"quantity\") * (1 - prop(\"discount\")) * (1 + prop(\"tax\")) * 100) / 100)",
+              "characters": 173
+            },
+            {
+              "id": "outstanding",
+              "expression": "lets(\n  unitPrice, prop(\"price\"),\n  units, prop(\"quantity\"),\n  discountRate, prop(\"discount\"),\n  taxRate, prop(\"tax\"),\n  invoiceAdjustment, 0,\n  cancelled, prop(\"cancelled\"),\n  paid, prop(\"paid\"),\n  subtotal, unitPrice * units,\n  discountAmount, subtotal * discountRate,\n  taxableAmount, subtotal - discountAmount,\n  taxAmount, taxableAmount * taxRate,\n  invoiceAmount, round((taxableAmount + taxAmount + invoiceAdjustment) * 100) / 100,\n  if(cancelled or empty(unitPrice) or empty(units), 0, if(paid, 0, invoiceAmount))\n)",
+              "characters": 522
+            },
+            {
+              "id": "description",
+              "expression": "upper(trim(prop(\"customer\"))) + \" / \" + if(prop(\"cancelled\"), \"Cancelled\", if(prop(\"paid\"), \"Paid\", \"Outstanding\")) + \" / unit \" + format(prop(\"price\"))",
+              "characters": 152
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "business-long",
+          "seed": 47183,
+          "rowCount": 1000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "price",
+            "quantity",
+            "discount",
+            "tax",
+            "cancelled",
+            "paid",
+            "customer"
+          ],
+          "formulas": [
+            {
+              "id": "total",
+              "expression": "if(prop(\"cancelled\") or empty(prop(\"price\")) or empty(prop(\"quantity\")), 0, round(prop(\"price\") * prop(\"quantity\") * (1 - prop(\"discount\")) * (1 + prop(\"tax\")) * 100) / 100)",
+              "characters": 173
+            },
+            {
+              "id": "outstanding",
+              "expression": "lets(\n  unitPrice, prop(\"price\"),\n  units, prop(\"quantity\"),\n  discountRate, prop(\"discount\"),\n  taxRate, prop(\"tax\"),\n  invoiceAdjustment, 0,\n  cancelled, prop(\"cancelled\"),\n  paid, prop(\"paid\"),\n  subtotal, unitPrice * units,\n  discountAmount, subtotal * discountRate,\n  taxableAmount, subtotal - discountAmount,\n  taxAmount, taxableAmount * taxRate,\n  invoiceAmount, round((taxableAmount + taxAmount + invoiceAdjustment) * 100) / 100,\n  if(cancelled or empty(unitPrice) or empty(units), 0, if(paid, 0, invoiceAmount))\n)",
+              "characters": 522
+            },
+            {
+              "id": "description",
+              "expression": "upper(trim(prop(\"customer\"))) + \" / \" + if(prop(\"cancelled\"), \"Cancelled\", if(prop(\"paid\"), \"Paid\", \"Outstanding\")) + \" / unit \" + format(prop(\"price\"))",
+              "characters": 152
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "native",
+          "family": "business-long",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "price",
+            "quantity",
+            "discount",
+            "tax",
+            "cancelled",
+            "paid",
+            "customer"
+          ],
+          "formulas": [
+            {
+              "id": "total",
+              "expression": "if(prop(\"cancelled\") or empty(prop(\"price\")) or empty(prop(\"quantity\")), 0, round(prop(\"price\") * prop(\"quantity\") * (1 - prop(\"discount\")) * (1 + prop(\"tax\")) * 100) / 100)",
+              "characters": 173
+            },
+            {
+              "id": "outstanding",
+              "expression": "lets(\n  unitPrice, prop(\"price\"),\n  units, prop(\"quantity\"),\n  discountRate, prop(\"discount\"),\n  taxRate, prop(\"tax\"),\n  invoiceAdjustment, 0,\n  cancelled, prop(\"cancelled\"),\n  paid, prop(\"paid\"),\n  subtotal, unitPrice * units,\n  discountAmount, subtotal * discountRate,\n  taxableAmount, subtotal - discountAmount,\n  taxAmount, taxableAmount * taxRate,\n  invoiceAmount, round((taxableAmount + taxAmount + invoiceAdjustment) * 100) / 100,\n  if(cancelled or empty(unitPrice) or empty(units), 0, if(paid, 0, invoiceAmount))\n)",
+              "characters": 522
+            },
+            {
+              "id": "description",
+              "expression": "upper(trim(prop(\"customer\"))) + \" / \" + if(prop(\"cancelled\"), \"Cancelled\", if(prop(\"paid\"), \"Paid\", \"Outstanding\")) + \" / unit \" + format(prop(\"price\"))",
+              "characters": 152
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        },
+        {
+          "mode": "production-computed-chain",
+          "variant": "legacy",
+          "family": "business-long",
+          "seed": 47183,
+          "rowCount": 10000,
+          "formulaCount": 3,
+          "inputFieldIds": [
+            "price",
+            "quantity",
+            "discount",
+            "tax",
+            "cancelled",
+            "paid",
+            "customer"
+          ],
+          "formulas": [
+            {
+              "id": "total",
+              "expression": "if(prop(\"cancelled\") or empty(prop(\"price\")) or empty(prop(\"quantity\")), 0, round(prop(\"price\") * prop(\"quantity\") * (1 - prop(\"discount\")) * (1 + prop(\"tax\")) * 100) / 100)",
+              "characters": 173
+            },
+            {
+              "id": "outstanding",
+              "expression": "lets(\n  unitPrice, prop(\"price\"),\n  units, prop(\"quantity\"),\n  discountRate, prop(\"discount\"),\n  taxRate, prop(\"tax\"),\n  invoiceAdjustment, 0,\n  cancelled, prop(\"cancelled\"),\n  paid, prop(\"paid\"),\n  subtotal, unitPrice * units,\n  discountAmount, subtotal * discountRate,\n  taxableAmount, subtotal - discountAmount,\n  taxAmount, taxableAmount * taxRate,\n  invoiceAmount, round((taxableAmount + taxAmount + invoiceAdjustment) * 100) / 100,\n  if(cancelled or empty(unitPrice) or empty(units), 0, if(paid, 0, invoiceAmount))\n)",
+              "characters": 522
+            },
+            {
+              "id": "description",
+              "expression": "upper(trim(prop(\"customer\"))) + \" / \" + if(prop(\"cancelled\"), \"Cancelled\", if(prop(\"paid\"), \"Paid\", \"Outstanding\")) + \" / unit \" + format(prop(\"price\"))",
+              "characters": 152
+            }
+          ],
+          "timer": "browser.performance.now",
+          "endpoint": "all requested production-projected formula results"
+        }
+      ],
+      "limits": [
+        "Only the pinned revisions, selected Chromium binary and recorded machine/workloads are compared.",
+        "Computed-chain input data is resident before timing; first evaluation includes Engine/schema initialization, not page asset loading.",
+        "Repeated read demand preserves production cache capacities; large working sets can evict legacy entries.",
+        "Each initial chain sample uses a new browser process. Warmup samples are verified but not reported.",
+        "Memory and instrumented CPU profiles are outside this first latency experiment."
+      ],
+      "browser": "145.0.7632.6"
+    },
+    "environment": {
+      "platform": "linux",
+      "release": "7.2.8-arch1-2",
+      "arch": "x64",
+      "node": "v25.9.0",
+      "cpu": "AMD Ryzen 9 7950X 16-Core Processor",
+      "logicalCpus": 32,
+      "totalMemoryBytes": 66501681152
+    },
+    "cacheMarkers": {
+      "legacy": {
+        "prepared": {
+          "revision": "4fdb4f45098a5b8f449ab4b0f7775a5aedb21c4a",
+          "lockHash": "3d3e036b18a62ac9c07274acdd7e3292181c5933a57207cdff4e95cfd02feb32",
+          "packageManager": "10.9.0",
+          "node": "v25.9.0",
+          "sdkRevision": null
+        },
+        "chainBuild": {
+          "inputs": {
+            "revision": "4fdb4f45098a5b8f449ab4b0f7775a5aedb21c4a",
+            "lockHash": "3d3e036b18a62ac9c07274acdd7e3292181c5933a57207cdff4e95cfd02feb32",
+            "sdkHash": null,
+            "harnessHash": "7ad912a4a18655c803e2258da0282ed2eab7cc60701408d6fcf05568c9a5ef24",
+            "buildScriptHash": "8010eee487bc615fdb42482a20fd2360f0cc5ccd1d14f6aff74723814503d897",
+            "node": "v25.9.0"
+          },
+          "artifactHash": "633dbf45358df6ad4e15b2efb5490e64c8167aaf9bf6f2927dc7bba88cda3f4d"
+        }
+      },
+      "native": {
+        "prepared": {
+          "revision": "c4485cdec14ed4e089e2472c882237d8a4ec0c3e",
+          "lockHash": "f171b407001ab2e3bff96b156864bbac3a5ef3de6b29368984ad412d75aeacf7",
+          "packageManager": "10.9.0",
+          "node": "v25.9.0",
+          "sdkRevision": "43b393c86a26e54ea51b5c32443ec59bc02667c9",
+          "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+          "wasmPack": "wasm-pack 0.12.1",
+          "sdkHash": "00f3343cae7108fbae8a29d1190837d4dcd37682521ab6b7dfdeb5bcefc560b0"
+        },
+        "chainBuild": {
+          "inputs": {
+            "revision": "c4485cdec14ed4e089e2472c882237d8a4ec0c3e",
+            "lockHash": "f171b407001ab2e3bff96b156864bbac3a5ef3de6b29368984ad412d75aeacf7",
+            "sdkHash": "00f3343cae7108fbae8a29d1190837d4dcd37682521ab6b7dfdeb5bcefc560b0",
+            "harnessHash": "7ad912a4a18655c803e2258da0282ed2eab7cc60701408d6fcf05568c9a5ef24",
+            "buildScriptHash": "51073a0f30caaed81bcb9234cb43e5210ec7f00308f5f94ae1711502144c97eb",
+            "node": "v25.9.0"
+          },
+          "artifactHash": "fae2690dafe1941f0c3adee1e7305fd89ed7cc1955a778e70c404a03aade9cfe"
+        }
+      }
+    }
+  },
+  "unavailable": [
+    "Original in-memory results.json metadata and exact exit timestamp",
+    "Original formal-run start and end load averages"
+  ],
+  "recoveryChecks": [
+    "Original NDJSON copied byte-for-byte and SHA-256 checked",
+    "Complete final newline and exactly 2520 samples",
+    "Exact family/rows/variant/session/operation/iteration Cartesian product, each key once",
+    "All samples verified, matched row and formula counts",
+    "Reporter verifies paired work, checksums and timing values before regenerating summaries"
+  ],
+  "limits": [
+    "This all-layer attempt failed during full-app setup after every chain session completed. It is not a successful all-layer run.",
+    "Chain measurements are preserved unchanged. Full-app measurements come from a separate subsequent run and are never merged into this failed attempt.",
+    "Original live load snapshots were lost; no reconstruction substitutes recovery-time load for them."
+  ]
+}
