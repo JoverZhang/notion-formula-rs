@@ -234,10 +234,10 @@ fn map_wraps_mapper_in_implicit_lambda_with_current() {
     // args[0] = list, not wrapped
     assert!(!matches!(&args[0].kind, ExprKind::ImplicitLambda { .. }));
 
-    // args[1] = mapper, wrapped with "current"
+    // args[1] = mapper, wrapped with "current" and zero-based "index".
     match &args[1].kind {
         ExprKind::ImplicitLambda { params, .. } => {
-            assert_eq!(params, &["current"]);
+            assert_eq!(params, &["current", "index"]);
         }
         other => panic!("mapper arg should be ImplicitLambda, got {:?}", other),
     }

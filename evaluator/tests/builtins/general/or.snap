@@ -1,0 +1,7 @@
+=== INPUT ===
+// @prop "Flag": boolean = [true, false, null]
+or(prop("Flag"), false, true, test("x", "["))
+=== OUTPUT ===
+row-0: true
+row-1: true
+row-2: true
