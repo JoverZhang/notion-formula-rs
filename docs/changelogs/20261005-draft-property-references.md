@@ -21,6 +21,10 @@ last_verified: 2026-10-05
 
 Draft snapshots now expose decoded property IDs and exact call/literal spans. Editors can retain stable property chips and replace IDs while preserving comments, without implementing another formula parser. Native spans use UTF-8; WASM spans use UTF-16. Complete references remain available when another part of the expression has an error.
 
+## Compatibility notes
+
+FormulaDraftState adds the required `property_references` snapshot field. Update native struct constructors and exhaustive patterns, and include the field in manually constructed TypeScript fixtures (`[]` when there are no references). Clients consuming these snapshots must use the updated SDK.
+
 ## Links
 
 - [Issue #67](https://github.com/JoverZhang/notion-formula-rs/issues/67)
