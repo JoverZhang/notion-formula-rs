@@ -2,12 +2,12 @@
 doc_id: specs.builtin-functions
 title: "Builtin function signatures"
 language: en
-source_language: zh-CN
+source_language: en
 counterpart: ./builtin-functions.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-01
+last_verified: 2026-10-05
 ---
 
 # Builtin function signatures
@@ -60,6 +60,9 @@ ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: ()
 #[resolver(resolve_empty)]
 empty(value?: any) -> any;
 length(value: string | any[]) -> number;
+/// A scalar Date renders in runtime local time as "September 24, 2026 18:00".
+/// Rich DateValue hides the clock when include_time=false and joins range endpoints with " → ".
+/// Lists use generic text conversion from the language contract rather than per-element date formatting.
 format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
@@ -103,6 +106,7 @@ padEnd(text: string | number, length: number, pad: string) -> string;
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
 /// Convert null elements to empty strings and retain separators; a null list argument returns null.
+/// Non-null elements use the language contract's generic text conversion, including raw date endpoints.
 /// join([1, empty(), 2], ",") → "1,,2".
 join<T>(list: T[], separator: string) -> string;
 split(text: string, separator: string) -> string[];
@@ -161,10 +165,12 @@ toNumber(value: any) -> number;
 
 ### Date
 
+Dates share the [Engine's Date value type and endpoint validation](formula-engine.md#type-definitions).
+
 ```builtin
-/// Frozen time for this evaluation.
+/// Frozen time for this evaluation; include_time=true.
 now() -> date;
-/// Local midnight for the same time snapshot and timezone offset.
+/// Local midnight for the same time snapshot and timezone offset; include_time=false.
 today() -> date;
 minute(date: date) -> number;
 hour(date: date) -> number;
@@ -173,12 +179,27 @@ date(date: date) -> number;
 week(date: date) -> number;
 month(date: date) -> number;
 year(date: date) -> number;
+/// Shift both endpoints and preserve include_time.
 dateAdd(date: date, amount: number, unit: string) -> date;
+/// Shift both endpoints in the opposite direction and preserve include_time.
 dateSubtract(date: date, amount: number, unit: string) -> date;
+/// Compare starts; normalize each include_time=false date to runtime local midnight before computing the difference.
 dateBetween(a: date, b: date, unit: string) -> number;
+/// Build a range from start.start and end.start; include_time is the logical OR of their flags.
+/// Null start returns null; null end returns start.start as a single date with start's flag.
+dateRange(start: date, end: date) -> date;
+/// Return a single date at start, preserving include_time; also accepts a single date.
+dateStart(date: date) -> date;
+/// Return a single date at end, or start when end is absent, preserving include_time.
+dateEnd(date: date) -> date;
+/// Return start's timestamp.
 timestamp(date: date) -> number;
+/// Construct a single date with include_time=true.
 fromTimestamp(timestamp: number) -> date;
+/// Format start using the caller's pattern.
 formatDate(date: date, format: string) -> string;
+/// YYYY-MM-DD creates a date at runtime local midnight with include_time=false.
+/// RFC3339 and local YYYY-MM-DDTHH:MM[:SS[.fraction]] create a single date with include_time=true.
 parseDate(text: string) -> date;
 ```
 
@@ -264,7 +285,6 @@ People currently has no supported functions. These declarations are excluded fro
   and / or / not          // Expressed by && / || / not operators
   lets                    // No heterogeneous sequential binder model
   link / style / unstyle  // No Link / StyledText types yet
-  dateRange / dateStart / dateEnd // No DateRange type yet
   name / email            // No person-name/email runtime inputs yet
 Unsupported declarations are treated like unknown functions, without a separate unsupported error class.
 Category order is General, Text, Number, Date, People, List, Special; declaration order is preserved within each.

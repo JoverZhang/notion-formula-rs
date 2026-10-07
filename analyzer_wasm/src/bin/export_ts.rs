@@ -124,6 +124,7 @@ fn engine_dto() -> String {
         engine::FormulaStatus::decl(),
         engine::FormulaEngineChangeResult::decl(),
         engine::Value::decl(),
+        engine::DateValue::decl(),
         engine::ColumnData::<f64>::decl(),
         engine::Column::decl(),
         engine::ColumnKind::decl(),

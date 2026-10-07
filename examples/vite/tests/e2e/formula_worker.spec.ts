@@ -102,6 +102,7 @@ test("real module Worker matches the synchronous WASM session contract", async (
       "engine snapshots",
       "transitive input dependencies",
       "lossless evaluation DTOs",
+      "rich date metadata",
       "typed native errors",
       "multiple drafts and borrow errors",
       "UTF-16 edits and versions",
@@ -112,6 +113,12 @@ test("real module Worker matches the synchronous WASM session contract", async (
     rows: 4,
     specialNumbers: true,
     exactDate: true,
+    richDates: true,
+    richRange: {
+      start: "9007199254740993",
+      end: "-9007199254740993",
+      include_time: false,
+    },
     maps: true,
     utf16Cursor: 2,
   });
@@ -155,6 +162,7 @@ test("installed package default Worker loads in Vite dev with a deployment base"
   const result = await page.evaluate(() => window.__formula_worker_contract());
   expect(result.maps).toBe(true);
   expect(result.exactDate).toBe(true);
+  expect(result.richDates).toBe(true);
   expect(result.verified).toContain("queued close and idempotence");
   expect(assets.some((asset) => asset.url.endsWith(".wasm"))).toBe(true);
   expect(

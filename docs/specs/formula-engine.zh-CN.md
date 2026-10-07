@@ -67,6 +67,19 @@ pub enum ValueType {
 
 **当前运行时值类型**
 
+```rust out=evaluator/src/core/date_value.h.rs
+/// Evaluator 与 Engine 共用的日期元数据；时间戳为 UTC Unix 毫秒。
+/// end 缺省时表示单个日期。保留原始端点，包括起止顺序相反的范围。
+/// include_time 控制 format() 的显示及 dateBetween 的零点归一化，不改变存储的时间戳。
+/// 与旧版 Date 一样，任意 i64 端点均可通过 Input 校验；日期操作负责检查范围。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DateValue {
+    pub start: i64,
+    pub end: Option<i64>,
+    pub include_time: bool,
+}
+```
+
 ```rust out=formula_engine/src/evaluation.h.rs
 /// 列式结构以 bitmap 标记 null 位置。
 #[derive(Clone, Debug, PartialEq)]
@@ -74,7 +87,11 @@ pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
     Boolean(ColumnData<bool>),
+    /// 旧版存储；没有有值行需要元数据时，输出采用此形式，包括零行和全 null 结果。
     Date(ColumnData<i64>),
+    /// 与 Date 使用相同的声明类型和列种类，完整保留日期元数据。
+    /// 任一有值行包含 end 或 include_time=false 时，输出采用此形式；旧版行转为 end=None、include_time=true。
+    DateValue(ColumnData<DateValue>),
     List(ColumnData<Vec<Option<Value>>>),
     /// 承载 Union 或 Unknown；每个非 null 值保留实际类型。
     Union(ColumnData<Value>),
@@ -96,6 +113,8 @@ pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix 毫秒时间戳。
     Date(i64),
+    /// 与 Date 属于同一语义类型；旧版 Date 相当于 end=None、include_time=true。
+    DateValue(DateValue),
     /// 元素 None 表示该位置没有值；null 列表、空列表和含 null 元素的列表不同。
     List(Vec<Option<Value>>),
 }
@@ -130,7 +149,7 @@ fn accepts(ty: &ValueType, value: Option<&Value>) -> bool {
     match (ty, value) {
         (T::Unknown, _) => true,
         (T::Number, V::Number(_)) | (T::String, V::String(_))
-        | (T::Boolean, V::Boolean(_)) | (T::Date, V::Date(_)) => true,
+        | (T::Boolean, V::Boolean(_)) | (T::Date, V::Date(_) | V::DateValue(_)) => true,
         (T::List(t), V::List(items)) => items.iter().all(|v| accepts(t, v.as_ref())),
         (T::Union(ts), v) => ts.iter().any(|t| accepts(t, Some(v))),
         _ => false,
@@ -322,7 +341,7 @@ pub enum RuntimeError {
         text: String,
     },
     /// 日期操作使用或产生的 UTC 时间或偏移后的本地时间超出公历 0001–9999 年。
-    /// 越界的 Date 输入值通过类型校验；日期操作使用该值时产生此行错误。
+    /// 越界的 Date / DateValue 输入端点可通过类型校验并原样复制；日期操作检查两个端点，越界时产生此行错误。
     DateOutOfRange,
 }
 /// 公式无法开始求值时返回；单行求值错误见 RowError。

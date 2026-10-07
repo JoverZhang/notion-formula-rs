@@ -196,6 +196,7 @@ fn input_values(column: &Column) -> Vec<Option<RuntimeValue>> {
         Column::String(data) => rows!(data, RuntimeValue::Text),
         Column::Boolean(data) => rows!(data, RuntimeValue::Bool),
         Column::Date(data) => rows!(data, RuntimeValue::Date),
+        Column::DateValue(data) => rows!(data, RuntimeValue::DateValue),
         Column::List(data) => rows!(data, |items: Vec<Option<Value>>| RuntimeValue::List(
             items
                 .into_iter()
@@ -212,6 +213,7 @@ fn runtime_value(value: Value) -> RuntimeValue {
         Value::String(value) => RuntimeValue::Text(value),
         Value::Boolean(value) => RuntimeValue::Bool(value),
         Value::Date(value) => RuntimeValue::Date(value),
+        Value::DateValue(value) => RuntimeValue::DateValue(value),
         Value::List(values) => RuntimeValue::List(
             values
                 .into_iter()
@@ -227,6 +229,7 @@ fn public_value(value: RuntimeValue) -> Value {
         RuntimeValue::Text(value) => Value::String(value),
         RuntimeValue::Bool(value) => Value::Boolean(value),
         RuntimeValue::Date(value) => Value::Date(value),
+        RuntimeValue::DateValue(value) => Value::DateValue(value),
         RuntimeValue::List(values) => Value::List(
             values
                 .into_iter()
@@ -294,7 +297,18 @@ fn runtime_column(rows: Vec<Option<RuntimeValue>>, kind: AbiKind) -> RuntimeColu
         AbiKind::Number => typed!(NumberKind, Number, 0.0),
         AbiKind::Text => typed!(TextKind, Text, String::new()),
         AbiKind::Boolean => typed!(BooleanKind, Bool, false),
-        AbiKind::Date => typed!(DateKind, Date, 0),
+        AbiKind::Date => {
+            let values = rows
+                .into_iter()
+                .map(|value| match value {
+                    Some(RuntimeValue::Date(value)) => value.into(),
+                    Some(RuntimeValue::DateValue(value)) => value,
+                    None => evaluator::DateValue::default(),
+                    Some(other) => unreachable!("date storage cannot contain {other:?}"),
+                })
+                .collect();
+            KernelColumn::<DateKind>::from_values(values, validity).into_column()
+        }
         AbiKind::List => typed!(ListKind, List, Vec::new()),
         AbiKind::Any => KernelColumn::<AnyKind>::from_values(
             rows.into_iter()
@@ -329,6 +343,23 @@ fn output_column(block: &EvalBlock, ty: &ValueType) -> Column {
         ValueType::Number => typed!(Number, 0.0),
         ValueType::String => typed!(String, String::new()),
         ValueType::Boolean => typed!(Boolean, false),
+        ValueType::Date
+            if rows
+                .iter()
+                .flatten()
+                .any(|value| matches!(value, Value::DateValue(_))) =>
+        {
+            let values = rows
+                .into_iter()
+                .map(|value| match value {
+                    Some(Value::Date(value)) => value.into(),
+                    Some(Value::DateValue(value)) => value,
+                    None => evaluator::DateValue::default(),
+                    Some(other) => unreachable!("date output cannot contain {other:?}"),
+                })
+                .collect();
+            Column::DateValue(ColumnData { values, validity })
+        }
         ValueType::Date => typed!(Date, 0),
         ValueType::List(_) => typed!(List, Vec::new()),
         ValueType::Unknown | ValueType::Union(_) => Column::Union(ColumnData {

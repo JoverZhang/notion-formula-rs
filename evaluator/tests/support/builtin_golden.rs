@@ -505,7 +505,7 @@ fn property_column(path: &Path, name: &str, ty: &Ty, values: &[JsonValue]) -> Co
         AbiKind::Date => {
             let (values, validity) = typed_values(path, name, values, |value| {
                 match json_to_typed_value(value, ty)? {
-                    Value::Date(value) => Some(value),
+                    Value::Date(value) => Some(value.into()),
                     _ => None,
                 }
             });
@@ -693,6 +693,12 @@ fn render_value(value: &Value, offset: FixedOffset, output: &mut String) {
                     .expect("serializing a date string cannot fail"),
             );
             output.push(')');
+        }
+        Value::DateValue(value) => {
+            output.push_str(&format!(
+                "date_value(start={}, end={:?}, include_time={})",
+                value.start, value.end, value.include_time
+            ));
         }
         Value::List(values) => {
             output.push('[');

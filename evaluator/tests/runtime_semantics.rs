@@ -423,7 +423,7 @@ fn regex_and_date_errors_keep_the_original_text_and_compile_detail() {
 fn date_inputs_are_allowed_until_a_date_operation_uses_them() {
     let date = || {
         Column::Date(KernelColumn::<DateKind>::from_values(
-            vec![i64::MAX],
+            vec![i64::MAX.into()],
             Validity::AllValid,
         ))
     };
@@ -466,7 +466,7 @@ fn date_operations_validate_utc_and_offset_adjusted_local_boundaries() {
     for (offset, failed_row) in [(-480, 0), (480, 1)] {
         let prepared = prepare(r#"year(prop("D"))"#, &[("D", Ty::Date)]);
         let column = Column::Date(KernelColumn::<DateKind>::from_values(
-            epochs.to_vec(),
+            epochs.into_iter().map(Into::into).collect(),
             Validity::AllValid,
         ));
         let inputs = EvalInputsBuilder::new(BuiltinRuntimeContext::new(0, offset))

@@ -2,12 +2,12 @@
 doc_id: specs.builtin-functions
 title: "Builtin 函数签名"
 language: zh-CN
-source_language: zh-CN
+source_language: en
 counterpart: ./builtin-functions.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-01
+last_verified: 2026-10-05
 ---
 
 # Builtin 函数签名
@@ -60,6 +60,9 @@ ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: ()
 #[resolver(resolve_empty)]
 empty(value?: any) -> any;
 length(value: string | any[]) -> number;
+/// 单个 Date 按运行时本地时间显示为 "September 24, 2026 18:00"。
+/// DateValue 的 include_time=false 时隐藏时分；范围的两个端点以 " → " 连接。
+/// 列表采用语言契约的通用文本转换，不逐项格式化日期。
 format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
@@ -103,6 +106,7 @@ padEnd(text: string | number, length: number, pad: string) -> string;
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
 /// null 元素转为空字符串并保留分隔符；列表参数为 null 时返回 null。
+/// 非 null 元素采用语言契约的通用文本转换，包括日期的原始端点。
 /// join([1, empty(), 2], ",") → "1,,2"。
 join<T>(list: T[], separator: string) -> string;
 split(text: string, separator: string) -> string[];
@@ -161,10 +165,12 @@ toNumber(value: any) -> number;
 
 ### Date
 
+日期共用 [Engine 的 Date 值类型和端点校验规则](formula-engine.zh-CN.md#类型定义)。
+
 ```builtin
-/// 本次求值冻结的时间。
+/// 本次求值冻结的时间；include_time=true。
 now() -> date;
-/// 同一时间快照与时区偏移对应的本地零点。
+/// 同一时间快照与时区偏移对应的本地零点；include_time=false。
 today() -> date;
 minute(date: date) -> number;
 hour(date: date) -> number;
@@ -173,12 +179,27 @@ date(date: date) -> number;
 week(date: date) -> number;
 month(date: date) -> number;
 year(date: date) -> number;
+/// 平移两个端点，保留 include_time。
 dateAdd(date: date, amount: number, unit: string) -> date;
+/// 向相反方向平移两个端点，保留 include_time。
 dateSubtract(date: date, amount: number, unit: string) -> date;
+/// 比较起点；计算差值前，将各自 include_time=false 的日期归一化到运行时本地零点。
 dateBetween(a: date, b: date, unit: string) -> number;
+/// 用 start.start 与 end.start 构造范围；include_time 为两个标记的逻辑或。
+/// start 为 null 时返回 null；end 为 null 时返回 start.start 表示的单个日期，保留 start 的标记。
+dateRange(start: date, end: date) -> date;
+/// 返回起点表示的单个日期，保留 include_time；也接受单个日期。
+dateStart(date: date) -> date;
+/// 返回终点表示的单个日期；无终点时返回起点，保留 include_time。
+dateEnd(date: date) -> date;
+/// 返回起点的时间戳。
 timestamp(date: date) -> number;
+/// 构造 include_time=true 的单个日期。
 fromTimestamp(timestamp: number) -> date;
+/// 按调用方的格式串格式化起点。
 formatDate(date: date, format: string) -> string;
+/// YYYY-MM-DD 按运行时本地零点构造日期，include_time=false。
+/// RFC3339 和本地 YYYY-MM-DDTHH:MM[:SS[.fraction]] 构造 include_time=true 的单个日期。
 parseDate(text: string) -> date;
 ```
 
@@ -264,7 +285,6 @@ People 当前无受支持函数。以下声明不进入可调用/补全集合：
   and / or / not          // 用 && / || / not 运算符表达
   lets                    // 缺少异构、顺序绑定模型
   link / style / unstyle  // 尚无 Link / StyledText 类型
-  dateRange / dateStart / dateEnd // 尚无 DateRange 类型
   name / email            // 尚无 person 名称/邮件输入
 调用 unsupported 声明按未知函数处理，不提供独立的 unsupported 错误类别。
 类别顺序固定为 General、Text、Number、Date、People、List、Special；各类别保留声明顺序。

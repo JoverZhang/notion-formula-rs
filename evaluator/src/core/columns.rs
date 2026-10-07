@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use super::errors::EvalError;
-use super::types::{Mask, Value};
+use super::types::{DateValue, Mask, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AbiKind {
@@ -349,12 +349,16 @@ define_kind!(
 );
 define_kind!(
     DateKind,
-    i64,
+    DateValue,
     Date,
     Date,
-    0,
-    Value::Date(value) => value,
-    |value: &i64| Value::Date(*value)
+    DateValue::default(),
+    value @ (Value::Date(_) | Value::DateValue(_)) => match value {
+        Value::Date(value) => value.into(),
+        Value::DateValue(value) => value,
+        _ => unreachable!(),
+    },
+    |value: &DateValue| value.into_value()
 );
 define_kind!(
     ListKind,
@@ -454,7 +458,7 @@ impl Column {
             Self::Number(column) => Value::Number(column.values()[index]),
             Self::Boolean(column) => Value::Bool(column.values()[index]),
             Self::Text(column) => Value::Text(column.values()[index].clone()),
-            Self::Date(column) => Value::Date(column.values()[index]),
+            Self::Date(column) => DateKind::to_value(&column.values()[index]),
             Self::List(column) => Value::List(column.values()[index].clone()),
             Self::Any(column) => column.values()[index].clone(),
         })
