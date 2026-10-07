@@ -7,7 +7,7 @@ counterpart: ./formula-engine.md
 implementation_status: current
 document_status: draft
 translation_status: synced
-last_verified: 2026-10-03
+last_verified: 2026-10-05
 ---
 
 # FormulaEngine：编译与求值
@@ -227,7 +227,8 @@ pub struct EvaluateInput {
 #[from(String, &str)]
 pub struct RowId(pub String);
 
-/// 入参校验失败时，不执行任何公式；一次只返回一个错误。
+/// 求值入参或 required_inputs 公式选择校验失败；一次只返回一个错误。
+/// 入参校验失败时，不执行任何公式。
 /// 同一定义和输入返回同一个错误。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EvaluateInputError {
@@ -354,6 +355,15 @@ impl FormulaEngine {
     pub fn property(&self, id: &PropertyId) -> Option<PropertyState>;
     pub fn properties(&self) -> Vec<PropertyState>;
     pub fn state(&self) -> FormulaEngineState<'_>;
+
+    /// 返回所选 Formula 直接或间接引用的已声明 Input ID，按 PropertyId 排序并去重。
+    /// 包含所有条件分支中的引用。读取已保存的依赖元数据，不求值、不修改 Engine；依赖环不会阻止查询结束。
+    /// Ready 目标返回完整的静态 Input 依赖集合。NotReady 目标仅返回已知引用：
+    /// 缺失属性不在结果中，非法语法可能导致引用无法识别。
+    /// 公式状态仍是判断依据：只有 Ready 目标才能证明其他 Input 未被使用。
+    /// evaluate 仍要求提供每个 Input 的列，包括未出现在本结果中的 Input。
+    /// 错误：按请求顺序校验，返回 EmptyFormulaIds、InvalidFormulaId 或 DuplicateFormulaId。
+    pub fn required_inputs(&self, formula_ids: &[PropertyId]) -> Result<Vec<PropertyId>, EvaluateInputError>;
 
     /// 输入校验通过即返回 Ok(EvaluateResult)，包括所有请求的公式都失败的情况。
     /// 公式与行错误随结果返回；其他公式继续求值。

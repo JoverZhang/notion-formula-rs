@@ -21,6 +21,7 @@ function session() {
     get_property: vi.fn(() => null),
     get_properties: vi.fn(() => []),
     get_state: vi.fn(() => "AllReady" as const),
+    required_inputs: vi.fn(() => []),
     upsert: vi.fn(() => ({ affected_formulas: ["f"] })),
     remove: vi.fn(() => null),
     evaluate: vi.fn(() => ({ formulas: new Map() })),
