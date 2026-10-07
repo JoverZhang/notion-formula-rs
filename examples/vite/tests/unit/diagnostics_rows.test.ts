@@ -1,5 +1,5 @@
+import type { ExpressionDiagnostic } from "@notion-formula/sdk";
 import { describe, expect, it } from "vitest";
-import type { ExpressionDiagnostic } from "../../src/formula/client";
 import { buildDiagnosticTextRows } from "../../src/model/diagnostics";
 
 function diag(overrides: Partial<ExpressionDiagnostic>): ExpressionDiagnostic {

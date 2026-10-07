@@ -19,7 +19,7 @@ The Worker clients use the [Engine](formula-engine.md) and [Draft](ide.md) contr
 
 ## Engine and Draft clients
 
-```ts spec-file=examples/vite/src/formula/client.h.ts
+```ts spec-file=packages/notion-formula/src/client.h.ts
 import type {
   CompletionConfig,
   CursorHelp,
@@ -38,8 +38,8 @@ import type {
   PropertyState,
   QuickFix,
   UpdateExpressionResult,
-} from "../engine/generated/wasm_dto";
-import type { FormulaWorker } from "./rpc";
+} from "./generated/wasm_dto.js";
+import type { FormulaWorker } from "./rpc.js";
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
 // Each request snapshots its arguments at enqueue; later mutations cannot change it.

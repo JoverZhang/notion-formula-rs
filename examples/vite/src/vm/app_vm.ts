@@ -1,12 +1,3 @@
-import { DEMO_SCHEMA, FORMULA_DEMOS } from "../app/context";
-import { buildEvaluateInput } from "../app/data";
-import {
-  FORMULA_IDS,
-  type AppState,
-  type FormulaEditorActions,
-  type FormulaId,
-  type FormulaState,
-} from "../app/types";
 import {
   createFormulaEngineClient,
   FormulaClientError,
@@ -22,7 +13,16 @@ import {
   type RuntimeContext,
   type TextEdit,
   type UpdateExpressionResult,
-} from "../formula/client";
+} from "@notion-formula/sdk";
+import { DEMO_SCHEMA, FORMULA_DEMOS } from "../app/context";
+import { buildEvaluateInput } from "../app/data";
+import {
+  FORMULA_IDS,
+  type AppState,
+  type FormulaEditorActions,
+  type FormulaId,
+  type FormulaState,
+} from "../app/types";
 
 const DEBOUNCE_MS = 80;
 const COMPLETION_CONFIG = { preferred_limit: 5 };

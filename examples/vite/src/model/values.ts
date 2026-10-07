@@ -1,4 +1,4 @@
-import type { Column, RuntimeError, Value, ValueType } from "../formula/client";
+import type { Column, RuntimeError, Value, ValueType } from "@notion-formula/sdk";
 
 export function formatValueType(ty: ValueType): string {
   if (typeof ty === "string") return ty.toLowerCase();

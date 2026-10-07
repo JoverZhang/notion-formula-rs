@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import type { CursorHelp } from "@notion-formula/sdk";
+import init, { FormulaEngineSession } from "@notion-formula/sdk/wasm";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { CursorHelp } from "../../src/formula/client";
-import init, { FormulaEngineSession } from "../../src/pkg/analyzer_wasm.js";
 
 function help(source: string, cursor: number): CursorHelp {
   const session = new FormulaEngineSession({ properties: [] });
@@ -50,7 +50,12 @@ function sigAtCloseParen(source: string) {
 
 beforeAll(async () => {
   const wasmBytes = await readFile(
-    fileURLToPath(new URL("../../src/pkg/analyzer_wasm_bg.wasm", import.meta.url)),
+    fileURLToPath(
+      new URL(
+        "../../node_modules/@notion-formula/sdk/dist/wasm/analyzer_wasm_bg.wasm",
+        import.meta.url,
+      ),
+    ),
   );
   await init({ module_or_path: wasmBytes });
 });

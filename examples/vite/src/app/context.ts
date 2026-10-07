@@ -1,4 +1,4 @@
-import type { FormulaSchema, ValueType } from "../formula/client";
+import type { FormulaSchema, ValueType } from "@notion-formula/sdk";
 import { FORMULA_IDS, type FormulaId } from "./types";
 
 export const PROPERTY_SCHEMA = [

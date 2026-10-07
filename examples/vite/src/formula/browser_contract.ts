@@ -1,4 +1,3 @@
-import init, { FormulaEngineSession } from "../pkg/analyzer_wasm.js";
 import {
   createFormulaEngineClient,
   FormulaClientError,
@@ -7,9 +6,10 @@ import {
   type FormulaClientErrorData,
   type FormulaDraftState,
   type FormulaSchema,
-} from "./client";
-import { formulaErrorData } from "./errors";
-import type { FormulaSession } from "./worker_runtime";
+} from "@notion-formula/sdk";
+import init, { FormulaEngineSession } from "@notion-formula/sdk/wasm";
+import FormulaWorker from "@notion-formula/sdk/worker?worker";
+import type { FormulaSession } from "../../../../packages/notion-formula/dist/worker_runtime.js";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -63,7 +63,8 @@ function nativeError(action: () => unknown): FormulaClientErrorData {
   try {
     action();
   } catch (error) {
-    return formulaErrorData(error, "WORKER_FAILURE");
+    assert(typeof error === "object" && error !== null && "code" in error, "Native typed error");
+    return error as FormulaClientErrorData;
   }
   throw new Error("Expected a synchronous WASM error");
 }
@@ -395,7 +396,7 @@ export async function runFormulaWorkerFailures() {
       },
       {
         workerFactory: () => {
-          const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+          const worker = new FormulaWorker();
           const terminate = worker.terminate.bind(worker);
           worker.terminate = () => {
             initTerminations++;

@@ -1,5 +1,5 @@
+import type { SignatureHelp } from "@notion-formula/sdk";
 import { describe, expect, it } from "vitest";
-import type { SignatureHelp } from "../../src/formula/client";
 import { planSignatureTokens } from "../../src/model/signature";
 
 function makeSignatureHelp(): SignatureHelp {

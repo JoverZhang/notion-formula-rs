@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020", "DOM", "ESNext.Disposable"],
+    "strict": true,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmitOnError": true
+  },
+  "include": ["src/**/*.ts"]
+}

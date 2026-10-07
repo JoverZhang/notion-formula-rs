@@ -15,30 +15,30 @@ import type {
   PropertyState,
   QuickFix,
   UpdateExpressionResult,
-} from "../engine/generated/wasm_dto";
+} from "./generated/wasm_dto.js";
 import type {
   CreateFormulaEngineClient,
   FormulaDraftClient,
   FormulaEngineClient,
-} from "./client.h";
+} from "./client.h.js";
 import {
   draftClosedError,
   engineClosedError,
   FormulaClientError,
   formulaErrorData,
-} from "./errors";
-import type { FormulaMethod, FormulaOperations } from "./protocol";
-import { FormulaRpc } from "./rpc";
+} from "./errors.js";
+import type { FormulaMethod, FormulaOperations } from "./protocol.js";
+import { FormulaRpc } from "./rpc.js";
 
-export type * from "../engine/generated/wasm_dto";
+export * from "./generated/wasm_dto.js";
 export type {
   CreateFormulaEngineClient,
   FormulaClientOptions,
   FormulaDraftClient,
   FormulaEngineClient,
-} from "./client.h";
-export { FormulaClientError } from "./errors";
-export type { FormulaWorker } from "./rpc";
+} from "./client.h.js";
+export { FormulaClientError } from "./errors.js";
+export type { FormulaWorker } from "./rpc.js";
 
 /** Each client owns one module Worker; initialization failures release that Worker. */
 export const createFormulaEngineClient: CreateFormulaEngineClient = async (
@@ -49,7 +49,7 @@ export const createFormulaEngineClient: CreateFormulaEngineClient = async (
   try {
     rpc = new FormulaRpc(
       options.workerFactory?.() ??
-        new Worker(new URL("./worker.ts", import.meta.url), { type: "module" }),
+        new Worker(new URL("./worker.js", import.meta.url), { type: "module" }),
     );
   } catch (error) {
     throw new FormulaClientError(formulaErrorData(error, "INITIALIZATION_ERROR"));

@@ -1,7 +1,7 @@
+import type { EvaluateResult } from "@notion-formula/sdk";
 import { FORMULA_DEMOS, PROPERTY_SCHEMA } from "../app/context";
 import { SAMPLE_ROWS } from "../app/data";
 import { FORMULA_IDS, type FormulaId } from "../app/types";
-import type { EvaluateResult } from "../formula/client";
 import { columnValue, formatRuntimeError, formatValue, formatValueType } from "../model/values";
 
 export function createFormulaTableView() {

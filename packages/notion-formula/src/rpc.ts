@@ -1,6 +1,6 @@
-import { FormulaClientError, formulaErrorData, isFormulaErrorData } from "./errors";
-import type { FormulaTransportErrorCode } from "./errors";
-import type { FormulaMethod, FormulaOperations, FormulaRequest } from "./protocol";
+import { FormulaClientError, formulaErrorData, isFormulaErrorData } from "./errors.js";
+import type { FormulaTransportErrorCode } from "./errors.js";
+import type { FormulaMethod, FormulaOperations, FormulaRequest } from "./protocol.js";
 
 export type FormulaWorker = Pick<
   Worker,

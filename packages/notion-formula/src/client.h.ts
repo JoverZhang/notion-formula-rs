@@ -19,8 +19,8 @@ import type {
   PropertyState,
   QuickFix,
   UpdateExpressionResult,
-} from "../engine/generated/wasm_dto";
-import type { FormulaWorker } from "./rpc";
+} from "./generated/wasm_dto.js";
+import type { FormulaWorker } from "./rpc.js";
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
 // Each request snapshots its arguments at enqueue; later mutations cannot change it.

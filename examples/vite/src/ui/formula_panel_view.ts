@@ -2,6 +2,13 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { linter, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, keymap } from "@codemirror/view";
+import type {
+  CompletionItem,
+  DraftVersion,
+  QuickFix,
+  SignatureHelp,
+  UpdateExpressionResult,
+} from "@notion-formula/sdk";
 import { PROPERTY_SCHEMA } from "../app/context";
 import {
   FORMULA_IDS,
@@ -29,13 +36,6 @@ import {
   type Chip,
   type TokenDecorationRange,
 } from "../editor_decorations";
-import type {
-  CompletionItem,
-  DraftVersion,
-  QuickFix,
-  SignatureHelp,
-  UpdateExpressionResult,
-} from "../formula/client";
 import {
   buildCompletionRows,
   createCompletionEdit,

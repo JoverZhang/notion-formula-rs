@@ -8,7 +8,7 @@ on:
       - "scripts/check-docs.mjs"
       - "scripts/check-docs.test.mjs"
       - "scripts/generate-wasm-client.mjs"
-      - "examples/vite/src/formula/client.h.ts"
+      - "packages/notion-formula/src/client.h.ts"
       - ".github/workflows/docs.yml"
   push:
     branches: [master]
@@ -18,7 +18,7 @@ on:
       - "scripts/check-docs.mjs"
       - "scripts/check-docs.test.mjs"
       - "scripts/generate-wasm-client.mjs"
-      - "examples/vite/src/formula/client.h.ts"
+      - "packages/notion-formula/src/client.h.ts"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 

@@ -28,7 +28,10 @@ const TOOL_IGNORED_DIRECTORY_NAMES = new Set([
   "node_modules",
   "target",
 ]);
-const TOOL_IGNORED_PATHS = new Set(["examples/vite/src/pkg"]);
+const TOOL_IGNORED_PATHS = new Set([
+  "examples/vite/src/pkg",
+  "packages/notion-formula/src/wasm",
+]);
 const BILINGUAL_METADATA = [
   "doc_id",
   "title",

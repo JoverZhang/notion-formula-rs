@@ -1,7 +1,7 @@
 import { EditorView } from "@codemirror/view";
+import type { CompletionItem, CursorHelp, UpdateExpressionResult } from "@notion-formula/sdk";
 import { vi } from "vitest";
 import type { FormulaEditorActions, FormulaState } from "../../src/app/types";
-import type { CompletionItem, CursorHelp, UpdateExpressionResult } from "../../src/formula/client";
 import { createFormulaPanelView } from "../../src/ui/formula_panel_view";
 
 export const completionItem = (overrides: Partial<CompletionItem> = {}): CompletionItem => ({

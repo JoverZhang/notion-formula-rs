@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
+import type { QuickFix } from "@notion-formula/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { QuickFix } from "../../src/formula/client";
 import { mountFormulaPanel } from "../helpers/formula_panel";
 
 const mounted: ReturnType<typeof mountFormulaPanel>[] = [];

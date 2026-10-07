@@ -1,4 +1,4 @@
-import type { SignatureHelp } from "../formula/client";
+import type { SignatureHelp } from "@notion-formula/sdk";
 import {
   planSignatureTokens,
   shouldUseWrappedSignature,

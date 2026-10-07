@@ -9,10 +9,10 @@ if (process.argv.length > 2 && !check) {
 
 const root = new URL("../", import.meta.url);
 const sourcePath = "docs/specs/wasm-api.md";
-const targetPath = "examples/vite/src/formula/client.h.ts";
+const targetPath = "packages/notion-formula/src/client.h.ts";
 const source = await readFile(new URL(sourcePath, root), "utf8");
 const blocks = [...source.matchAll(
-  /^```ts spec-file=examples\/vite\/src\/formula\/client\.h\.ts\r?\n([\s\S]*?)^```[ \t]*\r?$/gm,
+  /^```ts spec-file=packages\/notion-formula\/src\/client\.h\.ts\r?\n([\s\S]*?)^```[ \t]*\r?$/gm,
 )];
 if (blocks.length !== 1) {
   throw new Error(`Expected exactly one client declaration block in ${sourcePath}`);

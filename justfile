@@ -11,6 +11,7 @@ deps-rust:
   cargo fetch --locked --target wasm32-unknown-unknown
 
 deps-node:
+  pnpm -C packages/notion-formula install --frozen-lockfile
   pnpm -C examples/vite install --frozen-lockfile
 
 # CI
@@ -62,7 +63,7 @@ gen-ts:
   cargo run -p analyzer_wasm --bin export_ts
 
 wasm:
-  pnpm -C examples/vite -s run wasm:build
+  pnpm -C packages/notion-formula -s run build
 
 build: deps-node wasm
   pnpm -C examples/vite -s run build
@@ -73,6 +74,7 @@ run-example-vite: deps-node wasm
 clean:
   cargo clean
   cd examples/vite && rm -rf node_modules dist src/pkg test-results
+  cd packages/notion-formula && rm -rf node_modules dist src/wasm
 
 # Tests
 

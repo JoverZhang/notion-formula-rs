@@ -20,6 +20,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.28.0
         version: 6.39.7
+      '@notion-formula/sdk':
+        specifier: link:../../packages/notion-formula
+        version: link:../../packages/notion-formula
     devDependencies:
       '@eslint/js':
         specifier: ^9.15.0

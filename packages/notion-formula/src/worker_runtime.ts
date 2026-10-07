@@ -16,9 +16,9 @@ import type {
   PropertyState,
   QuickFix,
   UpdateExpressionResult,
-} from "../engine/generated/wasm_dto";
-import { formulaErrorData } from "./errors";
-import type { FormulaRequest, FormulaResponse } from "./protocol";
+} from "./generated/wasm_dto.js";
+import { formulaErrorData } from "./errors.js";
+import type { FormulaRequest, FormulaResponse } from "./protocol.js";
 
 /** Synchronous wasm-bindgen session boundary; all business validation stays in Rust. */
 export interface FormulaSession {

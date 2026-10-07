@@ -5,7 +5,7 @@ import type {
   RuntimeContext,
   Value,
   ValueType,
-} from "../formula/client";
+} from "@notion-formula/sdk";
 import { PROPERTY_SCHEMA, type InputPropertyId } from "./context";
 import { FORMULA_IDS } from "./types";
 
