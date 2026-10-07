@@ -478,7 +478,15 @@ export async function runFullApp({ variants, chromium, options = {}, onSample = 
           if (!drained) throw new Error('Final baseline input restoration did not drain to Cloud');
           if (options.captureScreenshots && session === 0) {
             const gridPath = path.join(outputDir, `full-app-${variant.id}-${count}-grid.png`);
-            await page.getByTestId('database-grid').screenshot({ path: gridPath });
+            const gridBox = await page.getByTestId('database-grid').boundingBox();
+            if (!gridBox) throw new Error('Benchmark Grid was not visible for evidence capture');
+            const gridClip = { x: Math.max(0, gridBox.x), y: Math.max(0, gridBox.y) };
+            gridClip.width = Math.min(VIEWPORT.width, gridBox.x + gridBox.width) - gridClip.x;
+            gridClip.height = Math.min(VIEWPORT.height, gridBox.y + gridBox.height) - gridClip.y;
+            if (gridClip.width <= 0 || gridClip.height <= 0) throw new Error('Benchmark Grid does not intersect its configured viewport');
+            // A virtual Grid's element can span thousands of empty pixels.
+            // Capture its visible intersection without scrolling the page.
+            await page.screenshot({ path: gridPath, clip: gridClip });
             await page.locator(cellSelector(dataset, 'total')).evaluate(element => element.click());
             await page.getByTestId('formula-editor-dialog').waitFor({ state: 'visible' });
             await source(page, '1 + 2', timeoutMs);
