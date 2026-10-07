@@ -1,6 +1,7 @@
 const dimensions = ['layer', 'scenario', 'operation', 'rows'];
 const csvFields = [...dimensions, 'variant', 'session', 'iteration', 'elapsedMs', 'rowCount', 'formulaCount',
-  'checksum', 'inputChecksum', 'visibleRows', 'visibleFormulaCells', 'domReadyMs', 'stableFrameMs', 'revision', 'verified'];
+  'checksum', 'inputChecksum', 'visibleRows', 'visibleFormulaCells', 'domReadyMs', 'stableFrameMs',
+  'diagnosticCategory', 'diagnosticText', 'revision', 'verified'];
 
 function quantile(values, probability) {
   const sorted = [...values].sort((a, b) => a - b);

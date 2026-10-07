@@ -20,6 +20,8 @@ last_verified: 2026-10-07
 
 安装 Node、固定版本 AppFlowy 指定的包管理器、带 `wasm32-unknown-unknown` target 的 Rust、`wasm-pack` 和 Chromium。准备过程拉取[不可变版本](../../../tools/appflowy-benchmark/revisions.json)，按各自的冻结 lockfile 安装依赖，并构建新版所固定的 SDK。生成的 checkout 放在运行器缓存中，不进入源码目录。
 
+未指定 `--browser-executable` 时，运行器使用固定版本 Playwright 配套的 Chromium。先运行 `--prepare`，再通过 `pnpm --dir <cache>/native exec playwright install chromium` 安装该浏览器。
+
 ```sh
 # 先用小样本验证测试工具；这种样本量不支持性能结论。
 just benchmark-appflowy --smoke --output /tmp/formula-benchmark-smoke \
@@ -47,6 +49,8 @@ just benchmark-appflowy --layer all --output /tmp/formula-benchmark-all \
 
 凭据、数据库标识、登录状态和详细应用错误保存在私密文件中，与可分享的结果分开；不要公开这些私密文件。`--layer full-app` 只运行完整应用对比。该层默认使用 100 行的代表性数据库；更大的完整应用数据集通过 `--full-app-rows` 显式选择。
 
+缓存保存专用数据库身份，后续运行复用同一批数据库，结束后保留数据供复查。`--screenshots` 在 UI 测量后仅截取虚构测试数据的 Grid 和编辑器内容，这些图片可单独分享。
+
 ## 测量内容
 
 | 层次 | 起点 → 完成条件 | 计入的工作 |
@@ -66,7 +70,7 @@ just benchmark-appflowy --layer all --output /tmp/formula-benchmark-all \
 
 ## 阅读结果
 
-`results.json` 包含源码版本、数据集与插桩信息、环境、限制、原始样本及对比汇总。`samples.csv` 保存原始测量行；若后续操作失败，`samples.ndjson` 保留已完成的进度。生成的 `report.md` 是 JSON 的便捷展示。
+`results.json` 包含应用及 benchmark 的源码版本与哈希、数据集与插桩信息、环境、限制、原始样本及对比汇总，浏览器计时代码也计入版本记录。`samples.csv` 保存原始测量行；若后续操作失败，`samples.ndjson` 保留已完成的进度。生成的 `report.md` 是 JSON 的便捷展示。
 
 [统计模块](../../../tools/appflowy-benchmark/report.mjs)按负载、操作、行数、会话和迭代号配对样本，报告绝对 P50/P95 耗时及 **新版 / 原版** 比值，小于 1 表示新版更快。95% 区间使用固定的统计随机种子，对完整配对会话重采样 2,000 次。少于五个会话时不下方向性结论；中位数落到时钟零分辨率时不计算加速比。小样本的尾部分位数仅供探索。失败和不支持的案例不会被静默移除。
 

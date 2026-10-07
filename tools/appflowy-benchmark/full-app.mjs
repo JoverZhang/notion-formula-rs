@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { buildFullApp, instrumentationHash } from './full-app/build.mjs';
+import { deadline } from './deadline.mjs';
+import { buildFullApp, buildInstrumentationHash, instrumentationHash, timingScriptHash } from './full-app/build.mjs';
 import { serveFullApp } from './full-app/server.mjs';
 import { installBrowserTiming, timingResult } from './full-app/timing.mjs';
 
@@ -34,17 +35,21 @@ async function privateJson(filePath, value) {
   await chmod(filePath, 0o600);
 }
 
-async function until(page, predicate, argument, timeoutMs) {
-  await page.waitForFunction(predicate, argument, { timeout: timeoutMs });
+async function readPrivateJson(filePath, label, missingValue) {
+  let contents;
+  try { contents = await readFile(filePath, 'utf8'); }
+  catch (error) {
+    if (error.code === 'ENOENT' && arguments.length >= 3) return missingValue;
+    throw new Error(`Could not read private ${label} JSON`);
+  }
+  // JSON.parse errors can quote malformed input, including secrets. Never
+  // propagate either that input or the user's private path into report.failure.
+  try { return JSON.parse(contents); }
+  catch { throw new Error(`Private ${label} JSON is malformed`); }
 }
 
-async function deadline(promise, timeoutMs, label) {
-  let timer;
-  try {
-    return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} did not complete within the configured timeout`)), timeoutMs);
-    })]);
-  } finally { clearTimeout(timer); }
+async function until(page, predicate, argument, timeoutMs) {
+  await page.waitForFunction(predicate, argument, { timeout: timeoutMs });
 }
 
 async function gridReady(page, timeoutMs) {
@@ -66,11 +71,11 @@ function accountFingerprint(credentials, state) {
 }
 
 function remapAuthState(state, origin) {
-  return {
-    ...state,
-    cookies: state.cookies?.map(cookie => ({ ...cookie, domain: '127.0.0.1' })),
-    origins: state.origins?.map(entry => ({ ...entry, origin })),
-  };
+  const token = state.origins?.flatMap(entry => entry.localStorage ?? []).find(entry => entry.name === 'token');
+  if (!token) throw new Error('Private authentication state has no AppFlowy token');
+  // Cold contexts carry authentication only: no provider cache, device ID,
+  // theme/language preferences, IndexedDB or cookies from the setup browser.
+  return { cookies: [], origins: [{ origin, localStorage: [{ name: 'token', value: token.value }] }] };
 }
 
 async function createContext(browser, origin, state, timeoutMs, navigation = null) {
@@ -300,7 +305,7 @@ async function cellInput(page, dataset, value) {
   return input;
 }
 
-async function iteration(page, dataset, rows, origin, timeoutMs, record) {
+async function iteration(page, dataset, rows, origin, timeoutMs, variant, record) {
   await page.goto(origin + dataset.route, { waitUntil: 'domcontentloaded' });
   const opened = await timingResult(page, timeoutMs);
   await record('dependency-chain', 'open-database-hot-visible-formulas', opened);
@@ -333,7 +338,16 @@ async function iteration(page, dataset, rows, origin, timeoutMs, record) {
   await page.getByTestId('formula-editor-input').press('ControlOrMeta+a');
   await page.evaluate(config => window.__FORMULA_BENCHMARK_TIMING__.arm(config), { kind: 'diagnostic', timeoutMs, source: invalid });
   await page.keyboard.insertText(invalid);
-  await record('invalid-expression', 'source-change-current-diagnostic', await timingResult(page, timeoutMs));
+  const diagnostic = await timingResult(page, timeoutMs);
+  // These exact pinned UI messages were observed in both real production apps.
+  // Validate the text CAPTURED at the completed timestamp, outside the timer:
+  // a caught Worker/action/preview failure must invalidate the sample even if
+  // the UI subsequently recovers to a legitimate syntax error.
+  const expectedDiagnostic = variant === 'legacy'
+    ? `Unexpected end of formula [1,${invalid.length + 1}]`
+    : 'expected expression after `+`';
+  if (diagnostic.diagnosticText !== expectedDiagnostic) throw new Error(`Unexpected diagnostic endpoint for ${variant}: ${diagnostic.diagnosticText}`);
+  await record('invalid-expression', 'source-change-current-diagnostic', { ...diagnostic, diagnosticCategory: 'syntax' });
 
   await source(page, dataset.totalExpression, timeoutMs);
   await previewReady(page, dataset.totalExpression, first.total, timeoutMs);
@@ -350,7 +364,7 @@ async function iteration(page, dataset, rows, origin, timeoutMs, record) {
 }
 
 export async function runFullApp({ variants, chromium, options = {}, onSample = async () => {} }) {
-  if (!Array.isArray(variants) || variants.length !== 2 || variants[0].id === variants[1].id) throw new Error('Full app benchmark requires two distinct pinned variants');
+  if (!Array.isArray(variants) || variants.length !== 2 || variants[0].id === variants[1].id || variants.some(variant => !['legacy', 'native'].includes(variant.id))) throw new Error('Full app benchmark requires the distinct pinned legacy and native variants');
   if (!options.backendUrl) throw new Error('Full app benchmark requires an explicit real Cloud backend URL');
   if (!options.credentialsPath && !options.authStatePath) throw new Error('Supply a private credentialsPath or authStatePath for real application authentication');
   const rowCounts = options.fullAppRows ?? options.rowCounts ?? [100];
@@ -371,16 +385,16 @@ export async function runFullApp({ variants, chromium, options = {}, onSample = 
       const info = body.data ?? body;
       return { available: true, reportedVersion: typeof info.version === 'string' ? info.version : null, minWebClientVersion: typeof info.min_web_client_version === 'string' ? info.min_web_client_version : null, selfHosted: typeof info.self_hosted === 'boolean' ? info.self_hosted : null };
     }).catch(() => ({ available: false }));
-  const credentials = options.credentialsPath ? JSON.parse(await readFile(options.credentialsPath, 'utf8')) : null;
-  let authState = options.authStatePath ? JSON.parse(await readFile(options.authStatePath, 'utf8')) : null;
+  const credentials = options.credentialsPath ? await readPrivateJson(options.credentialsPath, 'credentials') : null;
+  let authState = options.authStatePath ? await readPrivateJson(options.authStatePath, 'authentication state') : null;
   const fingerprint = digest({ backend: options.backendUrl.replace(/\/$/, ''), account: accountFingerprint(credentials, authState), workload: DATASET_OWNER });
   const privateCacheDir = path.join(path.resolve(options.cacheDir ?? path.join(outputDir, 'cache')), 'full-app-private', fingerprint);
   await mkdir(privateCacheDir, { recursive: true, mode: 0o700 });
   await chmod(privateCacheDir, 0o700);
   const manifestPath = path.join(privateCacheDir, 'datasets.json');
   const cachedAuthPath = path.join(privateCacheDir, 'authentication.json');
-  if (!authState) authState = await readFile(cachedAuthPath, 'utf8').then(JSON.parse).catch(() => null);
-  const manifest = await readFile(manifestPath, 'utf8').then(JSON.parse).catch(() => ({ owner: DATASET_OWNER, datasets: {} }));
+  if (!authState) authState = await readPrivateJson(cachedAuthPath, 'cached authentication', null);
+  const manifest = await readPrivateJson(manifestPath, 'cached dataset manifest', { owner: DATASET_OWNER, datasets: {} });
   if (manifest.owner !== DATASET_OWNER) throw new Error('Existing private dataset manifest is not owned by this benchmark');
   const builds = [];
   for (const variant of variants) builds.push({ ...variant, ...await buildFullApp(variant, outputDir, { rebuild: options.rebuildFullApp }) });
@@ -442,7 +456,7 @@ export async function runFullApp({ variants, chromium, options = {}, onSample = 
           await page.goto(server.origin + dataset.route, { waitUntil: 'domcontentloaded' });
           const cold = await timingResult(page, timeoutMs);
           const record = async (scenario, operation, timing, iterationIndex) => {
-            const sample = { layer: 'full-app', variant: variant.id, scenario, operation, rows: count, session, iteration: iterationIndex, elapsedMs: timing.elapsedMs, domReadyMs: timing.domReadyMs, stableFrameMs: timing.stableFrameMs, verified: true, inputChecksum: dataset.checksum, ...(timing.visibleRows === undefined ? {} : { visibleRows: timing.visibleRows, visibleFormulaCells: timing.visibleFormulaCells }) };
+            const sample = { layer: 'full-app', variant: variant.id, scenario, operation, rows: count, session, iteration: iterationIndex, elapsedMs: timing.elapsedMs, domReadyMs: timing.domReadyMs, stableFrameMs: timing.stableFrameMs, verified: true, inputChecksum: dataset.checksum, ...(timing.visibleRows === undefined ? {} : { visibleRows: timing.visibleRows, visibleFormulaCells: timing.visibleFormulaCells }), ...(timing.diagnosticText === undefined ? {} : { diagnosticText: timing.diagnosticText, diagnosticCategory: timing.diagnosticCategory }) };
             samples.push(sample);
             await onSample(sample);
           };
@@ -452,7 +466,7 @@ export async function runFullApp({ variants, chromium, options = {}, onSample = 
           await record('dependency-chain', 'open-database-cold-visible-formulas', cold, 0);
           for (let iterationIndex = -warmups; iterationIndex < samplesPerSession; iterationIndex++) {
             stage = `${variant.id}, ${count} rows, session ${session}, iteration ${iterationIndex}`;
-            await iteration(page, dataset, rows, server.origin, timeoutMs, async (scenario, operation, timing) => {
+            await iteration(page, dataset, rows, server.origin, timeoutMs, variant.id, async (scenario, operation, timing) => {
               if (iterationIndex < 0) return;
               await record(scenario, operation, timing, iterationIndex);
             });
@@ -467,9 +481,15 @@ export async function runFullApp({ variants, chromium, options = {}, onSample = 
             await page.getByTestId('database-grid').screenshot({ path: gridPath });
             await page.locator(cellSelector(dataset, 'total')).evaluate(element => element.click());
             await page.getByTestId('formula-editor-dialog').waitFor({ state: 'visible' });
-            await previewReady(page, dataset.totalExpression, rows[0].total, timeoutMs);
+            await source(page, '1 + 2', timeoutMs);
+            await previewReady(page, '1 + 2', 3, timeoutMs);
             const editorPath = path.join(outputDir, `full-app-${variant.id}-${count}-editor.png`);
-            await page.getByTestId('formula-editor-dialog').screenshot({ path: editorPath });
+            const dialogBox = await page.getByTestId('formula-editor-dialog').boundingBox();
+            const previewBox = await page.getByTestId('formula-editor-preview').boundingBox();
+            if (!dialogBox || !previewBox) throw new Error('Constant editor preview was not visible for evidence capture');
+            // Lower docs can display canonical field IDs. Capture only the
+            // controls, harmless constant source and current preview value.
+            await page.screenshot({ path: editorPath, clip: { x: dialogBox.x, y: dialogBox.y, width: dialogBox.width, height: Math.min(dialogBox.height, previewBox.y + previewBox.height - dialogBox.y + 8) } });
             await page.getByTestId('formula-editor-cancel').click();
             await page.getByTestId('formula-editor-dialog').waitFor({ state: 'hidden' });
             (artifacts.publicScreenshots ??= []).push(gridPath, editorPath);
@@ -494,10 +514,11 @@ export async function runFullApp({ variants, chromium, options = {}, onSample = 
         backendInfo,
         variants: variants.map(({ id, revision }) => ({ id, revision })),
         builds: builds.map(({ id, metadata }) => ({ variant: id, ...metadata })),
-        instrumentationHash, instrumentation: 'Identical retained test IDs and real database dispatch/context bridge; no formula implementation changes',
+        instrumentationHash, buildInstrumentationHash, timingScriptHash, instrumentation: 'Identical retained test IDs, real database dispatch/context bridge and browser timing observers; no formula implementation changes',
         viewport: VIEWPORT, timezone: 'UTC', locale: 'en-US', browserVersion,
         sessions, samplesPerSession, warmups, rowCounts,
         timer: 'Browser performance.now(): navigation start, captured Enter keydown, or captured editor beforeinput → correct current DOM stable for two animation frames',
+        diagnosticValidation: { legacy: 'Unexpected end of formula [1,<source length + 1>]', native: 'expected expression after `+`', category: 'syntax', capture: 'Exact error text captured with the completed browser timestamp, then compared outside the timed interval' },
         cacheProfile: 'Fresh browser PROCESS per variant/session/dataset. Cold sample is its first authenticated deep link, before /app hydration or dataset verification. Hot repetitions retain HTTP/IndexedDB caches after untimed verification and warmups.',
         scheduling: 'Serial sessions alternate variant order; all operations restore baseline inputs and cancel editor drafts before the next sample',
         datasets: rowCounts.map(count => ({ rows: count, formulaFields: 2, checksum: manifest.datasets[count].checksum })),

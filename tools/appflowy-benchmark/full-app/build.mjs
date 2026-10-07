@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, readFileSync } from 'node:fs';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -52,7 +52,9 @@ await build({ ...result.config, configFile: false, root, mode: 'production', plu
 if (instrumented !== 1) throw new Error('Full app benchmark context was not instrumented exactly once');
 `;
 
-export const instrumentationHash = createHash('sha256').update(script).digest('hex');
+export const timingScriptHash = createHash('sha256').update(readFileSync(new URL('./timing.mjs', import.meta.url))).digest('hex');
+export const buildInstrumentationHash = createHash('sha256').update(script).digest('hex');
+export const instrumentationHash = createHash('sha256').update(JSON.stringify({ buildInstrumentationHash, timingScriptHash })).digest('hex');
 
 export async function buildFullApp(variant, outputDir, { rebuild = false } = {}) {
   const generated = path.join(variant.root, '.formula-benchmark-full-app');
@@ -60,7 +62,7 @@ export async function buildFullApp(variant, outputDir, { rebuild = false } = {})
   const markerPath = path.join(generated, 'build.json');
   const lockHash = variant.lockHash ?? createHash('sha256').update(await readFile(path.join(variant.root, 'pnpm-lock.yaml'))).digest('hex');
   const sdkHash = variant.sdkHash ?? (variant.id === 'native' ? await directoryHash(path.join(variant.root, '.notion-formula-sdk')) : null);
-  const marker = { revision: variant.revision, instrumentationHash, nodeEnv: 'production', node: process.version, lockHash, sdkHash };
+  const marker = { revision: variant.revision, instrumentationHash, buildInstrumentationHash, timingScriptHash, nodeEnv: 'production', node: process.version, lockHash, sdkHash };
   if (!rebuild) {
     const previous = await readFile(markerPath, 'utf8').then(JSON.parse).catch(() => null);
     const indexExists = await readFile(path.join(dist, 'index.html')).then(() => true).catch(() => false);

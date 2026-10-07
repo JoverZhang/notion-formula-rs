@@ -1,11 +1,13 @@
 import { appendFile, mkdir, open, rename, unlink, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { prepareVariants, buildFixture } from './prepare.mjs';
+import { prepareVariants, buildFixture, directoryHash } from './prepare.mjs';
+import { deadline } from './deadline.mjs';
 import { renderReport, samplesCsv, summarize } from './report.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -17,7 +19,7 @@ const operations = ['read', 'edit-cell', 'edit-all', 'edit-formula'];
 // failures, changing work between A/B, and losing evidence on a later failure.
 function optionsFromArguments() {
   const { values } = parseArgs({ options: {
-    help: { type: 'boolean' }, smoke: { type: 'boolean' }, prepare: { type: 'boolean' },
+    help: { type: 'boolean' }, smoke: { type: 'boolean' }, prepare: { type: 'boolean' }, screenshots: { type: 'boolean' },
     layer: { type: 'string', default: 'chain' }, output: { type: 'string' }, cache: { type: 'string' },
     rows: { type: 'string' }, families: { type: 'string' }, sessions: { type: 'string' },
     samples: { type: 'string' }, warmups: { type: 'string' }, seed: { type: 'string', default: '47183' },
@@ -45,6 +47,7 @@ function optionsFromArguments() {
   --credentials FILE         Private JSON {email,password}; never copied into evidence
   --auth-state FILE          Alternatively, private Playwright storage state
   --full-app-rows 100         Full-app database sizes (independent from chain sizes)
+  --screenshots              Capture dummy Grid/editor images after UI measurements
   --timeout-ms N             Failure deadline, never a reported measurement
 
 First install Node, pnpm, Rust/wasm-pack and Chromium as documented. The runner
@@ -80,6 +83,7 @@ Failed or unmatched measurements fail the run; they do not count as speedups.`);
     samples: integer('samples', values.smoke ? 2 : 20),
     warmups: integer('warmups', values.smoke ? 1 : 5, 0), seed,
     timeoutMs: integer('timeout-ms', 120000), browserExecutablePath: values['browser-executable'],
+    captureScreenshots: Boolean(values.screenshots),
     backendUrl: values['backend-url'], gotrueUrl: values['gotrue-url'],
     credentialsPath: values.credentials && path.resolve(values.credentials),
     authStatePath: values['auth-state'] && path.resolve(values['auth-state']),
@@ -87,16 +91,12 @@ Failed or unmatched measurements fail the run; they do not count as speedups.`);
   if (!options.prepareOnly && options.layer !== 'chain' &&
       (!options.backendUrl || (!options.credentialsPath && !options.authStatePath)))
     throw new Error('Full-app runs require --backend-url and --credentials or --auth-state');
+  for (const endpoint of [options.backendUrl, options.gotrueUrl].filter(Boolean)) {
+    const url = new URL(endpoint);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+      throw new Error('Backend endpoints must be HTTP(S) URLs without embedded credentials');
+  }
   return options;
-}
-
-async function deadline(promise, milliseconds, context) {
-  let timer;
-  try {
-    return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${context}: deadline exceeded`)), milliseconds);
-    })]);
-  } finally { clearTimeout(timer); }
 }
 
 async function runChain(variants, chromium, options, record, metadata) {
@@ -171,6 +171,12 @@ async function main() {
   ] };
   const report = {
     schemaVersion: 1, createdAt: new Date().toISOString(), status: 'running',
+    benchmark: {
+      revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: directory, encoding: 'utf8' }).trim(),
+      sourceHash: await directoryHash(directory),
+      modifiedSources: Boolean(execFileSync('git', ['status', '--porcelain', '--untracked-files=all', '--', '.'],
+        { cwd: directory, encoding: 'utf8' }).trim()),
+    },
     configuration: Object.fromEntries(Object.entries(options).filter(([key]) =>
       !['credentialsPath', 'authStatePath', 'outputDir', 'cacheDir', 'browserExecutablePath'].includes(key))),
     environment: { platform: os.platform(), release: os.release(), arch: os.arch(), node: process.version,
@@ -200,7 +206,7 @@ async function main() {
       metadata.fullApp = fullApp.metadata;
       metadata.limits.push(...(fullApp.limits ?? []));
       metadata.artifacts = Object.fromEntries(Object.entries(fullApp.artifacts ?? {})
-        .map(([key, artifact]) => [key, path.basename(artifact)]));
+        .map(([key, artifact]) => [key, Array.isArray(artifact) ? artifact.map(file => path.basename(file)) : path.basename(artifact)]));
     }
     report.summary = summarize(samples);
     report.status = 'passed';

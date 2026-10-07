@@ -55,10 +55,13 @@ test('zero-duration samples do not claim an unbounded speedup', () => {
 test('CSV retains metadata and escapes separators without changing numerical values', () => {
   const csv = samplesCsv([sample('legacy', 1.25, 0, 0, {
     scenario: 'a,"b', inputChecksum: 'abc', visibleRows: 8, domReadyMs: 0.5, stableFrameMs: 0.75,
+    diagnosticCategory: 'syntax', diagnosticText: 'expected expression',
   })]);
   assert.match(csv, /elapsedMs/);
   assert.match(csv, /"a,""b"/);
   assert.match(csv, /1\.25/);
   assert.match(csv, /inputChecksum,visibleRows,visibleFormulaCells,domReadyMs,stableFrameMs/);
   assert.match(csv, /abc,8,,0\.5,0\.75/);
+  assert.match(csv, /diagnosticCategory,diagnosticText/);
+  assert.match(csv, /syntax,expected expression/);
 });

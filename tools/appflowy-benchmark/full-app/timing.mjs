@@ -64,7 +64,7 @@ export function installBrowserTiming(navigation) {
       const completedAt = performance.now();
       record.done = true;
       clearTimeout(record.timer);
-      window.__FORMULA_BENCHMARK_TIMING__.result = { elapsedMs: completedAt - record.start, domReadyMs: record.firstReadyAt - record.start, stableFrameMs: completedAt - record.firstReadyAt, startedAt: record.start, completedAt, visibleRows: next.visibleRows, visibleFormulaCells: next.visibleFormulaCells };
+      window.__FORMULA_BENCHMARK_TIMING__.result = { elapsedMs: completedAt - record.start, domReadyMs: record.firstReadyAt - record.start, stableFrameMs: completedAt - record.firstReadyAt, startedAt: record.start, completedAt, visibleRows: next.visibleRows, visibleFormulaCells: next.visibleFormulaCells, ...(record.config.kind === 'diagnostic' ? { diagnosticText: next.signature } : {}) };
     }));
   };
   window.__FORMULA_BENCHMARK_TIMING__ = {

@@ -20,6 +20,8 @@ Compare the original JavaScript implementation and the Rust/WASM integration at 
 
 Install Node, the pinned AppFlowy package manager, Rust with the `wasm32-unknown-unknown` target, `wasm-pack`, and Chromium. Preparation fetches the [immutable revisions](../../../tools/appflowy-benchmark/revisions.json), installs each frozen lockfile, and builds the native revision's pinned SDK. Generated checkouts stay in the runner's cache, outside the source tree.
 
+Without `--browser-executable`, the runner uses the Chromium bundled with the pinned Playwright package. Run `--prepare` first, then install that browser with `pnpm --dir <cache>/native exec playwright install chromium`.
+
 ```sh
 # Validate the harness with small samples; these do not support performance claims.
 just benchmark-appflowy --smoke --output /tmp/formula-benchmark-smoke \
@@ -47,6 +49,8 @@ just benchmark-appflowy --layer all --output /tmp/formula-benchmark-all \
 
 Credentials, database identities, auth state, and detailed application failures are private files, separate from the shareable results. Do not publish those private files. `--layer full-app` runs only the complete application comparison. Its default representative database has 100 rows; larger full-app datasets require an explicit `--full-app-rows` selection.
 
+The cache retains identities so subsequent runs reuse the same dedicated databases, which remain available for inspection. `--screenshots` captures only dummy Grid/editor content after UI measurements; these images can be shared separately.
+
 ## What is measured
 
 | Layer | Start → completion | Included work |
@@ -66,7 +70,7 @@ Browser timestamps define all durations. Playwright polls only to collect comple
 
 ## Read the evidence
 
-`results.json` contains source revisions, dataset and instrumentation details, the environment, limits, raw samples, and the comparison summary. `samples.csv` provides the raw measurement rows; `samples.ndjson` preserves progress if a later operation fails. The generated `report.md` is a convenience view of the JSON.
+`results.json` contains application and benchmark source revisions/hashes, dataset and instrumentation details, the environment, limits, raw samples, and the comparison summary. Browser timer code is included in the recorded provenance. `samples.csv` provides the raw measurement rows; `samples.ndjson` preserves progress if a later operation fails. The generated `report.md` is a convenience view of the JSON.
 
 The [reporter](../../../tools/appflowy-benchmark/report.mjs) pairs samples by workload, operation, row count, session, and iteration. It reports absolute P50/P95 durations and the ratio **native / legacy**; values below 1 favor native. Its 95% interval resamples whole paired browser sessions 2,000 times with a fixed reporting seed. Fewer than five sessions yield no directional conclusion; zero-resolution medians yield no speedup ratio. Small-sample tail percentiles remain exploratory. Failures and unsupported cases are not silently removed.
 
