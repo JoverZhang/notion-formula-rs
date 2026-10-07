@@ -7,7 +7,7 @@ counterpart: ./ide.md
 implementation_status: current
 document_status: draft
 translation_status: synced
-last_verified: 2026-10-03
+last_verified: 2026-10-05
 ---
 
 # FormulaDraft：编辑器能力
@@ -19,7 +19,7 @@ last_verified: 2026-10-03
 ## FormulaDraft
 
 ```rust out=formula_engine/src/formula_draft.h.rs
-use crate::{FormulaDefinition, FormulaEngine, ValueType};
+use crate::{FormulaDefinition, FormulaEngine, PropertyId, ValueType};
 
 pub use analyzer::{Span, TextEdit, Token};
 pub use ide::{
@@ -48,7 +48,7 @@ impl FormulaDraft<'_> {
     /// 返回整段 expression 的替换 edit；lexer/parser diagnostic 阻止格式化，语义错误不阻止。
     pub fn format_edits(&self) -> Result<FormulaEdit, FormatError>;
 
-    /// 原子更新 expression，返回前更新 output_type、diagnostics 和 tokens。
+    /// 原子更新 expression，返回前更新 state() 中的所有分析字段。
     ///
     /// - allow: 无效 expression；通过 state() 查看 diagnostics。
     /// - error: Edits 的版本、区间、cursor 或非重叠校验失败，Draft 不变。
@@ -87,6 +87,18 @@ pub struct FormulaDraftState {
     pub diagnostics: Vec<ExpressionDiagnostic>,
     /// 当前 definition.expression 的词法 tokens，保留注释、换行和 Eof。
     pub tokens: Vec<Token>,
+    /// 按源码顺序返回完整的 prop("id") 调用，保留重复引用及未解析的 ID。
+    /// 不包含字符串、注释、语法不完整或错误的调用，以及不支持的成员调用。
+    pub property_references: Vec<PropertyReference>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PropertyReference {
+    /// 解码后的字符串字面量；字段存在性与 Ready 状态仍由独立诊断报告。
+    pub property_id: PropertyId,
+    /// 整个调用的位置，包含内部空白和注释。
+    pub span: Span,
+    /// 仅包含带引号的 ID 字面量；替换此区间会保留调用中的空白和注释。
+    pub id_span: Span,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExpressionDiagnostic {

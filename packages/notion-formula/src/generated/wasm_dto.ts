@@ -112,7 +112,9 @@ export type EvaluateInputError = { "InvalidNow": { now: bigint, } } | { "Invalid
 
 export type CompletionConfig = { preferred_limit: number, };
 
-export type FormulaDraftState = { version: bigint, definition: FormulaDefinition, output_type: ValueType, diagnostics: Array<ExpressionDiagnostic>, tokens: Array<Token>, };
+export type FormulaDraftState = { version: bigint, definition: FormulaDefinition, output_type: ValueType, diagnostics: Array<ExpressionDiagnostic>, tokens: Array<Token>, property_references: Array<PropertyReference>, };
+
+export type PropertyReference = { property_id: string, span: Span, id_span: Span, };
 
 export type ExpressionDiagnostic = { id: string, span: Span, message: string, };
 

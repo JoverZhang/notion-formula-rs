@@ -140,6 +140,7 @@ fn engine_dto() -> String {
         engine::EvaluateInputError::decl(),
         engine::CompletionConfig::decl(),
         engine::FormulaDraftState::decl(),
+        engine::PropertyReference::decl(),
         engine::ExpressionDiagnostic::decl(),
         engine::CursorHelp::decl(),
         engine::FormulaEdit::decl(),

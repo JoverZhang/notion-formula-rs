@@ -9,7 +9,7 @@ document_status: draft
 translation_status: synced
 translation_model: gpt-6-sol
 translation_review_model: gpt-6-astra
-last_verified: 2026-10-03
+last_verified: 2026-10-05
 ---
 
 # FormulaDraft: Editor Capabilities
@@ -21,7 +21,7 @@ last_verified: 2026-10-03
 ## FormulaDraft
 
 ```rust out=formula_engine/src/formula_draft.h.rs
-use crate::{FormulaDefinition, FormulaEngine, ValueType};
+use crate::{FormulaDefinition, FormulaEngine, PropertyId, ValueType};
 
 pub use analyzer::{Span, TextEdit, Token};
 pub use ide::{
@@ -52,7 +52,7 @@ impl FormulaDraft<'_> {
     /// Returns a replacement edit for the entire expression; lexer/parser diagnostics prevent formatting, but semantic errors do not.
     pub fn format_edits(&self) -> Result<FormulaEdit, FormatError>;
 
-    /// Atomically updates the expression, updating output_type, diagnostics, and tokens before returning.
+    /// Atomically updates the expression and all analysis fields in state() before returning.
     ///
     /// - allow: an invalid expression; inspect diagnostics through state().
     /// - error: validation of the Edits version, ranges, cursor, or non-overlap fails; Draft remains unchanged.
@@ -91,6 +91,18 @@ pub struct FormulaDraftState {
     pub diagnostics: Vec<ExpressionDiagnostic>,
     /// Lexical tokens of the current definition.expression, retaining comments, newlines, and Eof.
     pub tokens: Vec<Token>,
+    /// Complete prop("id") calls in source order, including repeats and unresolved IDs.
+    /// Excludes strings, comments, malformed calls, and unsupported member calls.
+    pub property_references: Vec<PropertyReference>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PropertyReference {
+    /// Decoded string literal; existence and readiness remain separate diagnostics.
+    pub property_id: PropertyId,
+    /// The whole call, including internal whitespace and comments.
+    pub span: Span,
+    /// The quoted ID literal only; replacing this span preserves the call's trivia.
+    pub id_span: Span,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExpressionDiagnostic {

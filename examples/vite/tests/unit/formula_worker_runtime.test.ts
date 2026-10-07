@@ -13,6 +13,7 @@ const state = {
   output_type: "Number" as const,
   diagnostics: [],
   tokens: [],
+  property_references: [],
 };
 const edit = { base_version: 0n, edits: [{ range: { start: 0, end: 1 }, new_text: "2" }] };
 
