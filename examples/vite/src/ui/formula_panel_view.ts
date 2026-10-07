@@ -633,12 +633,17 @@ export function createFormulaPanelView(opts: {
     if (saveBtn.disabled || disposed) return;
     void opts.actions.save(opts.id).catch(showError);
   };
+  const onSaveMouseDown = (event: MouseEvent) => {
+    // Editor blur hides completions and can move Save before mouseup.
+    if (event.button === 0) event.preventDefault();
+  };
   const onDiscard = () => {
     if (discardBtn.disabled || disposed) return;
     void opts.actions.discard(opts.id).catch(showError);
   };
   formatBtn.addEventListener("click", onFormat);
   quickFixBtn.addEventListener("click", onQuickFix);
+  saveBtn.addEventListener("mousedown", onSaveMouseDown);
   saveBtn.addEventListener("click", onSave);
   discardBtn.addEventListener("click", onDiscard);
 
@@ -801,6 +806,7 @@ export function createFormulaPanelView(opts: {
       window.removeEventListener("resize", onResize);
       formatBtn.removeEventListener("click", onFormat);
       quickFixBtn.removeEventListener("click", onQuickFix);
+      saveBtn.removeEventListener("mousedown", onSaveMouseDown);
       saveBtn.removeEventListener("click", onSave);
       discardBtn.removeEventListener("click", onDiscard);
       unregisterDebug();
