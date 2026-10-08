@@ -14,6 +14,11 @@ deps-node:
   pnpm -C packages/notion-formula install --frozen-lockfile
   pnpm -C examples/vite install --frozen-lockfile
 
+deps-appflowy: deps-node wasm
+  git submodule update --init examples/appflowy-web
+  node scripts/stage-appflowy-sdk.mjs
+  pnpm -C examples/appflowy-web install --frozen-lockfile
+
 # CI
 
 verify: deps check test
@@ -70,6 +75,13 @@ build: deps-node wasm
 
 run-example-vite: deps-node wasm
   pnpm -C examples/vite -s run dev
+
+# Configure AppFlowy Cloud in the example's .env before starting the app.
+run-example-appflowy: deps-appflowy
+  pnpm -C examples/appflowy-web -s run dev
+
+build-example-appflowy: deps-appflowy
+  pnpm -C examples/appflowy-web -s run build
 
 clean:
   cargo clean
