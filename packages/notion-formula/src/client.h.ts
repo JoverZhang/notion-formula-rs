@@ -22,6 +22,9 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
+// Quote a formula string with \\, \", \n and \t escapes; preserve other valid Unicode characters.
+export declare function quoteFormulaString(value: string): string;
+
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
 // Each request snapshots its arguments at enqueue; later mutations cannot change it.
 // Non-cloneable arguments reject with INVALID_REQUEST at their FIFO position.

@@ -61,7 +61,8 @@ impl Analyzer {
     pub fn analyze(&self, source: String) -> Result<JsValue, JsValue> {
         let result = analyzer::analyze(&source, &self.context);
         let out: AnalyzeResult = Converter::analyze_output(&source, result);
-        to_value(&out)
+        out.serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(true))
+            .map_err(|_| JsValue::from(JsError::new("Serialize error")))
     }
 
     pub fn format(&self, source: String, cursor_utf16: u32) -> Result<JsValue, JsValue> {

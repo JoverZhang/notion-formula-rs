@@ -20,6 +20,7 @@ import type {
   CreateFormulaEngineClient,
   FormulaDraftClient,
   FormulaEngineClient,
+  quoteFormulaString as quoteFormulaStringDeclaration,
 } from "./client.h.js";
 import {
   draftClosedError,
@@ -39,6 +40,9 @@ export type {
 } from "./client.h.js";
 export { FormulaClientError } from "./errors.js";
 export type { FormulaWorker } from "./rpc.js";
+
+export const quoteFormulaString: typeof quoteFormulaStringDeclaration = (value) =>
+  `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\t/g, "\\t")}"`;
 
 /** Each client owns one module Worker; initialization failures release that Worker. */
 export const createFormulaEngineClient: CreateFormulaEngineClient = async (
