@@ -411,49 +411,95 @@ pub(crate) fn eval_split(
     })
 }
 
+pub(crate) fn eval_plain_text(
+    text: KernelColumn<TextKind>,
+    _styles: impl Iterator<Item = KernelColumn<TextKind>>,
+    mask: &Mask,
+) -> KernelResult<TextKind> {
+    // Value argument preparation has evaluated and type-checked style metadata.
+    eval_unary(&text, mask, |text| Ok(text.clone()))
+}
+
 pub(crate) fn eval_format_number(
     value: KernelColumn<NumberKind>,
     format: KernelColumn<TextKind>,
-    precision: KernelColumn<NumberKind>,
+    precision: Option<KernelColumn<NumberKind>>,
     mask: &Mask,
 ) -> KernelResult<TextKind> {
-    eval_ternary(
-        &value,
-        &format,
-        &precision,
-        mask,
-        |value, format, precision| {
-            let precision = bounded_count(
-                *precision,
-                "precision must be finite and between 0 and 1000000",
-            )?
-            .min(100);
-            let selector = format.to_ascii_lowercase();
-            match selector.as_str() {
-                "number" | "decimal" => Ok(render_fixed(*value, precision, false)),
-                "number_with_commas" | "commas" => Ok(render_fixed(*value, precision, true)),
-                "percent" | "%" => {
-                    let percent = *value * 100.0;
-                    Ok(format!("{}%", render_fixed(percent, precision, false)))
-                }
-                "scientific" => Ok(format!("{value:.*e}", precision)),
-                "usd" => Ok(render_currency(*value, precision, "$")),
-                "eur" => Ok(render_currency(*value, precision, "€")),
-                "gbp" => Ok(render_currency(*value, precision, "£")),
-                "jpy" => Ok(render_currency(*value, precision, "¥")),
-                "cny" => Ok(render_currency(*value, precision, "CN¥")),
-                "krw" => Ok(render_currency(*value, precision, "₩")),
-                "inr" => Ok(render_currency(*value, precision, "₹")),
-                "cad" => Ok(render_currency(*value, precision, "CA$")),
-                "aud" => Ok(render_currency(*value, precision, "A$")),
-                "chf" => Ok(render_currency(*value, precision, "CHF ")),
-                _ => Err(EvalError::invalid_value(
-                    Value::Text(format.clone()),
-                    "unsupported number format",
-                )),
+    eval_rows(mask, |row| {
+        let (Some(value), Some(format)) = (value.value(row), format.value(row)) else {
+            return TypedRow::Null;
+        };
+        let precision = match precision.as_ref() {
+            None => None,
+            Some(column) => match column.value(row) {
+                None => return TypedRow::Null,
+                Some(value) => match bounded_count(
+                    *value,
+                    "precision must be finite and between 0 and 1000000",
+                ) {
+                    Ok(value) => Some(value.min(100)),
+                    Err(error) => return TypedRow::Error(error),
+                },
+            },
+        };
+        let selector = format.trim().to_ascii_lowercase();
+        let rendered = match selector.as_str() {
+            "number" | "decimal" => Ok(render_number(*value, precision, false)),
+            "number_with_commas" | "commas" => Ok(render_number(*value, precision, true)),
+            "percent" | "%" => {
+                let percent = *value * 100.0;
+                Ok(format!("{}%", render_number(percent, precision, false)))
             }
-        },
-    )
+            "humanize" => Ok(render_compact(*value, precision)),
+            "scientific" => Ok(format!("{value:.*e}", precision.unwrap_or(10))),
+            "usd" => Ok(render_currency(*value, precision.unwrap_or(2), "$")),
+            "eur" => Ok(render_currency(*value, precision.unwrap_or(2), "€")),
+            "gbp" => Ok(render_currency(*value, precision.unwrap_or(2), "£")),
+            "jpy" => Ok(render_currency(*value, precision.unwrap_or(0), "¥")),
+            "cny" => Ok(render_currency(*value, precision.unwrap_or(2), "CN¥")),
+            "krw" => Ok(render_currency(*value, precision.unwrap_or(0), "₩")),
+            "inr" => Ok(render_currency(*value, precision.unwrap_or(2), "₹")),
+            "cad" => Ok(render_currency(*value, precision.unwrap_or(2), "CA$")),
+            "aud" => Ok(render_currency(*value, precision.unwrap_or(2), "A$")),
+            "chf" => Ok(render_currency(*value, precision.unwrap_or(2), "CHF ")),
+            _ => Err(EvalError::invalid_value(
+                Value::Text(format.clone()),
+                "unsupported number format",
+            )),
+        };
+        rendered
+            .map(TypedRow::Value)
+            .unwrap_or_else(TypedRow::Error)
+    })
+}
+
+fn render_number(value: f64, precision: Option<usize>, grouped: bool) -> String {
+    let mut rendered = render_fixed(value, precision.unwrap_or(10), grouped);
+    if precision.is_none() {
+        trim_fraction_zeros(&mut rendered);
+    }
+    rendered
+}
+
+fn render_compact(value: f64, precision: Option<usize>) -> String {
+    let (scaled, suffix) = [(1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")]
+        .into_iter()
+        .find(|(scale, _)| value.is_finite() && value.abs() >= *scale)
+        .map_or((value, ""), |(scale, suffix)| (value / scale, suffix));
+    let mut rendered = render_fixed(scaled, precision.unwrap_or(1), false);
+    if precision.is_none() {
+        trim_fraction_zeros(&mut rendered);
+    }
+    rendered.push_str(suffix);
+    rendered
+}
+
+fn trim_fraction_zeros(rendered: &mut String) {
+    if rendered.contains('.') {
+        let trimmed_len = rendered.trim_end_matches('0').trim_end_matches('.').len();
+        rendered.truncate(trimmed_len);
+    }
 }
 
 fn render_currency(value: f64, precision: usize, symbol: &str) -> String {
@@ -1083,8 +1129,9 @@ pub(crate) fn eval_format_date<C: BuiltinValueContext>(
 ) -> KernelResult<TextKind> {
     eval_binary(&date, &format, mask, |date, format| {
         validate_date(date, context)?;
-        Ok(local_datetime(date.start, context)?
-            .format(&translate_date_format(format))
+        let local = local_datetime(date.start, context)?;
+        Ok(local
+            .format(&translate_date_format(format, &local))
             .to_string())
     })
 }
@@ -1391,39 +1438,91 @@ fn shift_months(epoch_ms: i64, amount: i64, context: &impl BuiltinValueContext) 
     Some(shifted.timestamp_millis())
 }
 
-fn translate_date_format(format: &str) -> String {
+fn translate_date_format(format: &str, date: &chrono::DateTime<FixedOffset>) -> String {
     const TOKENS: &[(&str, &str)] = &[
         ("YYYY", "%Y"),
         ("MMMM", "%B"),
+        ("DDDo", ""),
+        ("DDDD", "%j"),
+        ("GGGG", "%G"),
+        ("gggg", ""),
+        ("DDD", "%-j"),
         ("MMM", "%b"),
         ("dddd", "%A"),
         ("ddd", "%a"),
+        ("SSS", "%3f"),
+        ("Do", ""),
+        ("Wo", ""),
+        ("wo", ""),
+        ("WW", "%V"),
+        ("ww", ""),
         ("YY", "%y"),
         ("MM", "%m"),
         ("DD", "%d"),
         ("HH", "%H"),
         ("hh", "%I"),
+        ("kk", ""),
         ("mm", "%M"),
         ("ss", "%S"),
-        ("Y", "%Y"),
+        ("ZZ", "%z"),
+        ("dd", ""),
+        ("Y", ""),
         ("M", "%-m"),
         ("D", "%-d"),
+        ("d", "%w"),
+        ("E", "%u"),
+        ("e", "%w"),
         ("H", "%-H"),
         ("h", "%-I"),
+        ("k", ""),
         ("m", "%-M"),
         ("s", "%-S"),
         ("A", "%p"),
         ("a", "%P"),
+        ("W", "%-V"),
+        ("w", ""),
+        ("Q", ""),
+        ("Z", "%:z"),
+        ("X", "%s"),
+        ("x", ""),
     ];
 
     let mut output = String::with_capacity(format.len());
     let mut remaining = format;
     while !remaining.is_empty() {
+        if remaining.starts_with('[')
+            && let Some(end) = remaining.find(']')
+        {
+            output.push_str(&remaining[1..end].replace('%', "%%"));
+            remaining = &remaining[end + 1..];
+            continue;
+        }
         if let Some((token, replacement)) = TOKENS
             .iter()
             .find(|(token, _)| remaining.starts_with(token))
         {
-            output.push_str(replacement);
+            if !replacement.is_empty() {
+                output.push_str(replacement);
+            } else {
+                let (week_year, week) = local_week(date);
+                let rendered = match *token {
+                    "Y" => date.year().to_string(),
+                    "Do" => ordinal(date.day()),
+                    "DDDo" => ordinal(date.ordinal()),
+                    "Wo" => ordinal(date.iso_week().week()),
+                    "wo" => ordinal(week),
+                    "w" => week.to_string(),
+                    "ww" => format!("{week:02}"),
+                    "gggg" => format!("{week_year:04}"),
+                    "Q" => ((date.month0() / 3) + 1).to_string(),
+                    "dd" => date.format("%a").to_string()[..2].to_string(),
+                    "k" => if date.hour() == 0 { 24 } else { date.hour() }.to_string(),
+                    "kk" => format!("{:02}", if date.hour() == 0 { 24 } else { date.hour() }),
+                    "x" => date.timestamp_millis().to_string(),
+                    _ => unreachable!("computed Moment token has a renderer"),
+                };
+                output.push_str(&rendered);
+            }
             remaining = &remaining[token.len()..];
             continue;
         }
@@ -1440,6 +1539,35 @@ fn translate_date_format(format: &str) -> String {
         remaining = &remaining[character.len_utf8()..];
     }
     output
+}
+
+fn ordinal(value: u32) -> String {
+    let suffix = if (11..=13).contains(&(value % 100)) {
+        "th"
+    } else {
+        match value % 10 {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th",
+        }
+    };
+    format!("{value}{suffix}")
+}
+
+fn local_week(date: &chrono::DateTime<FixedOffset>) -> (i32, u32) {
+    // The App's English locale starts weeks on Sunday; its first week contains January 1.
+    let year = date.year();
+    let weekday = date.weekday().num_days_from_sunday();
+    let year_end = NaiveDate::from_ymd_opt(year, 12, 31)
+        .expect("validated calendar year")
+        .ordinal();
+    if date.ordinal() + 6 - weekday > year_end {
+        (year + 1, 1)
+    } else {
+        let jan_weekday = (weekday + 7 - date.ordinal0() % 7) % 7;
+        (year, (date.ordinal0() + jan_weekday) / 7 + 1)
+    }
 }
 
 fn list_index(index: f64, len: usize) -> Option<usize> {
