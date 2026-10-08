@@ -56,25 +56,10 @@ pub fn postfix_capable_builtin_names() -> &'static HashSet<String> {
 /// - semantic inference for member calls
 /// - signature help postfix rendering
 pub fn is_postfix_capable(sig: &FunctionSig) -> bool {
-    // Postfix calls must have a deterministic "first parameter slot" and at least one additional
-    // parameter to be supplied inside `( ... )`.
-    //
-    // Deterministic first slot:
-    // - `head[0]` if head is non-empty
-    // - else `repeat[0]` if repeat is non-empty (repeat_min_groups is 1 in this repo)
-    // - else not postfix-capable (tail-only signatures are excluded by design)
-    if !sig.params.head.is_empty() {
-        return sig.display_params_len() >= 2;
-    }
-    if !sig.params.repeat.is_empty() {
-        // A repeat-only declaration has one logical slot but may require multiple
-        // physical groups. This keeps `concat` postfix-capable after moving from legacy
-        // numbered parameters to `repeat(min = 2)` without making one-group reducers
-        // such as `sum` newly postfix-capable.
-        return sig.display_params_len() >= 2
-            || sig.params.repeat.len() * sig.params.repeat_min_groups >= 2;
-    }
-    false
+    // The receiver fills the first head or repeat slot. It may supply the only
+    // argument (`list.sum()`); ordinary shape/type validation checks the rest.
+    // Zero-argument and tail-only declarations have no deterministic receiver.
+    !sig.params.head.is_empty() || !sig.params.repeat.is_empty()
 }
 
 /// A property available to `prop("Name")` calls and to editor completion.
