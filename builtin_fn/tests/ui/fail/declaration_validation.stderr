@@ -70,12 +70,6 @@ error: fixed parameters cannot be optional when repeat is present
 11 |             optionalHead?: number,
    |             ^^^^^^^^^^^^
 
-error: fixed parameters cannot be optional when repeat is present
-  --> tests/ui/fail/declaration_validation.rs:15:13
-   |
-15 |             tail?: number,
-   |             ^^^^
-
 error: `#[unsupported]` declarations require a doc comment
   --> tests/ui/fail/declaration_validation.rs:19:9
    |

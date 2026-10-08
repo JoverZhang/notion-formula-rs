@@ -1,0 +1,4 @@
+=== INPUT ===
+and(true, not(false)) or false and test("x", "[")
+=== OUTPUT ===
+row-0: true

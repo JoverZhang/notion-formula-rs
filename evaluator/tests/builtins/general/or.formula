@@ -1,0 +1,2 @@
+// @prop "Flag": boolean = [true, false, null]
+or(prop("Flag"), false, true, test("x", "["))

@@ -42,7 +42,7 @@ x?: T                  // An omittable argument, not a claim that all T values a
 T[] / A | B            // List / union; T and U bind within one call
 Ident<T>               // Binding identifier, not an ordinary string argument
 () -> T                // Deferred expression
-(current: T) -> U      // Expression with an implicit binding; callers do not write lambda syntax
+(current: T, index: number) -> U      // Expression with an implicit binding; callers do not write lambda syntax
 repeat(min = n) {...}  // Repeat the whole argument group at least n times; not one list argument
                        // Trailing commas in declarations do not permit them in formula calls
 ```
@@ -53,7 +53,11 @@ repeat(min = n) {...}  // Repeat the whole argument group at least n times; not 
 
 ```builtin
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
-ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
+/// Evaluate conditions in order; skip unselected values. Without else, an unmatched row returns ordinary null.
+ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else?: () -> T) -> T;
+/// Require Boolean/null expressions and short-circuit left to right using the && / || null rules.
+and(repeat(min = 1) { condition: () -> boolean }) -> boolean;
+or(repeat(min = 1) { condition: () -> boolean }) -> boolean;
 
 /// Returns null with no arguments; otherwise checks whether the value is empty.
 /// Return type is inferred by resolve_empty from argument count.
@@ -67,6 +71,9 @@ format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
+/// Bind names sequentially with independent value types; later bindings see and may shadow earlier names.
+/// Infer the result type from the final expression in that lexical scope.
+lets(repeat(min = 1) { var: Ident<any>, value: any }, expr: () -> any) -> any;
 ```
 
 #### empty type inference
@@ -220,13 +227,14 @@ unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
 /// Evaluate each element in input order, preserving list length; a null list argument returns null.
-map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+/// Every callback binds current and zero-based index; nested callbacks shadow and then restore both names.
+map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
 /// Flatten only one level in input order, retaining nulls; a null list argument returns null and an empty list returns [].
 /// flat([[1, empty()], [2]]) → [1, null, 2]; flat([[[]]]) → [[]].
@@ -282,8 +290,7 @@ id() -> string;
 
 ```text
 People currently has no supported functions. These declarations are excluded from callable/completion sets:
-  and / or / not          // Expressed by && / || / not operators
-  lets                    // No heterogeneous sequential binder model
+  not                     // Expressed by the not prefix operator, including not(true)
   link / style / unstyle  // No Link / StyledText types yet
   name / email            // No person-name/email runtime inputs yet
 Unsupported declarations are treated like unknown functions, without a separate unsupported error class.

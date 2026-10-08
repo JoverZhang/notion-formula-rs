@@ -52,16 +52,8 @@ impl ParamShape {
             );
         }
 
-        if !repeat.is_empty()
-            && !tail.is_empty()
-            && let Some(param) = tail.iter().find(|p| p.optional)
-        {
-            panic!(
-                "ParamShape invariant violated: when repeat params exist, tail params must be required for determinism (found optional: {:?})",
-                param
-            );
-        }
-
+        // Optional tail slots are resolved by resolve_repeat_tail_used, which prefers
+        // the largest suffix that leaves a complete repeat group.
         let mut seen_optional = false;
         for param in &tail {
             if seen_optional && !param.optional {
