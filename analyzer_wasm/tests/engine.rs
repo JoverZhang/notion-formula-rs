@@ -83,6 +83,68 @@ fn output(result: &JsValue, id: &str) -> JsValue {
 }
 
 #[wasm_bindgen_test]
+fn required_inputs_is_a_read_only_transitive_query_with_existing_selection_errors() {
+    let mut engine = session(vec![
+        input("Price", dto::ValueType::Number),
+        input("Quantity", dto::ValueType::Number),
+        input("unused", dto::ValueType::Number),
+        formula("Subtotal", r#"prop("Price") * prop("Quantity")"#),
+        formula("Total", r#"prop("Subtotal") + prop("Price")"#),
+        formula("not_ready", r#"prop("Quantity") + true"#),
+    ]);
+    let draft = engine
+        .create_draft(value(&definition("Total", "1")))
+        .unwrap();
+    let inputs = engine
+        .required_inputs(value(&vec!["Total", "not_ready"]))
+        .unwrap();
+    assert_eq!(
+        array(&inputs).to_vec(),
+        vec![JsValue::from_str("Price"), JsValue::from_str("Quantity")]
+    );
+    for (ids, expected) in [
+        (vec![], value(&dto::EvaluateInputError::EmptyFormulaIds)),
+        (
+            vec!["Price"],
+            value(&dto::EvaluateInputError::InvalidFormulaId { id: "Price".into() }),
+        ),
+        (
+            vec!["absent"],
+            value(&dto::EvaluateInputError::InvalidFormulaId {
+                id: "absent".into(),
+            }),
+        ),
+        (
+            vec!["Total", "Total"],
+            value(&dto::EvaluateInputError::DuplicateFormulaId { id: "Total".into() }),
+        ),
+    ] {
+        let error = engine.required_inputs(value(&ids)).unwrap_err();
+        error_code(&error, "EVALUATE_INPUT");
+        assert_eq!(
+            js_sys::JSON::stringify(&field(&field(&error, "payload"), "error")).unwrap(),
+            js_sys::JSON::stringify(&expected).unwrap()
+        );
+    }
+    for malformed in [
+        JsValue::NULL,
+        JsValue::from_str("Total"),
+        value(&vec![1_u32]),
+    ] {
+        invalid_dto(
+            &engine.required_inputs(malformed).unwrap_err(),
+            "required_inputs",
+        );
+    }
+    engine.draft_close(draft);
+    engine.close();
+    error_code(
+        &engine.required_inputs(value(&vec!["Total"])).unwrap_err(),
+        "ENGINE_CLOSED",
+    );
+}
+
+#[wasm_bindgen_test]
 fn strict_schema_and_formula_fields_reject_before_engine_mutations() {
     let malformed = value(&dto::FormulaSchema { properties: vec![] });
     set(&malformed, "extra", &JsValue::from_f64(1.0));

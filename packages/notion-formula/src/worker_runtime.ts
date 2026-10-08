@@ -25,6 +25,7 @@ export interface FormulaSession {
   get_property(id: PropertyId): PropertyState | null;
   get_properties(): PropertyState[];
   get_state(): FormulaEngineState;
+  required_inputs(formulaIds: PropertyId[]): PropertyId[];
   upsert(property: PropertyDefinition): FormulaEngineChangeResult;
   remove(id: PropertyId): FormulaEngineChangeResult | null;
   evaluate(input: EvaluateInput): EvaluateResult;
@@ -83,6 +84,8 @@ export class FormulaWorkerRuntime {
         return session.get_properties();
       case "engine.getState":
         return session.get_state();
+      case "engine.requiredInputs":
+        return session.required_inputs(...request.args);
       case "engine.upsert":
         return session.upsert(...request.args);
       case "engine.remove":

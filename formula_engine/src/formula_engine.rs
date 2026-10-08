@@ -143,6 +143,36 @@ impl FormulaEngine {
         }
     }
 
+    fn required_inputs_impl(
+        &self,
+        formula_ids: &[PropertyId],
+    ) -> Result<Vec<PropertyId>, EvaluateInputError> {
+        crate::validation::validate_formula_ids(formula_ids, |id| {
+            self.inner.dependencies.contains_key(id)
+        })?;
+        let mut inputs = BTreeSet::new();
+        let mut visited = BTreeSet::new();
+        // Visit saved metadata, rather than prepared formulas: NotReady formulas
+        // retain useful references, and an explicit worklist handles cycles and
+        // arbitrarily long formula chains without consuming native stack frames.
+        let mut pending: Vec<_> = formula_ids.iter().collect();
+        while let Some(id) = pending.pop() {
+            if !visited.insert(id) {
+                continue;
+            }
+            match self.inner.definitions.get(id) {
+                Some(PropertyDefinition::Input { .. }) => {
+                    inputs.insert(id.clone());
+                }
+                Some(PropertyDefinition::Formula(_)) => {
+                    pending.extend(self.inner.dependencies[id].iter());
+                }
+                None => {}
+            }
+        }
+        Ok(inputs.into_iter().collect())
+    }
+
     fn upsert_impl(
         &mut self,
         property: PropertyDefinition,
