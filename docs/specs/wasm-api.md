@@ -8,7 +8,7 @@ implementation_status: current
 document_status: stable
 translation_status: synced
 translation_review_model: gpt-6-astra
-last_verified: 2026-10-05
+last_verified: 2026-10-08
 ---
 
 # WASM API and Worker
@@ -40,6 +40,9 @@ import type {
   UpdateExpressionResult,
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
+
+// Quote a formula string with \\, \", \n and \t escapes; preserve other valid Unicode characters.
+export declare function quoteFormulaString(value: string): string;
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
 // Each request snapshots its arguments at enqueue; later mutations cannot change it.
@@ -398,7 +401,14 @@ type Diagnostic = {
   kind: DiagnosticKind; message: string; span: Span;
   line: number; col: number; actions: CodeAction[];
 };
-type Token = { kind: string; text: string; span: Span };
+type Token = {
+  kind: string;
+  /** Original source spelling, including quotes and escapes. */
+  text: string;
+  /** Decoded text for a valid String token, including ""; null for other tokens or invalid escapes. */
+  string_value: string | null;
+  span: Span;
+};
 type AnalyzeResult = {
   diagnostics: Diagnostic[]; tokens: Token[]; output_type: string;
 };
