@@ -60,6 +60,7 @@ class FakeDraft implements FormulaDraftClient {
         {
           kind: "native",
           text: this.definition.expression,
+          string_value: null,
           span: { start: 0, end: this.definition.expression.length },
         },
       ],

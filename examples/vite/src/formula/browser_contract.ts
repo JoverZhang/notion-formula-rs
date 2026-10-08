@@ -1,6 +1,7 @@
 import {
   createFormulaEngineClient,
   FormulaClientError,
+  quoteFormulaString,
   type Column,
   type EvaluateInput,
   type FormulaClientErrorData,
@@ -595,14 +596,64 @@ export async function runFormulaDiagnosticScopes() {
   }
 }
 
+export async function runFormulaStringValues() {
+  const cases = [
+    { value: "", source: '""' },
+    { value: 'quote"slash\\', source: String.raw`"quote\"slash\\"` },
+    { value: "line\nnext\ttab", source: String.raw`"line\nnext\ttab"` },
+    { value: "中文😀", source: '"中文😀"' },
+    { value: "raw\r\0\b\f\u0001", source: '"raw\r\0\b\f\u0001"' },
+  ];
+  const engine = await createFormulaEngineClient({ properties: [] });
+  const roundtrips: { source: string; value: string; utf16End: number }[] = [];
+  try {
+    for (const [index, entry] of cases.entries()) {
+      const source = quoteFormulaString(entry.value);
+      equal(source, entry.source, "Formula quoting uses supported escapes and raw characters");
+      const id = `value-${index}`;
+      const draft = await engine.createDraft({ id, expression: source });
+      const state = await draft.getState();
+      equal(state.diagnostics, [], "Quoted literal is accepted by the real parser");
+      const token = state.tokens[0];
+      equal(token.kind, "String", "Literal token kind");
+      equal(token.text, source, "Literal raw text");
+      equal(token.string_value, entry.value, "Literal decoded value");
+      equal(token.span, { start: 0, end: source.length }, "Literal UTF-16 span");
+      equal(state.tokens[1].string_value, null, "Eof has explicit null");
+      await draft.close();
+      await engine.upsert({ Formula: { id, expression: source } });
+      const result = await engine.evaluate({
+        row_ids: ["row"],
+        columns: new Map(),
+        runtime: { now: 0n, time_zone: "+00:00" },
+        formula_ids: [id],
+      });
+      const formula = result.formulas.get(id);
+      assert(formula && "Ok" in formula && "String" in formula.Ok.column, "String result");
+      equal(formula.Ok.column.String.values, [entry.value], "Real parser evaluation roundtrip");
+      roundtrips.push({ source, value: entry.value, utf16End: token.span.end });
+    }
+    const invalid = await engine.createDraft({ id: "invalid", expression: String.raw`"bad\r"` });
+    const invalidState = await invalid.getState();
+    equal(invalidState.tokens[0].string_value, null, "Invalid escape remains unusable");
+    assert(invalidState.diagnostics.length > 0, "Invalid escape retains diagnostics");
+    await invalid.close();
+    return { roundtrips, invalidEscapeNull: true };
+  } finally {
+    await engine.close();
+  }
+}
+
 declare global {
   interface Window {
     __formula_worker_contract: typeof runFormulaWorkerContract;
     __formula_worker_failures: typeof runFormulaWorkerFailures;
     __formula_diagnostic_scopes: typeof runFormulaDiagnosticScopes;
+    __formula_string_values: typeof runFormulaStringValues;
   }
 }
 
 window.__formula_worker_contract = runFormulaWorkerContract;
 window.__formula_worker_failures = runFormulaWorkerFailures;
 window.__formula_diagnostic_scopes = runFormulaDiagnosticScopes;
+window.__formula_string_values = runFormulaStringValues;

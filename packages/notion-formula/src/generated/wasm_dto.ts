@@ -32,7 +32,15 @@ range: Span,
  */
 new_text: string, };
 
-export type Token = { kind: string, text: string, 
+export type Token = { kind: string, 
+/**
+ * Original source spelling, including quotes and escapes.
+ */
+text: string, 
+/**
+ * Decoded text for a valid String token, including ""; null for other tokens or invalid escapes.
+ */
+string_value: string | null, 
 /**
  * Location in the source text (UTF-16 span).
  */

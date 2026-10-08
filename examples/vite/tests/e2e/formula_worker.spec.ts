@@ -90,6 +90,17 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
+test("SDK quotes strings for the real WASM parser and Worker carries decoded token values", async ({
+  page,
+}, testInfo) => {
+  await page.goto(url);
+  await page.waitForFunction(() => Boolean(window.__formula_string_values));
+  const result = await page.evaluate(() => window.__formula_string_values());
+  expect(result.roundtrips).toHaveLength(5);
+  expect(result.invalidEscapeNull).toBe(true);
+  await recordContract(testInfo, "sdk-string-values.json", result);
+});
+
 test("real module Worker matches the synchronous WASM session contract", async ({
   page,
 }, testInfo) => {
