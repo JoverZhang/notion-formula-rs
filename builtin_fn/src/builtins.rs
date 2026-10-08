@@ -163,17 +163,9 @@ fn date_definitions() -> BuiltinCategory {
         dateSubtract(date: date, amount: number, unit: string) -> date;
         dateBetween(a: date, b: date, unit: string) -> number;
 
-        #[unsupported]
-        /// The semantic type model does not yet represent `DateRange`.
-        dateRange(start: date, end: date) -> DateRange;
-
-        #[unsupported]
-        /// The semantic type model does not yet represent `DateRange`.
-        dateStart(range: DateRange) -> date;
-
-        #[unsupported]
-        /// The semantic type model does not yet represent `DateRange`.
-        dateEnd(range: DateRange) -> date;
+        dateRange(start: date, end: date) -> date;
+        dateStart(date: date) -> date;
+        dateEnd(date: date) -> date;
 
         timestamp(date: date) -> number;
         fromTimestamp(timestamp: number) -> date;

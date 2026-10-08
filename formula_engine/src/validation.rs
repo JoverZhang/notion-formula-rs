@@ -204,6 +204,7 @@ fn column_shape(column: &Column) -> (ColumnKind, usize, usize) {
         Column::String(data) => (ColumnKind::String, data.values.len(), data.validity.len()),
         Column::Boolean(data) => (ColumnKind::Boolean, data.values.len(), data.validity.len()),
         Column::Date(data) => (ColumnKind::Date, data.values.len(), data.validity.len()),
+        Column::DateValue(data) => (ColumnKind::Date, data.values.len(), data.validity.len()),
         Column::List(data) => (ColumnKind::List, data.values.len(), data.validity.len()),
         Column::Union(data) => (ColumnKind::Union, data.values.len(), data.validity.len()),
     }
@@ -238,7 +239,7 @@ fn value_mismatch(ty: &ValueType, value: &Value, path: &mut Vec<usize>) -> Optio
         | (ValueType::Number, Value::Number(_))
         | (ValueType::String, Value::String(_))
         | (ValueType::Boolean, Value::Boolean(_))
-        | (ValueType::Date, Value::Date(_)) => None,
+        | (ValueType::Date, Value::Date(_) | Value::DateValue(_)) => None,
         (ValueType::List(element_type), Value::List(items)) => {
             list_mismatch(element_type, items, path)
         }
@@ -261,7 +262,7 @@ fn accepts(ty: &ValueType, value: &Value) -> bool {
         | (ValueType::Number, Value::Number(_))
         | (ValueType::String, Value::String(_))
         | (ValueType::Boolean, Value::Boolean(_))
-        | (ValueType::Date, Value::Date(_)) => true,
+        | (ValueType::Date, Value::Date(_) | Value::DateValue(_)) => true,
         (ValueType::List(element_type), Value::List(items)) => items.iter().all(|item| {
             item.as_ref()
                 .is_none_or(|value| accepts(element_type, value))
@@ -276,7 +277,7 @@ fn actual_type(value: &Value) -> ValueType {
         Value::Number(_) => ValueType::Number,
         Value::String(_) => ValueType::String,
         Value::Boolean(_) => ValueType::Boolean,
-        Value::Date(_) => ValueType::Date,
+        Value::Date(_) | Value::DateValue(_) => ValueType::Date,
         Value::List(items) => {
             // Null elements contribute no type. Preserve first occurrence order
             // while deduplicating the concrete structures of present elements.

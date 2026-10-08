@@ -327,7 +327,7 @@ impl<'a> Planner<'a> {
             ExecNode::Literal(Value::Number(_)) => AbiKind::Number,
             ExecNode::Literal(Value::Text(_)) => AbiKind::Text,
             ExecNode::Literal(Value::Bool(_)) => AbiKind::Boolean,
-            ExecNode::Literal(Value::Date(_)) => AbiKind::Date,
+            ExecNode::Literal(Value::Date(_) | Value::DateValue(_)) => AbiKind::Date,
             ExecNode::Literal(Value::List(_)) | ExecNode::List(_) => AbiKind::List,
             ExecNode::Input(slot) => self
                 .required_columns

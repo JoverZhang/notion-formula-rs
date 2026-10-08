@@ -63,10 +63,46 @@ pub(crate) fn validate_evaluate_fields(value: &JsValue) -> Result<(), JsValue> {
             if let Some(tag) = tag.as_string()
                 && matches!(
                     tag.as_str(),
-                    "Number" | "String" | "Boolean" | "Date" | "List" | "Union"
+                    "Number" | "String" | "Boolean" | "Date" | "DateValue" | "List" | "Union"
                 )
             {
-                validate_fields(&field(&column, &tag)?, &["values", "validity"])?;
+                let data = field(&column, &tag)?;
+                validate_fields(&data, &["values", "validity"])?;
+                if matches!(tag.as_str(), "DateValue" | "List" | "Union") {
+                    let values = field(&data, "values")?.dyn_into::<Array>()?;
+                    for value in values.iter() {
+                        match tag.as_str() {
+                            "DateValue" => {
+                                validate_fields(&value, &["start", "end", "include_time"])?
+                            }
+                            "List" => validate_list_value_fields(&value)?,
+                            _ => validate_value_fields(&value)?,
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_list_value_fields(value: &JsValue) -> Result<(), JsValue> {
+    for value in value.clone().dyn_into::<Array>()?.iter() {
+        validate_value_fields(&value)?;
+    }
+    Ok(())
+}
+
+fn validate_value_fields(value: &JsValue) -> Result<(), JsValue> {
+    if value.is_object() {
+        for tag in Object::keys(value.unchecked_ref::<Object>()).iter() {
+            match tag.as_string().as_deref() {
+                Some("DateValue") => validate_fields(
+                    &field(value, "DateValue")?,
+                    &["start", "end", "include_time"],
+                )?,
+                Some("List") => validate_list_value_fields(&field(value, "List")?)?,
+                _ => {}
             }
         }
     }
@@ -99,6 +135,21 @@ fn deserialize_u64_bigint<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u64,
         return Err(serde::de::Error::custom("expected bigint"));
     }
     u64::try_from(value).map_err(|_| serde::de::Error::custom("bigint exceeds u64"))
+}
+
+fn deserialize_optional_i64_bigint<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<i64>, D::Error> {
+    let value: wasm_bindgen::JsValue = serde_wasm_bindgen::preserve::deserialize(d)?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    if !value.is_bigint() {
+        return Err(serde::de::Error::custom("expected bigint or null"));
+    }
+    i64::try_from(value)
+        .map(Some)
+        .map_err(|_| serde::de::Error::custom("bigint exceeds i64"))
 }
 
 fn deserialize_date_column<'de, D: serde::Deserializer<'de>>(

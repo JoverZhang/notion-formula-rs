@@ -145,6 +145,133 @@ fn required_inputs_is_a_read_only_transitive_query_with_existing_selection_error
 }
 
 #[wasm_bindgen_test]
+fn rich_dates_keep_exact_bigints_ranges_and_metadata_in_all_transports() {
+    let engine = session(vec![
+        input("date", dto::ValueType::Date),
+        input(
+            "nested",
+            dto::ValueType::List(Box::new(dto::ValueType::Date)),
+        ),
+        input("dynamic", dto::ValueType::Unknown),
+        formula("copy", r#"prop("date")"#),
+        formula("list", r#"prop("nested")"#),
+        formula("union", r#"prop("dynamic")"#),
+        formula("end", r#"dateEnd(prop("date"))"#),
+    ]);
+    let date = dto::DateValue {
+        start: 9_007_199_254_740_993,
+        end: Some(-9_007_199_254_740_993),
+        include_time: false,
+    };
+    let mut request = empty_input(&["copy", "list", "union", "end"]);
+    request.columns = HashMap::from([
+        (
+            "date".into(),
+            dto::Column::DateValue(dto::ColumnData {
+                values: vec![date.clone()],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "nested".into(),
+            dto::Column::List(dto::ColumnData {
+                values: vec![vec![
+                    Some(dto::Value::DateValue(date.clone())),
+                    None,
+                    Some(dto::Value::Date(0)),
+                ]],
+                validity: vec![true],
+            }),
+        ),
+        (
+            "dynamic".into(),
+            dto::Column::Union(dto::ColumnData {
+                values: vec![dto::Value::DateValue(date)],
+                validity: vec![true],
+            }),
+        ),
+    ]);
+    let result = engine.evaluate(value(&request)).unwrap();
+    for id in ["copy", "union"] {
+        let column = field(&output(&result, id), "column");
+        let date = if id == "copy" {
+            array(&field(&field(&column, "DateValue"), "values")).get(0)
+        } else {
+            field(
+                &array(&field(&field(&column, "Union"), "values")).get(0),
+                "DateValue",
+            )
+        };
+        assert_eq!(field(&date, "start"), value(&9_007_199_254_740_993_i64));
+        assert_eq!(field(&date, "end"), value(&-9_007_199_254_740_993_i64));
+        assert_eq!(field(&date, "include_time"), JsValue::FALSE);
+    }
+    let nested = array(&field(
+        &field(&field(&output(&result, "list"), "column"), "List"),
+        "values",
+    ))
+    .get(0);
+    let nested = array(&nested);
+    assert_eq!(
+        field(&field(&nested.get(0), "DateValue"), "end"),
+        value(&-9_007_199_254_740_993_i64)
+    );
+    assert!(nested.get(1).is_null());
+    assert_eq!(field(&nested.get(2), "Date"), value(&0_i64));
+    assert_eq!(array(&field(&output(&result, "end"), "errors")).length(), 1);
+    for (name, replacement) in [
+        ("start", JsValue::from_f64(1.0)),
+        ("start", JsValue::NULL),
+        ("start", JsValue::from_str("9007199254740993")),
+        ("start", value(&u64::MAX)),
+        ("end", JsValue::from_f64(1.0)),
+        ("end", JsValue::UNDEFINED),
+        ("end", value(&u64::MAX)),
+        ("include_time", JsValue::from_f64(1.0)),
+        ("include_time", JsValue::from_str("false")),
+        ("surplus", JsValue::TRUE),
+    ] {
+        let malformed = value(&request);
+        let columns: Map = field(&malformed, "columns").dyn_into().unwrap();
+        let date = array(&field(
+            &field(&columns.get(&JsValue::from_str("date")), "DateValue"),
+            "values",
+        ))
+        .get(0);
+        set(&date, name, &replacement);
+        invalid_dto(
+            &engine
+                .evaluate(malformed)
+                .expect_err(&format!("{name}: {replacement:?}")),
+            "evaluate",
+        );
+    }
+    for name in ["start", "end", "include_time"] {
+        let malformed = value(&request);
+        let columns: Map = field(&malformed, "columns").dyn_into().unwrap();
+        let date = array(&field(
+            &field(&columns.get(&JsValue::from_str("date")), "DateValue"),
+            "values",
+        ))
+        .get(0);
+        Reflect::delete_property(date.unchecked_ref(), &JsValue::from_str(name)).unwrap();
+        invalid_dto(&engine.evaluate(malformed).expect_err(name), "evaluate");
+    }
+    for name in ["nested", "dynamic"] {
+        let malformed = value(&request);
+        let columns: Map = field(&malformed, "columns").dyn_into().unwrap();
+        let column = columns.get(&JsValue::from_str(name));
+        let date = if name == "nested" {
+            array(&array(&field(&field(&column, "List"), "values")).get(0)).get(0)
+        } else {
+            array(&field(&field(&column, "Union"), "values")).get(0)
+        };
+        set(&field(&date, "DateValue"), "surplus", &JsValue::TRUE);
+        invalid_dto(&engine.evaluate(malformed).expect_err(name), "evaluate");
+    }
+}
+
+#[wasm_bindgen_test]
 fn strict_schema_and_formula_fields_reject_before_engine_mutations() {
     let malformed = value(&dto::FormulaSchema { properties: vec![] });
     set(&malformed, "extra", &JsValue::from_f64(1.0));

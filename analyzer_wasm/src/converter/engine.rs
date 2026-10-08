@@ -118,6 +118,26 @@ impl From<rust::FormulaEngineChangeResult> for js::FormulaEngineChangeResult {
     }
 }
 
+impl From<js::DateValue> for rust::DateValue {
+    fn from(value: js::DateValue) -> Self {
+        Self {
+            start: value.start,
+            end: value.end,
+            include_time: value.include_time,
+        }
+    }
+}
+
+impl From<rust::DateValue> for js::DateValue {
+    fn from(value: rust::DateValue) -> Self {
+        Self {
+            start: value.start,
+            end: value.end,
+            include_time: value.include_time,
+        }
+    }
+}
+
 impl From<js::Value> for rust::Value {
     fn from(value: js::Value) -> Self {
         match value {
@@ -125,6 +145,7 @@ impl From<js::Value> for rust::Value {
             js::Value::String(value) => Self::String(value),
             js::Value::Boolean(value) => Self::Boolean(value),
             js::Value::Date(value) => Self::Date(value),
+            js::Value::DateValue(value) => Self::DateValue(value.into()),
             js::Value::List(values) => {
                 Self::List(values.into_iter().map(|v| v.map(Into::into)).collect())
             }
@@ -139,6 +160,7 @@ impl From<rust::Value> for js::Value {
             rust::Value::String(value) => Self::String(value),
             rust::Value::Boolean(value) => Self::Boolean(value),
             rust::Value::Date(value) => Self::Date(value),
+            rust::Value::DateValue(value) => Self::DateValue(value.into()),
             rust::Value::List(values) => {
                 Self::List(values.into_iter().map(|v| v.map(Into::into)).collect())
             }
@@ -167,6 +189,7 @@ impl From<js::Column> for rust::Column {
             js::Column::String(column) => Self::String(native_column(column, |v| v)),
             js::Column::Boolean(column) => Self::Boolean(native_column(column, |v| v)),
             js::Column::Date(column) => Self::Date(native_column(column, |v| v)),
+            js::Column::DateValue(column) => Self::DateValue(native_column(column, Into::into)),
             js::Column::List(column) => Self::List(native_column(column, |v| {
                 v.into_iter().map(|v| v.map(Into::into)).collect()
             })),
@@ -182,6 +205,7 @@ impl From<rust::Column> for js::Column {
             rust::Column::String(column) => Self::String(js_column(column, |v| v)),
             rust::Column::Boolean(column) => Self::Boolean(js_column(column, |v| v)),
             rust::Column::Date(column) => Self::Date(js_column(column, |v| v)),
+            rust::Column::DateValue(column) => Self::DateValue(js_column(column, Into::into)),
             rust::Column::List(column) => Self::List(js_column(column, |v| {
                 v.into_iter().map(|v| v.map(Into::into)).collect()
             })),

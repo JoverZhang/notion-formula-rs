@@ -69,6 +69,19 @@ pub enum ValueType {
 
 **Current runtime value types**
 
+```rust out=evaluator/src/core/date_value.h.rs
+/// Date metadata shared by Evaluator and Engine; timestamps are UTC Unix milliseconds.
+/// A missing end denotes a single date. Endpoints are preserved, including reversed ranges.
+/// include_time controls format() display and dateBetween's midnight normalization, not stored timestamps.
+/// Like legacy Date, unrestricted i64 endpoints pass Input validation; date operations check their range.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DateValue {
+    pub start: i64,
+    pub end: Option<i64>,
+    pub include_time: bool,
+}
+```
+
 ```rust out=formula_engine/src/evaluation.h.rs
 /// Columnar data uses a bitmap to mark null positions.
 #[derive(Clone, Debug, PartialEq)]
@@ -76,7 +89,11 @@ pub enum Column {
     Number(ColumnData<f64>),
     String(ColumnData<String>),
     Boolean(ColumnData<bool>),
+    /// Legacy storage; output uses this form when no present row needs metadata, including zero-row and all-null results.
     Date(ColumnData<i64>),
+    /// Same declared type and column kind as Date, with lossless date metadata.
+    /// Output uses this form if any present row has an end or include_time=false; legacy rows become end=None, include_time=true.
+    DateValue(ColumnData<DateValue>),
     List(ColumnData<Vec<Option<Value>>>),
     /// Carries Union or Unknown; each non-null value retains its concrete type.
     Union(ColumnData<Value>),
@@ -99,6 +116,8 @@ pub enum Value {
     Number(f64), String(String), Boolean(bool),
     /// UTC Unix timestamp in milliseconds.
     Date(i64),
+    /// Same semantic type as Date; legacy Date means end=None and include_time=true.
+    DateValue(DateValue),
     /// An element None means that position has no value; a null list, an empty list, and a list with null elements differ.
     List(Vec<Option<Value>>),
 }
@@ -133,7 +152,7 @@ fn accepts(ty: &ValueType, value: Option<&Value>) -> bool {
     match (ty, value) {
         (T::Unknown, _) => true,
         (T::Number, V::Number(_)) | (T::String, V::String(_))
-        | (T::Boolean, V::Boolean(_)) | (T::Date, V::Date(_)) => true,
+        | (T::Boolean, V::Boolean(_)) | (T::Date, V::Date(_) | V::DateValue(_)) => true,
         (T::List(t), V::List(items)) => items.iter().all(|v| accepts(t, v.as_ref())),
         (T::Union(ts), v) => ts.iter().any(|t| accepts(t, Some(v))),
         _ => false,
@@ -325,7 +344,7 @@ pub enum RuntimeError {
         text: String,
     },
     /// UTC or offset-adjusted local time used or produced by a date operation is outside Gregorian years 0001–9999.
-    /// Out-of-range Date input values pass type validation; using them in a date operation produces this row error.
+    /// Out-of-range Date / DateValue input endpoints pass type validation and copying; date operations check both endpoints and produce this row error.
     DateOutOfRange,
 }
 /// Returned when a formula cannot begin evaluation; see RowError for row evaluation failures.

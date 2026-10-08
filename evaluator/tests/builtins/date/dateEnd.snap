@@ -1,0 +1,6 @@
+=== INPUT ===
+// @runtime = "2026-09-24T18:00:00+08:00"
+
+dateEnd(dateRange(parseDate("2026-09-24"), parseDate("2026-09-26")))
+=== OUTPUT ===
+row-0: date_value(start=1790352000000, end=None, include_time=false)
