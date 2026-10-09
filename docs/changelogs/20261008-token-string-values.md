@@ -1,35 +1,33 @@
 ---
 doc_id: changelog.20261008-token-string-values
-title: "Expose decoded string token values"
+title: "Add SDK formula string codec"
 language: en
 source_language: en
 counterpart: ./20261008-token-string-values.zh-CN.md
 implementation_status: historical
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 ---
 
-# Expose decoded string token values
+# Add SDK formula string codec
 
 [简体中文](20261008-token-string-values.zh-CN.md)
 
 - Type: Added
-- Component: Analyzer, WASM API, Browser SDK
+- Component: Browser SDK, Vite editor
 
 ## Summary
 
-Native tokens expose `Token::string_value()`. WASM tokens include `string_value` for valid strings,
-including empty strings; other tokens and invalid escapes return `null`.
-The SDK exports `quoteFormulaString` for writing formula strings. Vite property chips use decoded
-values and exclude member calls and incomplete property calls.
+The SDK exports synchronous pure functions `decodeFormulaString` and `quoteFormulaString`.
+Decoding accepts a complete double-quoted formula literal, including the empty string, with
+`\\`, `\"`, `\n` and `\t` escapes; invalid quotes or escapes return `null`.
+Vite property chips decode raw token text and exclude member calls and incomplete property calls.
 
 ## Compatibility notes
 
-Raw token spelling, `kind`, and byte/UTF-16 spans are unchanged. Code constructing WASM token DTOs
-must provide the new required `string_value: string | null` field.
+No breaking changes. WASM Token DTOs retain `kind`, raw `text`, and UTF-16 `span`.
 
 ## Links
 
-- [Lexical contract](../specs/formula-language.md#lexical-structure)
 - [WASM and SDK contract](../specs/wasm-api.md)

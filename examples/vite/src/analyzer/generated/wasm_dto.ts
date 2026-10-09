@@ -62,15 +62,7 @@ col: number,
  */
 actions: Array<CodeAction>, };
 
-export type Token = { kind: string, 
-/**
- * Original source spelling, including quotes and escapes.
- */
-text: string, 
-/**
- * Decoded text for a valid String token, including ""; null for other tokens or invalid escapes.
- */
-string_value: string | null, 
+export type Token = { kind: string, text: string, 
 /**
  * Location in the source text (UTF-16 span).
  */

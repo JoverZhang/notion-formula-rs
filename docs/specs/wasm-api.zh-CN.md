@@ -7,7 +7,7 @@ counterpart: ./wasm-api.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 ---
 
 # WASM API 与 Worker
@@ -40,7 +40,13 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
-// 为公式字符串加上引号，转义 \\、\"、\n 和 \t；保留其他有效 Unicode 字符。
+// 纯同步函数：解码一个完整的双引号公式字面量，包括 ""。
+// 仅接受 \\、\"、\n 和 \t 转义；引号或转义无效时返回 null。
+// 保留其他有效 Unicode 字符，包括原始控制字符。
+export declare function decodeFormulaString(literal: string): string | null;
+
+// 纯同步函数：为公式字符串加上引号，转义 \\、\"、\n 和 \t。
+// 保留其他有效 Unicode 字符，包括原始控制字符。
 export declare function quoteFormulaString(value: string): string;
 
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
@@ -403,8 +409,6 @@ type Token = {
   kind: string;
   /** 原始源码拼写，包含引号和转义序列。 */
   text: string;
-  /** 有效 String token 解码后的文本，包括 ""；其他 token 或无效转义为 null。 */
-  string_value: string | null;
   span: Span;
 };
 type AnalyzeResult = {
