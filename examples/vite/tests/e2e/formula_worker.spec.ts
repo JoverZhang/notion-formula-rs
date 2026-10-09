@@ -96,10 +96,16 @@ test("SDK string codec matches native evaluation and Worker tokens retain only r
   await page.goto(url);
   await page.waitForFunction(() => Boolean(window.__formula_string_codec));
   const result = await page.evaluate(() => window.__formula_string_codec());
-  expect(result.roundtrips).toHaveLength(21);
+  expect(result.roundtrips).toHaveLength(13);
   expect(result.rejected).toHaveLength(10);
+  expect(result.lexicalRejected).toHaveLength(16);
+  expect(result.incompleteCall.tokens.map((token) => token.kind)).toEqual([
+    "Ident",
+    "OpenParen",
+    "String",
+    "Eof",
+  ]);
   expect(result.propertyRoundtrips).toEqual([
-    { source: String.raw`prop("\q")`, propertyId: "q", value: 41 },
     { source: String.raw`prop("\\q")`, propertyId: "\\q", value: 73 },
     { source: 'prop("q")', propertyId: "q", value: 41 },
   ]);

@@ -45,9 +45,9 @@ import type { FormulaWorker } from "./rpc.js";
 // a"b -> "a\"b"；空字符串 -> ""。
 export declare function encodeFormulaString(value: string): string;
 
-// 纯同步函数；输入为词法分析器产出的一个完整 String token.text。
-// 只解码一次：\n -> 换行，\t -> tab；其他转义产生其后的字符本身。
-// "a\"b" -> a"b；"" -> 空字符串；"\q" -> q。保留 Unicode 和原始控制字符。
+// 纯同步函数；输入为词法分析器产出的一个完整、有效的 String token.text。
+// 只解码一次：\n -> 换行，\t -> tab，\" -> 双引号，\\ -> 反斜杠。
+// "a\"b" -> a"b；"" -> 空字符串。保留原始 Unicode 和控制字符。
 export declare function decodeFormulaString(literal: string): string;
 
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。

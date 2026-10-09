@@ -27,9 +27,9 @@ import type { FormulaWorker } from "./rpc.js";
 // a"b -> "a\"b"; empty -> "".
 export declare function encodeFormulaString(value: string): string;
 
-// Pure, synchronous; input is one complete String token.text from the lexer.
-// Decode once: \n -> newline, \t -> tab; any other escape yields its next character.
-// "a\"b" -> a"b; "" -> empty; "\q" -> q. Preserve Unicode and raw controls.
+// Pure, synchronous; input is one complete, valid String token.text from the lexer.
+// Decode once: \n -> newline, \t -> tab, \" -> double quote, \\ -> backslash.
+// "a\"b" -> a"b; "" -> empty. Preserve raw Unicode and control characters.
 export declare function decodeFormulaString(literal: string): string;
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
