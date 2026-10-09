@@ -18,8 +18,8 @@ pub struct LexOutput {
 /// - Numbers: integers, floating-point decimals, and scientific notation.
 ///   Dot is consumed as decimal only when followed by a digit (`3.14` is one token,
 ///   `3.method()` stays as three tokens: `3`, `.`, `method`).
-/// - Strings: double-quoted with escapes: `\n`, `\t`, `\"`, `\\`.
-///   Invalid escapes emit a diagnostic but are kept verbatim.
+/// - Strings: double-quoted; a backslash escapes the next Unicode scalar.
+///   Token text retains the original quotes and escapes without decoding.
 /// - Identifiers: `_` or Unicode letter (`is_alphabetic`), followed by `_` or
 ///   Unicode alphanumeric (`is_alphanumeric`).
 pub fn lex(input: &str) -> LexOutput {
@@ -204,30 +204,12 @@ pub fn lex(input: &str) -> LexOutput {
             ']' => TokenKind::CloseBracket,
 
             '"' => {
-                // Double-quoted string with escape support.
-                // Recognised escapes: \n, \t, \", \\
-                // Invalid escapes (e.g. \x) emit a diagnostic but are kept verbatim.
                 let mut end: Option<usize> = None;
-                let mut has_invalid_escape = false;
-                let mut invalid_escape_spans: Vec<Span> = Vec::new();
 
                 while let Some((i, c)) = iter.next() {
                     if c == '\\' {
-                        // Consume the next character as part of the escape.
-                        if let Some((esc_i, esc_c)) = iter.next() {
-                            match esc_c {
-                                'n' | 't' | '"' | '\\' => {
-                                    // Valid escape -- keep going.
-                                }
-                                _ => {
-                                    has_invalid_escape = true;
-                                    invalid_escape_spans.push(Span {
-                                        start: i as u32,
-                                        end: (esc_i + esc_c.len_utf8()) as u32,
-                                    });
-                                }
-                            }
-                        } else {
+                        // An escaped quote cannot terminate the literal.
+                        if iter.next().is_none() {
                             // Backslash at end of input -- unterminated string.
                             break;
                         }
@@ -252,16 +234,6 @@ pub fn lex(input: &str) -> LexOutput {
                     }
                 };
 
-                for esc_span in invalid_escape_spans {
-                    diagnostics.push(make_error(
-                        esc_span,
-                        format!(
-                            "invalid escape sequence '{}'",
-                            &input[esc_span.start as usize..esc_span.end as usize]
-                        ),
-                    ));
-                }
-
                 tokens.push(Token {
                     kind: TokenKind::Literal(Lit {
                         kind: LitKind::String,
@@ -274,7 +246,6 @@ pub fn lex(input: &str) -> LexOutput {
                         end: end as u32,
                     },
                 });
-                let _ = has_invalid_escape;
                 continue;
             }
 
