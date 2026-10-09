@@ -90,15 +90,17 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-test("SDK quotes strings for the real WASM parser and Worker carries decoded token values", async ({
+test("SDK string codec matches native evaluation and Worker tokens retain only raw fields", async ({
   page,
 }, testInfo) => {
   await page.goto(url);
-  await page.waitForFunction(() => Boolean(window.__formula_string_values));
-  const result = await page.evaluate(() => window.__formula_string_values());
-  expect(result.roundtrips).toHaveLength(5);
-  expect(result.invalidEscapeNull).toBe(true);
-  await recordContract(testInfo, "sdk-string-values.json", result);
+  await page.waitForFunction(() => Boolean(window.__formula_string_codec));
+  const result = await page.evaluate(() => window.__formula_string_codec());
+  expect(result.roundtrips).toHaveLength(10);
+  expect(result.rejected).toHaveLength(15);
+  expect(result.synchronous).toBe(true);
+  expect(result.rawTokenFields).toBe(true);
+  await recordContract(testInfo, "sdk-string-codec.json", result);
 });
 
 test("real module Worker matches the synchronous WASM session contract", async ({

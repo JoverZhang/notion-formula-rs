@@ -128,21 +128,6 @@ pub struct Token {
 }
 
 impl Token {
-    /// Decoded text for a valid String token, including `Some("")`.
-    /// Returns `None` for other tokens or invalid escapes; raw spelling and span are unchanged.
-    pub fn string_value(&self) -> Option<String> {
-        let TokenKind::Literal(Lit {
-            kind: LitKind::String,
-            symbol,
-        }) = &self.kind
-        else {
-            return None;
-        };
-        let inner = symbol.text.strip_prefix('"')?.strip_suffix('"')?;
-        let (value, valid) = crate::string::decode_string_content(inner);
-        valid.then_some(value)
-    }
-
     pub fn can_begin_expr(&self) -> bool {
         matches!(
             self.kind,

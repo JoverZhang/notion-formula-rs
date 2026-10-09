@@ -114,10 +114,7 @@ pub struct Diagnostic {
 #[derive(Serialize, TS)]
 pub struct Token {
     pub kind: String,
-    /// Original source spelling, including quotes and escapes.
     pub text: String,
-    /// Decoded text for a valid String token, including ""; null for other tokens or invalid escapes.
-    pub string_value: Option<String>,
     /// Location in the source text (UTF-16 span).
     pub span: Span,
 }

@@ -38,7 +38,6 @@ pub(crate) fn token_view(source: &str, token: &ByteToken) -> Token {
     Token {
         kind: token_kind_string(&token.kind).to_string(),
         text,
-        string_value: token.string_value(),
         span: span_dto(source, token.span),
     }
 }

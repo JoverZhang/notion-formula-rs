@@ -1,5 +1,6 @@
 import {
   createFormulaEngineClient,
+  decodeFormulaString,
   FormulaClientError,
   quoteFormulaString,
   type Column,
@@ -500,20 +501,54 @@ export async function runFormulaDiagnosticScopes() {
   }
 }
 
-export async function runFormulaStringValues() {
+export async function runFormulaStringCodec() {
   const cases = [
+    { value: "plain", source: '"plain"' },
     { value: "", source: '""' },
-    { value: 'quote"slash\\', source: String.raw`"quote\"slash\\"` },
-    { value: "line\nnext\ttab", source: String.raw`"line\nnext\ttab"` },
+    { value: "\n", source: String.raw`"\n"` },
+    { value: "\t", source: String.raw`"\t"` },
+    { value: '"', source: String.raw`"\""` },
+    { value: "\\", source: String.raw`"\\"` },
+    { value: 'line\nnext\tquote"slash\\', source: String.raw`"line\nnext\tquote\"slash\\"` },
     { value: "中文😀", source: '"中文😀"' },
     { value: "raw\r\0\b\f\u0001", source: '"raw\r\0\b\f\u0001"' },
   ];
+  // The codec is available synchronously before any Worker/WASM initialization.
+  for (const entry of cases) {
+    equal(decodeFormulaString(entry.source), entry.value, "Synchronous SDK decoding");
+    equal(quoteFormulaString(entry.value), entry.source, "Formula quoting");
+  }
+  const rawControls = '"raw\n\t\r\0\b\f\u0001"';
+  equal(decodeFormulaString(rawControls), "raw\n\t\r\0\b\f\u0001", "Raw control decoding");
+  const invalidLiterals = [
+    "",
+    "1",
+    'missing"',
+    '"missing',
+    "'single'",
+    '"trailing' + "\\",
+    String.raw`"escaped\"`,
+    '"unescaped"quote"',
+    '"trailing"text',
+    String.raw`"bad\q"`,
+    String.raw`"bad\r"`,
+    String.raw`"bad\u0000"`,
+    String.raw`"bad\b"`,
+    String.raw`"bad\f"`,
+    String.raw`"bad\0"`,
+  ];
+  for (const source of invalidLiterals)
+    equal(decodeFormulaString(source), null, "Invalid formula literal");
+
   const engine = await createFormulaEngineClient({ properties: [] });
   const roundtrips: { source: string; value: string; utf16End: number }[] = [];
+  const rejected: { source: string; diagnosticCount: number }[] = [];
   try {
-    for (const [index, entry] of cases.entries()) {
-      const source = quoteFormulaString(entry.value);
-      equal(source, entry.source, "Formula quoting uses supported escapes and raw characters");
+    for (const [index, entry] of [
+      ...cases,
+      { value: "raw\n\t\r\0\b\f\u0001", source: rawControls },
+    ].entries()) {
+      const source = entry.source;
       const id = `value-${index}`;
       const draft = await engine.createDraft({ id, expression: source });
       const state = await draft.getState();
@@ -521,9 +556,10 @@ export async function runFormulaStringValues() {
       const token = state.tokens[0];
       equal(token.kind, "String", "Literal token kind");
       equal(token.text, source, "Literal raw text");
-      equal(token.string_value, entry.value, "Literal decoded value");
       equal(token.span, { start: 0, end: source.length }, "Literal UTF-16 span");
-      equal(state.tokens[1].string_value, null, "Eof has explicit null");
+      for (const token of state.tokens)
+        equal(Object.keys(token).sort(), ["kind", "span", "text"], "Raw Token DTO fields");
+      equal(decodeFormulaString(token.text), entry.value, "Decode actual Worker token text");
       await draft.close();
       await engine.upsert({ Formula: { id, expression: source } });
       const result = await engine.evaluate({
@@ -535,14 +571,24 @@ export async function runFormulaStringValues() {
       const formula = result.formulas.get(id);
       assert(formula && "Ok" in formula && "String" in formula.Ok.column, "String result");
       equal(formula.Ok.column.String.values, [entry.value], "Real parser evaluation roundtrip");
+      equal(
+        decodeFormulaString(source),
+        formula.Ok.column.String.values[0],
+        "SDK decoding matches native WASM evaluation",
+      );
       roundtrips.push({ source, value: entry.value, utf16End: token.span.end });
     }
-    const invalid = await engine.createDraft({ id: "invalid", expression: String.raw`"bad\r"` });
-    const invalidState = await invalid.getState();
-    equal(invalidState.tokens[0].string_value, null, "Invalid escape remains unusable");
-    assert(invalidState.diagnostics.length > 0, "Invalid escape retains diagnostics");
-    await invalid.close();
-    return { roundtrips, invalidEscapeNull: true };
+    for (const source of invalidLiterals) {
+      const draft = await engine.createDraft({ id: "invalid", expression: source });
+      const state = await draft.getState();
+      for (const token of state.tokens)
+        equal(Object.keys(token).sort(), ["kind", "span", "text"], "Invalid Token DTO fields");
+      if (source !== "1")
+        assert(state.diagnostics.length > 0, "Invalid syntax retains diagnostics");
+      rejected.push({ source, diagnosticCount: state.diagnostics.length });
+      await draft.close();
+    }
+    return { roundtrips, rejected, synchronous: true, rawTokenFields: true };
   } finally {
     await engine.close();
   }
@@ -553,11 +599,11 @@ declare global {
     __formula_worker_contract: typeof runFormulaWorkerContract;
     __formula_worker_failures: typeof runFormulaWorkerFailures;
     __formula_diagnostic_scopes: typeof runFormulaDiagnosticScopes;
-    __formula_string_values: typeof runFormulaStringValues;
+    __formula_string_codec: typeof runFormulaStringCodec;
   }
 }
 
 window.__formula_worker_contract = runFormulaWorkerContract;
 window.__formula_worker_failures = runFormulaWorkerFailures;
 window.__formula_diagnostic_scopes = runFormulaDiagnosticScopes;
-window.__formula_string_values = runFormulaStringValues;
+window.__formula_string_codec = runFormulaStringCodec;

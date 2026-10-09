@@ -8,7 +8,7 @@ implementation_status: current
 document_status: stable
 translation_status: synced
 translation_review_model: gpt-6-astra
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 ---
 
 # WASM API and Worker
@@ -41,7 +41,13 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
-// Quote a formula string with \\, \", \n and \t escapes; preserve other valid Unicode characters.
+// Pure, synchronous: decode one complete double-quoted formula literal, including "".
+// Accept only \\, \", \n and \t escapes; invalid quotes or escapes return null.
+// Preserve other valid Unicode characters, including raw controls.
+export declare function decodeFormulaString(literal: string): string | null;
+
+// Pure, synchronous: quote a formula string with \\, \", \n and \t escapes.
+// Preserve other valid Unicode characters, including raw controls.
 export declare function quoteFormulaString(value: string): string;
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
@@ -383,8 +389,6 @@ type Token = {
   kind: string;
   /** Original source spelling, including quotes and escapes. */
   text: string;
-  /** Decoded text for a valid String token, including ""; null for other tokens or invalid escapes. */
-  string_value: string | null;
   span: Span;
 };
 type AnalyzeResult = {

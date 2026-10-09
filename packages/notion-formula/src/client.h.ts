@@ -22,7 +22,13 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
-// Quote a formula string with \\, \", \n and \t escapes; preserve other valid Unicode characters.
+// Pure, synchronous: decode one complete double-quoted formula literal, including "".
+// Accept only \\, \", \n and \t escapes; invalid quotes or escapes return null.
+// Preserve other valid Unicode characters, including raw controls.
+export declare function decodeFormulaString(literal: string): string | null;
+
+// Pure, synchronous: quote a formula string with \\, \", \n and \t escapes.
+// Preserve other valid Unicode characters, including raw controls.
 export declare function quoteFormulaString(value: string): string;
 
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
