@@ -11,7 +11,6 @@ mod lexer;
 mod parser;
 mod source_map;
 mod span;
-mod string;
 mod tests;
 mod text_edit;
 

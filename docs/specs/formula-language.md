@@ -7,7 +7,7 @@ counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-08
+last_verified: 2026-10-01
 ---
 
 # Formula Grammar and Evaluation Rules
@@ -87,11 +87,6 @@ pub struct Span {
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
-}
-
-impl Token {
-    /// Decoded text for a valid String token, including Some(""); None for other tokens or invalid escapes.
-    pub fn string_value(&self) -> Option<String>;
 }
 
 pub enum TokenKind {

@@ -1,6 +1,6 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import type { Token as FormulaToken } from "@notion-formula/sdk";
+import { decodeFormulaString, type Token as FormulaToken } from "@notion-formula/sdk";
 
 export type Token = FormulaToken;
 
@@ -78,8 +78,8 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     const stringIndex = nextNonTrivia(sortedTokens, openIndex + 1);
     const stringToken = sortedTokens[stringIndex];
     if (!stringToken || stringToken.kind !== "String") continue;
-    const argValue = stringToken.string_value;
-    if (typeof argValue !== "string") continue;
+    const argValue = decodeFormulaString(stringToken.text);
+    if (argValue === null) continue;
 
     const closeIndex = nextNonTrivia(sortedTokens, stringIndex + 1);
     const closeParen = sortedTokens[closeIndex];

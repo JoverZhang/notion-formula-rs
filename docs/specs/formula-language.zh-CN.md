@@ -7,7 +7,7 @@ counterpart: ./formula-language.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-08
+last_verified: 2026-10-01
 ---
 
 # 公式文法与求值规则
@@ -87,11 +87,6 @@ pub struct Span {
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
-}
-
-impl Token {
-    /// 返回有效 String token 解码后的文本，包括 Some("")；其他 token 或无效转义返回 None。
-    pub fn string_value(&self) -> Option<String>;
 }
 
 pub enum TokenKind {
