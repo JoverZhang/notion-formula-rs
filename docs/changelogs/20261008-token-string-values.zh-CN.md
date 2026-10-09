@@ -15,19 +15,19 @@ last_verified: 2026-10-09
 [English](20261008-token-string-values.md)
 
 - Type: Added
-- Component: Browser SDK、Vite 编辑器
+- Component: Analyzer、Browser SDK、Vite 编辑器
 
 ## Summary
 
 SDK 导出纯同步函数 `encodeFormulaString` 和 `decodeFormulaString`。
 编码为值加上双引号，并转义反斜杠、双引号、换行和 tab。
-解码接受一个完整 String token 的原始文本，包括空字符串，只解码一次：
-`\n` 变为换行，`\t` 变为 tab，其他转义产生其后的字符本身。
+解码接受一个完整、有效的 String token 的原始文本，包括空字符串，
+只解码一次 `\\`、`\"`、`\n` 和 `\t`。
 Vite 字段标签解码 token 的原始文本，排除成员调用和残缺的字段调用。
 
 ## Compatibility notes
 
-接受 `\q` 等原样字符转义，`\q` 解码为 `q`。
+遇到非法转义时，词法扫描停止，不生成该 String token，保留此前的 token。
 WASM Token DTO 保留 `kind`、原始 `text` 和 UTF-16 `span`。
 
 ## Links

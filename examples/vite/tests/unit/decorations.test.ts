@@ -55,14 +55,14 @@ describe("computePropChips", () => {
     });
   });
 
-  it("keeps empty and identity-escaped names and rejects incomplete calls", () => {
+  it("keeps empty and backslash names and rejects incomplete calls", () => {
     const emptySource = 'prop("")';
     expect(computePropChips(emptySource, propertyTokens(emptySource, '""'))[0].argValue).toBe("");
-    const identitySource = String.raw`prop("bad\q")`;
+    const backslashSource = String.raw`prop("bad\\q")`;
     expect(
-      computePropChips(identitySource, propertyTokens(identitySource, String.raw`"bad\q"`))[0]
+      computePropChips(backslashSource, propertyTokens(backslashSource, String.raw`"bad\\q"`))[0]
         .argValue,
-    ).toBe("badq");
+    ).toBe(String.raw`bad\q`);
     const tokens = propertyTokens('prop("Title")', '"Title"');
     expect(computePropChips('prop("Title"', tokens.slice(0, 3))).toEqual([]);
   });

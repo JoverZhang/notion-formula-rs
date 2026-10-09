@@ -44,8 +44,8 @@ digits      = digit, { digit } ;
 digit       = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 string      = '"', { string-char | escape }, '"' ;
 string-char = ? 除双引号、反斜杠以外的 Unicode scalar；包括原始换行 ? ;
-escape      = '\', ? 任意 Unicode scalar ? ;
-(* 转义只解码一次：n -> LF，t -> TAB；其他转义产生其后的 scalar 本身。 *)
+escape      = '\', ( "n" | "t" | '"' | '\' ) ;
+(* 只解码一次：n -> LF，t -> TAB，双引号 -> 双引号，反斜杠 -> 反斜杠。 *)
 identifier  = identifier-token - keyword ;
 identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
 letter      = ? Rust char::is_alphabetic ? ;
@@ -115,7 +115,12 @@ pub struct Lit {
     pub symbol: Symbol,
 }
 
-pub enum LitKind { Bool, Number, String }
+pub enum LitKind {
+    Bool, Number,
+    /// 闭合字面量，只允许 \\、\"、\n 和 \t 转义。
+    /// 非法转义的诊断覆盖其反斜杠和紧随的 scalar；扫描在生成此 token 前停止，保留此前的 token。
+    String,
+}
 pub enum CommentKind { Line, Block }
 ```
 

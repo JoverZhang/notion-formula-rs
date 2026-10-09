@@ -607,6 +607,8 @@ export async function runFormulaStringCodec() {
     { value: '"', source: String.raw`"\""` },
     { value: 'a"b', source: String.raw`"a\"b"` },
     { value: "\\", source: String.raw`"\\"` },
+    { value: "\\q", source: String.raw`"\\q"` },
+    { value: "\\n", source: String.raw`"\\n"` },
     { value: 'line\nnext\tquote"slash\\', source: String.raw`"line\nnext\tquote\"slash\\"` },
     { value: "中文😀", source: '"中文😀"' },
     { value: "raw\r\0\b\f\u0001", source: '"raw\r\0\b\f\u0001"' },
@@ -620,20 +622,7 @@ export async function runFormulaStringCodec() {
   assert(!("quoteFormulaString" in sdk), "SDK exports the encode name without a quote alias");
   const rawControls = '"raw\n\t\r\0\b\f\u0001"';
   equal(decodeFormulaString(rawControls), "raw\n\t\r\0\b\f\u0001", "Raw control decoding");
-  const cases = [
-    ...canonicalCases,
-    { value: "raw\n\t\r\0\b\f\u0001", source: rawControls },
-    { value: "q", source: String.raw`"\q"` },
-    { value: "r", source: String.raw`"\r"` },
-    { value: "x41", source: String.raw`"\x41"` },
-    { value: "u0041", source: String.raw`"\u0041"` },
-    { value: "b", source: String.raw`"\b"` },
-    { value: "f", source: String.raw`"\f"` },
-    { value: "0", source: String.raw`"\0"` },
-    { value: "中文😀", source: String.raw`"\中\文\😀"` },
-    { value: "\\q", source: String.raw`"\\q"` },
-    { value: "raw\n\t\r", source: '"raw\\\n\\\t\\\r"' },
-  ];
+  const cases = [...canonicalCases, { value: "raw\n\t\r\0\b\f\u0001", source: rawControls }];
   for (const entry of cases)
     equal(decodeFormulaString(entry.source), entry.value, "Decode complete formula token text");
   const incompleteLiterals = [
@@ -642,7 +631,7 @@ export async function runFormulaStringCodec() {
     '"',
     '"trailing' + "\\",
     String.raw`"escaped\"`,
-    String.raw`"identity\q`,
+    String.raw`"newline\n`,
   ];
   const invalidLiterals = [
     "",
@@ -650,6 +639,39 @@ export async function runFormulaStringCodec() {
     ...incompleteLiterals,
     '"unescaped"quote"',
     '"trailing"text',
+  ];
+  const propPrefix = [
+    { kind: "Ident", text: "prop", span: { start: 0, end: 4 } },
+    { kind: "OpenParen", text: "(", span: { start: 4, end: 5 } },
+  ];
+  const illegalEscapes = [
+    { source: String.raw`"\q"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\r"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\x41"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\u0041"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\0"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\'"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\b"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\f"`, span: { start: 1, end: 3 }, prefix: [] },
+    { source: String.raw`"\😀"`, span: { start: 1, end: 4 }, prefix: [] },
+    {
+      source: String.raw`"😀" + "\中" + prop("q")`,
+      span: { start: 8, end: 10 },
+      prefix: [
+        { kind: "String", text: '"😀"', span: { start: 0, end: 4 } },
+        { kind: "Plus", text: "+", span: { start: 5, end: 6 } },
+      ],
+    },
+    { source: '"raw\\\n"', span: { start: 4, end: 6 }, prefix: [] },
+    { source: '"raw\\\t"', span: { start: 4, end: 6 }, prefix: [] },
+    { source: '"raw\\\r"', span: { start: 4, end: 6 }, prefix: [] },
+    {
+      source: String.raw`prop("bad\q") + prop("q")`,
+      span: { start: 9, end: 11 },
+      prefix: propPrefix,
+    },
+    { source: String.raw`prop("\q" "q")`, span: { start: 6, end: 8 }, prefix: propPrefix },
+    { source: String.raw`"bad\q" + "\r"`, span: { start: 4, end: 6 }, prefix: [] },
   ];
 
   const engine = await createFormulaEngineClient({
@@ -662,6 +684,13 @@ export async function runFormulaStringCodec() {
   const roundtrips: { source: string; value: string; utf16End: number }[] = [];
   const rejected: { source: string; diagnosticCount: number }[] = [];
   const propertyRoundtrips: { source: string; propertyId: string; value: number }[] = [];
+  const lexicalRejected: {
+    source: string;
+    span: { start: number; end: number };
+    tokens: FormulaDraftState["tokens"];
+    diagnostics: { message: string; span: { start: number; end: number } }[];
+    status: "NotReady";
+  }[] = [];
   try {
     for (const [index, entry] of cases.entries()) {
       const source = entry.source;
@@ -721,8 +750,87 @@ export async function runFormulaStringCodec() {
       rejected.push({ source, diagnosticCount: state.diagnostics.length });
       await draft.close();
     }
+    for (const [index, entry] of illegalEscapes.entries()) {
+      const id = `illegal-${index}`;
+      const draft = await engine.createDraft({ id, expression: entry.source });
+      const state = await draft.getState();
+      equal(state.definition.expression, entry.source, "Draft preserves malformed source");
+      const lexical = state.diagnostics.filter((diagnostic) =>
+        diagnostic.message.startsWith("invalid escape sequence"),
+      );
+      equal(lexical.length, 1, "One lexical error at the first illegal escape");
+      equal(lexical[0].span, entry.span, "Illegal escape UTF-16 diagnostic span");
+      equal(
+        state.tokens,
+        [
+          ...entry.prefix,
+          { kind: "Eof", text: "", span: { start: entry.source.length, end: entry.source.length } },
+        ],
+        "Lexer preserves the prefix and stops without an invalid String or following tokens",
+      );
+      await draft.close();
+      await engine.upsert({ Formula: { id, expression: entry.source } });
+      const property = await engine.getProperty(id);
+      assert(property && "Formula" in property, "Saved malformed formula exists");
+      equal(property.Formula.status, "NotReady", "Lexical rejection prevents preparation");
+      const result = await engine.evaluate({
+        row_ids: ["row"],
+        columns,
+        runtime: { now: 0n, time_zone: "+00:00" },
+        formula_ids: [id],
+      });
+      equal(result.formulas.get(id), { Err: "NotReady" }, "Malformed formula cannot evaluate");
+      lexicalRejected.push({
+        source: entry.source,
+        span: entry.span,
+        tokens: state.tokens,
+        diagnostics: lexical.map(({ message, span }) => ({ message, span })),
+        status: "NotReady",
+      });
+    }
+    const incompleteCall = 'prop("q"';
+    const incompleteDraft = await engine.createDraft({
+      id: "incomplete-call",
+      expression: incompleteCall,
+    });
+    const incompleteState = await incompleteDraft.getState();
+    equal(
+      incompleteState.definition.expression,
+      incompleteCall,
+      "Incomplete call source is preserved",
+    );
+    equal(
+      incompleteState.tokens,
+      [
+        ...propPrefix,
+        { kind: "String", text: '"q"', span: { start: 5, end: 8 } },
+        { kind: "Eof", text: "", span: { start: 8, end: 8 } },
+      ],
+      "A valid closed String survives a missing call parenthesis",
+    );
+    assert(incompleteState.diagnostics.length > 0, "Incomplete call retains parse diagnostics");
+    assert(
+      incompleteState.diagnostics.every(
+        (diagnostic) =>
+          !diagnostic.message.includes("invalid escape") &&
+          !diagnostic.message.includes("unterminated string"),
+      ),
+      "The closed valid literal has no lexical error",
+    );
+    await incompleteDraft.close();
+    await engine.upsert({ Formula: { id: "incomplete-call", expression: incompleteCall } });
+    const incompleteResult = await engine.evaluate({
+      row_ids: ["row"],
+      columns,
+      runtime: { now: 0n, time_zone: "+00:00" },
+      formula_ids: ["incomplete-call"],
+    });
+    equal(
+      incompleteResult.formulas.get("incomplete-call"),
+      { Err: "NotReady" },
+      "Incomplete call cannot evaluate",
+    );
     for (const [index, entry] of [
-      { source: String.raw`prop("\q")`, propertyId: "q", value: 41 },
       { source: String.raw`prop("\\q")`, propertyId: "\\q", value: 73 },
       { source: 'prop("q")', propertyId: "q", value: 41 },
     ].entries()) {
@@ -735,6 +843,11 @@ export async function runFormulaStringCodec() {
       equal(token.text, entry.source.slice(5, -1), "Property token preserves original spelling");
       equal(token.span, { start: 5, end: entry.source.length - 1 }, "Property argument span");
       equal(decodeFormulaString(token.text), entry.propertyId, "Property ID is decoded once");
+      equal(
+        `prop(${encodeFormulaString(entry.propertyId)})`,
+        entry.source,
+        "Encoded property ID source",
+      );
       await draft.close();
       await engine.upsert({ Formula: { id, expression: entry.source } });
       const result = await engine.evaluate({
@@ -752,7 +865,18 @@ export async function runFormulaStringCodec() {
       );
       propertyRoundtrips.push(entry);
     }
-    return { roundtrips, rejected, propertyRoundtrips, synchronous: true, rawTokenFields: true };
+    return {
+      roundtrips,
+      rejected,
+      lexicalRejected,
+      incompleteCall: {
+        ...comparableDraft(incompleteState),
+        version: incompleteState.version.toString(),
+      },
+      propertyRoundtrips,
+      synchronous: true,
+      rawTokenFields: true,
+    };
   } finally {
     await engine.close();
   }
