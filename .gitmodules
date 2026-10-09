@@ -1,0 +1,3 @@
+[submodule "examples/appflowy-web"]
+	path = examples/appflowy-web
+	url = https://github.com/JoverZhang/AppFlowy-Web.git
