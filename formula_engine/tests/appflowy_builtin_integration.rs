@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use analyzer::{LitKind, TokenKind};
 use formula_engine::{
     Column, ColumnData, EvaluateInput, FormulaDefinition, FormulaEngine, FormulaOutput,
     FormulaSchema, NullBuffer, PropertyDefinition, RuntimeContext, ValueType,
@@ -41,7 +42,7 @@ fn output(engine: &FormulaEngine, input: &EvaluateInput) -> FormulaOutput {
 }
 
 #[test]
-fn lowered_bindings_preserve_string_token_values_and_original_spans() {
+fn lowered_bindings_preserve_raw_string_tokens_and_original_spans() {
     let source = r#"lets(a, prop( /* first */ "字段" ), b, [prop("second")].map(current + index), a + prop("字段"))"#;
     let e = FormulaEngine::new(FormulaSchema {
         properties: vec![
@@ -71,15 +72,17 @@ fn lowered_bindings_preserve_string_token_values_and_original_spans() {
         .state()
         .tokens
         .iter()
-        .filter_map(|token| token.string_value().map(|value| (token.span, value)))
+        .filter_map(|token| match &token.kind {
+            TokenKind::Literal(literal) if literal.kind == LitKind::String => {
+                Some((token.span, literal.symbol.text.as_str()))
+            }
+            _ => None,
+        })
         .collect::<Vec<_>>();
     assert_eq!(strings.len(), 3);
-    for ((span, value), id) in strings.iter().zip(["字段", "second", "字段"]) {
-        assert_eq!(value, id);
-        assert_eq!(
-            &source[span.start as usize..span.end as usize],
-            format!("\"{id}\"")
-        );
+    for ((span, text), id) in strings.iter().zip(["字段", "second", "字段"]) {
+        assert_eq!(*text, format!("\"{id}\""));
+        assert_eq!(&source[span.start as usize..span.end as usize], *text);
     }
     assert!(
         strings
@@ -148,9 +151,14 @@ fn word_logical_operators_preserve_date_input_comparisons_and_draft_tokens() {
             .state()
             .tokens
             .iter()
-            .filter_map(|token| token.string_value())
+            .filter_map(|token| match &token.kind {
+                TokenKind::Literal(literal) if literal.kind == LitKind::String => {
+                    Some(literal.symbol.text.as_str())
+                }
+                _ => None,
+            })
             .collect::<Vec<_>>(),
-        ["Deadline Date", "Snooze Deadline"]
+        [r#""Deadline Date""#, r#""Snooze Deadline""#]
     );
     let mut input = request(1);
     for (id, date) in [("Deadline Date", -86400000), ("Snooze Deadline", 86400000)] {
