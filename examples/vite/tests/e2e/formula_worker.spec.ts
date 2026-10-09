@@ -96,8 +96,13 @@ test("SDK string codec matches native evaluation and Worker tokens retain only r
   await page.goto(url);
   await page.waitForFunction(() => Boolean(window.__formula_string_codec));
   const result = await page.evaluate(() => window.__formula_string_codec());
-  expect(result.roundtrips).toHaveLength(10);
-  expect(result.rejected).toHaveLength(15);
+  expect(result.roundtrips).toHaveLength(21);
+  expect(result.rejected).toHaveLength(10);
+  expect(result.propertyRoundtrips).toEqual([
+    { source: String.raw`prop("\q")`, propertyId: "q", value: 41 },
+    { source: String.raw`prop("\\q")`, propertyId: "\\q", value: 73 },
+    { source: 'prop("q")', propertyId: "q", value: 41 },
+  ]);
   expect(result.synchronous).toBe(true);
   expect(result.rawTokenFields).toBe(true);
   await recordContract(testInfo, "sdk-string-codec.json", result);

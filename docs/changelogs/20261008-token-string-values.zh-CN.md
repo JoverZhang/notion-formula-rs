@@ -19,14 +19,16 @@ last_verified: 2026-10-09
 
 ## Summary
 
-SDK 导出纯同步函数 `decodeFormulaString` 和 `quoteFormulaString`。
-解码接受完整的双引号公式字面量，包括空字符串，支持 `\\`、`\"`、`\n` 和 `\t` 转义；
-引号或转义无效时返回 `null`。
+SDK 导出纯同步函数 `encodeFormulaString` 和 `decodeFormulaString`。
+编码为值加上双引号，并转义反斜杠、双引号、换行和 tab。
+解码接受一个完整 String token 的原始文本，包括空字符串，只解码一次：
+`\n` 变为换行，`\t` 变为 tab，其他转义产生其后的字符本身。
 Vite 字段标签解码 token 的原始文本，排除成员调用和残缺的字段调用。
 
 ## Compatibility notes
 
-没有破坏性变更。WASM Token DTO 保留 `kind`、原始 `text` 和 UTF-16 `span`。
+接受 `\q` 等原样字符转义，`\q` 解码为 `q`。
+WASM Token DTO 保留 `kind`、原始 `text` 和 UTF-16 `span`。
 
 ## Links
 

@@ -79,7 +79,6 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     const stringToken = sortedTokens[stringIndex];
     if (!stringToken || stringToken.kind !== "String") continue;
     const argValue = decodeFormulaString(stringToken.text);
-    if (argValue === null) continue;
 
     const closeIndex = nextNonTrivia(sortedTokens, stringIndex + 1);
     const closeParen = sortedTokens[closeIndex];

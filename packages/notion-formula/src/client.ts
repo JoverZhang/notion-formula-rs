@@ -39,7 +39,7 @@ export type {
 } from "./client.h.js";
 export { FormulaClientError } from "./errors.js";
 export type { FormulaWorker } from "./rpc.js";
-export { decodeFormulaString, quoteFormulaString } from "./string_codec.js";
+export { decodeFormulaString, encodeFormulaString } from "./string_codec.js";
 
 /** Each client owns one module Worker; initialization failures release that Worker. */
 export const createFormulaEngineClient: CreateFormulaEngineClient = async (

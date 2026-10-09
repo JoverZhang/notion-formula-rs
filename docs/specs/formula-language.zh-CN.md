@@ -7,7 +7,7 @@ counterpart: ./formula-language.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-01
+last_verified: 2026-10-09
 ---
 
 # 公式文法与求值规则
@@ -44,7 +44,8 @@ digits      = digit, { digit } ;
 digit       = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 string      = '"', { string-char | escape }, '"' ;
 string-char = ? 除双引号、反斜杠以外的 Unicode scalar；包括原始换行 ? ;
-escape      = '\', ( "n" | "t" | '"' | '\' ) ;
+escape      = '\', ? 任意 Unicode scalar ? ;
+(* 转义只解码一次：n -> LF，t -> TAB；其他转义产生其后的 scalar 本身。 *)
 identifier  = identifier-token - keyword ;
 identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
 letter      = ? Rust char::is_alphabetic ? ;

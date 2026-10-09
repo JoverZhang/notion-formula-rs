@@ -433,14 +433,25 @@ fn test_string_escaped_tab() {
 }
 
 #[test]
-fn test_string_invalid_escape_emits_diagnostic() {
-    let input = r#""a\xb""#;
-    let output = lex(input);
-    assert_eq!(output.diagnostics.len(), 1);
-    assert!(output.diagnostics[0].message.contains("invalid escape"));
-    assert!(output.diagnostics[0].message.contains(r"\x"));
-    // The string is still produced (with raw text).
-    assert_eq!(output.tokens[0].kind, string_lit(r#""a\xb""#));
+fn test_string_identity_escapes_retain_raw_text_without_diagnostics() {
+    for input in [
+        r#""\q""#,
+        r#""\r""#,
+        r#""\x41""#,
+        r#""\u0041""#,
+        r#""\中\😀""#,
+    ] {
+        let output = lex(input);
+        assert!(output.diagnostics.is_empty(), "{input}");
+        assert_eq!(output.tokens[0].kind, string_lit(input));
+        assert_eq!(
+            output.tokens[0].span,
+            Span {
+                start: 0,
+                end: input.len() as u32,
+            }
+        );
+    }
 }
 
 #[test]

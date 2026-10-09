@@ -1,14 +1,15 @@
 import {
   createFormulaEngineClient,
   decodeFormulaString,
+  encodeFormulaString,
   FormulaClientError,
-  quoteFormulaString,
   type Column,
   type EvaluateInput,
   type FormulaClientErrorData,
   type FormulaDraftState,
   type FormulaSchema,
 } from "@notion-formula/sdk";
+import * as sdk from "@notion-formula/sdk";
 import init, { FormulaEngineSession } from "@notion-formula/sdk/wasm";
 import FormulaWorker from "@notion-formula/sdk/worker?worker";
 import type { FormulaSession } from "../../../../packages/notion-formula/dist/worker_runtime.js";
@@ -502,52 +503,71 @@ export async function runFormulaDiagnosticScopes() {
 }
 
 export async function runFormulaStringCodec() {
-  const cases = [
+  const canonicalCases = [
     { value: "plain", source: '"plain"' },
     { value: "", source: '""' },
     { value: "\n", source: String.raw`"\n"` },
     { value: "\t", source: String.raw`"\t"` },
     { value: '"', source: String.raw`"\""` },
+    { value: 'a"b', source: String.raw`"a\"b"` },
     { value: "\\", source: String.raw`"\\"` },
     { value: 'line\nnext\tquote"slash\\', source: String.raw`"line\nnext\tquote\"slash\\"` },
     { value: "中文😀", source: '"中文😀"' },
     { value: "raw\r\0\b\f\u0001", source: '"raw\r\0\b\f\u0001"' },
   ];
   // The codec is available synchronously before any Worker/WASM initialization.
-  for (const entry of cases) {
+  for (const entry of canonicalCases) {
     equal(decodeFormulaString(entry.source), entry.value, "Synchronous SDK decoding");
-    equal(quoteFormulaString(entry.value), entry.source, "Formula quoting");
+    equal(encodeFormulaString(entry.value), entry.source, "Canonical formula encoding");
+    equal(decodeFormulaString(encodeFormulaString(entry.value)), entry.value, "Codec inverse");
   }
+  assert(!("quoteFormulaString" in sdk), "SDK exports the encode name without a quote alias");
   const rawControls = '"raw\n\t\r\0\b\f\u0001"';
   equal(decodeFormulaString(rawControls), "raw\n\t\r\0\b\f\u0001", "Raw control decoding");
-  const invalidLiterals = [
-    "",
-    "1",
+  const cases = [
+    ...canonicalCases,
+    { value: "raw\n\t\r\0\b\f\u0001", source: rawControls },
+    { value: "q", source: String.raw`"\q"` },
+    { value: "r", source: String.raw`"\r"` },
+    { value: "x41", source: String.raw`"\x41"` },
+    { value: "u0041", source: String.raw`"\u0041"` },
+    { value: "b", source: String.raw`"\b"` },
+    { value: "f", source: String.raw`"\f"` },
+    { value: "0", source: String.raw`"\0"` },
+    { value: "中文😀", source: String.raw`"\中\文\😀"` },
+    { value: "\\q", source: String.raw`"\\q"` },
+    { value: "raw\n\t\r", source: '"raw\\\n\\\t\\\r"' },
+  ];
+  for (const entry of cases)
+    equal(decodeFormulaString(entry.source), entry.value, "Decode complete formula token text");
+  const incompleteLiterals = [
     'missing"',
     '"missing',
-    "'single'",
+    '"',
     '"trailing' + "\\",
     String.raw`"escaped\"`,
+    String.raw`"identity\q`,
+  ];
+  const invalidLiterals = [
+    "",
+    "'single'",
+    ...incompleteLiterals,
     '"unescaped"quote"',
     '"trailing"text',
-    String.raw`"bad\q"`,
-    String.raw`"bad\r"`,
-    String.raw`"bad\u0000"`,
-    String.raw`"bad\b"`,
-    String.raw`"bad\f"`,
-    String.raw`"bad\0"`,
   ];
-  for (const source of invalidLiterals)
-    equal(decodeFormulaString(source), null, "Invalid formula literal");
 
-  const engine = await createFormulaEngineClient({ properties: [] });
+  const engine = await createFormulaEngineClient({
+    properties: [{ Input: { id: "q", ty: "Number" } }, { Input: { id: "\\q", ty: "Number" } }],
+  });
+  const columns = new Map<string, Column>([
+    ["q", { Number: { values: [41], validity: [true] } }],
+    ["\\q", { Number: { values: [73], validity: [true] } }],
+  ]);
   const roundtrips: { source: string; value: string; utf16End: number }[] = [];
   const rejected: { source: string; diagnosticCount: number }[] = [];
+  const propertyRoundtrips: { source: string; propertyId: string; value: number }[] = [];
   try {
-    for (const [index, entry] of [
-      ...cases,
-      { value: "raw\n\t\r\0\b\f\u0001", source: rawControls },
-    ].entries()) {
+    for (const [index, entry] of cases.entries()) {
       const source = entry.source;
       const id = `value-${index}`;
       const draft = await engine.createDraft({ id, expression: source });
@@ -559,12 +579,18 @@ export async function runFormulaStringCodec() {
       equal(token.span, { start: 0, end: source.length }, "Literal UTF-16 span");
       for (const token of state.tokens)
         equal(Object.keys(token).sort(), ["kind", "span", "text"], "Raw Token DTO fields");
-      equal(decodeFormulaString(token.text), entry.value, "Decode actual Worker token text");
+      const decoded: string = decodeFormulaString(token.text);
+      equal(decoded, entry.value, "Decode actual Worker token text");
+      equal(
+        decodeFormulaString(encodeFormulaString(decoded)),
+        entry.value,
+        "Re-encode decoded value",
+      );
       await draft.close();
       await engine.upsert({ Formula: { id, expression: source } });
       const result = await engine.evaluate({
         row_ids: ["row"],
-        columns: new Map(),
+        columns,
         runtime: { now: 0n, time_zone: "+00:00" },
         formula_ids: [id],
       });
@@ -583,12 +609,54 @@ export async function runFormulaStringCodec() {
       const state = await draft.getState();
       for (const token of state.tokens)
         equal(Object.keys(token).sort(), ["kind", "span", "text"], "Invalid Token DTO fields");
-      if (source !== "1")
-        assert(state.diagnostics.length > 0, "Invalid syntax retains diagnostics");
+      assert(state.diagnostics.length > 0, "Invalid syntax retains diagnostics");
+      if (incompleteLiterals.includes(source)) {
+        assert(
+          state.tokens.every((token) => token.kind !== "String"),
+          "Incomplete string source has no complete String token",
+        );
+        assert(
+          state.diagnostics.some((diagnostic) =>
+            diagnostic.message.includes("unterminated string"),
+          ),
+          "Incomplete strings retain lexer diagnostics",
+        );
+      }
       rejected.push({ source, diagnosticCount: state.diagnostics.length });
       await draft.close();
     }
-    return { roundtrips, rejected, synchronous: true, rawTokenFields: true };
+    for (const [index, entry] of [
+      { source: String.raw`prop("\q")`, propertyId: "q", value: 41 },
+      { source: String.raw`prop("\\q")`, propertyId: "\\q", value: 73 },
+      { source: 'prop("q")', propertyId: "q", value: 41 },
+    ].entries()) {
+      const id = `property-${index}`;
+      const draft = await engine.createDraft({ id, expression: entry.source });
+      const state = await draft.getState();
+      equal(state.diagnostics, [], "Escaped property ID resolves through the real Worker");
+      const token = state.tokens.find((token) => token.kind === "String");
+      assert(token, "Property argument has a complete String token");
+      equal(token.text, entry.source.slice(5, -1), "Property token preserves original spelling");
+      equal(token.span, { start: 5, end: entry.source.length - 1 }, "Property argument span");
+      equal(decodeFormulaString(token.text), entry.propertyId, "Property ID is decoded once");
+      await draft.close();
+      await engine.upsert({ Formula: { id, expression: entry.source } });
+      const result = await engine.evaluate({
+        row_ids: ["row"],
+        columns,
+        runtime: { now: 0n, time_zone: "+00:00" },
+        formula_ids: [id],
+      });
+      const formula = result.formulas.get(id);
+      assert(formula && "Ok" in formula && "Number" in formula.Ok.column, "Property number result");
+      equal(
+        formula.Ok.column.Number.values,
+        [entry.value],
+        "Distinct q and backslash-q property IDs",
+      );
+      propertyRoundtrips.push(entry);
+    }
+    return { roundtrips, rejected, propertyRoundtrips, synchronous: true, rawTokenFields: true };
   } finally {
     await engine.close();
   }

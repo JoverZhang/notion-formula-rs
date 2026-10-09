@@ -1,41 +1,14 @@
 import type {
   decodeFormulaString as decodeFormulaStringDeclaration,
-  quoteFormulaString as quoteFormulaStringDeclaration,
+  encodeFormulaString as encodeFormulaStringDeclaration,
 } from "./client.h.js";
 
-export const decodeFormulaString: typeof decodeFormulaStringDeclaration = (literal) => {
-  if (literal.length < 2 || literal[0] !== '"' || literal[literal.length - 1] !== '"')
-    return null;
+export const decodeFormulaString: typeof decodeFormulaStringDeclaration = (literal) =>
+  literal
+    .slice(1, -1)
+    .replace(/\\([\s\S])/gu, (_, character: string) =>
+      character === "n" ? "\n" : character === "t" ? "\t" : character,
+    );
 
-  let value = "";
-  const end = literal.length - 1;
-  for (let index = 1; index < end; index++) {
-    const character = literal[index];
-    if (character === '"') return null;
-    if (character !== "\\") {
-      value += character;
-      continue;
-    }
-    if (++index >= end) return null;
-    switch (literal[index]) {
-      case "n":
-        value += "\n";
-        break;
-      case "t":
-        value += "\t";
-        break;
-      case '"':
-        value += '"';
-        break;
-      case "\\":
-        value += "\\";
-        break;
-      default:
-        return null;
-    }
-  }
-  return value;
-};
-
-export const quoteFormulaString: typeof quoteFormulaStringDeclaration = (value) =>
+export const encodeFormulaString: typeof encodeFormulaStringDeclaration = (value) =>
   `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\t/g, "\\t")}"`;
