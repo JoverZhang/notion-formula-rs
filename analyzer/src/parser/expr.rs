@@ -968,7 +968,7 @@ enum RecoverScanResult {
 
 /// Unescape a string literal's inner content.
 ///
-/// Decode once: `\n` -> newline, `\t` -> tab; every other escape yields its next scalar.
+/// Decode a lexer-validated literal once: `\n`, `\t`, `\"`, `\\`.
 fn unescape_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars();
@@ -977,11 +977,9 @@ fn unescape_string(s: &str) -> String {
             match chars.next() {
                 Some('n') => out.push('\n'),
                 Some('t') => out.push('\t'),
-                Some(other) => out.push(other),
-                None => {
-                    // Trailing backslash -- keep it.
-                    out.push('\\');
-                }
+                Some('"') => out.push('"'),
+                Some('\\') => out.push('\\'),
+                _ => unreachable!("string tokens contain only lexer-validated escapes"),
             }
         } else {
             out.push(c);

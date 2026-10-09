@@ -15,19 +15,19 @@ last_verified: 2026-10-09
 [简体中文](20261008-token-string-values.zh-CN.md)
 
 - Type: Added
-- Component: Browser SDK, Vite editor
+- Component: Analyzer, Browser SDK, Vite editor
 
 ## Summary
 
 The SDK exports synchronous pure functions `encodeFormulaString` and `decodeFormulaString`.
 Encoding quotes the value and escapes backslash, double quote, newline and tab.
-Decoding accepts one complete String token's raw text, including the empty string, and decodes once:
-`\n` becomes newline, `\t` becomes tab, and every other escape yields its next character.
+Decoding accepts one complete, valid String token's raw text, including the empty string,
+and decodes `\\`, `\"`, `\n` and `\t` once.
 Vite property chips decode raw token text and exclude member calls and incomplete property calls.
 
 ## Compatibility notes
 
-Identity escapes such as `\q` are accepted and decode to `q`.
+Illegal escapes stop lexical scanning without producing a String token; earlier tokens remain.
 WASM Token DTOs retain `kind`, raw `text`, and UTF-16 `span`.
 
 ## Links

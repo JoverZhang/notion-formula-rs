@@ -18,7 +18,8 @@ pub struct LexOutput {
 /// - Numbers: integers, floating-point decimals, and scientific notation.
 ///   Dot is consumed as decimal only when followed by a digit (`3.14` is one token,
 ///   `3.method()` stays as three tokens: `3`, `.`, `method`).
-/// - Strings: double-quoted; a backslash escapes the next Unicode scalar.
+/// - Strings: closed double-quoted literals with only `\\`, `\"`, `\n`, `\t` escapes.
+///   An illegal escape stops scanning before this token; earlier tokens remain.
 ///   Token text retains the original quotes and escapes without decoding.
 /// - Identifiers: `_` or Unicode letter (`is_alphabetic`), followed by `_` or
 ///   Unicode alphanumeric (`is_alphanumeric`).
@@ -27,7 +28,7 @@ pub fn lex(input: &str) -> LexOutput {
     let mut diagnostics = Vec::new();
     let mut iter = input.char_indices().peekable();
 
-    while let Some((start, ch)) = iter.next() {
+    'scan: while let Some((start, ch)) = iter.next() {
         // Skip spaces/tabs but keep newlines as trivia tokens.
         if matches!(ch, ' ' | '\t' | '\r') {
             continue;
@@ -208,10 +209,23 @@ pub fn lex(input: &str) -> LexOutput {
 
                 while let Some((i, c)) = iter.next() {
                     if c == '\\' {
-                        // An escaped quote cannot terminate the literal.
-                        if iter.next().is_none() {
+                        let Some((escape_start, escape)) = iter.next() else {
                             // Backslash at end of input -- unterminated string.
                             break;
+                        };
+                        if !matches!(escape, '\\' | '"' | 'n' | 't') {
+                            let span = Span {
+                                start: i as u32,
+                                end: (escape_start + escape.len_utf8()) as u32,
+                            };
+                            diagnostics.push(make_error(
+                                span,
+                                format!(
+                                    "invalid escape sequence '{}'",
+                                    &input[span.start as usize..span.end as usize]
+                                ),
+                            ));
+                            break 'scan;
                         }
                     } else if c == '"' {
                         end = Some(i + 1);
