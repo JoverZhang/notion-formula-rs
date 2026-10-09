@@ -13,6 +13,9 @@ test("chips require complete direct property calls in real WASM tokens", async (
     { source: String.raw`prop("Ti\qtle")`, tokenCount: 4, chipCount: 0 },
     { source: "prop(1)", tokenCount: 4, chipCount: 0 },
     { source: '"😀" + prop("Title")', tokenCount: 6, chipCount: 1 },
+    { source: String.raw`prop("\Title")`, tokenCount: 4, chipCount: 1 },
+    { source: String.raw`prop("\\Title")`, tokenCount: 4, chipCount: 0 },
+    { source: 'prop("Title', tokenCount: 2, chipCount: 0 },
   ]) {
     await setEditorContent(page, "Formula 1", source);
     await expectEditorText(page, "Formula 1", source);
@@ -27,6 +30,7 @@ test("chips require complete direct property calls in real WASM tokens", async (
   }
   expect(observations[0].ranges).toMatchObject([{ from: 0, to: 13, propName: "Title" }]);
   expect(observations[5].ranges).toMatchObject([{ from: 7, to: 20, propName: "Title" }]);
+  expect(observations[6].ranges).toMatchObject([{ from: 0, to: 14, propName: "Title" }]);
   const screenshot = testInfo.outputPath("token-chips.png");
   await page.screenshot({ path: screenshot, fullPage: true });
   await testInfo.attach("token-chips.png", { path: screenshot, contentType: "image/png" });

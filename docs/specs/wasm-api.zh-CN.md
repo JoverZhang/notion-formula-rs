@@ -40,14 +40,15 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
-// 纯同步函数：解码一个完整的双引号公式字面量，包括 ""。
-// 仅接受 \\、\"、\n 和 \t 转义；引号或转义无效时返回 null。
-// 保留其他有效 Unicode 字符，包括原始控制字符。
-export declare function decodeFormulaString(literal: string): string | null;
+// 纯同步函数，无需初始化 Worker/WASM。为有效 Unicode 值加上双引号，
+// 转义反斜杠、双引号、换行和 tab；保留其他字符。
+// a"b -> "a\"b"；空字符串 -> ""。
+export declare function encodeFormulaString(value: string): string;
 
-// 纯同步函数：为公式字符串加上引号，转义 \\、\"、\n 和 \t。
-// 保留其他有效 Unicode 字符，包括原始控制字符。
-export declare function quoteFormulaString(value: string): string;
+// 纯同步函数；输入为词法分析器产出的一个完整 String token.text。
+// 只解码一次：\n -> 换行，\t -> tab；其他转义产生其后的字符本身。
+// "a\"b" -> a"b；"" -> 空字符串；"\q" -> q。保留 Unicode 和原始控制字符。
+export declare function decodeFormulaString(literal: string): string;
 
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
 // 每个请求入队时保存参数快照；后续突变不改变已入队的请求。
