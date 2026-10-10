@@ -90,6 +90,30 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
+test("SDK string codec matches native evaluation and Worker tokens retain only raw fields", async ({
+  page,
+}, testInfo) => {
+  await page.goto(url);
+  await page.waitForFunction(() => Boolean(window.__formula_string_codec));
+  const result = await page.evaluate(() => window.__formula_string_codec());
+  expect(result.roundtrips).toHaveLength(13);
+  expect(result.rejected).toHaveLength(10);
+  expect(result.lexicalRejected).toHaveLength(16);
+  expect(result.incompleteCall.tokens.map((token) => token.kind)).toEqual([
+    "Ident",
+    "OpenParen",
+    "String",
+    "Eof",
+  ]);
+  expect(result.propertyRoundtrips).toEqual([
+    { source: String.raw`prop("\\q")`, propertyId: "\\q", value: 73 },
+    { source: 'prop("q")', propertyId: "q", value: 41 },
+  ]);
+  expect(result.synchronous).toBe(true);
+  expect(result.rawTokenFields).toBe(true);
+  await recordContract(testInfo, "sdk-string-codec.json", result);
+});
+
 test("real module Worker matches the synchronous WASM session contract", async ({
   page,
 }, testInfo) => {
@@ -100,6 +124,7 @@ test("real module Worker matches the synchronous WASM session contract", async (
   expect(result).toEqual({
     verified: [
       "engine snapshots",
+      "transitive input dependencies",
       "lossless evaluation DTOs",
       "typed native errors",
       "multiple drafts and borrow errors",

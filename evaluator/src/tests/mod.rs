@@ -29,7 +29,7 @@ fn generated_catalog_has_one_obligation_per_supported_builtin() {
         .filter_map(|entry| entry.implementation)
         .collect::<Vec<_>>();
     assert_eq!(BuiltinKey::ALL.len(), supported.len());
-    assert_eq!(BuiltinKey::ALL.len(), 85);
+    assert_eq!(BuiltinKey::ALL.len(), 87);
     for (key, signature) in BuiltinKey::ALL.iter().zip(supported) {
         assert_eq!(key.name(), signature.name);
         let expected_mode = if signature

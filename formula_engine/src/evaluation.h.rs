@@ -58,7 +58,8 @@ pub struct EvaluateInput {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::From)]
 #[from(String, &str)]
 pub struct RowId(pub String);
-/// Input validation failures prevent all formula evaluation; only one error is returned.
+/// Evaluation input or required_inputs formula-selection validation failures; only one error is returned.
+/// Input validation failures prevent all formula evaluation.
 /// The same definition and input return the same error.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EvaluateInputError {

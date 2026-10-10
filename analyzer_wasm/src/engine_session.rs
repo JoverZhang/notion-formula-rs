@@ -156,6 +156,29 @@ impl FormulaEngineSession {
         to_value(&state)
     }
 
+    fn required_inputs_impl(&self, formula_ids: JsValue) -> Result<JsValue, JsValue> {
+        let engine = self.inner.engine().map_err(error_value)?;
+        if !js_sys::Array::is_array(&formula_ids) {
+            return Err(invalid_dto("required_inputs"));
+        }
+        let ids: Vec<dto::PropertyId> = from_value(formula_ids, "required_inputs")?;
+        let ids: Vec<_> = ids.into_iter().map(Into::into).collect();
+        let inputs: Vec<dto::PropertyId> = engine
+            .required_inputs(&ids)
+            .map_err(|error| {
+                error_value(dto::FormulaClientErrorData::EvaluateInput {
+                    message: "Invalid formula selection".into(),
+                    payload: dto::EvaluateInputPayload {
+                        error: error.into(),
+                    },
+                })
+            })?
+            .into_iter()
+            .map(|id| id.0)
+            .collect();
+        to_value(&inputs)
+    }
+
     fn upsert_impl(&mut self, property: JsValue) -> Result<JsValue, JsValue> {
         let engine = self.inner.engine_mut().map_err(error_value)?;
         let property: dto::PropertyDefinition =

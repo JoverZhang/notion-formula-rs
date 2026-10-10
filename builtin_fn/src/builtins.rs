@@ -86,18 +86,16 @@ fn text_definitions() -> BuiltinCategory {
         /// The semantic type model does not yet represent `Link`.
         link(label: string, url: string) -> Link;
 
-        #[unsupported]
-        /// The semantic type model does not yet represent `StyledText`.
+        /// Return text unchanged; style names are accepted as plain string metadata.
         style(
             text: string,
-            repeat(min = 1) {
+            repeat(min = 0) {
                 styles: string,
             },
-        ) -> StyledText;
+        ) -> string;
 
-        #[unsupported]
-        /// The semantic type model does not yet represent `StyledText`.
-        unstyle(text: string | StyledText, styles?: string) -> string;
+        /// Return text unchanged, accepting zero or more style names.
+        unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
 
         concat<T>(
             repeat(min = 2) {
@@ -114,7 +112,9 @@ fn math_definitions() -> BuiltinCategory {
     builtin_functions! {
         category: Number;
 
-        formatNumber(value: number, format: string, precision: number) -> string;
+        /// Missing precision uses up to 10 decimal digits, one compact digit, or currency defaults.
+        /// Explicit precision retains trailing zeros and the existing finite 0..=1000000 constraint.
+        formatNumber(value: number, format: string, precision?: number) -> string;
         add(a: number, b: number) -> number;
         subtract(a: number, b: number) -> number;
         multiply(a: number, b: number) -> number;
@@ -176,6 +176,7 @@ fn date_definitions() -> BuiltinCategory {
 
         timestamp(date: date) -> number;
         fromTimestamp(timestamp: number) -> date;
+        /// Format the start using Moment tokens and [literal] text in the runtime fixed offset.
         formatDate(date: date, format: string) -> string;
         parseDate(text: string) -> date;
     }

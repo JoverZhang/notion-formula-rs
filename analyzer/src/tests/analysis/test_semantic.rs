@@ -162,13 +162,13 @@ fn test_postfix_capable_builtin_uses_normal_call_validation() {
 }
 
 #[test]
-fn test_non_postfix_capable_builtin_emits_error() {
+fn test_receiver_only_builtin_validates_receiver_type() {
     let ctx = ctx_with_builtins();
     let diags = run_semantic("true.sum()", ctx);
     assert_single_diag(
         diags,
-        "sum() does not support postfix calls",
-        Span { start: 0, end: 10 },
+        "sum() expects number arguments",
+        Span { start: 0, end: 4 },
     );
 }
 

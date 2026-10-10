@@ -7,7 +7,7 @@ counterpart: ./wasm-api.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-04
+last_verified: 2026-10-09
 ---
 
 # WASM API 与 Worker
@@ -40,6 +40,16 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
+// 纯同步函数，无需初始化 Worker/WASM。为有效 Unicode 值加上双引号，
+// 转义反斜杠、双引号、换行和 tab；保留其他字符。
+// a"b -> "a\"b"；空字符串 -> ""。
+export declare function encodeFormulaString(value: string): string;
+
+// 纯同步函数；输入为词法分析器产出的一个完整、有效的 String token.text。
+// 只解码一次：\n -> 换行，\t -> tab，\" -> 双引号，\\ -> 反斜杠。
+// "a\"b" -> a"b；"" -> 空字符串。保留原始 Unicode 和控制字符。
+export declare function decodeFormulaString(literal: string): string;
+
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
 // 每个请求入队时保存参数快照；后续突变不改变已入队的请求。
 // 不可克隆的参数在对应 FIFO 位置以 INVALID_REQUEST 拒绝。
@@ -47,6 +57,9 @@ export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
+  // 返回排序、去重后的传递 Input ID。Ready 目标的依赖集合完整；
+  // NotReady 目标只返回已知引用。无效目标列表以 EVALUATE_INPUT 拒绝。
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]>;
   // 所有 Draft 消耗或关闭之前，拒绝并返回 ACTIVE_DRAFTS。
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
   remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
@@ -308,6 +321,10 @@ impl FormulaEngineSession {
     pub fn get_property(&self, id: String) -> Result<JsValue, JsValue>;
     pub fn get_properties(&self) -> Result<JsValue, JsValue>;
     pub fn get_state(&self) -> Result<JsValue, JsValue>;
+    /// 接收 PropertyId[]，按 FormulaEngine::required_inputs 的语义返回 PropertyId[]。
+    /// 数组格式错误返回 INVALID_DTO；公式选择错误返回 EVALUATE_INPUT。
+    /// 存在活动 Draft 时仍可调用；Engine 关闭后返回 ENGINE_CLOSED。
+    pub fn required_inputs(&self, formula_ids: JsValue) -> Result<JsValue, JsValue>;
     /// 任何 Draft handle 存在时，拒绝并返回 ACTIVE_DRAFTS。
     pub fn upsert(&mut self, property: JsValue) -> Result<JsValue, JsValue>;
     /// 任何 Draft handle 存在时，拒绝并返回 ACTIVE_DRAFTS。
@@ -374,7 +391,12 @@ type Diagnostic = {
   kind: DiagnosticKind; message: string; span: Span;
   line: number; col: number; actions: CodeAction[];
 };
-type Token = { kind: string; text: string; span: Span };
+type Token = {
+  kind: string;
+  /** 原始源码拼写，包含引号和转义序列。 */
+  text: string;
+  span: Span;
+};
 type AnalyzeResult = {
   diagnostics: Diagnostic[]; tokens: Token[]; output_type: string;
 };

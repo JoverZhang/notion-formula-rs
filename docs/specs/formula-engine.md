@@ -9,7 +9,7 @@ document_status: draft
 translation_status: synced
 translation_model: gpt-6-luna
 translation_review_model: gpt-6-astra
-last_verified: 2026-10-03
+last_verified: 2026-10-05
 ---
 
 # FormulaEngine: compilation and evaluation
@@ -230,7 +230,8 @@ pub struct EvaluateInput {
 #[from(String, &str)]
 pub struct RowId(pub String);
 
-/// Input validation failures prevent all formula evaluation; only one error is returned.
+/// Evaluation input or required_inputs formula-selection validation failures; only one error is returned.
+/// Input validation failures prevent all formula evaluation.
 /// The same definition and input return the same error.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EvaluateInputError {
@@ -357,6 +358,16 @@ impl FormulaEngine {
     pub fn property(&self, id: &PropertyId) -> Option<PropertyState>;
     pub fn properties(&self) -> Vec<PropertyState>;
     pub fn state(&self) -> FormulaEngineState<'_>;
+
+    /// Returns declared Input IDs referenced directly or transitively by the selected Formulas,
+    /// deduplicated and sorted by PropertyId. Includes references in all conditional branches.
+    /// Reads saved dependency metadata without evaluating or changing Engine; cycles terminate.
+    /// Ready targets yield the complete static Input closure. NotReady targets expose only known
+    /// references; missing properties are omitted and invalid syntax may hide references.
+    /// Formula status remains authoritative: only Ready targets prove other Inputs unused.
+    /// evaluate still requires columns for every Input, including those absent from this result.
+    /// Errors: EmptyFormulaIds, InvalidFormulaId, or DuplicateFormulaId, checked in request order.
+    pub fn required_inputs(&self, formula_ids: &[PropertyId]) -> Result<Vec<PropertyId>, EvaluateInputError>;
 
     /// Returns Ok(EvaluateResult) once input validation passes, even if every requested formula fails.
     /// Formula and row errors are returned with the result; other formulas continue.

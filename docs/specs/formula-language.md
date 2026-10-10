@@ -7,7 +7,7 @@ counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-01
+last_verified: 2026-10-09
 ---
 
 # Formula Grammar and Evaluation Rules
@@ -45,6 +45,7 @@ digit       = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 string      = '"', { string-char | escape }, '"' ;
 string-char = ? Any Unicode scalar other than double quote or backslash; includes raw newlines ? ;
 escape      = '\', ( "n" | "t" | '"' | '\' ) ;
+(* Decode once: n -> LF, t -> TAB, double quote -> double quote, backslash -> backslash. *)
 identifier  = identifier-token - keyword ;
 identifier-token = ( "_" | letter ), { "_" | alphanumeric } ;
 letter      = ? Rust char::is_alphabetic ? ;
@@ -114,7 +115,13 @@ pub struct Lit {
     pub symbol: Symbol,
 }
 
-pub enum LitKind { Bool, Number, String }
+pub enum LitKind {
+    Bool, Number,
+    /// Closed literal with only \\, \", \n and \t escapes.
+    /// An illegal escape diagnoses its backslash and following scalar.
+    /// Scanning stops before this token; earlier tokens remain.
+    String,
+}
 pub enum CommentKind { Line, Block }
 ```
 
@@ -211,7 +218,7 @@ evaluate          → runtime issues are per-row errors; other rows can continue
 
 Current inference allows unknown, unions, and nested unknown.
 Unknown identifiers or uncertain inference need not be rejected immediately; syntax diagnostics prevent evaluation.
-For example, "count: " + 3 may infer as unknown, but at runtime it can still concatenate text.
+When either + operand is known to be String, the result is inferred as String, matching runtime text conversion.
 Diagnostic messages are not a machine interface.
 ```
 

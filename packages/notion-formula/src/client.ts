@@ -39,6 +39,7 @@ export type {
 } from "./client.h.js";
 export { FormulaClientError } from "./errors.js";
 export type { FormulaWorker } from "./rpc.js";
+export { decodeFormulaString, encodeFormulaString } from "./string_codec.js";
 
 /** Each client owns one module Worker; initialization failures release that Worker. */
 export const createFormulaEngineClient: CreateFormulaEngineClient = async (
@@ -87,6 +88,10 @@ class EngineClient implements FormulaEngineClient {
 
   getState(): Promise<FormulaEngineState> {
     return this.call("engine.getState", []);
+  }
+
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]> {
+    return this.call("engine.requiredInputs", [formulaIds]);
   }
 
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult> {

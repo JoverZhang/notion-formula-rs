@@ -26,6 +26,7 @@ export type FormulaOperations = {
   "engine.getProperty": Operation<[PropertyId], PropertyState | null>;
   "engine.getProperties": Operation<[], PropertyState[]>;
   "engine.getState": Operation<[], FormulaEngineState>;
+  "engine.requiredInputs": Operation<[PropertyId[]], PropertyId[]>;
   "engine.upsert": Operation<[PropertyDefinition], FormulaEngineChangeResult>;
   "engine.remove": Operation<[PropertyId], FormulaEngineChangeResult | null>;
   "engine.evaluate": Operation<[EvaluateInput], EvaluateResult>;

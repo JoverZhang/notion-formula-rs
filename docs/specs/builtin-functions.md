@@ -107,6 +107,10 @@ trim(text: string) -> string;
 repeat(text: string, times: number) -> string;
 padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
+/// Preserve text, including ordinary null, after evaluating and type-checking all style names; styling metadata is ignored.
+style(text: string, repeat(min = 0) { styles: string }) -> string;
+unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
+/// Accept at least two lists; scalar text concatenation uses +.
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
 
 /// Convert null elements to empty strings and retain separators; a null list argument returns null.
@@ -120,7 +124,12 @@ split(text: string, separator: string) -> string[];
 Numeric operations follow the [Number rules](formula-language.md#current-number).
 
 ```builtin
-formatNumber(value: number, format: string, precision: number) -> string;
+/// Formats: number/decimal, number_with_commas/commas, percent/%, scientific, humanize, usd/eur/gbp/jpy/cny/krw/inr/cad/aud/chf.
+/// Trim and lowercase format; unknown selectors produce InvalidValue. Explicit null precision returns null.
+/// Precision must be finite in 0..=1000000; truncate and cap at 100 digits.
+/// Without precision, decimal/commas/percent use up to 10 fractional digits, humanize uses up to one (K/M/B/T),
+/// scientific uses 10, currencies use two, and jpy/krw use zero. Explicit precision retains trailing zeros.
+formatNumber(value: number, format: string, precision?: number) -> string;
 add(a: number, b: number) -> number;
 subtract(a: number, b: number) -> number;
 multiply(a: number, b: number) -> number;
@@ -185,6 +194,9 @@ dateSubtract(date: date, amount: number, unit: string) -> date;
 dateBetween(a: date, b: date, unit: string) -> number;
 timestamp(date: date) -> number;
 fromTimestamp(timestamp: number) -> date;
+/// Format start in the runtime fixed offset with Moment calendar, clock, ordinal, weekday and week tokens.
+/// [text] is literal; W/WW/Wo/GGGG use ISO weeks, w/ww/wo/gggg use English Sunday-start weeks.
+/// Percent signs are literal. [Week] W on 2024-03-05 renders "Week 10".
 formatDate(date: date, format: string) -> string;
 parseDate(text: string) -> date;
 ```
@@ -270,7 +282,7 @@ id() -> string;
 ```text
 People currently has no supported functions. These declarations are excluded from callable/completion sets:
   not                     // Expressed by the not prefix operator, including not(true)
-  link / style / unstyle  // No Link / StyledText types yet
+  link                    // No Link type yet
   dateRange / dateStart / dateEnd // No DateRange type yet
   name / email            // No person-name/email runtime inputs yet
 Unsupported declarations are treated like unknown functions, without a separate unsupported error class.
@@ -287,7 +299,7 @@ shape → type → execution
   Unknown, including nested unknown, is indeterminate rather than an immediate mismatch; analysis success does not ensure row success.
 
 postfix
-  Requires a deterministic first parameter slot and another argument position after consuming the receiver.
+  Requires a deterministic first parameter slot; the receiver may supply the only argument, as in values.sum().
   receiver.f(args) is equivalent to f(receiver, args), subject to type compatibility.
   Parsing a member call does not make every builtin postfix-capable; unsupported member calls do not fall back to ordinary calls.
 

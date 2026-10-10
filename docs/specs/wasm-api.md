@@ -8,7 +8,7 @@ implementation_status: current
 document_status: stable
 translation_status: synced
 translation_review_model: gpt-6-astra
-last_verified: 2026-10-04
+last_verified: 2026-10-09
 ---
 
 # WASM API and Worker
@@ -41,6 +41,16 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
+// Pure, synchronous; no Worker/WASM initialization. Quote a valid Unicode value,
+// escaping backslash, double quote, newline and tab; preserve other characters.
+// a"b -> "a\"b"; empty -> "".
+export declare function encodeFormulaString(value: string): string;
+
+// Pure, synchronous; input is one complete, valid String token.text from the lexer.
+// Decode once: \n -> newline, \t -> tab, \" -> double quote, \\ -> backslash.
+// "a\"b" -> a"b; "" -> empty. Preserve raw Unicode and control characters.
+export declare function decodeFormulaString(literal: string): string;
+
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
 // Each request snapshots its arguments at enqueue; later mutations cannot change it.
 // Non-cloneable arguments reject with INVALID_REQUEST at their FIFO position.
@@ -48,6 +58,9 @@ export interface FormulaEngineClient {
   getProperty(id: PropertyId): Promise<PropertyState | null>;
   getProperties(): Promise<PropertyState[]>;
   getState(): Promise<FormulaEngineState>;
+  // Sorted, distinct transitive Input IDs. Ready targets have complete closures;
+  // NotReady targets expose known references only. Invalid selections reject with EVALUATE_INPUT.
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]>;
   // Rejects ACTIVE_DRAFTS until every Draft has been consumed or closed.
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult>;
   remove(id: PropertyId): Promise<FormulaEngineChangeResult | null>;
@@ -310,6 +323,10 @@ impl FormulaEngineSession {
     pub fn get_property(&self, id: String) -> Result<JsValue, JsValue>;
     pub fn get_properties(&self) -> Result<JsValue, JsValue>;
     pub fn get_state(&self) -> Result<JsValue, JsValue>;
+    /// Accepts PropertyId[] and returns PropertyId[] with FormulaEngine::required_inputs semantics.
+    /// Malformed arrays reject with INVALID_DTO; formula-selection errors use EVALUATE_INPUT.
+    /// Available while Drafts are active; Engine close rejects with ENGINE_CLOSED.
+    pub fn required_inputs(&self, formula_ids: JsValue) -> Result<JsValue, JsValue>;
     /// Rejects ACTIVE_DRAFTS while any Draft handle exists.
     pub fn upsert(&mut self, property: JsValue) -> Result<JsValue, JsValue>;
     /// Rejects ACTIVE_DRAFTS while any Draft handle exists.
@@ -376,7 +393,12 @@ type Diagnostic = {
   kind: DiagnosticKind; message: string; span: Span;
   line: number; col: number; actions: CodeAction[];
 };
-type Token = { kind: string; text: string; span: Span };
+type Token = {
+  kind: string;
+  /** Original source spelling, including quotes and escapes. */
+  text: string;
+  span: Span;
+};
 type AnalyzeResult = {
   diagnostics: Diagnostic[]; tokens: Token[]; output_type: string;
 };

@@ -1,0 +1,4 @@
+=== INPUT ===
+formatDate(parseDate("2024-03-05T10:30:05.125Z"), "[Week] W dddd Do DDDo GGGG-WW HH:mm Z")
+=== OUTPUT ===
+row-0: "Week 10 Tuesday 5th 65th 2024-10 18:30 +08:00"
