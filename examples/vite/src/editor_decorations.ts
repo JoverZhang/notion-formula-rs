@@ -1,6 +1,6 @@
 import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import type { Token as FormulaToken } from "@notion-formula/sdk";
+import { decodeFormulaString, type Token as FormulaToken } from "@notion-formula/sdk";
 
 export type Token = FormulaToken;
 
@@ -65,6 +65,9 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
   for (let i = 0; i < sortedTokens.length; i += 1) {
     const ident = sortedTokens[i];
     if (!ident || ident.kind !== "Ident" || ident.text !== "prop") continue;
+    let previousIndex = i - 1;
+    while (previousIndex >= 0 && isTriviaKind(sortedTokens[previousIndex].kind)) previousIndex -= 1;
+    if (sortedTokens[previousIndex]?.kind === "Dot") continue;
     const identStart = ident.span?.start;
     if (typeof identStart !== "number") continue;
 
@@ -75,6 +78,7 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     const stringIndex = nextNonTrivia(sortedTokens, openIndex + 1);
     const stringToken = sortedTokens[stringIndex];
     if (!stringToken || stringToken.kind !== "String") continue;
+    const argValue = decodeFormulaString(stringToken.text);
 
     const closeIndex = nextNonTrivia(sortedTokens, stringIndex + 1);
     const closeParen = sortedTokens[closeIndex];
@@ -84,13 +88,10 @@ export function computePropChips(source: string, tokens: Token[]): Chip[] {
     const stringEnd = stringToken.span?.end;
     const closeEnd = closeParen.span?.end;
     if (typeof stringStart !== "number" || typeof stringEnd !== "number") continue;
-    if (typeof closeEnd !== "number" || closeEnd <= stringEnd) continue;
+    if (typeof closeEnd !== "number" || closeEnd <= stringEnd || closeEnd > source.length) continue;
 
-    const rawText = stringToken.text ?? source.slice(stringStart, stringEnd);
-    const hasQuotes = rawText.startsWith('"') && rawText.endsWith('"');
-    const argContentStart = stringStart + (hasQuotes ? 1 : 0);
-    const argContentEnd = stringEnd - (hasQuotes ? 1 : 0);
-    const argValue = source.slice(argContentStart, argContentEnd);
+    const argContentStart = stringStart + 1;
+    const argContentEnd = stringEnd - 1;
 
     chips.push({
       spanStart: identStart,

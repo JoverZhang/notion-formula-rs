@@ -7,6 +7,19 @@ import {
 } from "../../src/editor_decorations";
 
 describe("computePropChips", () => {
+  function propertyTokens(source: string, raw: string): Token[] {
+    return [
+      { kind: "Ident", text: "prop", span: { start: 0, end: 4 } },
+      { kind: "OpenParen", text: "(", span: { start: 4, end: 5 } },
+      { kind: "String", text: raw, span: { start: 5, end: 5 + raw.length } },
+      {
+        kind: "CloseParen",
+        text: ")",
+        span: { start: source.length - 1, end: source.length },
+      },
+    ];
+  }
+
   it('detects prop("Title")', () => {
     const source = 'prop("Title")';
     const tokens: Token[] = [
@@ -24,6 +37,56 @@ describe("computePropChips", () => {
       spanEnd: 13,
       argValue: "Title",
     });
+  });
+
+  it("looks up quote and backslash field names by decoding raw token text", () => {
+    const source = String.raw`prop("quote\"slash\\")`;
+    const raw = String.raw`"quote\"slash\\"`;
+    const fieldName = 'quote"slash\\';
+    const fields = new Map([[fieldName, "field-id"]]);
+    const chips = computePropChips(source, propertyTokens(source, raw));
+    expect(chips).toHaveLength(1);
+    expect(fields.get(chips[0].argValue)).toBe("field-id");
+    expect(chips[0]).toMatchObject({
+      spanStart: 0,
+      spanEnd: source.length,
+      argContentStart: 6,
+      argContentEnd: source.length - 2,
+    });
+  });
+
+  it("keeps empty and backslash names and rejects incomplete calls", () => {
+    const emptySource = 'prop("")';
+    expect(computePropChips(emptySource, propertyTokens(emptySource, '""'))[0].argValue).toBe("");
+    const backslashSource = String.raw`prop("bad\\q")`;
+    expect(
+      computePropChips(backslashSource, propertyTokens(backslashSource, String.raw`"bad\\q"`))[0]
+        .argValue,
+    ).toBe(String.raw`bad\q`);
+    const tokens = propertyTokens('prop("Title")', '"Title"');
+    expect(computePropChips('prop("Title"', tokens.slice(0, 3))).toEqual([]);
+  });
+
+  it("excludes member prop calls while retaining complete calls in incomplete formulas", () => {
+    const directSource = 'prop("Title")';
+    const tokens = propertyTokens(directSource, '"Title"');
+    expect(computePropChips(`${directSource} +`, tokens)).toHaveLength(1);
+    const memberTokens: Token[] = [
+      { kind: "Ident", text: "value", span: { start: 0, end: 5 } },
+      { kind: "Dot", text: ".", span: { start: 5, end: 6 } },
+      ...tokens.map((token) => ({
+        ...token,
+        span: { start: token.span.start + 6, end: token.span.end + 6 },
+      })),
+    ];
+    expect(computePropChips(`value.${directSource}`, memberTokens)).toEqual([]);
+  });
+
+  it("requires a String token before decoding the argument text", () => {
+    const source = "prop(1)";
+    const tokens = propertyTokens(source, "1");
+    tokens[2].kind = "Number";
+    expect(computePropChips(source, tokens)).toEqual([]);
   });
 });
 

@@ -7,7 +7,7 @@ counterpart: ./wasm-api.md
 implementation_status: current
 document_status: stable
 translation_status: synced
-last_verified: 2026-10-04
+last_verified: 2026-10-09
 ---
 
 # WASM API 与 Worker
@@ -39,6 +39,16 @@ import type {
   UpdateExpressionResult,
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
+
+// 纯同步函数，无需初始化 Worker/WASM。为有效 Unicode 值加上双引号，
+// 转义反斜杠、双引号、换行和 tab；保留其他字符。
+// a"b -> "a\"b"；空字符串 -> ""。
+export declare function encodeFormulaString(value: string): string;
+
+// 纯同步函数；输入为词法分析器产出的一个完整、有效的 String token.text。
+// 只解码一次：\n -> 换行，\t -> tab，\" -> 双引号，\\ -> 反斜杠。
+// "a\"b" -> a"b；"" -> 空字符串。保留原始 Unicode 和控制字符。
+export declare function decodeFormulaString(literal: string): string;
 
 // Engine 及其全部 Draft 共用一条 FIFO 队列；调用失败不阻断后续调用。
 // 每个请求入队时保存参数快照；后续突变不改变已入队的请求。
@@ -374,7 +384,12 @@ type Diagnostic = {
   kind: DiagnosticKind; message: string; span: Span;
   line: number; col: number; actions: CodeAction[];
 };
-type Token = { kind: string; text: string; span: Span };
+type Token = {
+  kind: string;
+  /** 原始源码拼写，包含引号和转义序列。 */
+  text: string;
+  span: Span;
+};
 type AnalyzeResult = {
   diagnostics: Diagnostic[]; tokens: Token[]; output_type: string;
 };
