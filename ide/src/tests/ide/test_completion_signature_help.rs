@@ -330,12 +330,14 @@ fn signature_help_ifs_active_param_repeat_value_highlights_value() {
 }
 
 #[test]
-fn signature_help_postfix_non_postfix_capable_function_is_not_method_style() {
+fn signature_help_postfix_reducer_keeps_receiver_separate_from_arguments() {
     let c = ctx().build();
     t("true.sum($0")
         .ctx(c)
-        .expect_sig_label("sum(values1: number | number[], ...) -> number")
-        .expect_sig_label_not_contains(").sum(");
+        .expect_sig_label(
+            "(values1: number | number[]).sum(values2: number | number[], ...) -> number",
+        )
+        .expect_sig_label_not_contains("sum(values1:");
 }
 
 #[test]

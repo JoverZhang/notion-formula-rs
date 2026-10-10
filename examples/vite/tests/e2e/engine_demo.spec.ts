@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import type { FormulaId } from "../../src/app/types";
 import {
@@ -168,6 +169,60 @@ test("special numbers and nested nulls survive Worker evaluation and rendering",
     "data-output-type",
     "list<list<number>>",
   );
+});
+
+test("saving a scrolled draft preserves pointer clicks and keyboard activation", async ({
+  page,
+}, testInfo) => {
+  await openReady(page);
+  await setEditorContent(page, "Formula 1", "123");
+  await expect(
+    page.locator('[data-testid="completion-panel"][data-formula-id="Formula 1"]'),
+  ).toBeVisible();
+  const saveButton = button(page, "Formula 1", "save");
+  await saveButton.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+  try {
+    // Editor blur closes completions on an animation frame. A held pointer
+    // exposes page-scroll clamping between the press and release.
+    await saveButton.click({ delay: 100 });
+    await expect(saveButton).toBeDisabled();
+    await expect(cells(page, "Formula 1")).toHaveText(Array(4).fill("123"));
+    await expect(cells(page, "Formula 2")).toHaveText(Array(4).fill("124"));
+
+    await setEditorContent(page, "Formula 1", "125");
+    await expect(saveButton).toBeEnabled();
+    await saveButton.focus();
+    await page.keyboard.press("Enter");
+    await expect(saveButton).toBeDisabled();
+    await expect(cells(page, "Formula 1")).toHaveText(Array(4).fill("125"));
+    await expect(cells(page, "Formula 2")).toHaveText(Array(4).fill("126"));
+  } finally {
+    const json = testInfo.outputPath("scrolled-draft-save.json");
+    const screenshot = testInfo.outputPath("scrolled-draft-save.png");
+    const snapshot = await page.evaluate(() => ({
+      source: window.__nf_debug?.getState("Formula 1").source,
+      scrollY: window.scrollY,
+      saveDisabled: document.querySelector<HTMLButtonElement>(
+        '[data-testid="save-button"][data-formula-id="Formula 1"]',
+      )?.disabled,
+      cells: Array.from(
+        document.querySelectorAll('[data-testid="formula-cell"][data-formula-id="Formula 1"]'),
+        (cell) => cell.textContent,
+      ),
+    }));
+    await writeFile(json, JSON.stringify(snapshot, null, 2));
+    await page.screenshot({ path: screenshot });
+    await testInfo.attach("scrolled-draft-save.json", {
+      path: json,
+      contentType: "application/json",
+    });
+    await testInfo.attach("scrolled-draft-save.png", {
+      path: screenshot,
+      contentType: "image/png",
+    });
+  }
 });
 
 test("date inputs render dates and unrelated formulas survive a NotReady save", async ({

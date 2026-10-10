@@ -433,14 +433,101 @@ fn test_string_escaped_tab() {
 }
 
 #[test]
-fn test_string_invalid_escape_emits_diagnostic() {
-    let input = r#""a\xb""#;
+fn test_string_invalid_escapes_stop_before_emitting_a_string() {
+    for (input, start, end) in [
+        (r#""\q""#, 1, 3),
+        (r#""\r""#, 1, 3),
+        (r#""\x41""#, 1, 3),
+        (r#""\u0041""#, 1, 3),
+        (r#""\0""#, 1, 3),
+        (r#""\'""#, 1, 3),
+        (r#""\b""#, 1, 3),
+        (r#""\f""#, 1, 3),
+        (r#""\😀""#, 1, 6),
+        ("\"raw\\\n\"", 4, 6),
+        ("\"raw\\\t\"", 4, 6),
+        ("\"raw\\\r\"", 4, 6),
+    ] {
+        let output = lex(input);
+        assert_eq!(output.diagnostics.len(), 1, "{input}");
+        assert_eq!(output.diagnostics[0].code, crate::DiagnosticCode::LexError);
+        assert_eq!(output.diagnostics[0].span, Span { start, end });
+        assert_eq!(
+            output.diagnostics[0].message,
+            format!(
+                "invalid escape sequence '{}'",
+                &input[start as usize..end as usize]
+            )
+        );
+        assert_eq!(output.tokens.len(), 1);
+        assert_eq!(output.tokens[0].kind, TokenKind::Eof);
+        assert_eq!(
+            output.tokens[0].span,
+            Span {
+                start: input.len() as u32,
+                end: input.len() as u32
+            }
+        );
+    }
+}
+
+#[test]
+fn test_string_invalid_escape_preserves_prefix_and_stops_scan() {
+    let input = r#""😀" + "\中" + prop("q")"#;
     let output = lex(input);
     assert_eq!(output.diagnostics.len(), 1);
-    assert!(output.diagnostics[0].message.contains("invalid escape"));
-    assert!(output.diagnostics[0].message.contains(r"\x"));
-    // The string is still produced (with raw text).
-    assert_eq!(output.tokens[0].kind, string_lit(r#""a\xb""#));
+    assert_eq!(output.diagnostics[0].code, crate::DiagnosticCode::LexError);
+    assert_eq!(output.diagnostics[0].span, Span { start: 10, end: 14 });
+    assert_eq!(
+        output
+            .tokens
+            .iter()
+            .map(|token| (token.kind.clone(), token.span))
+            .collect::<Vec<_>>(),
+        vec![
+            (string_lit(r#""😀""#), Span { start: 0, end: 6 }),
+            (TokenKind::Plus, Span { start: 7, end: 8 }),
+            (
+                TokenKind::Eof,
+                Span {
+                    start: input.len() as u32,
+                    end: input.len() as u32
+                }
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_string_invalid_escape_cannot_fuse_property_call_tokens() {
+    let input = r#"prop("\q" "q") + prop("q")"#;
+    let output = lex(input);
+    assert_eq!(output.diagnostics.len(), 1);
+    assert_eq!(output.diagnostics[0].code, crate::DiagnosticCode::LexError);
+    assert_eq!(output.diagnostics[0].span, Span { start: 6, end: 8 });
+    assert_eq!(
+        output
+            .tokens
+            .iter()
+            .map(|token| token.kind.clone())
+            .collect::<Vec<_>>(),
+        vec![ident("prop"), TokenKind::OpenParen, TokenKind::Eof]
+    );
+    let syntax = crate::analyze_syntax(input);
+    assert_eq!(
+        syntax
+            .tokens
+            .iter()
+            .map(|token| token.kind.clone())
+            .collect::<Vec<_>>(),
+        vec![ident("prop"), TokenKind::OpenParen, TokenKind::Eof]
+    );
+    assert!(
+        syntax
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == crate::DiagnosticCode::LexError)
+    );
 }
 
 #[test]
@@ -453,6 +540,16 @@ fn test_string_unterminated_with_trailing_backslash() {
             .message
             .contains("unterminated string")
     );
+    assert_eq!(output.diagnostics[0].code, crate::DiagnosticCode::LexError);
+    assert_eq!(
+        output.diagnostics[0].span,
+        Span {
+            start: 0,
+            end: input.len() as u32
+        }
+    );
+    assert_eq!(output.tokens.len(), 1);
+    assert_eq!(output.tokens[0].kind, TokenKind::Eof);
 }
 
 // ---------------------------------------------------------------------------
