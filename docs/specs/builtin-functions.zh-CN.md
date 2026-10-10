@@ -17,6 +17,8 @@ last_verified: 2026-10-01
 声明的执行入口由 [builtins.rs](../../builtin_fn/src/builtins.rs) 驱动。
 `builtin` 代码块是签名目录，尚未接入 Markdown → Rust 生成。
 
+`Notion 差异：` 注释记录与 [Notion 函数定义](https://www.notion.com/help/formula-syntax)的已确认差异；未标注不代表已验证完全一致。
+
 ## 签名记法
 
 以下 EBNF 定义本页使用的记法，不是内部 macro DSL 的完整文法。
@@ -42,7 +44,7 @@ x?: T                  // 可省略参数，不是“所有 T 不可为 null”
 T[] / A | B            // list / union；T、U 在同一次调用内绑定
 Ident<T>               // 绑定标识符，不是普通字符串参数
 () -> T                // 延迟表达式
-(current: T) -> U      // 带隐式绑定的表达式；调用者不写 lambda 语法
+(current: T, index: number) -> U      // 带隐式绑定的表达式；调用者不写 lambda 语法
 repeat(min = n) {...}  // 整组参数重复至少 n 次；不是一个 list 参数
                        // 声明中的尾逗号不意味着公式调用允许尾逗号
 ```
@@ -53,7 +55,11 @@ repeat(min = n) {...}  // 整组参数重复至少 n 次；不是一个 list 参
 
 ```builtin
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
-ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
+/// 按顺序求值条件，跳过未选中的值；省略 else 时，未匹配的行返回普通 null。
+ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else?: () -> T) -> T;
+/// 表达式只接受 Boolean/null；从左到右短路，空值规则与 && / || 相同。
+and(repeat(min = 1) { condition: () -> boolean }) -> boolean;
+or(repeat(min = 1) { condition: () -> boolean }) -> boolean;
 
 /// 无参返回 null；有参时判断值是否为空。
 /// 返回类型由 resolve_empty 按实参个数确定。
@@ -64,6 +70,9 @@ format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
+/// 按顺序绑定名称，各值类型独立；后续绑定可读取或遮蔽已有名称。
+/// 返回类型由最终表达式在该词法作用域中的类型决定。
+lets(repeat(min = 1) { var: Ident<any>, value: any }, expr: () -> any) -> any;
 ```
 
 #### empty 类型推断
@@ -100,8 +109,12 @@ trim(text: string) -> string;
 repeat(text: string, times: number) -> string;
 padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
-/// 所有样式名称照常求值并检查类型，随后原样返回文本（含普通 null）；忽略样式元数据。
+/// Notion 差异：原样返回纯文本，不保留格式或颜色信息。
+/// 样式名称照常求值并检查类型；普通 null 文本仍返回 null。
+/// style("Done", "b", "green") → "Done"（普通文本）。
 style(text: string, repeat(min = 0) { styles: string }) -> string;
+/// Notion 差异：文本不携带样式，因此原样返回，不执行样式移除。
+/// 样式名称照常求值并检查类型；普通 null 文本仍返回 null。
 unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
 /// 至少接受两个列表；标量文本拼接使用 +。
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
@@ -211,13 +224,14 @@ unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
 /// 按输入顺序逐元素求值，保持列表长度；列表参数为 null 时返回 null。
-map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+/// 所有回调隐式绑定 current 与从零开始的 index；嵌套回调遮蔽两者，退出后恢复。
+map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
 /// 按输入顺序只展开一层，保留 null；列表参数为 null 时返回 null，空列表返回 []。
 /// flat([[1, empty()], [2]]) → [1, null, 2]；flat([[[]]]) → [[]]。
@@ -273,8 +287,7 @@ id() -> string;
 
 ```text
 People 当前无受支持函数。以下声明不进入可调用/补全集合：
-  and / or / not          // 用 && / || / not 运算符表达
-  lets                    // 缺少异构、顺序绑定模型
+  not                     // 使用 not 前缀运算符，包括 not(true)
   link                    // 尚无 Link 类型
   dateRange / dateStart / dateEnd // 尚无 DateRange 类型
   name / email            // 尚无 person 名称/邮件输入

@@ -34,11 +34,11 @@ fn generated_contract_is_deterministic_ordered_and_unique() {
     let names = categories
         .iter()
         .flat_map(|category| &category.entries)
-        .filter(|entry| entry.is_supported())
+        .filter(|entry| entry.is_supported() && !entry.requires_lowering)
         .map(|entry| entry.name.as_str())
         .collect::<Vec<_>>();
-    assert_eq!(names.len(), 85);
-    assert_eq!(names.iter().copied().collect::<HashSet<_>>().len(), 85);
+    assert_eq!(names.len(), 87);
+    assert_eq!(names.iter().copied().collect::<HashSet<_>>().len(), 87);
 
     let mut cursor = 0;
     for name in names {
@@ -81,7 +81,7 @@ fn generated_structures_cover_the_five_parameter_shapes() {
     assert!(generated.contains("pub(crate) struct SpliceArgs {"));
     assert!(generated.contains("pub(crate) repeat_groups: RepeatGroups<SpliceRepeatGroup>"));
     assert!(generated.contains("pub(crate) struct IfsPlans {"));
-    assert!(generated.contains("pub(crate) else_: ThunkPlan<AnyKind>"));
+    assert!(generated.contains("pub(crate) else_: Option<ThunkPlan<AnyKind>>"));
 
     let generated =
         build_support::generate_contract_for_names(&[synthetic_complete_shape()], &["caseOf"])
@@ -275,6 +275,14 @@ impl PreparedControlledArguments {
         _group: Option<usize>,
     ) -> Result<ThunkPlan<K>, PreparedArgumentError> {
         Ok(ThunkPlan(PhantomData))
+    }
+
+    fn take_optional_thunk<K>(
+        &mut self,
+        _parameter: ParamRef,
+        _group: Option<usize>,
+    ) -> Result<Option<ThunkPlan<K>>, PreparedArgumentError> {
+        Ok(Some(ThunkPlan(PhantomData)))
     }
 
     fn contract_failure(

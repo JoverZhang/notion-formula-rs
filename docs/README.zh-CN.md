@@ -41,3 +41,4 @@ last_verified: 2026-09-02
 
 - [Notion 的 empty() 与空值行为](experiments/notion-empty-semantics/README.zh-CN.md)
 - [Notion 列表空值与 repeat 次数](experiments/notion-list-repeat-semantics/README.zh-CN.md)
+- [Notion `ifs` 参数数量与默认值](experiments/notion-ifs-arity/README.zh-CN.md)

@@ -17,27 +17,26 @@ fn general_definitions() -> BuiltinCategory {
 
         if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 
+        /// Evaluate conditions in order; without else, an unmatched row returns ordinary null.
         ifs<T: Variant>(
             repeat(min = 1) {
                 condition: boolean,
                 value: () -> T,
             },
-            else: () -> T,
+            else?: () -> T,
         ) -> T;
 
-        #[unsupported]
-        /// Currently expressed by the `&&` operator rather than a builtin call.
+        /// Evaluate Boolean expressions from left to right with the `&&` null and short-circuit rules.
         and(
-            repeat(min = 2) {
-                condition: boolean,
+            repeat(min = 1) {
+                condition: () -> boolean,
             },
         ) -> boolean;
 
-        #[unsupported]
-        /// Currently expressed by the `||` operator rather than a builtin call.
+        /// Evaluate Boolean expressions from left to right with the `||` null and short-circuit rules.
         or(
-            repeat(min = 2) {
-                condition: boolean,
+            repeat(min = 1) {
+                condition: () -> boolean,
             },
         ) -> boolean;
 
@@ -54,8 +53,8 @@ fn general_definitions() -> BuiltinCategory {
 
         let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 
-        #[unsupported]
-        /// Precise sequential binder typing requires a heterogeneous binder-pack model.
+        #[lowered]
+        /// Bind names sequentially with independent value types; later bindings may shadow earlier names.
         lets(
             repeat(min = 1) {
                 var: Ident<any>,
@@ -87,7 +86,9 @@ fn text_definitions() -> BuiltinCategory {
         /// The semantic type model does not yet represent `Link`.
         link(label: string, url: string) -> Link;
 
-        /// Return text unchanged; style names are accepted as plain string metadata.
+        /// Notion difference: return plain text unchanged, without formatting or color metadata.
+        /// Style names are still evaluated and type-checked; ordinary null text remains null.
+        /// style("Done", "b", "green") → "Done" (plain text).
         style(
             text: string,
             repeat(min = 0) {
@@ -95,7 +96,8 @@ fn text_definitions() -> BuiltinCategory {
             },
         ) -> string;
 
-        /// Return text unchanged, accepting zero or more style names.
+        /// Notion difference: text carries no styles, so return it unchanged without removing styles.
+        /// Style names are still evaluated and type-checked; ordinary null text remains null.
         unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
 
         concat<T>(
@@ -251,13 +253,14 @@ fn list_definitions() -> BuiltinCategory {
         reverse<T>(list: T[]) -> T[];
         unique<T>(list: T[]) -> T[];
         includes<T>(list: T[], value: T) -> boolean;
-        map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-        filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-        find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-        findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-        some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-        every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-        count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+        /// Callbacks bind current and zero-based index; nested callbacks restore the outer bindings.
+        map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+        filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+        find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+        findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+        some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+        every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+        count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
         #[resolver(resolve_flat)]
         flat<T>(list: T[]) -> T[];

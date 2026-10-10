@@ -319,7 +319,15 @@ impl<'a> Formatter<'a> {
         left: &Expr,
         right: &Expr,
     ) -> Rendered {
-        let op_str = binop_str(op.node);
+        let op_str = match (
+            op.node,
+            self.source
+                .get(op.span.start as usize..op.span.end as usize),
+        ) {
+            (BinOpKind::AndAnd, Some("and")) => "and",
+            (BinOpKind::OrOr, Some("or")) => "or",
+            _ => binop_str(op.node),
+        };
         let has_newline = self.expr_has_newline(expr);
         let trailing_line_comment = self
             .available_trailing_comment(expr)

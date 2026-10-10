@@ -243,9 +243,9 @@ fn ifs_partial_and_final_snapshots_support_staged_lambda_inference() {
             ],
         },
     );
-    assert!(matches!(partial.validity, ShapeValidity::Invalid(_)));
-    assert_eq!(partial.projection.len(), 5);
-    assert_eq!(partial.projection[4].logical_param, ParamRef::Tail(0));
+    assert_eq!(partial.validity, ShapeValidity::Valid);
+    assert_eq!(partial.projection.len(), 4);
+    assert_eq!(partial.projection[3].logical_param, ParamRef::Repeat(1));
 
     let resolved = resolve_call_signature(
         &signature,

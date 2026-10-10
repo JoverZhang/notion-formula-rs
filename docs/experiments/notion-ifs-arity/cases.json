@@ -1,0 +1,317 @@
+[
+  {
+    "name": "ifs literal arity and empty-result observers",
+    "cases": [
+      {
+        "label": "ifs_zero",
+        "expression": "ifs()",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_one_true",
+        "expression": "ifs(true)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_one_false",
+        "expression": "ifs(false)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_one_number",
+        "expression": "ifs(42)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_one_text",
+        "expression": "ifs(\"fallback\")",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_two_hit",
+        "expression": "ifs(true, 11)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_two_miss",
+        "expression": "ifs(false, 11)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_three_hit",
+        "expression": "ifs(true, 11, 99)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_three_miss",
+        "expression": "ifs(false, 11, 99)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_four_first",
+        "expression": "ifs(true, 11, false, 22)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_four_second",
+        "expression": "ifs(false, 11, true, 22)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_four_both",
+        "expression": "ifs(true, 11, true, 22)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_four_none",
+        "expression": "ifs(false, 11, false, 22)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_five_default",
+        "expression": "ifs(false, 11, false, 22, 99)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_six_third",
+        "expression": "ifs(false, 11, false, 22, true, 33)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_six_none",
+        "expression": "ifs(false, 11, false, 22, false, 33)",
+        "category": "arity"
+      },
+      {
+        "label": "ifs_seven_default",
+        "expression": "ifs(false, 11, false, 22, false, 33, 99)",
+        "category": "arity"
+      },
+      {
+        "label": "if_two_hit",
+        "expression": "if(true, 11)",
+        "category": "arity"
+      },
+      {
+        "label": "if_two_miss",
+        "expression": "if(false, 11)",
+        "category": "arity"
+      },
+      {
+        "label": "if_three_hit",
+        "expression": "if(true, 11, 99)",
+        "category": "arity"
+      },
+      {
+        "label": "if_three_miss",
+        "expression": "if(false, 11, 99)",
+        "category": "arity"
+      },
+      {
+        "label": "number_condition",
+        "expression": "ifs(1, 11)",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "text_condition",
+        "expression": "ifs(\"true\", 11)",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "number_second_condition",
+        "expression": "ifs(false, 11, 42, 22)",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "missing_value",
+        "expression": "ifs(true,)",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "text_miss",
+        "expression": "ifs(false, \"hit\")",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "boolean_miss",
+        "expression": "ifs(false, true)",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "list_miss",
+        "expression": "ifs(false, [11, 22])",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "date_miss",
+        "expression": "ifs(false, parseDate(\"2026-10-10\"))",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "mixed_first",
+        "expression": "ifs(true, 11, false, \"hit\")",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "mixed_second",
+        "expression": "ifs(false, 11, true, \"hit\")",
+        "category": "type_and_syntax_boundary"
+      },
+      {
+        "label": "omitted_else_empty",
+        "expression": "empty(ifs(false, 11))",
+        "category": "empty_observer"
+      },
+      {
+        "label": "omitted_else_format",
+        "expression": "\"<\" + format(ifs(false, 11)) + \">\"",
+        "category": "format_observer"
+      },
+      {
+        "label": "explicit_empty_else_empty",
+        "expression": "empty(ifs(false, 11, empty()))",
+        "category": "empty_observer"
+      },
+      {
+        "label": "explicit_empty_else_format",
+        "expression": "\"<\" + format(ifs(false, 11, empty())) + \">\"",
+        "category": "format_observer"
+      },
+      {
+        "label": "ordinary_empty_empty",
+        "expression": "empty(empty())",
+        "category": "empty_observer"
+      },
+      {
+        "label": "ordinary_empty_format",
+        "expression": "\"<\" + format(empty()) + \">\"",
+        "category": "format_observer"
+      },
+      {
+        "label": "number_zero_empty",
+        "expression": "empty(0)",
+        "category": "empty_observer"
+      },
+      {
+        "label": "number_zero_format",
+        "expression": "\"<\" + format(0) + \">\"",
+        "category": "format_observer"
+      },
+      {
+        "label": "executed_failure_empty",
+        "expression": "empty(test(\"abc\", prop(\"Pattern\")))",
+        "category": "empty_observer"
+      },
+      {
+        "label": "executed_failure_format",
+        "expression": "\"<\" + format(test(\"abc\", prop(\"Pattern\"))) + \">\"",
+        "category": "format_observer"
+      },
+      {
+        "label": "omitted_else_list_length",
+        "expression": "length([ifs(false, 11)])",
+        "category": "list_observer"
+      },
+      {
+        "label": "omitted_else_list_join",
+        "expression": "join([1, ifs(false, 11), 2], \"|\")",
+        "category": "list_observer"
+      }
+    ],
+    "rows": [
+      {
+        "name": "literal_controls",
+        "inputs": {
+          "Pattern": "["
+        }
+      }
+    ]
+  },
+  {
+    "name": "ifs property conditions and executed-branch controls",
+    "cases": [
+      {
+        "label": "two_no_else",
+        "expression": "ifs(prop(\"Count\") > 0, 11)",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "four_no_else",
+        "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22)",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "five_with_else",
+        "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22, 99)",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "failure_direct",
+        "expression": "test(\"abc\", prop(\"Pattern\"))",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "failure_value",
+        "expression": "ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\")))",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "failure_value_empty",
+        "expression": "empty(ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\"))))",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "failure_later",
+        "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")), false)",
+        "category": "property_and_failure_control"
+      },
+      {
+        "label": "failure_default",
+        "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")))",
+        "category": "property_and_failure_control"
+      }
+    ],
+    "rows": [
+      {
+        "name": "neither_invalid_regex",
+        "inputs": {
+          "Count": 0,
+          "N": 0,
+          "Pattern": "["
+        }
+      },
+      {
+        "name": "first_invalid_regex",
+        "inputs": {
+          "Count": 1,
+          "N": 0,
+          "Pattern": "["
+        }
+      },
+      {
+        "name": "second_invalid_regex",
+        "inputs": {
+          "Count": 0,
+          "N": 1,
+          "Pattern": "["
+        }
+      },
+      {
+        "name": "both_invalid_regex",
+        "inputs": {
+          "Count": 1,
+          "N": 1,
+          "Pattern": "["
+        }
+      },
+      {
+        "name": "neither_valid_regex",
+        "inputs": {
+          "Count": 0,
+          "N": 0,
+          "Pattern": "a"
+        }
+      }
+    ]
+  }
+]

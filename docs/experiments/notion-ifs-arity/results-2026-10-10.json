@@ -1,0 +1,853 @@
+{
+  "observed_on": "2026-10-10",
+  "api_version": "2025-09-03",
+  "endpoint": "GET /v1/pages/{page_id}",
+  "response_field": "properties[formula_name].formula",
+  "groups": [
+    {
+      "name": "ifs literal arity and empty-result observers",
+      "formula_creation_errors": [
+        {
+          "label": "ifs_zero",
+          "expression": "ifs()",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "ifs_one_true",
+          "expression": "ifs(true)",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "ifs_one_false",
+          "expression": "ifs(false)",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "ifs_one_number",
+          "expression": "ifs(42)",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "ifs_one_text",
+          "expression": "ifs(\"fallback\")",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "if_two_hit",
+          "expression": "if(true, 11)",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "if_two_miss",
+          "expression": "if(false, 11)",
+          "category": "arity",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "missing_value",
+          "expression": "ifs(true,)",
+          "category": "type_and_syntax_boundary",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Parse error with formula"
+        }
+      ],
+      "rows": [
+        {
+          "name": "literal_controls",
+          "inputs": {
+            "Pattern": "["
+          },
+          "stored_inputs": {
+            "Pattern": "["
+          },
+          "results": [
+            {
+              "label": "ifs_two_hit",
+              "expression": "ifs(true, 11)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "ifs_two_miss",
+              "expression": "ifs(false, 11)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "ifs_three_hit",
+              "expression": "ifs(true, 11, 99)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "ifs_three_miss",
+              "expression": "ifs(false, 11, 99)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 99
+              }
+            },
+            {
+              "label": "ifs_four_first",
+              "expression": "ifs(true, 11, false, 22)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "ifs_four_second",
+              "expression": "ifs(false, 11, true, 22)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 22
+              }
+            },
+            {
+              "label": "ifs_four_both",
+              "expression": "ifs(true, 11, true, 22)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "ifs_four_none",
+              "expression": "ifs(false, 11, false, 22)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "ifs_five_default",
+              "expression": "ifs(false, 11, false, 22, 99)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 99
+              }
+            },
+            {
+              "label": "ifs_six_third",
+              "expression": "ifs(false, 11, false, 22, true, 33)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 33
+              }
+            },
+            {
+              "label": "ifs_six_none",
+              "expression": "ifs(false, 11, false, 22, false, 33)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "ifs_seven_default",
+              "expression": "ifs(false, 11, false, 22, false, 33, 99)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 99
+              }
+            },
+            {
+              "label": "if_three_hit",
+              "expression": "if(true, 11, 99)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "if_three_miss",
+              "expression": "if(false, 11, 99)",
+              "category": "arity",
+              "formula": {
+                "type": "number",
+                "number": 99
+              }
+            },
+            {
+              "label": "number_condition",
+              "expression": "ifs(1, 11)",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "text_condition",
+              "expression": "ifs(\"true\", 11)",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "number_second_condition",
+              "expression": "ifs(false, 11, 42, 22)",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "number",
+                "number": 22
+              }
+            },
+            {
+              "label": "text_miss",
+              "expression": "ifs(false, \"hit\")",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "boolean_miss",
+              "expression": "ifs(false, true)",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "list_miss",
+              "expression": "ifs(false, [11, 22])",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "date_miss",
+              "expression": "ifs(false, parseDate(\"2026-10-10\"))",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "date",
+                "date": null
+              }
+            },
+            {
+              "label": "mixed_first",
+              "expression": "ifs(true, 11, false, \"hit\")",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "mixed_second",
+              "expression": "ifs(false, 11, true, \"hit\")",
+              "category": "type_and_syntax_boundary",
+              "formula": {
+                "type": "string",
+                "string": "hit"
+              }
+            },
+            {
+              "label": "omitted_else_empty",
+              "expression": "empty(ifs(false, 11))",
+              "category": "empty_observer",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "omitted_else_format",
+              "expression": "\"<\" + format(ifs(false, 11)) + \">\"",
+              "category": "format_observer",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "explicit_empty_else_empty",
+              "expression": "empty(ifs(false, 11, empty()))",
+              "category": "empty_observer",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "explicit_empty_else_format",
+              "expression": "\"<\" + format(ifs(false, 11, empty())) + \">\"",
+              "category": "format_observer",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "ordinary_empty_empty",
+              "expression": "empty(empty())",
+              "category": "empty_observer",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "ordinary_empty_format",
+              "expression": "\"<\" + format(empty()) + \">\"",
+              "category": "format_observer",
+              "formula": {
+                "type": "string",
+                "string": "<>"
+              }
+            },
+            {
+              "label": "number_zero_empty",
+              "expression": "empty(0)",
+              "category": "empty_observer",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "number_zero_format",
+              "expression": "\"<\" + format(0) + \">\"",
+              "category": "format_observer",
+              "formula": {
+                "type": "string",
+                "string": "<0>"
+              }
+            },
+            {
+              "label": "executed_failure_empty",
+              "expression": "empty(test(\"abc\", prop(\"Pattern\")))",
+              "category": "empty_observer",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "executed_failure_format",
+              "expression": "\"<\" + format(test(\"abc\", prop(\"Pattern\"))) + \">\"",
+              "category": "format_observer",
+              "formula": {
+                "type": "string",
+                "string": null
+              }
+            },
+            {
+              "label": "omitted_else_list_length",
+              "expression": "length([ifs(false, 11)])",
+              "category": "list_observer",
+              "formula": {
+                "type": "number",
+                "number": 1
+              }
+            },
+            {
+              "label": "omitted_else_list_join",
+              "expression": "join([1, ifs(false, 11), 2], \"|\")",
+              "category": "list_observer",
+              "formula": {
+                "type": "string",
+                "string": "1||2"
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        }
+      ]
+    },
+    {
+      "name": "ifs property conditions and executed-branch controls",
+      "formula_creation_errors": [],
+      "rows": [
+        {
+          "name": "neither_invalid_regex",
+          "inputs": {
+            "Count": 0,
+            "N": 0,
+            "Pattern": "["
+          },
+          "stored_inputs": {
+            "Count": 0,
+            "N": 0,
+            "Pattern": "["
+          },
+          "results": [
+            {
+              "label": "two_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "four_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "five_with_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22, 99)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 99
+              }
+            },
+            {
+              "label": "failure_direct",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value",
+              "expression": "ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value_empty",
+              "expression": "empty(ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\"))))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "failure_later",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")), false)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_default",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "first_invalid_regex",
+          "inputs": {
+            "Count": 1,
+            "N": 0,
+            "Pattern": "["
+          },
+          "stored_inputs": {
+            "Count": 1,
+            "N": 0,
+            "Pattern": "["
+          },
+          "results": [
+            {
+              "label": "two_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "four_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "five_with_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22, 99)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "failure_direct",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value",
+              "expression": "ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value_empty",
+              "expression": "empty(ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\"))))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_later",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")), false)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "failure_default",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "second_invalid_regex",
+          "inputs": {
+            "Count": 0,
+            "N": 1,
+            "Pattern": "["
+          },
+          "stored_inputs": {
+            "Count": 0,
+            "N": 1,
+            "Pattern": "["
+          },
+          "results": [
+            {
+              "label": "two_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "four_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 22
+              }
+            },
+            {
+              "label": "five_with_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22, 99)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 22
+              }
+            },
+            {
+              "label": "failure_direct",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value",
+              "expression": "ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value_empty",
+              "expression": "empty(ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\"))))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "failure_later",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")), false)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_default",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "both_invalid_regex",
+          "inputs": {
+            "Count": 1,
+            "N": 1,
+            "Pattern": "["
+          },
+          "stored_inputs": {
+            "Count": 1,
+            "N": 1,
+            "Pattern": "["
+          },
+          "results": [
+            {
+              "label": "two_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "four_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "five_with_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22, 99)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 11
+              }
+            },
+            {
+              "label": "failure_direct",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value",
+              "expression": "ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value_empty",
+              "expression": "empty(ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\"))))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_later",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")), false)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "failure_default",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "neither_valid_regex",
+          "inputs": {
+            "Count": 0,
+            "N": 0,
+            "Pattern": "a"
+          },
+          "stored_inputs": {
+            "Count": 0,
+            "N": 0,
+            "Pattern": "a"
+          },
+          "results": [
+            {
+              "label": "two_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "four_no_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": null
+              }
+            },
+            {
+              "label": "five_with_else",
+              "expression": "ifs(prop(\"Count\") > 0, 11, prop(\"N\") > 0, 22, 99)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "number",
+                "number": 99
+              }
+            },
+            {
+              "label": "failure_direct",
+              "expression": "test(\"abc\", prop(\"Pattern\"))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "failure_value",
+              "expression": "ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": null
+              }
+            },
+            {
+              "label": "failure_value_empty",
+              "expression": "empty(ifs(prop(\"Count\") > 0, test(\"abc\", prop(\"Pattern\"))))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            },
+            {
+              "label": "failure_later",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")), false)",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": false
+              }
+            },
+            {
+              "label": "failure_default",
+              "expression": "ifs(prop(\"Count\") > 0, true, test(\"abc\", prop(\"Pattern\")))",
+              "category": "property_and_failure_control",
+              "formula": {
+                "type": "boolean",
+                "boolean": true
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        }
+      ]
+    }
+  ],
+  "complete": true
+}
