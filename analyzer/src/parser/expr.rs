@@ -220,8 +220,6 @@ impl<'a> Parser<'a> {
             ""
         };
 
-        // Process escape sequences: \n, \t, \", \\
-        // Invalid escapes are kept verbatim (the lexer already emitted a diagnostic).
         let unescaped = unescape_string(inner);
 
         self.mk_expr(
@@ -970,9 +968,7 @@ enum RecoverScanResult {
 
 /// Unescape a string literal's inner content.
 ///
-/// Recognised escapes: `\n` -> newline, `\t` -> tab, `\"` -> double quote, `\\` -> backslash.
-/// Invalid escape sequences (e.g. `\x`) are kept verbatim -- the lexer already emitted a
-/// diagnostic for them.
+/// Decode a lexer-validated literal once: `\n`, `\t`, `\"`, `\\`.
 fn unescape_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars();
@@ -983,15 +979,7 @@ fn unescape_string(s: &str) -> String {
                 Some('t') => out.push('\t'),
                 Some('"') => out.push('"'),
                 Some('\\') => out.push('\\'),
-                Some(other) => {
-                    // Invalid escape -- keep verbatim.
-                    out.push('\\');
-                    out.push(other);
-                }
-                None => {
-                    // Trailing backslash -- keep it.
-                    out.push('\\');
-                }
+                _ => unreachable!("string tokens contain only lexer-validated escapes"),
             }
         } else {
             out.push(c);

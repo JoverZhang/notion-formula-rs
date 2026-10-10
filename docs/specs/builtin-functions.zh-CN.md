@@ -280,7 +280,7 @@ shape → type → execution
   unknown（包括嵌套 unknown）表示未确定，不立即视为类型不匹配；通过分析不保证逐行成功。
 
 postfix
-  首参数槽位确定，且接收 receiver 后仍有其他参数位置，才具备 postfix 能力。
+  只需有确定的首参数槽位；receiver 可以提供唯一的实参，如 values.sum()。
   receiver.f(args) 等价于 f(receiver, args)，还需类型兼容。
   parser 接受 member-call 语法，不表示任何 builtin 都能 postfix；不支持时不回退成普通调用。
 

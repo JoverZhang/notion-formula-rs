@@ -22,6 +22,16 @@ import type {
 } from "./generated/wasm_dto.js";
 import type { FormulaWorker } from "./rpc.js";
 
+// Pure, synchronous; no Worker/WASM initialization. Quote a valid Unicode value,
+// escaping backslash, double quote, newline and tab; preserve other characters.
+// a"b -> "a\"b"; empty -> "".
+export declare function encodeFormulaString(value: string): string;
+
+// Pure, synchronous; input is one complete, valid String token.text from the lexer.
+// Decode once: \n -> newline, \t -> tab, \" -> double quote, \\ -> backslash.
+// "a\"b" -> a"b; "" -> empty. Preserve raw Unicode and control characters.
+export declare function decodeFormulaString(literal: string): string;
+
 // An Engine and all its Drafts share one FIFO queue; rejected calls do not stop it.
 // Each request snapshots its arguments at enqueue; later mutations cannot change it.
 // Non-cloneable arguments reject with INVALID_REQUEST at their FIFO position.
