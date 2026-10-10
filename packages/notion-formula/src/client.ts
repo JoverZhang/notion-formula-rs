@@ -90,6 +90,10 @@ class EngineClient implements FormulaEngineClient {
     return this.call("engine.getState", []);
   }
 
+  requiredInputs(formulaIds: PropertyId[]): Promise<PropertyId[]> {
+    return this.call("engine.requiredInputs", [formulaIds]);
+  }
+
   upsert(property: PropertyDefinition): Promise<FormulaEngineChangeResult> {
     return this.call("engine.upsert", [property]);
   }

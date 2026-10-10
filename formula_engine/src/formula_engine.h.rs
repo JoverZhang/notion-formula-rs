@@ -117,6 +117,20 @@ impl FormulaEngine {
     pub fn state(&self) -> FormulaEngineState<'_> {
         Self::state_impl(self)
     }
+    /// Returns declared Input IDs referenced directly or transitively by the selected Formulas,
+    /// deduplicated and sorted by PropertyId. Includes references in all conditional branches.
+    /// Reads saved dependency metadata without evaluating or changing Engine; cycles terminate.
+    /// Ready targets yield the complete static Input closure. NotReady targets expose only known
+    /// references; missing properties are omitted and invalid syntax may hide references.
+    /// Formula status remains authoritative: only Ready targets prove other Inputs unused.
+    /// evaluate still requires columns for every Input, including those absent from this result.
+    /// Errors: EmptyFormulaIds, InvalidFormulaId, or DuplicateFormulaId, checked in request order.
+    pub fn required_inputs(
+        &self,
+        formula_ids: &[PropertyId],
+    ) -> Result<Vec<PropertyId>, EvaluateInputError> {
+        Self::required_inputs_impl(self, formula_ids)
+    }
     /// Returns Ok(EvaluateResult) once input validation passes, even if every requested formula fails.
     /// Formula and row errors are returned with the result; other formulas continue.
     ///

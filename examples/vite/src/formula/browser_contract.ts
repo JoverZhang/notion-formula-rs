@@ -168,6 +168,25 @@ export async function runFormulaWorkerContract() {
     equal(await engine.getState(), direct.get_state(), "state");
     verified.push("engine snapshots");
 
+    const transitive = { Formula: { id: "twice", expression: 'prop("copy") + prop("copy")' } };
+    await engine.upsert(transitive);
+    direct.upsert(transitive);
+    const targets = ["twice", "formatted"];
+    const dependencies = engine.requiredInputs(targets);
+    targets[0] = "absent";
+    equal(await dependencies, ["n", "text"], "transitive input snapshot");
+    equal(
+      await engine.requiredInputs(["twice", "formatted"]),
+      direct.required_inputs(["twice", "formatted"]),
+      "native dependency query",
+    );
+    equal(
+      await clientError(() => engine.requiredInputs(["n"])),
+      nativeError(() => direct.required_inputs(["n"])),
+      "dependency selection error",
+    );
+    verified.push("transitive input dependencies");
+
     const result = await engine.evaluate(input);
     equal(result, direct.evaluate(input), "evaluation");
     assert(result.formulas instanceof Map, "Result formulas must be Map");
@@ -220,6 +239,7 @@ export async function runFormulaWorkerContract() {
     ]);
     const firstHandle = direct.create_draft(definition);
     const secondHandle = direct.create_draft({ id: "other", expression: "3" });
+    equal(await engine.requiredInputs(["twice"]), ["n"], "dependency query during editing");
     const clientState = await first.getState();
     const directState = direct.draft_state(firstHandle);
     equal(comparableDraft(clientState), comparableDraft(directState), "draft state");
