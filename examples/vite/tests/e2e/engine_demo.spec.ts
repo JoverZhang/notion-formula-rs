@@ -246,6 +246,23 @@ test("date inputs render dates and unrelated formulas survive a NotReady save", 
   await expect(cells(page, "Formula 2")).toHaveText(Array(4).fill("123"));
 });
 
+test("rich date ranges preserve both endpoints and time visibility in table cells", async ({
+  page,
+}, testInfo) => {
+  await openReady(page);
+  await save(page, "Formula 2", 'dateEnd(prop("Formula 1"))');
+  await save(page, "Formula 1", "dateRange(fromTimestamp(0), fromTimestamp(60000))");
+  await expect(cells(page, "Formula 1")).toHaveText(
+    Array(4).fill("1970-01-01T00:00:00.000Z → 1970-01-01T00:01:00.000Z"),
+  );
+  await save(page, "Formula 1", 'dateRange(parseDate("1970-01-01"), parseDate("1970-01-03"))');
+  await expect(cells(page, "Formula 1")).toHaveText(Array(4).fill("1970-01-01 → 1970-01-03"));
+  await expect(cells(page, "Formula 2")).toHaveText(Array(4).fill("1970-01-03"));
+  const path = testInfo.outputPath("rich-date-range-table.png");
+  await page.locator("table").screenshot({ path });
+  await testInfo.attach("rich-date-range-table.png", { path, contentType: "image/png" });
+});
+
 test("WASM initialization failure is visible and never leaves results looking current", async ({
   page,
 }) => {

@@ -3,4 +3,4 @@
 
 today()
 === OUTPUT ===
-row-0: date("2024-05-06T00:00:00+08:00")
+row-0: date_value(start=1714924800000, end=None, include_time=false)

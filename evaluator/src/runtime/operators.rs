@@ -7,7 +7,7 @@ use crate::core::columns::{
     NumberKind, TextKind, Validity,
 };
 use crate::core::errors::EvalError;
-use crate::core::types::{EvalBlock, Mask, Value, value_type_accepts};
+use crate::core::types::{EvalBlock, Mask, Value, value_type_accepts, values_equal};
 
 pub(crate) fn literal_block(value: Value, mask: &Mask) -> EvalBlock {
     let len = mask.len();
@@ -25,6 +25,10 @@ pub(crate) fn literal_block(value: Value, mask: &Mask) -> EvalBlock {
             Validity::AllValid,
         )),
         Value::Date(value) => Column::Date(KernelColumn::from_values(
+            vec![value.into(); len],
+            Validity::AllValid,
+        )),
+        Value::DateValue(value) => Column::Date(KernelColumn::from_values(
             vec![value; len],
             Validity::AllValid,
         )),
@@ -207,8 +211,8 @@ fn eval_binary_row(op: BinOpKind, left: Value, right: Value) -> RowOutcome {
         (Caret, Value::Number(left), Value::Number(right)) => {
             RowOutcome::Value(Value::Number(pow_number(left, right)))
         }
-        (EqEq, left, right) => RowOutcome::Value(Value::Bool(left == right)),
-        (Ne, left, right) => RowOutcome::Value(Value::Bool(left != right)),
+        (EqEq, left, right) => RowOutcome::Value(Value::Bool(values_equal(&left, &right))),
+        (Ne, left, right) => RowOutcome::Value(Value::Bool(!values_equal(&left, &right))),
         (Lt | Le | Ge | Gt, Value::Number(left), Value::Number(right)) => {
             let matches = match op {
                 Lt => left < right,
@@ -265,6 +269,9 @@ fn compare_values(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
         (Value::Text(left), Value::Text(right)) => Some(left.cmp(right)),
         (Value::Bool(left), Value::Bool(right)) => Some(left.cmp(right)),
         (Value::Date(left), Value::Date(right)) => Some(left.cmp(right)),
+        (Value::DateValue(left), Value::DateValue(right)) => Some(left.start.cmp(&right.start)),
+        (Value::Date(left), Value::DateValue(right)) => Some(left.cmp(&right.start)),
+        (Value::DateValue(left), Value::Date(right)) => Some(left.start.cmp(right)),
         _ => None,
     }
 }
@@ -436,6 +443,10 @@ pub(crate) fn stringify_value(value: &Value) -> String {
         Value::Text(value) => value.clone(),
         Value::Bool(value) => value.to_string(),
         Value::Date(value) => value.to_string(),
+        Value::DateValue(value) => match value.end {
+            Some(end) => format!("{} → {end}", value.start),
+            None => value.start.to_string(),
+        },
         Value::List(values) => {
             let values = values
                 .iter()

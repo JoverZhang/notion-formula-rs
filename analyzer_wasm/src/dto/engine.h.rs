@@ -64,6 +64,16 @@ pub enum FormulaStatus {
 pub struct FormulaEngineChangeResult {
     pub affected_formulas: Vec<PropertyId>,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+/// Lossless date metadata; both endpoints are strict bigint milliseconds and end is explicit null when absent.
+pub struct DateValue {
+    #[serde(deserialize_with = "deserialize_i64_bigint")]
+    pub start: i64,
+    #[serde(deserialize_with = "deserialize_optional_i64_bigint")]
+    pub end: Option<i64>,
+    pub include_time: bool,
+}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 /// Number retains NaN, infinities and signed zero. Date uses bigint milliseconds.
 /// Ordinary nested null is represented by None, serialized as JavaScript null.
@@ -71,7 +81,9 @@ pub enum Value {
     Number(f64),
     String(String),
     Boolean(bool),
+    /// Legacy Date means end=null and include_time=true; both variants have semantic type Date.
     Date(#[serde(deserialize_with = "deserialize_i64_bigint")] i64),
+    DateValue(DateValue),
     List(Vec<Option<Value>>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -87,6 +99,8 @@ pub enum Column {
     String(ColumnData<String>),
     Boolean(ColumnData<bool>),
     Date(#[serde(deserialize_with = "deserialize_date_column")] ColumnData<i64>),
+    /// Shares ColumnKind::Date with legacy Date; output storage follows the Engine contract.
+    DateValue(ColumnData<DateValue>),
     List(ColumnData<Vec<Option<Value>>>),
     Union(ColumnData<Value>),
 }

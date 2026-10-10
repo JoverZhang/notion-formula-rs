@@ -3,4 +3,4 @@
 
 dateSubtract(parseDate("2024-05-06"), 2, "days")
 === OUTPUT ===
-row-0: date("2024-05-04T00:00:00+08:00")
+row-0: date_value(start=1714752000000, end=None, include_time=false)

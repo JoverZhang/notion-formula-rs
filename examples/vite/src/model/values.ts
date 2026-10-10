@@ -6,7 +6,7 @@ export function formatValueType(ty: ValueType): string {
   return ty.Union.map(formatValueType).join(" | ");
 }
 
-export function formatDateValue(value: bigint): string {
+export function formatDateValue(value: bigint, includeTime?: boolean): string {
   // Both limits matter before converting an exact engine timestamp to a JS number.
   const dateLimit = 8640000000000000n;
   const safeLimit = BigInt(Number.MAX_SAFE_INTEGER);
@@ -14,7 +14,9 @@ export function formatDateValue(value: bigint): string {
     return value.toString();
   }
   const iso = new Date(Number(value)).toISOString();
-  return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, -14) : iso;
+  return includeTime === false || (includeTime === undefined && iso.endsWith("T00:00:00.000Z"))
+    ? iso.slice(0, iso.indexOf("T"))
+    : iso;
 }
 
 export function formatValue(value: Value | null): string {
@@ -23,6 +25,12 @@ export function formatValue(value: Value | null): string {
   if ("String" in value) return value.String;
   if ("Boolean" in value) return String(value.Boolean);
   if ("Date" in value) return formatDateValue(value.Date);
+  if ("DateValue" in value) {
+    const date = value.DateValue;
+    const endpoint = (timestamp: bigint) => formatDateValue(timestamp, date.include_time);
+    const start = endpoint(date.start);
+    return date.end === null ? start : `${start} → ${endpoint(date.end)}`;
+  }
   return `[${value.List.map(formatValue).join(", ")}]`;
 }
 
@@ -35,6 +43,10 @@ export function columnValue(column: Column, rowIndex: number): Value | null {
     return column.Boolean.validity[rowIndex] ? { Boolean: column.Boolean.values[rowIndex] } : null;
   if ("Date" in column)
     return column.Date.validity[rowIndex] ? { Date: column.Date.values[rowIndex] } : null;
+  if ("DateValue" in column)
+    return column.DateValue.validity[rowIndex]
+      ? { DateValue: column.DateValue.values[rowIndex] }
+      : null;
   if ("List" in column)
     return column.List.validity[rowIndex] ? { List: column.List.values[rowIndex] } : null;
   return column.Union.validity[rowIndex] ? column.Union.values[rowIndex] : null;

@@ -2,7 +2,7 @@
 doc_id: specs.formula-language
 title: "Formula Grammar and Evaluation Rules"
 language: en
-source_language: zh-CN
+source_language: en
 counterpart: ./formula-language.zh-CN.md
 implementation_status: current
 document_status: stable
@@ -164,8 +164,11 @@ a == b / !=    any non-null values; different value kinds are unequal
 a < <= >= > b  same kind among number/string/boolean/date → boolean
 
 Unary/non-logical binary non-null operand combinations not listed above → row type error; ==/!= accept different kinds and are not in this category.
-Comparison order: numbers by numeric value, strings lexicographically, booleans false < true, dates chronologically.
-Text conversion: integers have no .0, booleans are lowercase, dates are epoch-millisecond integers,
+Comparison order: numbers by numeric value, strings lexicographically, booleans false < true, dates by start timestamp.
+Date equality compares start and optional end, ignoring include_time; legacy Date is a single date with no end.
+This equality also applies recursively in lists and in equal/unequal/unique/includes.
+Text conversion: integers have no .0, booleans are lowercase, single dates are epoch-millisecond integers,
+                 date ranges retain both raw endpoints as start → end,
                  lists use square brackets and commas around recursively converted elements.
 
 Non-logical operators: evaluate both sides; if either errors, report an error; otherwise, if either is null, return null.

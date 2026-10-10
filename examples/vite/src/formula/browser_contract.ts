@@ -196,6 +196,76 @@ export async function runFormulaWorkerContract() {
     );
     verified.push("lossless evaluation DTOs");
 
+    const range = {
+      start: 9_007_199_254_740_993n,
+      end: -9_007_199_254_740_993n,
+      include_time: false,
+    };
+    const richDates: Column = {
+      DateValue: {
+        values: [
+          range,
+          { start: 1n, end: null, include_time: false },
+          { start: -1n, end: null, include_time: true },
+          range,
+        ],
+        validity: [true, true, true, false],
+      },
+    };
+    const nestedDates: Column = {
+      List: {
+        values: [[{ DateValue: range }, null, { Date: 0n }], [], [], []],
+        validity: [true, true, true, true],
+      },
+    };
+    const unionDates: Column = {
+      Union: {
+        values: [
+          { DateValue: range },
+          { Date: 0n },
+          { Number: -0 },
+          { List: [{ DateValue: range }] },
+        ],
+        validity: [true, true, true, true],
+      },
+    };
+    const richInput: EvaluateInput = {
+      ...input,
+      columns: new Map(input.columns),
+      formula_ids: ["date_copy", "list_copy", "union_copy"],
+    };
+    richInput.columns.set("date", richDates);
+    richInput.columns.set("items", nestedDates);
+    richInput.columns.set("dynamic", unionDates);
+    const richResult = await engine.evaluate(richInput);
+    equal(richResult, direct.evaluate(richInput), "rich date evaluation");
+    const richDate = richResult.formulas.get("date_copy");
+    assert(richDate && "Ok" in richDate, "Expected rich date copy");
+    assert("DateValue" in richDate.Ok.column, "Expected rich date column");
+    equal(
+      richDate.Ok.column,
+      {
+        DateValue: {
+          ...richDates.DateValue,
+          values: [
+            ...richDates.DateValue.values.slice(0, 3),
+            { start: 0n, end: null, include_time: false },
+          ],
+        },
+      },
+      "exact range, hidden time, mixed scalar row and null placeholder",
+    );
+    equal(richDate.Ok.output_type, "Date", "rich dates share Date semantic type");
+    for (const [id, column] of [
+      ["list_copy", nestedDates],
+      ["union_copy", unionDates],
+    ] as const) {
+      const output = richResult.formulas.get(id);
+      assert(output && "Ok" in output, "Expected nested date copy");
+      equal(output.Ok.column, column, id);
+    }
+    verified.push("rich date metadata");
+
     const invalidInput = {
       ...input,
       runtime: { now: -9_223_372_036_854_775_808n, time_zone: "+00:00" },
@@ -377,6 +447,12 @@ export async function runFormulaWorkerContract() {
       rows: input.row_ids.length,
       specialNumbers: true,
       exactDate: true,
+      richDates: true,
+      richRange: {
+        start: richDate.Ok.column.DateValue.values[0].start.toString(),
+        end: richDate.Ok.column.DateValue.values[0].end?.toString() ?? null,
+        include_time: richDate.Ok.column.DateValue.values[0].include_time,
+      },
       maps: true,
       utf16Cursor: changed.cursor,
     };

@@ -141,12 +141,25 @@ pub enum FormulaStatus { Ready { output_type: ValueType }, NotReady }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 pub struct FormulaEngineChangeResult { pub affected_formulas: Vec<PropertyId> }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+/// 完整保留日期元数据；两个端点均严格要求 bigint 毫秒，没有终点时 end 须显式为 null。
+pub struct DateValue {
+    #[serde(deserialize_with = "deserialize_i64_bigint")]
+    pub start: i64,
+    #[serde(deserialize_with = "deserialize_optional_i64_bigint")]
+    pub end: Option<i64>,
+    pub include_time: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 /// Number 保留 NaN、Infinity 和 signed zero；Date 使用 bigint 毫秒。
 /// 普通嵌套 null 以 None 表示，序列化为 JavaScript null。
 pub enum Value {
     Number(f64), String(String), Boolean(bool),
+    /// 旧版 Date 相当于 end=null、include_time=true；两种形式的语义类型均为 Date。
     Date(#[serde(deserialize_with = "deserialize_i64_bigint")] i64),
+    DateValue(DateValue),
     List(Vec<Option<Value>>),
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -157,6 +170,8 @@ pub struct ColumnData<T> { pub values: Vec<T>, pub validity: Vec<bool> }
 pub enum Column {
     Number(ColumnData<f64>), String(ColumnData<String>), Boolean(ColumnData<bool>),
     Date(#[serde(deserialize_with = "deserialize_date_column")] ColumnData<i64>),
+    /// 与旧版 Date 共用 ColumnKind::Date；输出存储遵循 Engine 契约。
+    DateValue(ColumnData<DateValue>),
     List(ColumnData<Vec<Option<Value>>>), Union(ColumnData<Value>),
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
