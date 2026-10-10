@@ -1,0 +1,65 @@
+[
+  {
+    "role": "cloud",
+    "image": "docker.io/appflowyinc/appflowy_cloud:0.19.0",
+    "imageId": "sha256:3b8d3139fe031db8e61e401d9f9deb0d451b05e616938284bd5707ddcefe183f",
+    "repoDigests": [
+      "docker.io/appflowyinc/appflowy_cloud@sha256:49940729f905090143e21f05986ca5e21883fcc6c2260032acae1ff0ea8641e4",
+      "docker.io/appflowyinc/appflowy_cloud@sha256:a7fbe44a50b6eb260a3323f0d9a458387fb74a565658ecef95b093a1fb1e66e1"
+    ]
+  },
+  {
+    "role": "gotrue",
+    "image": "docker.io/appflowyinc/gotrue:latest",
+    "imageId": "sha256:10af4edefe78c5bb378f8a19951270c97d8a970589e2a4422df8c063465153ca",
+    "repoDigests": [
+      "docker.io/appflowyinc/gotrue@sha256:10c14914e51702ad6c65215a8da52616621daa8a6b4626dfdfc0b6deee03adcd",
+      "docker.io/appflowyinc/gotrue@sha256:74b60212c3e6a044555badb9085870708f806e54e422096fb8c4b7025133d1ba"
+    ]
+  },
+  {
+    "role": "worker",
+    "image": "docker.io/appflowyinc/appflowy_worker:0.19.0",
+    "imageId": "sha256:9f8c9b20a64ca09ec3e7388d2d7b931dc4b8930ce93ca19f60c0a2b9a2e25e36",
+    "repoDigests": [
+      "docker.io/appflowyinc/appflowy_worker@sha256:b2343c576227ed6f73ae310f48b2e9b7da624aeb9c4298d45381df9659ecbedd",
+      "docker.io/appflowyinc/appflowy_worker@sha256:bc3ace9322a1428563afc1c76d5bd01129539f33935477b1fa47c6402ba29d8c"
+    ]
+  },
+  {
+    "role": "search",
+    "image": "docker.io/appflowyinc/appflowy_search:0.19.0",
+    "imageId": "sha256:ccbbbc7c1dd1336797d0bc4d1a1a3f9b9f7d3865b7807ec7aa1e6fe927e50106",
+    "repoDigests": [
+      "docker.io/appflowyinc/appflowy_search@sha256:567e611518dcece3a783d3a0ddea016138e49e7a77a363642aabe86dbf83e70f",
+      "docker.io/appflowyinc/appflowy_search@sha256:6bafe411253e043bfc9fd953c742b27d2302518b070465ac5035668f1adc72ed"
+    ]
+  },
+  {
+    "role": "postgres",
+    "image": "docker.io/pgvector/pgvector:pg16",
+    "imageId": "sha256:f1447071e6c8449dcf4056aa0994c81d3566ce5ee232de36b04dc25696a116dd",
+    "repoDigests": [
+      "docker.io/pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a",
+      "docker.io/pgvector/pgvector@sha256:a97d77306ff47cc1d8add4d000cec2207da2e110746318df3137ce53c337ca30"
+    ]
+  },
+  {
+    "role": "redis",
+    "image": "docker.io/library/redis:7-alpine",
+    "imageId": "sha256:f84b0c4678011602b9b98c227a4dcd5468bf8b088b02fdd4165cb7758bad8058",
+    "repoDigests": [
+      "docker.io/library/redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "docker.io/library/redis@sha256:ca0acbb137c1dc3339c8b147a58fd6f42775d4599327b50e7b116c23de501af2"
+    ]
+  },
+  {
+    "role": "minio",
+    "image": "docker.io/appflowyinc/minio:RELEASE.2025-09-07T16-13-09Z",
+    "imageId": "sha256:69b2ec208575b69597784255eec6fa6a2985ee9e1a47f4411a51f7f5fdd193a9",
+    "repoDigests": [
+      "docker.io/appflowyinc/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "docker.io/appflowyinc/minio@sha256:a1a8bd4ac40ad7881a245bab97323e18f971e4d4cba2c2007ec1bedd21cbaba2"
+    ]
+  }
+]

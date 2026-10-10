@@ -42,3 +42,4 @@ clients, and WASM integrations to the current user-visible contract they need.
 
 - [Notion `empty()` and null behavior](experiments/notion-empty-semantics/README.md)
 - [Notion list nulls and repeat counts](experiments/notion-list-repeat-semantics/README.md)
+- [AppFlowy formula A/B benchmark](experiments/appflowy-formula-benchmark/README.md)
