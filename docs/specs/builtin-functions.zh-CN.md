@@ -17,6 +17,8 @@ last_verified: 2026-10-01
 声明的执行入口由 [builtins.rs](../../builtin_fn/src/builtins.rs) 驱动。
 `builtin` 代码块是签名目录，尚未接入 Markdown → Rust 生成。
 
+`Notion 差异：` 注释记录与 [Notion 函数定义](https://www.notion.com/help/formula-syntax)的已确认差异；未标注不代表已验证完全一致。
+
 ## 签名记法
 
 以下 EBNF 定义本页使用的记法，不是内部 macro DSL 的完整文法。
@@ -100,8 +102,12 @@ trim(text: string) -> string;
 repeat(text: string, times: number) -> string;
 padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
-/// 所有样式名称照常求值并检查类型，随后原样返回文本（含普通 null）；忽略样式元数据。
+/// Notion 差异：原样返回纯文本，不保留格式或颜色信息。
+/// 样式名称照常求值并检查类型；普通 null 文本仍返回 null。
+/// style("Done", "b", "green") → "Done"（普通文本）。
 style(text: string, repeat(min = 0) { styles: string }) -> string;
+/// Notion 差异：文本不携带样式，因此原样返回，不执行样式移除。
+/// 样式名称照常求值并检查类型；普通 null 文本仍返回 null。
 unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
 /// 至少接受两个列表；标量文本拼接使用 +。
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];

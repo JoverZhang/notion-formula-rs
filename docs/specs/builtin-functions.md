@@ -17,6 +17,8 @@ last_verified: 2026-10-01
 Declarations execute through [builtins.rs](../../builtin_fn/src/builtins.rs).
 The `builtin` blocks are a signature catalog and are not yet connected to Markdown → Rust generation.
 
+`Notion difference:` comments record confirmed differences from [Notion's function definitions](https://www.notion.com/help/formula-syntax); an unmarked function has not necessarily been verified to match fully.
+
 ## Signature notation
 
 This EBNF defines the notation used on this page, not the complete internal macro DSL.
@@ -100,8 +102,12 @@ trim(text: string) -> string;
 repeat(text: string, times: number) -> string;
 padStart(text: string | number, length: number, pad: string) -> string;
 padEnd(text: string | number, length: number, pad: string) -> string;
-/// Preserve text, including ordinary null, after evaluating and type-checking all style names; styling metadata is ignored.
+/// Notion difference: return plain text unchanged, without formatting or color metadata.
+/// Style names are still evaluated and type-checked; ordinary null text remains null.
+/// style("Done", "b", "green") → "Done" (plain text).
 style(text: string, repeat(min = 0) { styles: string }) -> string;
+/// Notion difference: text carries no styles, so return it unchanged without removing styles.
+/// Style names are still evaluated and type-checked; ordinary null text remains null.
 unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
 /// Accept at least two lists; scalar text concatenation uses +.
 concat<T>(repeat(min = 2) { lists: T[] }) -> T[];
