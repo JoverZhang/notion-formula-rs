@@ -215,10 +215,10 @@ fn format_number_returns_string() {
 fn format_number_arity_error() {
     let ctx = builtins_ctx();
     assert_single_diag(
-        "formatNumber(3.14, \"percent\")",
+        "formatNumber(3.14)",
         &ctx,
-        "formatNumber() expects exactly 3 arguments",
-        Span { start: 0, end: 29 },
+        "formatNumber() expects at least 2 arguments",
+        Span { start: 0, end: 18 },
     );
 }
 

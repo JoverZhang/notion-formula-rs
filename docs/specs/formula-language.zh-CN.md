@@ -215,7 +215,7 @@ evaluate          → 运行时问题是逐行错误；其他行可继续
 
 Current 推断允许 unknown、union，以及嵌套 unknown。
 未知标识符或不确定推断不必立即拒绝；语法诊断阻止求值。
-例如 "count: " + 3 可推断为 unknown，但运行时仍可拼接文本。
++ 任一操作数已知为 String 时，结果推断为 String，与运行时文本转换一致。
 诊断 message 不是机器接口。
 ```
 

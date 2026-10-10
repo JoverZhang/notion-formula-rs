@@ -24,7 +24,7 @@ fn number_column(values: Vec<f64>, validity: Validity) -> Column {
 fn generated_catalog_has_one_obligation_per_supported_builtin() {
     let supported = builtin_fn::builtins_functions();
     assert_eq!(BuiltinKey::ALL.len(), supported.len());
-    assert_eq!(BuiltinKey::ALL.len(), 83);
+    assert_eq!(BuiltinKey::ALL.len(), 85);
     for (key, signature) in BuiltinKey::ALL.iter().zip(supported) {
         assert_eq!(key.name(), signature.name);
         let expected_mode = if signature

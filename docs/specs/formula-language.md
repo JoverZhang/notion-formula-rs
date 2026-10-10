@@ -216,7 +216,7 @@ evaluate          → runtime issues are per-row errors; other rows can continue
 
 Current inference allows unknown, unions, and nested unknown.
 Unknown identifiers or uncertain inference need not be rejected immediately; syntax diagnostics prevent evaluation.
-For example, "count: " + 3 may infer as unknown, but at runtime it can still concatenate text.
+When either + operand is known to be String, the result is inferred as String, matching runtime text conversion.
 Diagnostic messages are not a machine interface.
 ```
 

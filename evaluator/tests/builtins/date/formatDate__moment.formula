@@ -1,0 +1,1 @@
+formatDate(parseDate("2024-03-05T10:30:05.125Z"), "[Week] W dddd Do DDDo GGGG-WW HH:mm Z")
