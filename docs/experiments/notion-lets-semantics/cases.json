@@ -1,0 +1,111 @@
+[
+  {
+    "name": "lets literal bindings and scope",
+    "cases": [
+      {
+        "label": "requested_formula",
+        "expression": "lets(a, 1, label, \"v\", a, a + 1, label + format(a))",
+        "category": "rebind"
+      },
+      {
+        "label": "requested_nested_let",
+        "expression": "let(a, 1, let(label, \"v\", let(a, a + 1, label + format(a))))",
+        "category": "nested_control"
+      },
+      {
+        "label": "distinct_sequential_names",
+        "expression": "lets(a, 1, b, a + 1, a + b)",
+        "category": "sequential"
+      },
+      {
+        "label": "same_name_constant",
+        "expression": "lets(a, 1, a, 2, a)",
+        "category": "rebind"
+      },
+      {
+        "label": "same_name_type_change",
+        "expression": "lets(a, 1, a, \"v\" + format(a), a)",
+        "category": "rebind"
+      },
+      {
+        "label": "capture_before_rebind",
+        "expression": "lets(a, 1, before, a, a, 2, format(before) + \":\" + format(a))",
+        "category": "scope"
+      },
+      {
+        "label": "restore_outer_binding",
+        "expression": "let(a, 7, lets(a, 1, a, a + 1, a) + a)",
+        "category": "scope"
+      },
+      {
+        "label": "rhs_reads_outer_binding",
+        "expression": "let(a, 7, lets(a, a + 1, a))",
+        "category": "scope"
+      },
+      {
+        "label": "repeated_self_reference",
+        "expression": "lets(a, 1, a, a + 1, a, a * 3, a)",
+        "category": "rebind"
+      },
+      {
+        "label": "without_rebind_control",
+        "expression": "lets(a, 1, label, \"v\", label + format(a))",
+        "category": "control"
+      },
+      {
+        "label": "unbound_self_reference",
+        "expression": "lets(a, a + 1, a)",
+        "category": "invalid_reference"
+      },
+      {
+        "label": "forward_reference",
+        "expression": "lets(a, b + 1, b, 2, a)",
+        "category": "invalid_reference"
+      }
+    ],
+    "rows": [
+      {
+        "name": "literal_controls",
+        "inputs": {}
+      }
+    ]
+  },
+  {
+    "name": "lets property bindings",
+    "cases": [
+      {
+        "label": "requested_property_formula",
+        "expression": "lets(a, prop(\"Count\"), label, prop(\"Text\"), a, a + 1, label + format(a))",
+        "category": "property_rebind"
+      },
+      {
+        "label": "requested_property_nested_let",
+        "expression": "let(a, prop(\"Count\"), let(label, prop(\"Text\"), let(a, a + 1, label + format(a))))",
+        "category": "property_nested_control"
+      }
+    ],
+    "rows": [
+      {
+        "name": "positive",
+        "inputs": {
+          "Count": 1,
+          "Text": "v"
+        }
+      },
+      {
+        "name": "zero",
+        "inputs": {
+          "Count": 0,
+          "Text": "zero:"
+        }
+      },
+      {
+        "name": "negative_unicode",
+        "inputs": {
+          "Count": -3,
+          "Text": "数:"
+        }
+      }
+    ]
+  }
+]

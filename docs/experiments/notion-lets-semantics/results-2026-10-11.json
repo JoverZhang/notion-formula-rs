@@ -1,0 +1,232 @@
+{
+  "observed_on": "2026-10-11",
+  "api_version": "2025-09-03",
+  "endpoint": "GET /v1/pages/{page_id}",
+  "response_field": "properties[formula_name].formula",
+  "groups": [
+    {
+      "name": "lets literal bindings and scope",
+      "formula_creation_errors": [
+        {
+          "label": "unbound_self_reference",
+          "expression": "lets(a, a + 1, a)",
+          "category": "invalid_reference",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        },
+        {
+          "label": "forward_reference",
+          "expression": "lets(a, b + 1, b, 2, a)",
+          "category": "invalid_reference",
+          "status": 400,
+          "code": "validation_error",
+          "message": "Type error with formula"
+        }
+      ],
+      "rows": [
+        {
+          "name": "literal_controls",
+          "inputs": {},
+          "stored_inputs": {},
+          "results": [
+            {
+              "label": "requested_formula",
+              "expression": "lets(a, 1, label, \"v\", a, a + 1, label + format(a))",
+              "category": "rebind",
+              "formula": {
+                "type": "string",
+                "string": "v2"
+              }
+            },
+            {
+              "label": "requested_nested_let",
+              "expression": "let(a, 1, let(label, \"v\", let(a, a + 1, label + format(a))))",
+              "category": "nested_control",
+              "formula": {
+                "type": "string",
+                "string": "v2"
+              }
+            },
+            {
+              "label": "distinct_sequential_names",
+              "expression": "lets(a, 1, b, a + 1, a + b)",
+              "category": "sequential",
+              "formula": {
+                "type": "number",
+                "number": 3
+              }
+            },
+            {
+              "label": "same_name_constant",
+              "expression": "lets(a, 1, a, 2, a)",
+              "category": "rebind",
+              "formula": {
+                "type": "number",
+                "number": 2
+              }
+            },
+            {
+              "label": "same_name_type_change",
+              "expression": "lets(a, 1, a, \"v\" + format(a), a)",
+              "category": "rebind",
+              "formula": {
+                "type": "string",
+                "string": "v1"
+              }
+            },
+            {
+              "label": "capture_before_rebind",
+              "expression": "lets(a, 1, before, a, a, 2, format(before) + \":\" + format(a))",
+              "category": "scope",
+              "formula": {
+                "type": "string",
+                "string": "1:2"
+              }
+            },
+            {
+              "label": "restore_outer_binding",
+              "expression": "let(a, 7, lets(a, 1, a, a + 1, a) + a)",
+              "category": "scope",
+              "formula": {
+                "type": "number",
+                "number": 9
+              }
+            },
+            {
+              "label": "rhs_reads_outer_binding",
+              "expression": "let(a, 7, lets(a, a + 1, a))",
+              "category": "scope",
+              "formula": {
+                "type": "number",
+                "number": 8
+              }
+            },
+            {
+              "label": "repeated_self_reference",
+              "expression": "lets(a, 1, a, a + 1, a, a * 3, a)",
+              "category": "rebind",
+              "formula": {
+                "type": "number",
+                "number": 6
+              }
+            },
+            {
+              "label": "without_rebind_control",
+              "expression": "lets(a, 1, label, \"v\", label + format(a))",
+              "category": "control",
+              "formula": {
+                "type": "string",
+                "string": "v1"
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        }
+      ]
+    },
+    {
+      "name": "lets property bindings",
+      "formula_creation_errors": [],
+      "rows": [
+        {
+          "name": "positive",
+          "inputs": {
+            "Count": 1,
+            "Text": "v"
+          },
+          "stored_inputs": {
+            "Count": 1,
+            "Text": "v"
+          },
+          "results": [
+            {
+              "label": "requested_property_formula",
+              "expression": "lets(a, prop(\"Count\"), label, prop(\"Text\"), a, a + 1, label + format(a))",
+              "category": "property_rebind",
+              "formula": {
+                "type": "string",
+                "string": "v2"
+              }
+            },
+            {
+              "label": "requested_property_nested_let",
+              "expression": "let(a, prop(\"Count\"), let(label, prop(\"Text\"), let(a, a + 1, label + format(a))))",
+              "category": "property_nested_control",
+              "formula": {
+                "type": "string",
+                "string": "v2"
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "zero",
+          "inputs": {
+            "Count": 0,
+            "Text": "zero:"
+          },
+          "stored_inputs": {
+            "Count": 0,
+            "Text": "zero:"
+          },
+          "results": [
+            {
+              "label": "requested_property_formula",
+              "expression": "lets(a, prop(\"Count\"), label, prop(\"Text\"), a, a + 1, label + format(a))",
+              "category": "property_rebind",
+              "formula": {
+                "type": "string",
+                "string": "zero:1"
+              }
+            },
+            {
+              "label": "requested_property_nested_let",
+              "expression": "let(a, prop(\"Count\"), let(label, prop(\"Text\"), let(a, a + 1, label + format(a))))",
+              "category": "property_nested_control",
+              "formula": {
+                "type": "string",
+                "string": "zero:1"
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        },
+        {
+          "name": "negative_unicode",
+          "inputs": {
+            "Count": -3,
+            "Text": "数:"
+          },
+          "stored_inputs": {
+            "Count": -3,
+            "Text": "数:"
+          },
+          "results": [
+            {
+              "label": "requested_property_formula",
+              "expression": "lets(a, prop(\"Count\"), label, prop(\"Text\"), a, a + 1, label + format(a))",
+              "category": "property_rebind",
+              "formula": {
+                "type": "string",
+                "string": "数:-2"
+              }
+            },
+            {
+              "label": "requested_property_nested_let",
+              "expression": "let(a, prop(\"Count\"), let(label, prop(\"Text\"), let(a, a + 1, label + format(a))))",
+              "category": "property_nested_control",
+              "formula": {
+                "type": "string",
+                "string": "数:-2"
+              }
+            }
+          ],
+          "repeat_read_matches": true
+        }
+      ]
+    }
+  ],
+  "complete": true
+}
