@@ -155,6 +155,106 @@ test("row errors retain their origin and ordinary nulls remain distinct", async 
   }
 });
 
+test("ifs requires a fallback and keeps explicit nulls and lazy row errors", async ({
+  page,
+}, testInfo) => {
+  await openReady(page);
+  const observations: object[] = [];
+  try {
+    const incomplete = 'ifs(true, "42", false, )';
+    await setEditorContent(page, "Formula 1", incomplete);
+    await page.evaluate((cursor) => {
+      window.__nf_debug!.setSelectionHead("Formula 1", cursor);
+    }, incomplete.lastIndexOf(")"));
+    const signature = page.locator(
+      '[data-testid="suggestion-signature"][data-formula-id="Formula 1"]',
+    );
+    const main = signature.locator(".completion-signature-main");
+    const active = main.locator(".is-active");
+    await expect(main).toBeVisible();
+    await expect(main).toContainText("else: string");
+    await expect(main).not.toContainText("?");
+    await expect(active).toHaveText("value2: string");
+    observations.push({
+      source: incomplete,
+      signature: await main.innerText(),
+      active: await active.innerText(),
+    });
+
+    for (const source of [
+      "ifs(true, 11)",
+      "ifs(false, 11, false, 22)",
+      "ifs(false, 11, false, 22, false, 33)",
+    ]) {
+      await setEditorContent(page, "Formula 1", source);
+      const diagnostics = page.locator(
+        '[data-testid="formula-diagnostics"][data-formula-id="Formula 1"]',
+      );
+      await expect(diagnostics).toContainText(
+        /ifs\(\) (expects at least 3 arguments|has an invalid argument shape)/,
+      );
+      observations.push({ source, diagnostics: await diagnostics.innerText() });
+    }
+
+    const explicitNull = 'ifs(prop("Number") > 10, 11, empty())';
+    await save(page, "Formula 1", explicitNull);
+    await expect(cells(page, "Formula 1")).toHaveText(["11", "null", "null", "11"]);
+    const heading = page.locator('th[data-formula-id="Formula 1"]');
+    await expect(heading).toHaveAttribute("data-output-type", "unknown");
+    for (const row of [1, 2]) {
+      await expect(cells(page, "Formula 1").nth(row)).not.toHaveClass(/is-error/);
+      await expect(cells(page, "Formula 1").nth(row)).not.toHaveAttribute("data-error-origins");
+    }
+    observations.push({
+      source: explicitNull,
+      outputType: await heading.getAttribute("data-output-type"),
+      cells: await cells(page, "Formula 1").allTextContents(),
+    });
+
+    const sevenArguments =
+      'ifs(prop("Number") > 10, 11, prop("Number") == 7, 22, prop("Number") == 4, 33, 99)';
+    await save(page, "Formula 1", sevenArguments);
+    await expect(cells(page, "Formula 1")).toHaveText(["11", "22", "33", "11"]);
+    await expect(heading).toHaveAttribute("data-output-type", "number");
+    observations.push({
+      source: sevenArguments,
+      outputType: await heading.getAttribute("data-output-type"),
+      cells: await cells(page, "Formula 1").allTextContents(),
+    });
+
+    const lazyErrors =
+      'ifs(prop("Number") > 10, true, prop("Number") == 7, test("x", "["), empty())';
+    await save(page, "Formula 1", lazyErrors);
+    await expect(cells(page, "Formula 1")).toHaveText(["true", "Error", "null", "true"]);
+    await expect(heading).toHaveAttribute("data-output-type", "unknown");
+    await expect(cells(page, "Formula 1").nth(1)).toHaveAttribute(
+      "data-error-origins",
+      "Formula 1",
+    );
+    await expect(cells(page, "Formula 1").nth(1)).toHaveAttribute(
+      "title",
+      /Formula 1: Invalid regular expression/,
+    );
+    await expect(cells(page, "Formula 1").nth(2)).not.toHaveClass(/is-error/);
+    observations.push({
+      source: lazyErrors,
+      outputType: await heading.getAttribute("data-output-type"),
+      cells: await cells(page, "Formula 1").allTextContents(),
+      errorOrigin: await cells(page, "Formula 1").nth(1).getAttribute("data-error-origins"),
+    });
+  } finally {
+    const json = testInfo.outputPath("ifs-required-else.json");
+    const screenshot = testInfo.outputPath("ifs-required-else.png");
+    await writeFile(json, JSON.stringify(observations, null, 2));
+    await page.screenshot({ path: screenshot });
+    await testInfo.attach("ifs-required-else.json", {
+      path: json,
+      contentType: "application/json",
+    });
+    await testInfo.attach("ifs-required-else.png", { path: screenshot, contentType: "image/png" });
+  }
+});
+
 test("special numbers and nested nulls survive Worker evaluation and rendering", async ({
   page,
 }) => {
