@@ -25,19 +25,17 @@ fn general_definitions() -> BuiltinCategory {
             else: () -> T,
         ) -> T;
 
-        #[unsupported]
-        /// Currently expressed by the `&&` operator rather than a builtin call.
+        /// Evaluate Boolean expressions from left to right with the `&&` null and short-circuit rules.
         and(
-            repeat(min = 2) {
-                condition: boolean,
+            repeat(min = 1) {
+                condition: () -> boolean,
             },
         ) -> boolean;
 
-        #[unsupported]
-        /// Currently expressed by the `||` operator rather than a builtin call.
+        /// Evaluate Boolean expressions from left to right with the `||` null and short-circuit rules.
         or(
-            repeat(min = 2) {
-                condition: boolean,
+            repeat(min = 1) {
+                condition: () -> boolean,
             },
         ) -> boolean;
 

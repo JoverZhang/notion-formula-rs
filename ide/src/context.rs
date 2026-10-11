@@ -74,6 +74,10 @@ pub(crate) fn detect_position_kind(
         return PositionKind::AfterDot;
     }
 
+    if is_word_logical_operator_position(tokens, cursor) {
+        return PositionKind::NeedExpr;
+    }
+
     if is_strictly_inside_ident(tokens, cursor) {
         return PositionKind::NeedExpr;
     }
@@ -93,6 +97,25 @@ pub(crate) fn detect_position_kind(
         }
         _ => PositionKind::None,
     }
+}
+
+fn is_word_logical_operator_position(tokens: &[Token], cursor: u32) -> bool {
+    let Some((index, token)) = prev_non_trivia_insertion(tokens, cursor) else {
+        return false;
+    };
+    if !matches!(&token.kind, TokenKind::Ident(symbol) if matches!(symbol.text.as_str(), "and" | "or"))
+    {
+        return false;
+    }
+    prev_non_trivia_before(tokens, index).is_some_and(|(_, left)| {
+        matches!(
+            left.kind,
+            TokenKind::Ident(_)
+                | TokenKind::Literal(_)
+                | TokenKind::CloseParen
+                | TokenKind::CloseBracket
+        )
+    })
 }
 
 fn is_postfix_member_access_position(tokens: &[Token], cursor: u32) -> bool {

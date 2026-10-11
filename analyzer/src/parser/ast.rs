@@ -76,6 +76,10 @@ impl BinOp {
             TokenKind::Gt => BinOpKind::Gt,
             TokenKind::AndAnd => BinOpKind::AndAnd,
             TokenKind::OrOr => BinOpKind::OrOr,
+            // Contextual aliases remain identifiers in prefix position, so the
+            // same spellings also support ordinary and(...) / or(...) calls.
+            TokenKind::Ident(ref symbol) if symbol.text == "and" => BinOpKind::AndAnd,
+            TokenKind::Ident(ref symbol) if symbol.text == "or" => BinOpKind::OrOr,
             TokenKind::Plus => BinOpKind::Plus,
             TokenKind::Minus => BinOpKind::Minus,
             TokenKind::Star => BinOpKind::Star,
@@ -95,7 +99,7 @@ impl BinOp {
     /// Larger numbers bind tighter.
     ///
     /// Operator set handled by the expression parser:
-    /// - Logical: `||`, `&&`
+    /// - Logical: `||` / `or`, `&&` / `and`
     /// - Equality: `==`, `!=`
     /// - Comparison: `<`, `<=`, `>=`, `>`
     /// - Arithmetic: `+`, `-`, `*`, `/`, `%`, `^`

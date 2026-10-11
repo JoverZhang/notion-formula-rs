@@ -54,6 +54,9 @@ repeat(min = n) {...}  // Repeat the whole argument group at least n times; not 
 ```builtin
 if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
+/// Require Boolean/null expressions and short-circuit left to right using the && / || null rules.
+and(repeat(min = 1) { condition: () -> boolean }) -> boolean;
+or(repeat(min = 1) { condition: () -> boolean }) -> boolean;
 
 /// Returns null with no arguments; otherwise checks whether the value is empty.
 /// Return type is inferred by resolve_empty from argument count.
@@ -273,7 +276,7 @@ id() -> string;
 
 ```text
 People currently has no supported functions. These declarations are excluded from callable/completion sets:
-  and / or / not          // Expressed by && / || / not operators
+  not                     // Expressed by the not prefix operator, including not(true)
   lets                    // No heterogeneous sequential binder model
   link                    // No Link type yet
   dateRange / dateStart / dateEnd // No DateRange type yet
