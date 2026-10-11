@@ -209,7 +209,7 @@ pub enum ExprKind {
     /// The parser never produces this variant. It is created in-place by `infer_call`
     /// when a call argument occupies a `Ty::Fn`-typed parameter position.
     ///
-    /// `params` contains the resolved binding names (e.g. `["current"]` for list builtins,
+    /// `params` contains the resolved binding names (e.g. `["current", "index"]` for list builtins,
     /// `["a"]` for `let(a, ...)`). Empty for nullary thunks.
     /// `body` is the original expression that was at this argument position.
     ImplicitLambda {

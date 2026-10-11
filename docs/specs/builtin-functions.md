@@ -44,7 +44,7 @@ x?: T                  // An omittable argument, not a claim that all T values a
 T[] / A | B            // List / union; T and U bind within one call
 Ident<T>               // Binding identifier, not an ordinary string argument
 () -> T                // Deferred expression
-(current: T) -> U      // Expression with an implicit binding; callers do not write lambda syntax
+(current: T, index: number) -> U      // Expression with an implicit binding; callers do not write lambda syntax
 repeat(min = n) {...}  // Repeat the whole argument group at least n times; not one list argument
                        // Trailing commas in declarations do not permit them in formula calls
 ```
@@ -220,13 +220,14 @@ unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
 /// Evaluate each element in input order, preserving list length; a null list argument returns null.
-map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+/// Every callback binds current and zero-based index; nested callbacks shadow and then restore both names.
+map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
 /// Flatten only one level in input order, retaining nulls; a null list argument returns null and an empty list returns [].
 /// flat([[1, empty()], [2]]) → [1, null, 2]; flat([[[]]]) → [[]].
