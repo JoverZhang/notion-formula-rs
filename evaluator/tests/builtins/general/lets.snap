@@ -1,0 +1,4 @@
+=== INPUT ===
+lets(a, 1, label, "v", a, a + 1, label + format(a))
+=== OUTPUT ===
+row-0: "v2"

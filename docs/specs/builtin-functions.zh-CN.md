@@ -64,6 +64,9 @@ format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
+/// 按顺序绑定名称，各值类型独立；后续绑定可读取或遮蔽已有名称。
+/// 返回类型由最终表达式在该词法作用域中的类型决定。
+lets(repeat(min = 1) { var: Ident<any>, value: any }, expr: () -> any) -> any;
 ```
 
 #### empty 类型推断
@@ -274,7 +277,6 @@ id() -> string;
 ```text
 People 当前无受支持函数。以下声明不进入可调用/补全集合：
   and / or / not          // 用 && / || / not 运算符表达
-  lets                    // 缺少异构、顺序绑定模型
   link                    // 尚无 Link 类型
   dateRange / dateStart / dateEnd // 尚无 DateRange 类型
   name / email            // 尚无 person 名称/邮件输入

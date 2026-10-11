@@ -64,6 +64,9 @@ format(value: any) -> string;
 equal(a: any, b: any) -> boolean;
 unequal(a: any, b: any) -> boolean;
 let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
+/// Bind names sequentially with independent value types; later bindings see and may shadow earlier names.
+/// Infer the result type from the final expression in that lexical scope.
+lets(repeat(min = 1) { var: Ident<any>, value: any }, expr: () -> any) -> any;
 ```
 
 #### empty type inference
@@ -274,7 +277,6 @@ id() -> string;
 ```text
 People currently has no supported functions. These declarations are excluded from callable/completion sets:
   and / or / not          // Expressed by && / || / not operators
-  lets                    // No heterogeneous sequential binder model
   link                    // No Link type yet
   dateRange / dateStart / dateEnd // No DateRange type yet
   name / email            // No person-name/email runtime inputs yet
