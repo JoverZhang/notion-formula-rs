@@ -33,6 +33,8 @@ pub struct BuiltinCatalogEntry {
     pub category: FunctionCategory,
     /// `None` only for an `#[unsupported]` declaration.
     pub implementation: Option<FunctionSig>,
+    /// Source calls require semantic lowering rather than a direct evaluator kernel.
+    pub requires_lowering: bool,
 }
 
 impl BuiltinCatalogEntry {
@@ -52,6 +54,7 @@ impl BuiltinCatalogEntry {
             docs,
             category,
             implementation: Some(implementation),
+            requires_lowering: false,
         }
     }
 
@@ -70,10 +73,17 @@ impl BuiltinCatalogEntry {
             docs,
             category,
             implementation: None,
+            requires_lowering: false,
         }
     }
 
     pub fn is_supported(&self) -> bool {
         self.implementation.is_some()
+    }
+
+    #[doc(hidden)]
+    pub fn with_lowering(mut self, required: bool) -> Self {
+        self.requires_lowering = required;
+        self
     }
 }

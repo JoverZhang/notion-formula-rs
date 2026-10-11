@@ -53,8 +53,8 @@ fn general_definitions() -> BuiltinCategory {
 
         let<T, U>(ident: Ident<T>, value: T, body: (ident: T) -> U) -> U;
 
-        #[unsupported]
-        /// Precise sequential binder typing requires a heterogeneous binder-pack model.
+        #[lowered]
+        /// Bind names sequentially with independent value types; later bindings may shadow earlier names.
         lets(
             repeat(min = 1) {
                 var: Ident<any>,

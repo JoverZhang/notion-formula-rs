@@ -34,7 +34,7 @@ fn generated_contract_is_deterministic_ordered_and_unique() {
     let names = categories
         .iter()
         .flat_map(|category| &category.entries)
-        .filter(|entry| entry.is_supported())
+        .filter(|entry| entry.is_supported() && !entry.requires_lowering)
         .map(|entry| entry.name.as_str())
         .collect::<Vec<_>>();
     assert_eq!(names.len(), 87);
