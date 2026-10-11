@@ -129,6 +129,14 @@ describe("WASM signature help (instantiated types)", () => {
     expect(sig.active_parameter).toBe(4);
   });
 
+  it("ifs(true, text, false, <empty>) highlights value2 and retains required else", () => {
+    const source = 'ifs(true, "42", false, )';
+    expect(sigLabelAtCloseParen(source)).toBe(
+      "ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., else: string) -> string",
+    );
+    expect(sigAtCloseParen(source).active_parameter).toBe(3);
+  });
+
   it("ifs(..., true, <empty>) highlights value in repeat pair", () => {
     const sig = sigAtCloseParen('ifs(true, "123", true, "123", true, )');
     expect(sig.active_parameter).toBe(5);
