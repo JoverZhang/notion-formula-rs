@@ -48,5 +48,6 @@ fn bounded_shape_representatives_lower_from_the_catalog() {
     assert_eq!(ifs.params.repeat_min_groups, 1);
     assert_eq!(ifs.params.repeat[0].name, "condition");
     assert_eq!(ifs.params.repeat[1].name, "value");
+    assert!(!ifs.params.tail[0].optional);
     assert_eq!(ifs.generics[0].kind, GenericParamKind::Variant);
 }

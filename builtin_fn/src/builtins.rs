@@ -17,6 +17,7 @@ fn general_definitions() -> BuiltinCategory {
 
         if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 
+        /// Evaluate conditions in order; final else is required, and empty() provides a null fallback.
         ifs<T: Variant>(
             repeat(min = 1) {
                 condition: boolean,
@@ -87,7 +88,9 @@ fn text_definitions() -> BuiltinCategory {
         /// The semantic type model does not yet represent `Link`.
         link(label: string, url: string) -> Link;
 
-        /// Return text unchanged; style names are accepted as plain string metadata.
+        /// Notion difference: return plain text unchanged, without formatting or color metadata.
+        /// Style names are still evaluated and type-checked; ordinary null text remains null.
+        /// style("Done", "b", "green") → "Done" (plain text).
         style(
             text: string,
             repeat(min = 0) {
@@ -95,7 +98,8 @@ fn text_definitions() -> BuiltinCategory {
             },
         ) -> string;
 
-        /// Return text unchanged, accepting zero or more style names.
+        /// Notion difference: text carries no styles, so return it unchanged without removing styles.
+        /// Style names are still evaluated and type-checked; ordinary null text remains null.
         unstyle(text: string, repeat(min = 0) { styles: string }) -> string;
 
         concat<T>(

@@ -282,6 +282,7 @@ fn signature_help_ifs_invalid_total_4_guides_to_value2() {
     t("ifs(true, \"42\", false, $0)")
         .ctx(c)
         .expect_sig_active(3)
+        .expect_sig_active_param_name("value2")
         .expect_sig_label("ifs(condition1: boolean, value1: string, condition2: boolean, value2: string, ..., else: string) -> string");
 }
 
