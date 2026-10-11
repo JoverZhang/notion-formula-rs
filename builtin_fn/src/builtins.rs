@@ -251,13 +251,14 @@ fn list_definitions() -> BuiltinCategory {
         reverse<T>(list: T[]) -> T[];
         unique<T>(list: T[]) -> T[];
         includes<T>(list: T[], value: T) -> boolean;
-        map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-        filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-        find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-        findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-        some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-        every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-        count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+        /// Callbacks bind current and zero-based index; nested callbacks restore the outer bindings.
+        map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+        filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+        find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+        findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+        some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+        every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+        count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
         #[resolver(resolve_flat)]
         flat<T>(list: T[]) -> T[];

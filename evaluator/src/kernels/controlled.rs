@@ -194,24 +194,14 @@ fn eval_map_impl<C: BuiltinEvalContext>(
         .map(Vec::len)
         .max()
         .unwrap_or(0);
-    let parameter = mapper
-        .parameters()
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "current".to_string());
-
     for index in 0..max_len {
         let element_mask = element_mask(&lists, &active, index, mask.len());
         if !element_mask.any() {
             continue;
         }
-        let binding = element_binding(&lists, index, &element_mask);
+        let bindings = element_bindings(mapper.parameters(), &lists, index, &element_mask);
         let mapped = context
-            .apply_lambda(
-                mapper.clone(),
-                LambdaBindings::new(vec![(parameter.clone(), binding)]),
-                &element_mask,
-            )
+            .apply_lambda(mapper.clone(), bindings, &element_mask)
             .into_eval_block();
         errors.extend(mapped.errors.iter().cloned());
         for row in 0..mask.len() {
@@ -259,24 +249,14 @@ fn eval_predicate_list<C: BuiltinEvalContext, K: ColumnKind>(
         .map(Vec::len)
         .max()
         .unwrap_or(0);
-    let parameter = predicate
-        .parameters()
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "current".to_string());
-
     for index in 0..max_len {
         let element_mask = element_mask(&lists, &active, index, mask.len());
         if !element_mask.any() {
             continue;
         }
-        let binding = element_binding(&lists, index, &element_mask);
+        let bindings = element_bindings(predicate.parameters(), &lists, index, &element_mask);
         let tested = context
-            .apply_lambda(
-                predicate.clone(),
-                LambdaBindings::new(vec![(parameter.clone(), binding)]),
-                &element_mask,
-            )
+            .apply_lambda(predicate.clone(), bindings, &element_mask)
             .into_eval_block();
         errors.extend(tested.errors.iter().cloned());
 
@@ -392,6 +372,31 @@ fn element_mask(lists: &[RowList], active: &Mask, index: usize, len: usize) -> M
     (0..len)
         .map(|row| active[row] && lists[row].as_ref().is_some_and(|list| index < list.len()))
         .collect()
+}
+
+fn element_bindings(
+    parameters: &[String],
+    lists: &[RowList],
+    index: usize,
+    mask: &Mask,
+) -> LambdaBindings {
+    let current_name = parameters
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "current".to_string());
+    let index_name = parameters
+        .get(1)
+        .cloned()
+        .unwrap_or_else(|| "index".to_string());
+    // Lexical variables use the Any physical ABI even when their semantic type is Number.
+    let index_column = Column::Any(KernelColumn::from_values(
+        vec![Value::Number(index as f64); mask.len()],
+        Validity::AllValid,
+    ));
+    LambdaBindings::new(vec![
+        (current_name, element_binding(lists, index, mask)),
+        (index_name, index_column),
+    ])
 }
 
 fn element_binding(lists: &[RowList], index: usize, mask: &Mask) -> Column {

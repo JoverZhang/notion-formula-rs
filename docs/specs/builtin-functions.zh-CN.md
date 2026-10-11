@@ -42,7 +42,7 @@ x?: T                  // 可省略参数，不是“所有 T 不可为 null”
 T[] / A | B            // list / union；T、U 在同一次调用内绑定
 Ident<T>               // 绑定标识符，不是普通字符串参数
 () -> T                // 延迟表达式
-(current: T) -> U      // 带隐式绑定的表达式；调用者不写 lambda 语法
+(current: T, index: number) -> U      // 带隐式绑定的表达式；调用者不写 lambda 语法
 repeat(min = n) {...}  // 整组参数重复至少 n 次；不是一个 list 参数
                        // 声明中的尾逗号不意味着公式调用允许尾逗号
 ```
@@ -211,13 +211,14 @@ unique<T>(list: T[]) -> T[];
 includes<T>(list: T[], value: T) -> boolean;
 
 /// 按输入顺序逐元素求值，保持列表长度；列表参数为 null 时返回 null。
-map<T, U>(list: T[], mapper: (current: T) -> U) -> U[];
-filter<T>(list: T[], predicate: (current: T) -> boolean) -> T[];
-find<T>(list: T[], predicate: (current: T) -> boolean) -> T;
-findIndex<T>(list: T[], predicate: (current: T) -> boolean) -> number;
-some<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-every<T>(list: T[], predicate: (current: T) -> boolean) -> boolean;
-count<T>(list: T[], predicate: (current: T) -> boolean) -> number;
+/// 所有回调隐式绑定 current 与从零开始的 index；嵌套回调遮蔽两者，退出后恢复。
+map<T, U>(list: T[], mapper: (current: T, index: number) -> U) -> U[];
+filter<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T[];
+find<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> T;
+findIndex<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
+some<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+every<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> boolean;
+count<T>(list: T[], predicate: (current: T, index: number) -> boolean) -> number;
 
 /// 按输入顺序只展开一层，保留 null；列表参数为 null 时返回 null，空列表返回 []。
 /// flat([[1, empty()], [2]]) → [1, null, 2]；flat([[[]]]) → [[]]。
