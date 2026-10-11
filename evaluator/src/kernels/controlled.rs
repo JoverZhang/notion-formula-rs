@@ -1,9 +1,9 @@
 use crate::builtins::contract::{
-    CountPlans, EveryPlans, FilterPlans, FindIndexPlans, FindPlans, IfPlans, IfsPlans, LetPlans,
-    MapPlans, SomePlans,
+    AndPlans, CountPlans, EveryPlans, FilterPlans, FindIndexPlans, FindPlans, IfPlans, IfsPlans,
+    LetPlans, MapPlans, OrPlans, SomePlans,
 };
 use crate::builtins::{
-    BuiltinEvalContext, BuiltinKey, LambdaBindings, LambdaPlan, RowOutcome, ValuePlan,
+    BuiltinEvalContext, BuiltinKey, LambdaBindings, LambdaPlan, RowOutcome, ThunkPlan, ValuePlan,
     block_into_kernel, rows_to_kernel,
 };
 use crate::core::columns::{
@@ -11,6 +11,61 @@ use crate::core::columns::{
 };
 use crate::core::errors::EvalError;
 use crate::core::types::{EvalBlock, Mask, Value};
+use crate::runtime::operators::{eval_cast, eval_logical_and, eval_logical_or};
+
+pub(crate) fn eval_and<C: BuiltinEvalContext>(
+    context: &mut C,
+    args: AndPlans,
+    mask: &Mask,
+) -> KernelResult<BooleanKind> {
+    eval_boolean_call(
+        context,
+        args.repeat_groups
+            .into_vec()
+            .into_iter()
+            .map(|group| group.condition),
+        mask,
+        true,
+    )
+}
+
+pub(crate) fn eval_or<C: BuiltinEvalContext>(
+    context: &mut C,
+    args: OrPlans,
+    mask: &Mask,
+) -> KernelResult<BooleanKind> {
+    eval_boolean_call(
+        context,
+        args.repeat_groups
+            .into_vec()
+            .into_iter()
+            .map(|group| group.condition),
+        mask,
+        false,
+    )
+}
+
+fn eval_boolean_call<C: BuiltinEvalContext>(
+    context: &mut C,
+    mut conditions: impl Iterator<Item = ThunkPlan<BooleanKind>>,
+    mask: &Mask,
+    conjunction: bool,
+) -> KernelResult<BooleanKind> {
+    let Some(first) = conditions.next() else {
+        return block_into_kernel(EvalBlock::fail_mask(mask, EvalError::InvalidArgument), mask);
+    };
+    let mut result = context.eval_thunk(first, mask).into_eval_block();
+    for condition in conditions {
+        let evaluate =
+            |remaining: &Mask| context.eval_thunk(condition, remaining).into_eval_block();
+        result = if conjunction {
+            eval_logical_and(result, mask, evaluate)
+        } else {
+            eval_logical_or(result, mask, evaluate)
+        };
+    }
+    block_into_kernel(eval_cast(result, BooleanKind::ABI_KIND, mask), mask)
+}
 
 pub(crate) fn eval_if<C: BuiltinEvalContext>(
     context: &mut C,

@@ -59,6 +59,9 @@ if<T: Variant>(condition: boolean, then: () -> T, else: () -> T) -> T;
 /// 与 Notion 的差异：[被测 Notion 调用](../experiments/notion-ifs-arity/README.zh-CN.md)接受省略 else。
 /// ifs(false, 11, empty()) → null。
 ifs<T: Variant>(repeat(min = 1) { condition: boolean, value: () -> T }, else: () -> T) -> T;
+/// 表达式只接受 Boolean/null；从左到右短路，空值规则与 && / || 相同。
+and(repeat(min = 1) { condition: () -> boolean }) -> boolean;
+or(repeat(min = 1) { condition: () -> boolean }) -> boolean;
 
 /// 无参返回 null；有参时判断值是否为空。
 /// 返回类型由 resolve_empty 按实参个数确定。
@@ -283,7 +286,7 @@ id() -> string;
 
 ```text
 People 当前无受支持函数。以下声明不进入可调用/补全集合：
-  and / or / not          // 用 && / || / not 运算符表达
+  not                     // 使用 not 前缀运算符，包括 not(true)
   lets                    // 缺少异构、顺序绑定模型
   link                    // 尚无 Link 类型
   dateRange / dateStart / dateEnd // 尚无 DateRange 类型
